@@ -143,8 +143,8 @@ class ActiveWorkersCard(Card):
         return f"Workers whose heartbeat is within the last {_td_format(delta)}."
 
     def get_metric(self) -> int:
-        return WorkerHeartbeat.query.filter(
-            last_heartbeat_at__gte=heartbeat_cutoff()
+        return WorkerHeartbeat.query.where(
+            WorkerHeartbeat.last_heartbeat_at.gte(heartbeat_cutoff())
         ).count()
 
     def get_link(self) -> str:
@@ -163,8 +163,8 @@ class StaleWorkersCard(Card):
         )
 
     def get_metric(self) -> int:
-        return WorkerHeartbeat.query.filter(
-            last_heartbeat_at__lt=heartbeat_cutoff()
+        return WorkerHeartbeat.query.where(
+            WorkerHeartbeat.last_heartbeat_at.lt(heartbeat_cutoff())
         ).count()
 
     def get_link(self) -> str:
@@ -278,12 +278,12 @@ class JobResultViewset(AdminViewset):
             queryset: JobResultQuerySet = super().get_initial_queryset()  # ty: ignore[invalid-assignment]
             return queryset.annotate(
                 retried=Case(
-                    When(retry_job_request_uuid__isnull=False, then=True),
+                    When(JobResult.retry_job_request_uuid.is_null(False), then=True),
                     default=False,
                     output_field=postgres.BooleanField(),
                 ),
                 is_retry=Case(
-                    When(retry_attempt__gt=0, then=True),
+                    When(JobResult.retry_attempt.gt(0), then=True),
                     default=False,
                     output_field=postgres.BooleanField(),
                 ),
@@ -358,7 +358,10 @@ class WorkerHeartbeatViewset(AdminViewset):
             queryset = super().get_initial_queryset()
             return queryset.annotate(
                 stale=Case(
-                    When(last_heartbeat_at__lt=heartbeat_cutoff(), then=True),
+                    When(
+                        WorkerHeartbeat.last_heartbeat_at.lt(heartbeat_cutoff()),
+                        then=True,
+                    ),
                     default=False,
                     output_field=postgres.BooleanField(),
                 ),
@@ -369,9 +372,9 @@ class WorkerHeartbeatViewset(AdminViewset):
         ) -> postgres.QuerySet[WorkerHeartbeat]:
             cutoff = heartbeat_cutoff()
             if self.filter == "Active":
-                return queryset.filter(last_heartbeat_at__gte=cutoff)
+                return queryset.where(WorkerHeartbeat.last_heartbeat_at.gte(cutoff))
             if self.filter == "Stale":
-                return queryset.filter(last_heartbeat_at__lt=cutoff)
+                return queryset.where(WorkerHeartbeat.last_heartbeat_at.lt(cutoff))
             return queryset
 
     class DetailView(AdminModelDetailView):

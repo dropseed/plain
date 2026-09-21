@@ -142,7 +142,7 @@ def clear() -> None:
         seconds=settings.JOBS_RESULTS_RETENTION
     )
     click.echo(f"Clearing job results created before {cutoff}")
-    count = JobResult.query.filter(created_at__lt=cutoff).delete()
+    count = JobResult.query.where(JobResult.created_at.lt(cutoff)).delete()
     click.echo(f"Deleted {count} jobs")
 
 
