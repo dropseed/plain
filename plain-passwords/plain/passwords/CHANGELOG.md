@@ -1,5 +1,16 @@
 # plain-passwords changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-passwords@0.27.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.26.11](https://github.com/dropseed/plain/releases/plain-passwords@0.26.11) (2026-09-21)
 
 ### What's changed
