@@ -4,7 +4,7 @@ import datetime
 import warnings
 from collections.abc import Callable, Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from plain.preflight import PreflightResult
 from plain.utils import timezone
@@ -110,6 +110,11 @@ class DateField[T: (datetime.date, datetime.date | None) = datetime.date](
             return []
         return _check_if_value_fixed(self, value)
 
+    # See `Field.to_python`: only a None input comes back as None.
+    @overload
+    def to_python(self, value: None) -> None: ...
+    @overload
+    def to_python(self, value: Any) -> datetime.date: ...
     def to_python(self, value: Any) -> datetime.date | None:
         if value is None:
             return value
@@ -226,6 +231,11 @@ class DateTimeField[
             kwargs["update_now"] = True
         return name, path, args, kwargs
 
+    # See `Field.to_python`: only a None input comes back as None.
+    @overload
+    def to_python(self, value: None) -> None: ...
+    @overload
+    def to_python(self, value: Any) -> datetime.datetime: ...
     def to_python(self, value: Any) -> datetime.datetime | None:
         if value is None:
             return value
@@ -355,6 +365,11 @@ class TimeField[T: (datetime.time, datetime.time | None) = datetime.time](
             return []
         return _check_if_value_fixed(self, value, now=now)
 
+    # See `Field.to_python`: only a None input comes back as None.
+    @overload
+    def to_python(self, value: None) -> None: ...
+    @overload
+    def to_python(self, value: Any) -> datetime.time: ...
     def to_python(self, value: Any) -> datetime.time | None:
         if value is None:
             return None

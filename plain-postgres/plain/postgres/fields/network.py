@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from plain.postgres.dialect import adapt_ipaddressfield_value
 from plain.preflight import PreflightResult
@@ -71,6 +71,11 @@ class GenericIPAddressField[T: (str, str | None) = str](DefaultableField[T]):
             kwargs["protocol"] = self.protocol
         return name, path, args, kwargs
 
+    # See `Field.to_python`: only a None input comes back as None.
+    @overload
+    def to_python(self, value: None) -> None: ...
+    @overload
+    def to_python(self, value: Any) -> str: ...
     def to_python(self, value: Any) -> str | None:
         if value is None:
             return None

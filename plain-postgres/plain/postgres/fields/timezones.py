@@ -3,7 +3,7 @@ from __future__ import annotations
 import zoneinfo
 from collections.abc import Callable, Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, overload
 
 from plain import exceptions
 
@@ -118,6 +118,11 @@ class TimeZoneField[
     def _max_length_for_choices_check(self) -> int | None:
         return self.max_length
 
+    # See `Field.to_python`: only a None input comes back as None.
+    @overload
+    def to_python(self, value: None) -> None: ...
+    @overload
+    def to_python(self, value: Any) -> zoneinfo.ZoneInfo: ...
     def to_python(self, value: Any) -> zoneinfo.ZoneInfo | None:
         """Convert input to ZoneInfo object."""
         if value is None or value == "":
