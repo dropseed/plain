@@ -142,7 +142,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T, QS]):
             children: ReverseForeignKey[Child, ChildQuerySet] = ReverseForeignKey(to="Child", field="parent")
 
         class Child(Model):
-            parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
+            parent: Field[Parent] = ForeignKeyField(Parent, on_delete=postgres.CASCADE)
 
     Args:
         to: The related model (string name or model class)

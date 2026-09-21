@@ -194,7 +194,7 @@ class AdminViewRegistry:
 
         # Get pinned items (ordered)
         pinned_slugs = list(
-            PinnedNavItem.query.filter(user=user)
+            PinnedNavItem.query.where(PinnedNavItem.user.id.equals(user.id))
             .order_by("order", "created_at")
             .select(PinnedNavItem.view_slug, flat=True)[:max_pinned]
         )

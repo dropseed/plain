@@ -130,9 +130,9 @@ class AdminView(AuthView, TemplateView):
 
         context["nav_tabs"] = registry.get_nav_tabs(self.request)
         context["pinned_slugs"] = set(
-            PinnedNavItem.query.filter(user=self.user).select(
-                PinnedNavItem.view_slug, flat=True
-            )
+            PinnedNavItem.query.where(
+                PinnedNavItem.user.id.equals(self.user.id)
+            ).select(PinnedNavItem.view_slug, flat=True)
         )
         context["preflight_counts"] = get_check_counts()
         context["admin_url"] = registry.get_url

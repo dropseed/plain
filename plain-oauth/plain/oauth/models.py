@@ -24,7 +24,7 @@ class OAuthConnection(postgres.Model):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
     updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
-    user: User = types.ForeignKeyField(
+    user: Field[User] = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )
@@ -150,14 +150,13 @@ class OAuthConnection(postgres.Model):
         Connect will either create a new connection or update an existing connection
         """
         try:
-            # Stays on the string form: `user` is a string-ref FK
-            # (`ForeignKeyField("users.User")`), so it has no typed condition,
-            # and half-converting would leave a mixed where()/filter() chain.
-            connection = cls.query.get(
-                user=user,
-                provider_key=provider_key,
-                provider_user_id=oauth_user.provider_id,
-            )
+            # Conditions in the order get() sorted its kwargs, so the SQL is
+            # byte-identical to the string form this replaced.
+            connection = cls.query.where(
+                cls.provider_key.equals(provider_key),
+                cls.provider_user_id.equals(oauth_user.provider_id),
+                cls.user.id.equals(user.id),
+            ).get()
         except cls.DoesNotExist:
             # Create our own instance (not using get_or_create)
             # so that any created signals contain the token fields too

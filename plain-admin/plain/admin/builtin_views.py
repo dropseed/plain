@@ -57,7 +57,9 @@ class PinNavView(AdminView):
         if not view_slug:
             return Response("view_slug is required", status_code=400)
 
-        current_count = PinnedNavItem.query.filter(user=self.user).count()
+        current_count = PinnedNavItem.query.where(
+            PinnedNavItem.user.id.equals(self.user.id)
+        ).count()
         if current_count >= MAX_PINNED_ITEMS:
             return Response(
                 f"Maximum of {MAX_PINNED_ITEMS} pinned items reached",
@@ -68,7 +70,7 @@ class PinNavView(AdminView):
             return Response("Invalid view_slug", status_code=400)
 
         max_order = (
-            PinnedNavItem.query.filter(user=self.user)
+            PinnedNavItem.query.where(PinnedNavItem.user.id.equals(self.user.id))
             .order_by("-order")
             .select(PinnedNavItem.order, flat=True)
             .first()
@@ -96,9 +98,10 @@ class UnpinNavView(AdminView):
         if not view_slug:
             return Response("view_slug is required", status_code=400)
 
-        PinnedNavItem.query.filter(
-            user=self.user,
-            view_slug=view_slug,
+        # Conditions in the order filter() sorted its kwargs, so the SQL is byte-identical.
+        PinnedNavItem.query.where(
+            PinnedNavItem.user.id.equals(self.user.id),
+            PinnedNavItem.view_slug.equals(view_slug),
         ).delete()
 
         referer = self.request.headers.get("Referer", "/admin/")
@@ -122,15 +125,17 @@ class ReorderPinnedView(AdminView):
             return Response("Invalid slugs JSON", status_code=400)
 
         user_pinned = set(
-            PinnedNavItem.query.filter(user=self.user).select(
-                PinnedNavItem.view_slug, flat=True
-            )
+            PinnedNavItem.query.where(
+                PinnedNavItem.user.id.equals(self.user.id)
+            ).select(PinnedNavItem.view_slug, flat=True)
         )
         for i, slug in enumerate(slugs):
             if slug in user_pinned:
-                PinnedNavItem.query.filter(user=self.user, view_slug=slug).update(
-                    order=i
-                )
+                # Conditions in the order filter() sorted its kwargs.
+                PinnedNavItem.query.where(
+                    PinnedNavItem.user.id.equals(self.user.id),
+                    PinnedNavItem.view_slug.equals(slug),
+                ).update(order=i)
 
         return Response("OK")
 

@@ -47,17 +47,34 @@ class Article(postgres.Model):
   treats it as optional — constructing without it yields `None` — so
   `default=None` is purely for the checker: it persists nothing and changes no
   schema. `plain preflight` lists the ones still missing it
-  (`postgres.nullable_field_without_default`). Applies to class-ref and string
-  forward-ref FKs alike.
+  (`postgres.nullable_field_without_default`). Applies to class-ref and
+  string-ref FKs alike.
 - **DB-owned** fields are still annotated but auto-excluded from the
   constructor: the `id`, `create_now`/`update_now` datetimes, `generate=True`,
   and `RandomStringField`.
-- **String forward-ref FKs** (`"self"`, `"OtherModel"`) keep a _value-type_
-  annotation — the checker can't resolve the string to a model:
-  `parent: Foo | None = types.ForeignKeyField("self", on_delete=postgres.CASCADE, allow_null=True, default=None)`.
-  That annotation is a model instance, not a field, so `where()` traversal
-  (`Child.parent.name.equals(...)`) doesn't type-check through it — declare the
-  target above and pass the class when you want traversal typed.
+- **String model references** (`"users.User"`, `"OtherModel"`, `"self"`) annotate
+  `Field[Related]` like any other FK — the string is a runtime device for import
+  cycles, self-references, and cross-package references (a framework package
+  pointing at the app's `User`), not a typing compromise. `Related` comes from
+  the annotation, so import it under `TYPE_CHECKING` when importing it for real
+  would be the cycle you were avoiding:
+    ```python
+    if TYPE_CHECKING:
+        from app.users.models import User
+
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+    parent: Field[Foo | None] = types.ForeignKeyField(
+        "self", on_delete=postgres.CASCADE, allow_null=True, default=None
+    )
+    ```
+    Annotating the field with the related model itself (`user: User = ...`) names a
+    model instance rather than a field: class access becomes a `User`,
+    `Model.user.id` is an `int`, and the condition methods disappear.
+    `plain preflight`'s `postgres.foreign_key_annotated_as_value` reports a
+    foreign key whose annotation — on the model or any base class — names the
+    related model. It wants positive evidence, so an unannotated field, a
+    `ClassVar[...]` one, or a spelling it can't read stays quiet: a clean run
+    means "nothing found", not "nothing to find".
 - **Encrypted fields** are annotated `EncryptedField[T]` (imported from
   `plain.postgres` alongside `Field`), not `Field[T]`. It's a `Field[T]`
   subclass, so the constructor is typed identically, but it also carries the
