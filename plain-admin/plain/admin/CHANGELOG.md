@@ -1,5 +1,16 @@
 # plain-admin changelog
 
+## [0.86.4](https://github.com/dropseed/plain/releases/plain-admin@0.86.4) (2026-09-21)
+
+### What's changed
+
+- The model views' `id` lookups, the bulk-action `id__in` filter and the pinned-nav reads use typed `where()`/`select()`; SQL is unchanged. The bulk-action filter takes its primary key from the queryset's model, so a subclass returning another model's queryset from `get_initial_queryset()` keeps working ([c7d83a8d3d](https://github.com/dropseed/plain/commit/c7d83a8d3d))
+- `PinnedNavItem.user` is annotated `Field[User]` and its seven `filter(user=...)` sites are typed conditions, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
 ## [0.86.3](https://github.com/dropseed/plain/releases/plain-admin@0.86.3) (2026-09-20)
 
 ### What's changed
