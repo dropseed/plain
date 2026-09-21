@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.164.1](https://github.com/dropseed/plain/releases/plain@0.164.1) (2026-09-21)
+
+### What's changed
+
+- `plain request --user` looks the user up with typed `where()` conditions; a non-numeric value still falls through to the email lookup ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.164.0](https://github.com/dropseed/plain/releases/plain@0.164.0) (2026-09-20)
 
 ### What's changed
