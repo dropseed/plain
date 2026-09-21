@@ -1322,7 +1322,7 @@ requires-dist = [
 
 [[package]]
 name = "plain-scan"
-version = "0.6.6"
+version = "0.7.0"
 source = { editable = "plain-scan" }
 dependencies = [
     { name = "httpx" },
