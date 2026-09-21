@@ -30,7 +30,7 @@ from ..registry import models_registry
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import Col, Func
+    from plain.postgres.expressions import Col, Combinable, Func
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.sql.compiler import SQLCompiler
 
@@ -168,22 +168,37 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     # with type-specific lookups (comparison on numeric, string ops on text).
     # The names are listed once in CONDITION_METHODS below -- anything that
     # needs the set (traversal advice, tests) imports it rather than retyping.
-    def equals(self, value: T) -> Q:
+    # The comparisons take a value, another column of the same value type, or
+    # an expression. `Field[T]` is what makes `retry_attempt.lt(retries)` the
+    # typed spelling of `filter(retry_attempt__lt=F("retries"))` -- and, being
+    # parameterized by the same `T`, it rejects a column of another type.
+    #
+    # `Field[T | None]` is the second arm because `Field` is invariant in `T`,
+    # so a nullable column is a different type to the checker and a non-null
+    # one wouldn't otherwise accept it. Only that direction is expressible:
+    # from a nullable left there is no way to name `T` without its `None`, so
+    # `note.equals(name)` is rejected while `name.equals(note)` is accepted.
+    #
+    # `Combinable` is deliberately unconstrained: an expression's output type
+    # isn't tracked, so `priority.lt(F("name"))` type-checks. `F()` is the
+    # untyped escape hatch here exactly as it is in `filter()`, and narrowing
+    # it would mean typing expressions first.
+    def equals(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("equals", "", value)
 
-    def not_equal(self, value: T) -> Q:
+    def not_equal(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return ~self._build_q("not_equal", "", value)
 
-    def gt(self, value: T) -> Q:
+    def gt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("gt", "gt", value)
 
-    def gte(self, value: T) -> Q:
+    def gte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("gte", "gte", value)
 
-    def lt(self, value: T) -> Q:
+    def lt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("lt", "lt", value)
 
-    def lte(self, value: T) -> Q:
+    def lte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("lte", "lte", value)
 
     def is_null(self, value: bool = True) -> Q:
@@ -213,6 +228,18 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 
     def endswith(self: Field[str] | Field[str | None], value: str) -> Q:
         return self._build_q("endswith", "endswith", value)
+
+    # The case-insensitive halves. `iequals` is named for the condition it is
+    # (`equals`, ignoring case) rather than for the `iexact` lookup it builds --
+    # there is no `exact` condition method for it to pair with.
+    def iequals(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iequals", "iexact", value)
+
+    def istartswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("istartswith", "istartswith", value)
+
+    def iendswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iendswith", "iendswith", value)
 
     def _build_q(self, method: str, suffix: str, value: Any) -> Q:
         """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
@@ -256,13 +283,44 @@ class Field[T](Selectable[T], RegisterLookupMixin):
                 f"{type(self).__name__} {self.name!r} does not support "
                 f".{method}() -- no {suffix!r} lookup is registered for it."
             )
+        other_column = value if isinstance(value, Field) else None
+        if other_column is not None:
+            # Comparing against another column. Everything above guards the
+            # left-hand field; the right-hand one gets its own say here.
+            other_column.check_usable_as_comparison_column(method)
+            # `F(name)` is the reference the ORM already understands, and a
+            # traversed field's `name` carries its relation prefix, so this is
+            # the whole conversion.
+            from plain.postgres.expressions import F
+
+            value = F(other_column.name)
         name = f"{self.name}{LOOKUP_SEP}{suffix}" if suffix else self.name
         q = Q((name, value))
+        # Which model's where() this condition belongs to, and the field that
+        # built it. See `Q._condition_origins`. A column comparison records
+        # both sides, so a right-hand column from another model is caught the
+        # same way a left-hand one is.
+        origins = set()
         if source := self.source_model:
-            # Which model's where() this condition belongs to, and the field
-            # that built it. See `Q._condition_origins`.
-            q._condition_origins = frozenset({(source, self.name)})
+            origins.add((source, self.name))
+        if other_column is not None and (source := other_column.source_model):
+            origins.add((source, other_column.name))
+        if origins:
+            q._condition_origins = frozenset(origins)
         return q
+
+    def check_usable_as_comparison_column(self, method: str) -> None:
+        """Hook for a field used as the *right-hand* column of a comparison.
+
+        A no-op for an ordinary column. `EncryptedField` overrides it to
+        refuse: its own block lives in `_build_q`, which only ever runs on the
+        field the condition was built *from*, and the type checker can't help
+        either -- `EncryptedField[str]` is a `Field[str]`, so it satisfies
+        `equals`'s `Field[T]` arm like any other string column.
+
+        `method` is the condition the caller wrote on the left-hand field, so
+        a refusal can name it.
+        """
 
     def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:
         """Return a detached copy of this field whose name carries `prefix`.
@@ -730,7 +788,21 @@ class Field[T](Selectable[T], RegisterLookupMixin):
 # set rather than the methods themselves -- the relation-traversal advice in
 # related_typed.py, the tests that sweep the surface -- imports from here
 # instead of keeping its own copy in sync.
-STRING_CONDITION_METHODS = ("contains", "icontains", "startswith", "endswith")
+#
+# The string conditions come paired with the lookup each one builds. Almost
+# every one is named for its lookup; `iequals` is the exception -- there is no
+# `exact` condition method for an `iexact` to pair with -- so the pairing is
+# written down rather than assumed by whatever needs it.
+STRING_CONDITION_LOOKUPS = {
+    "contains": "contains",
+    "icontains": "icontains",
+    "startswith": "startswith",
+    "endswith": "endswith",
+    "iequals": "iexact",
+    "istartswith": "istartswith",
+    "iendswith": "iendswith",
+}
+STRING_CONDITION_METHODS = tuple(STRING_CONDITION_LOOKUPS)
 CONDITION_METHODS = (
     "equals",
     "not_equal",

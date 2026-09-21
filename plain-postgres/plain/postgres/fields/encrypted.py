@@ -212,6 +212,17 @@ class EncryptedField[T](Field[T]):
             return super()._build_q(method, suffix, value)
         raise TypeError(self._lookup_unsupported_message(method))
 
+    def check_usable_as_comparison_column(self, method: str) -> None:
+        """The other half of the block: an encrypted column is no more
+        comparable on the right of a comparison than on the left.
+
+        `_build_q` above only runs on the field the condition was built from,
+        so without this `SecretStore.name.equals(SecretStore.api_key)` would
+        compile to `name = api_key` -- plaintext against ciphertext, matching
+        nothing, silently.
+        """
+        raise TypeError(self._lookup_unsupported_message(method))
+
     def matches_deterministically(self, value: Any) -> bool:
         """Whether `value` has a stored form equality can actually match.
 
@@ -276,6 +287,12 @@ class EncryptedField[T](Field[T]):
         def startswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
         def endswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def iequals(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def istartswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
+
+        def iendswith(self, value: Never) -> Never: ...  # ty: ignore[invalid-method-override]
 
     def _lookup_unsupported_message(self, method: str) -> str:
         assert self.name, (

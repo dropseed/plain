@@ -28,6 +28,7 @@ from plain.postgres import types
 from plain.postgres.base import ModelBase, ModelMixin
 from plain.postgres.fields.base import (
     CONDITION_METHODS,
+    STRING_CONDITION_LOOKUPS,
     STRING_CONDITION_METHODS,
     Field,
 )
@@ -231,9 +232,10 @@ def test_string_valued_fields_support_the_string_conditions(
     if issubclass(field_class, EncryptedField):
         pytest.skip(f"{name} blocks .{method}() statically (Never) and at runtime")
 
-    assert method in field_class.get_lookups(), (
+    lookup = STRING_CONDITION_LOOKUPS[method]
+    assert lookup in field_class.get_lookups(), (
         f"{name} is typed `str` by types.pyi, so `Field.{method}`'s `self` "
-        f"restriction admits it, but it registers no {method!r} lookup -- the "
+        f"restriction admits it, but it registers no {lookup!r} lookup -- the "
         f"call type-checks and then raises TypeError from `_build_q`."
     )
 

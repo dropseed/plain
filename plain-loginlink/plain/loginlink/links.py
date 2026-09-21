@@ -53,6 +53,11 @@ def get_link_token_user(token: str) -> User:
     email = signed_data["email"]
 
     try:
-        return User.query.get(id=user_id, email__iexact=email)
+        # Condition order mirrors the `filter(**kwargs)` this replaced: it
+        # sorted its kwargs, `where()` keeps the order written.
+        return User.query.where(
+            User.email.iequals(email),
+            User.id.equals(user_id),
+        ).get()
     except User.DoesNotExist:
         raise LoginLinkChanged()
