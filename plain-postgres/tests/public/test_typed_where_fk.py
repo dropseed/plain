@@ -47,7 +47,7 @@ def test_fk_field_access_supports_other_lookups():
         ("parent__name__isnull", True)
     ]
     assert ChildCascade.parent.name.is_in(["a", "b"]).children == [
-        ("parent__name__in", ["a", "b"])
+        ("parent__name__any_of", ["a", "b"])
     ]
 
 
@@ -221,7 +221,9 @@ def test_shadowed_field_traversal_runs(db):
 
 def test_relation_key_conditions_build_q():
     assert ChildCascade.parent.id.equals(7).children == [("parent__id", 7)]
-    assert ChildCascade.parent.id.is_in([1, 2]).children == [("parent__id__in", [1, 2])]
+    assert ChildCascade.parent.id.is_in([1, 2]).children == [
+        ("parent__id__any_of", [1, 2])
+    ]
     assert ChildSetNull.parent.id.is_null().children == [("parent__id__isnull", True)]
     assert ChildCascade.parent.id.not_equal(7).children == [("parent__id", 7)]
 

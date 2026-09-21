@@ -247,6 +247,14 @@ User.query.where(~User.role.equals("guest"))
 User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
 ```
 
+`is_in` binds the whole collection as one array parameter -- `WHERE "role" = ANY(%s::text[])` rather than `IN (%s, %s)` -- so one statement text covers any number of values. Two things follow: `pg_stat_statements` groups every call into a single entry instead of one per list length, and an empty list is no longer a special case (it matches nothing by running a real query, where before it ran none at all). Pass a queryset instead of a collection and it stays a subquery: `WHERE "id" IN (SELECT ...)`.
+
+A `None` in the collection raises `ValueError`. NULL is not a value a comparison can match -- it would match nothing, and negated it would exclude every row -- so it belongs in `is_null()`. Combine them when you want both:
+
+```python
+User.query.where(User.role.is_in(["admin"]) | User.role.is_null())
+```
+
 `~` negates whatever it wraps, which is what you want for a composite condition but not for a null check. `is_null()` takes a flag, and the two compile differently:
 
 ```python
@@ -302,6 +310,8 @@ Post.query.where(Post.author.id.equals(author.id))
 Post.query.where(Post.author.id.is_in([a.id for a in authors]))
 Post.query.where(Post.author.id.is_null())  # nullable relation
 ```
+
+(`is_in` is the one that reads differently: it binds an array, as above, where `filter(author__in=[...])` writes out a placeholder per value. Same rows, same column.)
 
 `Post.author.equals(author)` raises `AttributeError` naming this spelling (an `AttributeError`, so `hasattr` and `getattr(..., default)` keep behaving). It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
 
