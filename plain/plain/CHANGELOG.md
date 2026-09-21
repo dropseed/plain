@@ -1,5 +1,15 @@
 # plain changelog
 
+## [0.165.0](https://github.com/dropseed/plain/releases/plain@0.165.0) (2026-09-21)
+
+### What's changed
+
+- Plain requires Python 3.14. Every package's `requires-python` is now `>=3.14`, and the framework is free to use 3.14 syntax and semantics — t-strings (which `plain.postgres`'s `sql()` is built on) and deferred annotations. The last floor bump was 3.12 → 3.13 in September 2025; 3.15 is out in October and takes 3.13 out of bugfix support ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Move the project to Python 3.14: set `requires-python` in `pyproject.toml`, update `.python-version` and the Docker base image, then `uv lock`.
+
 ## [0.164.1](https://github.com/dropseed/plain/releases/plain@0.164.1) (2026-09-21)
 
 ### What's changed
