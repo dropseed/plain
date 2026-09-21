@@ -1301,7 +1301,7 @@ dev = [
 
 [[package]]
 name = "plain-pytest"
-version = "0.19.1"
+version = "0.20.0"
 source = { editable = "plain-pytest" }
 dependencies = [
     { name = "click" },
@@ -1345,7 +1345,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.46.3"
+version = "0.47.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
@@ -1425,7 +1425,7 @@ dev = [{ name = "plain-pytest", editable = "plain-pytest" }]
 
 [[package]]
 name = "plain-toolbar"
-version = "0.13.1"
+version = "0.14.0"
 source = { editable = "plain-toolbar" }
 dependencies = [
     { name = "plain" },
