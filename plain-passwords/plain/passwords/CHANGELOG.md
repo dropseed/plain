@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.26.11](https://github.com/dropseed/plain/releases/plain-passwords@0.26.11) (2026-09-21)
+
+### What's changed
+
+- The case-insensitive email lookups in the login and password-reset forms use `User.email.iequals(...)`; SQL is unchanged ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8)) ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
 ## [0.26.10](https://github.com/dropseed/plain/releases/plain-passwords@0.26.10) (2026-09-20)
 
 ### What's changed
