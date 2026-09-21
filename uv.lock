@@ -919,7 +919,7 @@ dev = [
 
 [[package]]
 name = "plain-dev"
-version = "0.69.1"
+version = "0.70.0"
 source = { editable = "plain-dev" }
 dependencies = [
     { name = "click" },
