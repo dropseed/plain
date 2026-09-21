@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Optional, TypeAliasType
 
 from plain.postgres import Field, ModelMixin, types
 from plain.postgres import Field as AliasedField
@@ -362,18 +362,52 @@ MalformedAnnotation = _class_in_module(
 MalformedAnnotation.__annotations__ = {"owner": "AnnotationTarget["}
 
 
-class DoubledOptional(Model):
-    """`Optional[X | None]` collapses at runtime but survives as written text."""
+# `Optional[X | None]` written out in full. It goes through a module of its own
+# because ruff rewrites the spelling on sight (UP045) and the whole point is the
+# nested text that reaches `__annotations__`.
+DoubledOptional = _class_in_module(
+    "tests.fk_annotation_doubled_optional",
+    "DoubledOptional",
+    "class DoubledOptional(Model):\n"
+    "    model_options = postgres.Options(package_label='examples')\n"
+    "    owner: Optional[AnnotationTarget | None] = types.ForeignKeyField(\n"
+    "        AnnotationTarget, on_delete=postgres.SET_NULL,\n"
+    "        allow_null=True, required=False, default=None,\n"
+    "    )\n",
+    postponed=True,
+    Model=Model,
+    types=types,
+    postgres=postgres,
+    Optional=Optional,
+    AnnotationTarget=AnnotationTarget,
+)
 
-    model_options = postgres.Options(package_label="examples")
-
-    owner: None | AnnotationTarget = types.ForeignKeyField(  # ty: ignore[invalid-assignment]
-        AnnotationTarget,
-        on_delete=postgres.SET_NULL,
-        allow_null=True,
-        required=False,
-        default=None,
-    )
+# Thirty wrappers around a model: alternating type aliases and `Annotated`,
+# because consecutive `Annotated`s flatten into one and would not be a chain at
+# all. Each layer is a shape the check knows how to peel, so what stops it is
+# the budget -- which is also what keeps a self-referential alias
+# (`type Loop = Annotated[Loop, 1]`) from running the stack out instead.
+DeeplyWrapped = _class_in_module(
+    "tests.fk_annotation_deeply_wrapped",
+    "DeeplyWrapped",
+    "deep = AnnotationTarget\n"
+    "for _layer in range(15):\n"
+    "    deep = TypeAliasType('Layer', deep)\n"
+    "    deep = Annotated[deep, 'layer']\n"
+    "\n"
+    "class DeeplyWrapped(Model):\n"
+    "    model_options = postgres.Options(package_label='examples')\n"
+    "    owner: deep = types.ForeignKeyField(\n"
+    "        AnnotationTarget, on_delete=postgres.CASCADE\n"
+    "    )\n",
+    postponed=False,
+    Model=Model,
+    types=types,
+    postgres=postgres,
+    Annotated=Annotated,
+    TypeAliasType=TypeAliasType,
+    AnnotationTarget=AnnotationTarget,
+)
 
 
 def test_a_module_that_raises_on_attribute_access_is_silent():
@@ -389,12 +423,25 @@ def test_an_unbalanced_annotation_is_silent():
 def test_a_doubled_optional_warns_with_a_valid_rewrite():
     """It still names the related model, so it still warns -- and the rewrite
     is built from the field, so the doubled `| None` can't reach the message."""
+    assert (
+        DoubledOptional.__annotations__["owner"] == "Optional[AnnotationTarget | None]"
+    )
     assert foreign_keys_annotated_as_values(DoubledOptional) == [
         ("owner", "AnnotationTarget")
     ]
     fix = foreign_key_annotation_results(DoubledOptional)[0].fix
     assert "'owner: Field[AnnotationTarget | None] = ...' with default=None" in fix
     assert "None | None" not in fix
+
+
+def test_a_wrapper_chain_deeper_than_the_budget_is_silent():
+    """Unwrapping is bounded, and running out of passes means "can't tell" --
+    never a half-peeled guess.
+
+    Under the wrappers is the related model, so peeling all the way down would
+    warn. The check declines to, because it never got to the bottom.
+    """
+    assert foreign_keys_annotated_as_values(DeeplyWrapped) == []
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +497,48 @@ EvaluatedAnnotations = _class_in_module(
     FieldAlias=FieldAlias,
     AnnotationTarget=AnnotationTarget,
 )
+
+
+# A model that happens to be named `Field`, in a module of its own so the two
+# meanings of the name can't be confused by accident.
+_MODEL_NAMED_FIELD = _class_in_module(
+    "tests.fk_annotation_model_named_field",
+    "Field",
+    "class Field(Model):\n"
+    "    model_options = postgres.Options(package_label='examples')\n"
+    "    label: PlainField[str] = types.TextField(max_length=10)\n",
+    postponed=True,
+    Model=Model,
+    types=types,
+    postgres=postgres,
+    PlainField=Field,
+)
+
+RelatedNamedField = _class_in_module(
+    "tests.fk_annotation_named_field_owner",
+    "RelatedNamedField",
+    "class RelatedNamedField(Model):\n"
+    "    model_options = postgres.Options(package_label='examples')\n"
+    "    owner: Field = types.ForeignKeyField(\n"
+    "        _target, on_delete=postgres.CASCADE\n"
+    "    )\n",
+    postponed=True,
+    Model=Model,
+    types=types,
+    postgres=postgres,
+    # In this module `Field` is the field class -- which is what the annotation
+    # means -- while the key points at a *model* of the same name.
+    Field=Field,
+    _target=_MODEL_NAMED_FIELD,
+)
+
+
+def test_what_the_name_resolves_to_beats_what_it_looks_like():
+    """A bare `Field` annotation against a model that happens to be named
+    `Field`. Comparing names alone would call it the model and warn about
+    correct code; resolving the name first settles it."""
+    assert _MODEL_NAMED_FIELD.__name__ == "Field"
+    assert foreign_keys_annotated_as_values(RelatedNamedField) == []
 
 
 def test_the_related_model_name_is_matched_even_when_it_cannot_be_imported():

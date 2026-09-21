@@ -356,7 +356,11 @@ def _unwrap_evaluated(annotation: Any) -> Any:
     for _ in range(_MAX_UNWRAP):
         origin = typing.get_origin(annotation)
         if origin is Annotated:
-            return _unwrap_evaluated(typing.get_args(annotation)[0])
+            # Peeled in the loop, not by recursion, so every wrapper counts
+            # against the same budget -- `type Loop = Annotated[Loop, 1]` has
+            # to run out of passes, not out of stack.
+            annotation = typing.get_args(annotation)[0]
+            continue
         if origin is typing.Union or origin is UnionType:
             named = [
                 arg for arg in typing.get_args(annotation) if arg is not type(None)
@@ -418,10 +422,17 @@ def _classify(annotation: object, owner: type, field: Any) -> str:
     if not head:
         return _UNKNOWN
 
-    # A bare name matching the model this key points at is the spelling the
-    # check exists for, and it has to be caught even when the related model is
-    # imported only under `if TYPE_CHECKING:` -- which is exactly when it can't
-    # be resolved below.
+    # What the name actually refers to here beats what it looks like. A model
+    # named `Field` is rare but possible, and `owner: Field` in a module where
+    # `Field` is `plain.postgres.Field` means the field class either way.
+    resolved = _resolve_in_module(head, owner)
+    if resolved is not None:
+        return by_type(resolved)
+
+    # Nothing to resolve -- which is the normal state of affairs when the
+    # related model is imported only under `if TYPE_CHECKING:`. Its own name is
+    # then the only evidence there is, and this is the spelling the check
+    # exists for.
     related = _related_model(field)
     if (
         subscript is None
@@ -429,8 +440,7 @@ def _classify(annotation: object, owner: type, field: Any) -> str:
         and head.rsplit(".", 1)[-1] == (related.__name__)
     ):
         return _VALUE
-
-    return by_type(_resolve_in_module(head, owner))
+    return _UNKNOWN
 
 
 def _resolve_in_module(dotted: str, owner: type) -> object | None:
@@ -549,6 +559,14 @@ class CheckForeignKeyAnnotatedAsValue(PreflightCheck):
     This used to be the required spelling for a string model reference, back
     when those overloads returned a bare ``T``. They return the descriptor now,
     so ``Field[Related]`` is the one spelling for every foreign key.
+
+    **Non-goal.** Aliasing ``Field`` to the name of a typing wrapper this reads
+    structurally -- ``from plain.postgres import Field as Optional``, and then
+    ``Optional[User]`` -- is classified by spelling and can warn about correct
+    code. Untangling it would mean resolving names the whole point of a string
+    model reference is to leave alone. The result is advisory either way:
+    nothing is broken at runtime, and a stubborn one is silenceable through
+    ``PREFLIGHT_SILENCED_RESULTS``.
     """
 
     def run(self) -> list[PreflightResult]:
