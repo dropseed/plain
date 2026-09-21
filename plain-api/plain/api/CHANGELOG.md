@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.35.3](https://github.com/dropseed/plain/releases/plain-api@0.35.3) (2026-09-21)
+
+### What's changed
+
+- The API key lookup uses a typed `where()` condition; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- If plain.postgres is installed (API keys), it must be 0.119.0 or newer. plain.api still works without it.
+
 ## [0.35.2](https://github.com/dropseed/plain/releases/plain-api@0.35.2) (2026-09-20)
 
 ### What's changed
