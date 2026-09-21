@@ -22,7 +22,7 @@ class ProvidersChartCard(ChartCard):
 
     def get_chart_data(self) -> dict:
         results = OAuthConnection.query.sql(
-            """
+            t"""
             SELECT {OAuthConnection.provider_key} AS provider_key,
                    count(*) AS "count!"
             FROM {OAuthConnection}

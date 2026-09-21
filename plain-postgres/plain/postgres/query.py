@@ -67,6 +67,8 @@ from plain.utils.functional import partition
 __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 
 if TYPE_CHECKING:
+    from string.templatelib import Template
+
     from _typeshed import DataclassInstance
     from plain.postgres import Model
     from plain.postgres.written import Written
@@ -1919,25 +1921,27 @@ class QuerySet[T: "Model"]:
 
     @overload
     def sql[R: DataclassInstance](
-        self, template: str, *, result_type: type[R], **values: Any
+        self, template: Template, *, result_type: type[R]
     ) -> Written[R]: ...
 
     @overload
-    def sql(
-        self, template: str, *, result_type: None = None, **values: Any
-    ) -> Written[T]: ...
+    def sql(self, template: Template, *, result_type: None = None) -> Written[T]: ...
 
-    def sql(self, template: str, *, result_type: Any = None, **values: Any) -> Any:
-        """Write the query out, with `{}` references resolved against the models.
+    def sql(self, template: Template, *, result_type: Any = None) -> Any:
+        """Write the query out as a t-string, models interpolated directly.
 
         The written half of the query API: `where()`/`order_by()` build a query
         the code assembles, `sql()` runs one you wrote.
 
+        The template is a `Template` (PEP 750), so Python interpolates it and
+        this never sees a string it has to trust -- a `str`, however it was
+        made, is not a `Template` and the type checker says so.
+
         The statement is the whole query, so it starts from the bare model --
         `Model.query.sql(...)`. A queryset that has been narrowed cannot carry
         its narrowing into written SQL, and silently dropping it would drop
-        whatever that filter was there to enforce. Embed the queryset as a
-        subquery instead: `sql("... FROM {rows} r", rows=narrowed)`.
+        whatever that filter was there to enforce. Interpolate the queryset as
+        a subquery instead: `sql(t"... FROM {narrowed} r")`.
 
         See `plain.postgres.written` and the README for the reference table.
         """
@@ -1948,7 +1952,6 @@ class QuerySet[T: "Model"]:
         return Written(
             model=self.model,
             template=template,
-            values=values,
             result_type=result_type,
         )
 
@@ -1987,7 +1990,7 @@ class QuerySet[T: "Model"]:
             f"{self.model.__name__}.query — this one already has "
             f"{', '.join(applied) or 'been narrowed'}, which a written "
             "statement can't carry. Put the queryset in the statement as a "
-            'subquery instead: sql("... FROM {rows} r", rows=queryset).'
+            'subquery instead: sql(t"... FROM {queryset} rows").'
         )
 
     def _compiles_like_the_models_own_queryset(self) -> bool:
