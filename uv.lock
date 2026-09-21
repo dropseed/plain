@@ -952,7 +952,7 @@ dev = [
 
 [[package]]
 name = "plain-elements"
-version = "0.11.7"
+version = "0.12.0"
 source = { editable = "plain-elements" }
 dependencies = [
     { name = "plain" },
