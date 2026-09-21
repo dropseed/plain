@@ -409,7 +409,24 @@ Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfi
 
 **A column belongs to the model whose field built it**, the same as [a condition does](#querying-with-typed-conditions): `Order.query.select(User.email)` raises `TypeError` naming both models. A type checker can't catch it — `Field[str]` is `Field[str]` whichever model declared it — and without the check the name `"email"` just resolves against `Order`, silently the wrong column when both models have one. Expressions are unaffected: `F("email")` and `Upper("email")` take a string resolved against whatever query they land in, like `filter()`'s kwargs.
 
-**Relations are not selectable yet.** `select(Post.author)` (the relation) and `select(Post.author.city)` (a column through it) both raise `TypeError`, and so does `select(Post.author.id)` — the foreign key column itself. The reason is nullability: a column reached through a relation arrives over a join, so a nullable relation yields `None` where the traversed field's type says it can't. Until `select()` can express that, `values_list("author__id", flat=True)` is the spelling, and the error message names it.
+**A foreign key's own key column is selectable; the relation and anything past it are not.** `select(Post.author.id)` reads `"post"."author_id"` — a local column of the table being selected, with no join — so it is accepted, and it compiles to exactly what `values_list("author", flat=True)` always has. The rule is narrow: one hop, ending at the related model's primary key.
+
+```python
+author_ids = Post.query.select(Post.author.id, flat=True)
+authors = Author.query.where(Author.id.is_in(author_ids))
+```
+
+With `result_type=`, the dataclass field is named for the column it holds — `author_id`, not the relation and not the `author__id` lookup path.
+
+Everything else still raises `TypeError`:
+
+- `select(Post.author)` — a relation is not a column. The message names the key column that is one.
+- `select(Post.author.city)` — one hop, but the column lives on the other table.
+- `select(Post.author.organization.id)`, or any hop through a many-to-many — the key column isn't local to the selecting table either.
+
+The reason is nullability: a column reached over a join comes back as `None` when the relation doesn't match, and the traversed field's type says it can't. `values_list()` with the lookup path remains the spelling for those, and the error message names it. The key column has no such problem — its nullability is the foreign key's own `allow_null`.
+
+One caveat on that: a nullable foreign key's key column types as `int`, not `int | None`. `Post.author` resolves to `type[Author]` at class access whether or not the foreign key is nullable — that is what makes traversal type-check at all — so `.id` is `Author`'s own `Field[int]` either way, and the nullability is lost before `select()` sees it. The value really can be `None`, so narrow it when the foreign key is nullable.
 
 **`select()` hands back a plain `RowQuerySet`, not your custom QuerySet subclass.** Chain your own methods before `select()`, not after — `User.query.active().select(...)` works, `User.query.select(...).active()` raises `AttributeError`.
 

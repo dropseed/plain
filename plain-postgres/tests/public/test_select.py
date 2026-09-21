@@ -12,6 +12,7 @@ from dataclasses import InitVar, dataclass, field, fields
 import pytest
 from app.examples.models.alias_collisions import AliasCollisionExample
 from app.examples.models.defaults import DefaultsExample
+from app.examples.models.delete import CircA, CircB, Grandchild
 from app.examples.models.mixins import MixinTestModel, TimestampMixin
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import RowQuerySet
@@ -174,8 +175,8 @@ def test_select_rejects_fk_traversal(db):
 
 
 def test_select_rejects_fk_reference(db):
-    """A relation is not a column, and its key column is out for now too."""
-    with pytest.raises(TypeError, match="key column is not selectable yet"):
+    """A relation is not a column, and the message names the one that is."""
+    with pytest.raises(TypeError, match=r"key column instead -- WidgetTag\.widget\.id"):
         WidgetTag.query.select(WidgetTag.widget)  # ty: ignore[no-matching-overload]
 
 
@@ -187,12 +188,88 @@ def test_select_flat_rejects_more_than_one_column(db):
         )
 
 
-def test_select_rejects_the_foreign_key_column_for_now(db):
-    """`WidgetTag.widget.id` is the FK column, but it still arrives over the
-    relation, so it is refused with the rest of traversal until select() can
-    say it is nullable."""
-    with pytest.raises(TypeError, match=r'values_list\("widget__id"\)'):
-        WidgetTag.query.select(WidgetTag.widget.id)
+class TestSelectForeignKeyColumn:
+    """A foreign key's own key column is a local column, so it is selectable.
+
+    `WidgetTag.widget.id` is `"widgettag"."widget_id"` — no join, and no
+    nullability the type doesn't already carry. The SQL identity with
+    `values_list("widget")` is pinned in
+    tests/internal/test_select_fk_column_sql.py.
+    """
+
+    @pytest.fixture
+    def tagged(self, db):
+        widget = Widget.query.create(name="w", size="s")
+        tag = Tag.query.create(name="t")
+        return WidgetTag.query.create(widget=widget, tag=tag)
+
+    def test_flat_selects_the_key_column(self, tagged):
+        assert list(WidgetTag.query.select(WidgetTag.widget.id, flat=True)) == [
+            tagged.widget.id
+        ]
+
+    def test_tuple_row_carries_the_key_column(self, tagged):
+        assert list(WidgetTag.query.select(WidgetTag.widget.id, WidgetTag.tag.id)) == [
+            (tagged.widget.id, tagged.tag.id)
+        ]
+
+    def test_result_type_maps_it_onto_the_column_name(self, tagged):
+        @dataclass
+        class TagRow:
+            widget_id: int
+            tag_id: int
+
+        rows = list(
+            WidgetTag.query.select(
+                WidgetTag.widget.id, WidgetTag.tag.id, result_type=TagRow
+            )
+        )
+        assert rows == [TagRow(widget_id=tagged.widget.id, tag_id=tagged.tag.id)]
+
+    def test_result_type_name_must_be_the_column_name(self, tagged):
+        """The dataclass field names the column the row holds, `widget_id` --
+        not the relation, and not the `widget__id` lookup path."""
+
+        @dataclass
+        class WidgetRow:
+            widget: int
+
+        with pytest.raises(TypeError, match="'widget_id' does not match"):
+            WidgetTag.query.select(WidgetTag.widget.id, result_type=WidgetRow)
+
+    def test_nullable_key_column_comes_back_as_none(self, db):
+        """A nullable foreign key yields None, which is the key column's own
+        nullability — not something the join introduced."""
+        partner = CircA.query.create(name="a")
+        CircB.query.create(name="paired", partner=partner)
+        CircB.query.create(name="lone")
+
+        assert list(
+            CircB.query.order_by("name").select(CircB.partner.id, flat=True)
+        ) == [None, partner.id]
+
+    def test_a_non_key_column_is_still_refused(self, db):
+        """One hop, but the column lives on the related table."""
+        with pytest.raises(TypeError, match=r'values_list\("widget__name"\)'):
+            WidgetTag.query.select(WidgetTag.widget.name)
+
+    def test_two_hops_to_a_key_column_are_still_refused(self, db):
+        """The second hop's key column lives on the related table, not this
+        one, so it really does arrive over a join."""
+        with pytest.raises(
+            TypeError, match=r'values_list\("mid_parent__grandparent__id"\)'
+        ):
+            Grandchild.query.select(Grandchild.mid_parent.grandparent.id)
+
+    def test_many_to_many_hop_is_still_refused(self, db):
+        """A many-to-many stores its keys in a third table, so its key column
+        is never local to the selecting one."""
+        with pytest.raises(TypeError, match=r'values_list\("widget__tags__id"\)'):
+            # The checker stops a hop earlier: a many-to-many is a manager at
+            # class level, with no fields hanging off it.
+            WidgetTag.query.select(
+                WidgetTag.widget.tags.id  # ty: ignore[unresolved-attribute]
+            )
 
 
 def test_select_result_type_must_be_dataclass(db):
@@ -569,6 +646,13 @@ class TestColumnsBelongToTheirModel:
         model" would be advice that doesn't help here."""
         with pytest.raises(TypeError, match="WidgetTag.widget__name"):
             DefaultsExample.query.select(WidgetTag.widget.name)
+
+    def test_another_models_key_column_raises_as_cross_model(self, rows):
+        """A foreign key's key column is selectable, but only on the queryset
+        it belongs to -- the guard runs before the column resolves, so it
+        still catches one rooted elsewhere."""
+        with pytest.raises(TypeError, match="WidgetTag.widget__id"):
+            DefaultsExample.query.select(WidgetTag.widget.id)
 
     def test_traversed_column_on_its_own_root_still_reports_traversal(self, db):
         with pytest.raises(TypeError, match="reached through a relation"):

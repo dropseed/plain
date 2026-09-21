@@ -29,7 +29,9 @@ class ClearExpiredOAuthTokens(Chore):
             RefreshToken.revoked.equals(True) | RefreshToken.expires_at.lt(now)
         ).delete()
 
-        live_access_ids = RefreshToken.query.values_list("access_token", flat=True)
+        live_access_ids = RefreshToken.query.select(
+            RefreshToken.access_token.id, flat=True
+        )
         access = (
             AccessToken.query.where(
                 AccessToken.revoked.equals(True) | AccessToken.expires_at.lt(now)
