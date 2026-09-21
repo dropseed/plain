@@ -498,19 +498,11 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             self.name,
         )
 
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> T: ...
     def to_python(self, value: Any) -> T | None:
         """
         Convert the input value into the expected Python data type, raising
         plain.exceptions.ValidationError if the data can't be converted.
         Return the converted value. Subclasses should override this.
-
-        None is the only input that comes back as None -- every other value
-        either converts or raises -- so the overloads say that instead of
-        making every caller narrow a `T | None` it can't actually get.
         """
         return value
 

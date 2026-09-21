@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, overload
+from typing import Any
 
 from plain import exceptions
 
@@ -11,11 +11,6 @@ class BooleanField[T: (bool, bool | None) = bool](DefaultableField[T]):
     db_type_sql = "boolean"
     empty_strings_allowed = False
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> bool: ...
     def to_python(self, value: Any) -> bool | None:
         if self.allow_null and value in self.empty_values:
             return None

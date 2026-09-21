@@ -41,17 +41,3 @@ def must_reject_assigning_the_wrong_value_type(row: DefaultsExample) -> None:
     # Non-nullable rejects None statically even though the runtime would store
     # it and fail later at validate/save time.
     row.name = None  # ty: ignore[invalid-assignment]
-
-
-def must_accept_to_python_narrowing_on_a_not_null_field(raw: str) -> None:
-    """`to_python` returns None only for a None input, so a caller that never
-    passes None doesn't have to narrow a `T | None` it can't get.
-
-    Consumer: plain-admin's `select_objects_by_id`, which coerces request
-    strings through the pk field.
-    """
-    assert_type(DefaultsExample.id.to_python(raw), int)
-    assert_type(DefaultsExample.name.to_python(raw), str)
-    assert_type(DefaultsExample.id.to_python(None), None)
-    # A nullable field's `T` already includes None, so it stays `str | None`.
-    assert_type(DefaultsExample.note.to_python(raw), str | None)

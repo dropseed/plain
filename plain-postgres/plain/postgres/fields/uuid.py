@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from plain import exceptions
@@ -68,11 +68,6 @@ class UUIDField[T: (UUID, UUID | None) = UUID](ColumnField[T]):
             value = self.to_python(value)
         return value
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> UUID: ...
     def to_python(self, value: Any) -> UUID | None:
         if value is not None and not isinstance(value, UUID):
             input_form = "int" if isinstance(value, int) else "hex"

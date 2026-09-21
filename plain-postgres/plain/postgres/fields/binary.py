@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from base64 import b64decode
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any
 
 import psycopg
 from plain.validators import MaxLengthValidator
@@ -60,11 +60,6 @@ class BinaryField[
             return psycopg.Binary(value)
         return value
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> bytes | memoryview: ...
     def to_python(self, value: Any) -> bytes | memoryview | None:
         # If it's a string, it should be base64-encoded data
         if isinstance(value, str):

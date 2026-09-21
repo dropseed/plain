@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast, overload
+from typing import TYPE_CHECKING, Any, cast
 
 from plain.preflight import PreflightResult
 
@@ -53,11 +53,6 @@ class PrimaryKeyField(ColumnField[int]):
         # Identity columns aren't user-validated — Postgres owns the value.
         pass
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> int: ...
     def to_python(self, value: Any) -> int | None:
         if value is None:
             return value

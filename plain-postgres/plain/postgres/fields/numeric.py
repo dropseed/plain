@@ -3,7 +3,7 @@ from __future__ import annotations
 import decimal
 from collections.abc import Callable, Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any
 
 from plain.preflight import PreflightResult
 from psycopg.types import numeric
@@ -31,11 +31,6 @@ class FloatField[T: (float, float | None) = float](DefaultableField[T]):
                 f"Field '{self.name}' expected a number but got {value!r}.",
             ) from e
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> float: ...
     def to_python(self, value: Any) -> float | None:
         if value is None:
             return value
@@ -110,11 +105,6 @@ class IntegerField[T: (int, int | None) = int](DefaultableField[T]):
             return value
         return self.psycopg_type(value)
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> int: ...
     def to_python(self, value: Any) -> int | None:
         if value is None:
             return value
@@ -256,11 +246,6 @@ class DecimalField[T: (decimal.Decimal, decimal.Decimal | None) = decimal.Decima
             kwargs["decimal_places"] = self.decimal_places
         return name, path, args, kwargs
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> decimal.Decimal: ...
     def to_python(self, value: Any) -> decimal.Decimal | None:
         if value is None:
             return value

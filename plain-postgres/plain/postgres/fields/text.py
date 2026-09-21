@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any
 
 from plain.preflight import PreflightResult
 from plain.validators import MaxLengthValidator
@@ -78,11 +78,6 @@ class TextField[T: (str, str | None) = str](ChoicesField[T]):
     def _max_length_for_choices_check(self) -> int | None:
         return self.max_length
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> str: ...
     def to_python(self, value: Any) -> str | None:
         if isinstance(value, str) or value is None:
             return value

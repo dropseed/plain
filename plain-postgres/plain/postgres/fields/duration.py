@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, Any
 
 from plain.utils.dateparse import parse_duration
 
@@ -22,11 +22,6 @@ class DurationField[
     db_type_sql = "interval"
     empty_strings_allowed = False
 
-    # See `Field.to_python`: only a None input comes back as None.
-    @overload
-    def to_python(self, value: None) -> None: ...
-    @overload
-    def to_python(self, value: Any) -> datetime.timedelta: ...
     def to_python(self, value: Any) -> datetime.timedelta | None:
         if value is None:
             return value
