@@ -269,7 +269,7 @@ A **nullable column is a different value type** to the checker — `Field[int | 
 
 An `F()` expression works too, but that arm is untyped: an expression's output type isn't tracked, so nothing checks it against the column. `F()` is the same escape hatch here that it is in `filter()`.
 
-**A condition _is_ a `Q`**, so these replace `Q` everywhere, not just in `filter()`. Anything that takes a `Q` takes one unchanged — `When()`, `Case`, an aggregate's `filter=`:
+**A condition _is_ a `Q`**, so these replace `Q` everywhere, not just in `filter()`. Anything that takes a `Q` takes one unchanged — `When()`, including the ones inside a `Case()`, and an aggregate's `filter=`:
 
 ```python
 from plain.postgres.aggregates import Count
@@ -311,7 +311,7 @@ A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no tr
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
-**`where()` preserves the order you wrote; `filter()` sorted its kwargs alphabetically.** Converting a multi-condition `filter()` changes the WHERE clause text and the parameter order, though not which rows it matches:
+**`where()` preserves the order you wrote; `filter()` sorted its kwargs alphabetically.** Converting a multi-condition `filter()` can change the WHERE clause text and the parameter order, though not which rows it matches:
 
 ```sql
 -- filter(role="admin", email="a@example.com")
@@ -320,9 +320,11 @@ WHERE ("email" = %s AND "role" = %s)  -- params: ('a@example.com', 'admin')
 WHERE ("role" = %s AND "email" = %s)  -- params: ('admin', 'a@example.com')
 ```
 
-Anything pinned to statement text notices: a test asserting on generated SQL, or a `pg_stat_statements` fingerprint, which sees the reordered statement as a new entry.
+Kwargs you already wrote alphabetically convert unchanged. Where the source order wasn't alphabetical, preserving it changes the predicate structure — a test asserting on generated SQL notices, and so can `pg_stat_statements`, which groups by structure rather than literal text and files the reordered statement as a new entry.
 
-**Conditions are strict where `filter()` was lenient.** A string kwarg coerced whatever you handed it, so `filter(age="18")` and `filter(uuid="0f2e...")` both ran; `User.age.equals("18")` and a `Field[UUID]`'s `.equals("0f2e...")` are type errors, because `equals` takes the field's value type. Callers holding a string from a CLI argument, URL segment, or session parse it first — `int(raw)`, `uuid.UUID(raw)` — which moves a bad value from a failure deep inside query compilation to a `ValueError` at the call site, next to the input that was wrong.
+**Conditions are strict where `filter()` was lenient — to the type checker.** `equals` takes the field's value type, so `User.age.equals("18")` and a `Field[UUID]`'s `.equals("3f2504e0-4f89-11d3-9a0c-0305e82c3301")` are type errors where `filter(age="18")` and `filter(uuid="3f2504e0-4f89-11d3-9a0c-0305e82c3301")` were not. Runtime coercion is unchanged: `User.age.equals("18")` still coerces the string and runs, exactly as the kwarg did.
+
+So the strictness lands on the caller. Code holding a string from a CLI argument, URL segment, or session parses it first — `int(raw)`, `uuid.UUID(raw)` — and an invalid value raises `ValueError` there, before the ORM is involved, next to the input that was wrong.
 
 **A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
 

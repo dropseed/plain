@@ -44,7 +44,7 @@ class MCPResource(ABC):
             '''An order by ID.'''
 
             uri_template = "orders://{order_id}"
-            mime_type = "application/json"
+            mime_type = "text/plain"
 
             def __init__(self, order_id: int):
                 self.order_id = order_id
