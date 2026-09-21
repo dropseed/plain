@@ -49,13 +49,13 @@ logger = get_framework_logger()
 class JobRequestQuerySet(postgres.QuerySet["JobRequest"]):
     def ready_to_run(self) -> Self:
         """JobRequests with no scheduling constraint or whose `start_at` is past."""
-        return self.filter(
-            postgres.Q(start_at__isnull=True) | postgres.Q(start_at__lte=timezone.now())
+        return self.where(
+            JobRequest.start_at.is_null() | JobRequest.start_at.lte(timezone.now())
         )
 
     def scheduled(self) -> Self:
         """JobRequests scheduled to start in the future."""
-        return self.filter(start_at__gt=timezone.now())
+        return self.where(JobRequest.start_at.gt(timezone.now()))
 
 
 @postgres.register_model
@@ -167,10 +167,12 @@ class JobRequest(postgres.Model):
 
 class JobQuerySet(postgres.QuerySet["JobProcess"]):
     def running(self) -> Self:
-        return self.filter(started_at__isnull=False)
+        # is_null(False) compiles to IS NOT NULL; ~is_null() would compile to
+        # NOT (started_at IS NULL).
+        return self.where(JobProcess.started_at.is_null(False))
 
     def waiting(self) -> Self:
-        return self.filter(started_at__isnull=True)
+        return self.where(JobProcess.started_at.is_null())
 
 
 @postgres.register_model
@@ -536,33 +538,40 @@ class JobProcess(postgres.Model):
 
 class JobResultQuerySet(postgres.QuerySet["JobResult"]):
     def successful(self) -> Self:
-        return self.filter(status=JobResultStatuses.SUCCESSFUL)
+        return self.where(JobResult.status.equals(JobResultStatuses.SUCCESSFUL))
 
     def cancelled(self) -> Self:
-        return self.filter(status=JobResultStatuses.CANCELLED)
+        return self.where(JobResult.status.equals(JobResultStatuses.CANCELLED))
 
     def lost(self) -> Self:
-        return self.filter(status=JobResultStatuses.LOST)
+        return self.where(JobResult.status.equals(JobResultStatuses.LOST))
 
     def errored(self) -> Self:
-        return self.filter(status=JobResultStatuses.ERRORED)
+        return self.where(JobResult.status.equals(JobResultStatuses.ERRORED))
 
     def retried(self) -> Self:
-        return self.filter(
-            postgres.Q(retry_job_request_uuid__isnull=False)
-            | postgres.Q(retry_attempt__gt=0)
+        # is_null(False) compiles to IS NOT NULL; ~is_null() would compile to
+        # NOT (retry_job_request_uuid IS NULL).
+        return self.where(
+            JobResult.retry_job_request_uuid.is_null(False)
+            | JobResult.retry_attempt.gt(0)
         )
 
     def failed(self) -> Self:
-        return self.filter(
-            status__in=[
-                JobResultStatuses.ERRORED,
-                JobResultStatuses.LOST,
-                JobResultStatuses.CANCELLED,
-            ]
+        return self.where(
+            JobResult.status.is_in(
+                [
+                    JobResultStatuses.ERRORED,
+                    JobResultStatuses.LOST,
+                    JobResultStatuses.CANCELLED,
+                ]
+            )
         )
 
     def retryable(self) -> Self:
+        # Still `filter()`: `Field[int].lt()` is annotated to take an `int`,
+        # so `lt(F("retries"))` is a type error even though the ORM compiles it
+        # to exactly the same SQL. Converting would cost a `ty: ignore`.
         return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
@@ -792,7 +801,9 @@ def rescue_stale_workers() -> list[JobResult]:
     without converting all of that worker's jobs, stranding the rest forever.
     """
     cutoff = heartbeat_cutoff()
-    dead_workers = WorkerHeartbeat.query.filter(last_heartbeat_at__lt=cutoff)
+    dead_workers = WorkerHeartbeat.query.where(
+        WorkerHeartbeat.last_heartbeat_at.lt(cutoff)
+    )
 
     pending_hooks: list[JobResult] = []
     for worker in dead_workers:
@@ -812,16 +823,23 @@ def rescue_stale_workers() -> list[JobResult]:
                 # Atomic claim. If another rescuer also saw this dead
                 # heartbeat, only one of us deletes a row. The loser sees 0
                 # affected and skips.
-                claimed = WorkerHeartbeat.query.filter(
-                    worker_id=worker.worker_id,
-                    last_heartbeat_at__lt=cutoff,
+                #
+                # Conditions are listed in the order `filter()` sorted its
+                # kwargs, so the compiled SQL is unchanged.
+                claimed = WorkerHeartbeat.query.where(
+                    WorkerHeartbeat.last_heartbeat_at.lt(cutoff),
+                    WorkerHeartbeat.worker_id.equals(worker.worker_id),
                 ).delete()
                 if not claimed:
                     continue
 
                 # list() materializes the queryset before the loop body
                 # starts deleting rows, so iteration can't skip entries.
-                for job in list(JobProcess.query.filter(worker_id=worker.worker_id)):
+                for job in list(
+                    JobProcess.query.where(
+                        JobProcess.worker_id.equals(worker.worker_id)
+                    )
+                ):
                     result = job.convert_to_result(
                         status=JobResultStatuses.LOST, fire_hook=False
                     )

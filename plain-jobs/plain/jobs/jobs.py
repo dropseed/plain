@@ -233,14 +233,21 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        filters = {"job_class": job_class_name}
-        if concurrency_key:
-            filters["concurrency_key"] = concurrency_key
+        # `concurrency_key` is listed before `job_class` because `filter()`
+        # sorted its kwargs, so the compiled SQL is unchanged.
+        concurrency_conditions = (
+            [JobRequest.concurrency_key.equals(concurrency_key)]
+            if concurrency_key
+            else []
+        )
 
-        qs = JobRequest.query.filter(**filters)
+        qs = JobRequest.query.where(
+            *concurrency_conditions,
+            JobRequest.job_class.equals(job_class_name),
+        )
 
         if not include_retries:
-            qs = qs.filter(retry_attempt=0)
+            qs = qs.where(JobRequest.retry_attempt.equals(0))
 
         return qs
 
@@ -268,17 +275,24 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        filters = {"job_class": job_class_name}
-        if concurrency_key:
-            filters["concurrency_key"] = concurrency_key
+        # `concurrency_key` is listed before `job_class` because `filter()`
+        # sorted its kwargs, so the compiled SQL is unchanged.
+        concurrency_conditions = (
+            [JobProcess.concurrency_key.equals(concurrency_key)]
+            if concurrency_key
+            else []
+        )
 
-        qs = JobProcess.query.filter(**filters)
+        qs = JobProcess.query.where(
+            *concurrency_conditions,
+            JobProcess.job_class.equals(job_class_name),
+        )
 
         if not include_retries:
-            qs = qs.filter(retry_attempt=0)
+            qs = qs.where(JobProcess.retry_attempt.equals(0))
 
         if not include_self and self.job_process:
-            qs = qs.exclude(id=self.job_process.id)
+            qs = qs.where(~JobProcess.id.equals(self.job_process.id))
 
         return qs
 
