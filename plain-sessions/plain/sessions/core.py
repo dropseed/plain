@@ -91,12 +91,12 @@ class SessionStore(MutableMapping):
 
         try:
             # Condition order mirrors what `filter(**kwargs)` emitted: it sorts
-            # its kwargs, `where()` keeps the order written.
+            # its kwargs, typed conditions keep the order written.
             model = self._model
-            session = model.query.where(
+            session = model.query.get(
                 model.expires_at.gt(timezone.now()),
                 model.session_key.equals(self.session_key),
-            ).get()
+            )
             self._session_instance = session
             self._session_cache = session.session_data
             return self._session_cache

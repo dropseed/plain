@@ -76,7 +76,7 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
             return None
 
         try:
-            user = User.query.where(User.id.equals(data["id"])).get()
+            user = User.query.get(data["id"])
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return None
 

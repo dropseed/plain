@@ -152,7 +152,7 @@ class PasswordLoginForm(forms.Form):
         if email and password:
             try:
                 # The vast majority of users won't have a case-sensitive email, so we act that way
-                user = User.query.where(User.email.iequals(email)).get()
+                user = User.query.get(User.email.iequals(email))
             except User.DoesNotExist:
                 # Run the default password hasher once to reduce the timing
                 # difference between an existing and a nonexistent user (django #20760).
