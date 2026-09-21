@@ -51,6 +51,13 @@ def must_accept_multi_hop_traversal() -> None:
     assert_type(Grandchild.mid_parent.grandparent.name.equals("x"), Q)
 
 
+def must_accept_lookup_path_on_a_traversed_field() -> None:
+    # `"parent__name"` at runtime; the claim here is only that it stays a
+    # `str` after traversal, so generic code can build a lookup from it.
+    # Runtime half: tests/public/test_typed_where_fk.py.
+    assert_type(ChildCascade.parent.name.lookup_path, str)
+
+
 def must_reject_a_condition_on_the_relation_itself() -> None:
     # The spelling that works is `parent.id.equals(...)`; a `.equals` on the
     # relation would have to mean something the lookup language cannot say.
