@@ -1,5 +1,15 @@
 # plain-tailwind changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.25.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.24.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.24.2) (2026-09-20)
 
 ### What's changed
