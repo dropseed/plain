@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.9.0](https://github.com/dropseed/plain/releases/plain-connect@0.9.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-connect@0.8.0) (2026-08-21)
 
 ### What's changed
