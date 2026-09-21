@@ -100,6 +100,10 @@ def _empty(of_cls: type) -> Any:
 # Ordering conditions: the ones a None operand is meaningless for.
 _ORDERING_SUFFIXES = frozenset({"gt", "gte", "lt", "lte"})
 
+# The two lookups `.is_in()` can build: `any_of` for a collection of values,
+# `in` for a queryset. Both take a collection, so both need the string guard.
+_IS_IN_SUFFIXES = frozenset({"in", "any_of"})
+
 
 class Field[T](Selectable[T], RegisterLookupMixin):
     """Base class for all field types"""
@@ -205,7 +209,19 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         return self._build_q("is_null", "isnull", value)
 
     def is_in(self, values: Iterable[T]) -> Q:
-        return self._build_q("is_in", "in", values)
+        """Match rows whose value is one of `values`.
+
+        A plain collection binds as a single array parameter --
+        `"col" = ANY(%s::text[])` -- so the statement has the same shape for
+        any number of values, an empty list included. A queryset stays a
+        subquery: `"col" IN (SELECT ...)`.
+        """
+        from plain.postgres.query import QuerySet
+        from plain.postgres.sql.query import Query
+
+        if isinstance(values, QuerySet | Query):
+            return self._build_q("is_in", "in", values)
+        return self._build_q("is_in", "any_of", values)
 
     # Pattern conditions. They live on Field, like every other condition, so
     # they survive the `Field[T]` annotation models carry -- a field's declared
@@ -266,7 +282,7 @@ class Field[T](Selectable[T], RegisterLookupMixin):
                 f"meaning for None -- a SQL comparison against NULL is never "
                 f"true. Use .is_null() instead."
             )
-        if suffix == "in" and isinstance(value, str | bytes):
+        if suffix in _IS_IN_SUFFIXES and isinstance(value, str | bytes):
             # `Iterable[T]` is satisfied by `str` when T is `str`, and `str` is
             # a `Sequence[str]`, so there is no way to exclude it statically.
             # Left alone it iterates characters and silently matches the wrong
@@ -276,6 +292,12 @@ class Field[T](Selectable[T], RegisterLookupMixin):
                 f"collection of values, not a single {type(value).__name__}. "
                 f"Pass a list -- .is_in([{value!r}])."
             )
+        if suffix == "any_of":
+            # Materialise once, here. A set or a generator is handed straight
+            # to `Q`, which is copied, hashed and repr'd on its way to the
+            # compiler -- a generator would be exhausted by the first of those
+            # and bind an empty array.
+            value = list(value)
         if suffix and not self.get_lookup(suffix):
             # The type checker rejects most of these already (a `Field[int]`
             # has no `.startswith`); this catches what it can't see.

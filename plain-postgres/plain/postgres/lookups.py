@@ -257,6 +257,23 @@ class BuiltinLookup(Lookup):
         return OPERATORS[self.lookup_name] % rhs
 
 
+def lookup_value_field(lhs: Any) -> Any:
+    """The field a lookup's right-hand values are prepared against.
+
+    A relation prepares lookup values against its target column's field (e.g.
+    the remote `id`); every other field prepares its own values. Narrowing
+    instead of getattr() keeps `.target_field` greppable and type-checked, so
+    removing it fails loudly rather than silently here.
+    """
+    from plain.postgres.fields.related import RelatedField
+    from plain.postgres.fields.reverse_related import ForeignObjectRel
+
+    output_field = lhs.output_field
+    if isinstance(output_field, RelatedField | ForeignObjectRel):
+        return output_field.target_field
+    return output_field
+
+
 class FieldGetDbPrepValueMixin(Lookup):
     """
     Some lookups require Field.get_db_prep_value() to be called on their
@@ -270,18 +287,7 @@ class FieldGetDbPrepValueMixin(Lookup):
     def get_db_prep_lookup(
         self, value: Any, connection: DatabaseConnection
     ) -> tuple[str, list[Any]]:
-        from plain.postgres.fields.related import RelatedField
-        from plain.postgres.fields.reverse_related import ForeignObjectRel
-
-        # A relation prepares lookup values against its target column's field
-        # (e.g. the remote `id`); every other field prepares its own values.
-        # Narrowing instead of getattr() keeps `.target_field` greppable and
-        # type-checked, so removing it fails loudly rather than silently here.
-        output_field = self.lhs.output_field
-        if isinstance(output_field, RelatedField | ForeignObjectRel):
-            prep_field = output_field.target_field
-        else:
-            prep_field = output_field
+        prep_field = lookup_value_field(self.lhs)
         return (
             "%s",
             [prep_field.get_db_prep_value(v, connection, prepared=True) for v in value]
@@ -531,6 +537,52 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
         return f"IN {rhs}"
 
     # PostgreSQL has no limit on IN clause size, so no need to override as_sql()
+
+
+@Field.register_lookup
+class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
+    """`col = ANY(%s::<type>[])` -- Postgres's own spelling of `IN (...)`.
+
+    This is what `Field.is_in([...])` builds. The whole collection binds as a
+    single array parameter, so one statement text serves any number of values,
+    including none -- the shape a prepared-statement plan can be cached
+    against. `In` (the `field__in=` kwarg) spells the same idea as
+    `IN (%s, %s, ...)`: a placeholder per value, so the statement text changes
+    with the list's length and an empty list has no statement at all.
+
+    NULL behaves exactly as it does in SQL `IN`: `col = ANY(ARRAY[1, NULL])`
+    matches a 1 and yields NULL (no match) for anything else, so a NULL in the
+    list never matches a row and never excludes one under negation either.
+    """
+
+    lookup_name: str = "any_of"
+
+    def array_db_type(self) -> str:
+        """The Postgres array type the bound list is cast to.
+
+        The cast is the point: psycopg picks an array's element type from the
+        Python values it is handed, so `[]` carries no type at all and
+        `[1, 2]` can come out narrower than the column. Naming the column's
+        own type settles the comparison before Postgres has to guess.
+        """
+        prep_field = lookup_value_field(self.lhs)
+        db_type = prep_field.db_type()
+        assert db_type, (
+            f"{prep_field!r} has no column type, so `= ANY()` has no array "
+            f"type to cast to."
+        )
+        return db_type
+
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: DatabaseConnection
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
+        # `get_db_prep_lookup` hands back one prepared value per element; bind
+        # the whole list as the single array parameter.
+        _, values = self.get_db_prep_lookup(self.rhs, connection)
+        return f"%s::{self.array_db_type()}[]", [values]
+
+    def get_rhs_op(self, connection: DatabaseConnection, rhs: str | list[str]) -> str:
+        return f"= ANY({rhs})"
 
 
 class PatternLookup(BuiltinLookup):

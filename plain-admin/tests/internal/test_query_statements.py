@@ -46,8 +46,12 @@ USER_BY_ID = (
     'SELECT "users_user"."id", "users_user"."is_admin", "users_user"."username" '
     'FROM "users_user" WHERE "users_user"."id" = %s LIMIT 21'
 )
-USERS_BY_ID_IN = (
-    'UPDATE "users_user" SET "is_admin" = %s WHERE "users_user"."id" IN (%s, %s)'
+# `select_objects_by_id()` builds the selection with `is_in()`, which binds
+# the ids as one array parameter -- the same statement whether one row or
+# fifty were ticked.
+USERS_BY_SELECTED_IDS = (
+    'UPDATE "users_user" SET "is_admin" = %s '
+    'WHERE "users_user"."id" = ANY(%s::bigint[])'
 )
 
 
@@ -119,7 +123,7 @@ def test_the_detail_view_looks_its_object_up_by_id(admin_client, otel_spans):
     assert statements(otel_spans, USER_TABLE) == [USER_BY_ID, USER_BY_ID]
 
 
-def test_an_action_matches_the_selected_ids_with_in(admin_client, otel_spans):
+def test_an_action_matches_the_selected_ids_with_any_of(admin_client, otel_spans):
     a = User.query.create(username="a")
     b = User.query.create(username="b")
 
@@ -130,6 +134,6 @@ def test_an_action_matches_the_selected_ids_with_in(admin_client, otel_spans):
     )
     assert response.status_code == 302
 
-    # select_objects_by_id() keeps the queryset lazy, so the IN lands on the
-    # UPDATE the action performs.
-    assert statements(otel_spans, USER_TABLE) == [USER_BY_ID, USERS_BY_ID_IN]
+    # select_objects_by_id() keeps the queryset lazy, so the membership test
+    # lands on the UPDATE the action performs.
+    assert statements(otel_spans, USER_TABLE) == [USER_BY_ID, USERS_BY_SELECTED_IDS]
