@@ -183,38 +183,49 @@ _RELATIONS = (
     BaseRelatedManager,
 )
 
-# Everything a literal expression can be made of. A node outside this set --
-# a name, an attribute, a call, a subscript -- means the braces refer to
-# something in the program.
-_LITERAL_NODES = (
-    ast.Expression,
-    ast.Constant,
-    ast.Tuple,
-    ast.List,
-    ast.Dict,
-    ast.Set,
-    ast.UnaryOp,
-    ast.BinOp,
-    ast.unaryop,
-    ast.operator,
-    ast.expr_context,
-)
 
+def _brace_lookalike_error(expression: str) -> str | None:
+    """The message for braces that were meant to stay braces, if these were.
 
-def _interpolates_a_literal(expression: str) -> bool:
-    """Whether the braces hold a literal instead of naming anything.
-
-    `'^\\d{2}$'` is a regex the author forgot to double the braces in, and
-    Python read `{2}` as an interpolation of the int 2. By the time it is a
-    value there is no way to tell that from a parameter someone meant to
-    bind, so the source text between the braces is what answers it: nothing
-    in the program is named, so nothing was meant to bind.
+    `'^\\d{2}$'` is a regex whose braces weren't doubled, and Python read
+    `{2}` as an interpolation of the int 2. Nothing downstream can tell that
+    from a parameter, so the source text between the braces answers it — but
+    only for the two shapes a forgotten brace actually makes: a bare integer
+    (a quantifier) and a comma-separated run of literals (an array literal,
+    a regex range). Every other literal is left alone to bind, because
+    `{None}`, `{"active"}` and `{True}` are values someone meant.
     """
     try:
-        tree = ast.parse(expression, mode="eval")
+        node = ast.parse(expression, mode="eval").body
     except SyntaxError:
-        return False
-    return all(isinstance(node, _LITERAL_NODES) for node in ast.walk(tree))
+        return None
+
+    doubled = f"{{{{{expression}}}}}"
+
+    # `type(...) is int` rather than isinstance: True is an int, and a bool
+    # is a value to bind.
+    if isinstance(node, ast.Constant) and type(node.value) is int:
+        return (
+            f"{{{expression}}} interpolates the number {node.value} as a bound "
+            "parameter. Write the number into the SQL, or — if this was meant "
+            "to be a literal brace, a regex quantifier like \\d{2} or an array "
+            f"literal — write {doubled}."
+        )
+
+    # `'{1,2,3}'` parses as a tuple. A set can only come from braces the
+    # author typed on purpose, but psycopg can't adapt one either way.
+    if isinstance(node, ast.Tuple | ast.Set) and all(
+        isinstance(element, ast.Constant) for element in node.elts
+    ):
+        kind = type(node).__name__.lower()
+        return (
+            f"{{{expression}}} interpolates a {kind} of literals as a bound "
+            "parameter. Write them into the SQL, or — if this was meant to be "
+            "a literal brace, an array literal or a regex range — write "
+            f"{doubled}."
+        )
+
+    return None
 
 
 def _render_interpolation(
@@ -232,14 +243,8 @@ def _render_interpolation(
     value = interpolation.value
     format_spec = interpolation.format_spec
 
-    if _interpolates_a_literal(written):
-        raise ValueError(
-            f"{{{written}}} interpolates a literal, which is never a value "
-            "worth binding — it is almost always a brace that should have "
-            "been doubled. A literal brace in SQL — a regex quantifier like "
-            "\\d{2}, an array or jsonb literal — is written `{{`, and `}` is "
-            "written `}}`."
-        )
+    if (lookalike := _brace_lookalike_error(written)) is not None:
+        raise ValueError(lookalike)
 
     if interpolation.conversion:
         raise ValueError(

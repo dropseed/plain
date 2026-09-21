@@ -569,7 +569,7 @@ Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = ANY({ids}
 
 A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
 
-A `{` that isn't an interpolation — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any f-string. Forget it and Python reads the braces as an interpolation, so `'^\d{2}$'` would quietly bind the number 2; `sql()` refuses an interpolation whose braces hold nothing but a literal, and says to double them.
+A `{` that isn't an interpolation — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any f-string. Forget it and Python reads the braces as an interpolation, so `'^\d{2}$'` would quietly bind the number 2. `sql()` catches the shapes a forgotten brace makes — a bare number, and a comma-separated run of literals like `{1,2,3}` or `{2,5}` — and says to double them. (A jsonb literal trips the format-spec error instead, because `{"a": 1}` splits into an expression and a spec; that message says to double them too.) Any other literal is a value: `{None}` binds NULL, `{"active"}` and `{True}` bind as themselves.
 
 `!r` and `!s` are refused — there is nothing to convert — and the only format specs are the two in the table: `:*` on a model and `:name` on a column. Anything else raises, quoting what you wrote between the braces. So does a model **instance** or a relation accessor: `{job}` and `{Widget.tags}` are not columns, and the message says what to write instead.
 

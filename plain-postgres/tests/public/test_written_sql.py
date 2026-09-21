@@ -746,7 +746,7 @@ def test_a_format_spec_on_a_nested_template_is_refused(db):
 
 def test_an_undoubled_regex_quantifier_is_refused(db):
     """`{2}` is a quantifier the braces weren't doubled in, not a parameter."""
-    with pytest.raises(ValueError, match="interpolates a literal"):
+    with pytest.raises(ValueError, match="interpolates the number 2"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE name ~ '^a{2}$'")
 
 
@@ -759,8 +759,14 @@ def test_a_doubled_regex_quantifier_renders_the_brace(widgets):
     assert statement.get().name == "aa"
 
 
+def test_an_undoubled_regex_range_is_refused(db):
+    """`{2,5}` reaches the renderer as a tuple of two ints."""
+    with pytest.raises(ValueError, match="interpolates a tuple"):
+        Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE name ~ '^a{2, 5}$'")
+
+
 def test_an_undoubled_array_literal_is_refused(db):
-    with pytest.raises(ValueError, match="interpolates a literal"):
+    with pytest.raises(ValueError, match="interpolates a tuple"):
         Widget.query.sql(t"SELECT '{1, 2, 3}'::int[] AS ids")
 
 
@@ -774,7 +780,12 @@ def test_a_doubled_array_literal_renders(db):
 
 
 def test_an_undoubled_jsonb_literal_is_refused(db):
-    with pytest.raises(ValueError, match="interpolates a literal"):
+    """`{"a": 1}` splits into the expression `"a"` and a junk format spec.
+
+    So it lands on the format-spec refusal rather than the brace lookalike,
+    and that message carries the doubling hint too.
+    """
+    with pytest.raises(ValueError, match="double it"):
         Widget.query.sql(t"""SELECT '{"a": 1}'::jsonb AS payload""")
 
 
@@ -787,6 +798,38 @@ def test_a_doubled_jsonb_literal_renders(db):
         t"""SELECT '{{"a": 1}}'::jsonb AS payload""", result_type=Payload
     )
     assert statement.get() == Payload(payload={"a": 1})
+
+
+def test_none_binds_as_null(db):
+    """`{None}` is a value, not a brace lookalike — it sets a column NULL."""
+    ReturningEvent.query.create(label="signup", count=1, payload={"plan": "pro"})
+
+    statement = ReturningEvent.query.sql(
+        t"""
+        UPDATE {ReturningEvent} SET {ReturningEvent.payload:name} = {None}
+        RETURNING {ReturningEvent:*}
+        """
+    )
+    assert statement.params == (None,)
+    assert statement.get().payload is None
+
+
+def test_a_string_literal_binds(widgets):
+    statement = Widget.query.sql(
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {'small'}"
+    )
+    assert statement.params == ("small",)
+    assert statement.get().name == "small-widget"
+
+
+def test_a_boolean_literal_binds(db):
+    @dataclass
+    class Flag:
+        flag: bool
+
+    statement = Widget.query.sql(t"SELECT {True}::boolean AS flag", result_type=Flag)
+    assert statement.params == (True,)
+    assert statement.get() == Flag(flag=True)
 
 
 # ---------------------------------------------------------------------------
