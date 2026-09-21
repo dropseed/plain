@@ -51,6 +51,7 @@ from .indexes import Index
 from .options import Options
 from .query import QuerySet, RowQuerySet
 from .query_utils import Q
+from .written import Fragment, Written
 from . import types
 
 # This module exports the user-facing API for defining model classes,
@@ -82,6 +83,7 @@ __all__ = [
     "Field",
     "FloatField",
     "ForeignKeyField",
+    "Fragment",
     "GenericIPAddressField",
     "Index",
     "IntegerField",
@@ -107,6 +109,7 @@ __all__ = [
     "URLField",
     "UUIDField",
     "UniqueConstraint",
+    "Written",
     "get_connection",
     "models_registry",
     "register_model",

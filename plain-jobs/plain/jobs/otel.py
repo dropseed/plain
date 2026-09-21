@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import importlib.metadata
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import wraps
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -23,7 +25,7 @@ from opentelemetry.semconv._incubating.metrics.messaging_metrics import (
     create_messaging_client_sent_messages,
 )
 from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
-from plain.postgres.aggregates import Count, Min
+from plain.postgres.aggregates import Count
 from plain.postgres.db import return_database_connection
 from plain.postgres.otel import suppress_db_tracing
 from plain.utils import timezone
@@ -263,21 +265,26 @@ class WorkerMetrics:
         from .models import JobRequest
 
         queues = active.worker.queues
-        # `values(...).annotate(...)` is a grouped aggregate, which has no
-        # typed spelling — only the condition converts.
-        rows = (
-            JobRequest.query.ready_to_run()
-            .where(JobRequest.queue.is_in(queues))
-            .values("queue")
-            .annotate(oldest=Min("created_at"))
+        # A grouped aggregate is a written query: the ready-to-run queryset
+        # goes in as the subquery it already is.
+        rows = JobRequest.query.sql(
+            """
+            SELECT ready.queue AS queue, min(ready.created_at) AS "oldest?"
+            FROM {ready} ready
+            WHERE ready.queue = ANY({queues})
+            GROUP BY 1
+            """,
+            ready=JobRequest.query.ready_to_run(),
+            queues=queues,
+            result_type=_QueueOldest,
         )
         now = timezone.now()
         # `max(0, ...)` defends against Python/Postgres clock skew producing
         # a negative age. Empty queues fall through to 0.0 below.
         ages = {
-            row["queue"]: max(0.0, (now - row["oldest"]).total_seconds())
+            row.queue: max(0.0, (now - row.oldest).total_seconds())
             for row in rows
-            if row["oldest"] is not None
+            if row.oldest is not None
         }
         return [
             Observation(ages.get(q, 0.0), {MESSAGING_DESTINATION_NAME: q})
@@ -325,12 +332,34 @@ class WorkerMetrics:
         ]
 
 
+@dataclass
+class _QueueCount:
+    queue: str
+    n: int
+
+
+@dataclass
+class _QueueOldest:
+    queue: str
+    oldest: datetime.datetime | None
+
+
 def _count_per_queue(queryset: Any, queues: list[str]) -> list[Observation]:
-    # Still `filter()`: `queryset` is `Any` (it takes JobRequest and JobProcess
-    # querysets alike), so a typed condition would have to reach its field
-    # through `queryset.model` and would be checked against nothing anyway.
-    rows = queryset.filter(queue__in=queues).values("queue").annotate(c=Count("*"))
-    counts = {row["queue"]: row["c"] for row in rows}
+    # `queryset` is `Any` -- it takes JobRequest and JobProcess querysets
+    # alike -- so it goes into the written statement as the subquery it
+    # already is, and the grouping is written out.
+    rows = queryset.model.query.sql(
+        """
+        SELECT rows.queue AS queue, count(*) AS "n!"
+        FROM {queryset} rows
+        WHERE rows.queue = ANY({queues})
+        GROUP BY 1
+        """,
+        queryset=queryset,
+        queues=queues,
+        result_type=_QueueCount,
+    )
+    counts = {row.queue: row.n for row in rows}
     return [
         Observation(counts.get(q, 0), {MESSAGING_DESTINATION_NAME: q}) for q in queues
     ]

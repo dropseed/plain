@@ -518,7 +518,7 @@ class ForeignKeyField(ColumnField, RelatedField):
         )
 
     def _db_violation_error(
-        self, instance: Model, model: type[Model]
+        self, instance: Model | None, model: type[Model]
     ) -> ValidationError:
         """The ValidationError for a ForeignKeyViolation on a write of
         ``instance`` — the referenced row doesn't exist. Routed to this field,
@@ -526,14 +526,18 @@ class ForeignKeyField(ColumnField, RelatedField):
 
         Same signature as ``BaseConstraint._db_violation_error`` so the write
         path treats a foreign key and a declared constraint alike; ``model``
-        is unused here."""
+        is unused here. Without an instance — a written statement writes rows,
+        not objects — the message names the model but not the value, which
+        only the row being written carries."""
         assert self.name is not None
         error = ValidationError(
             self.does_not_exist_error_message,
             code="invalid_choice",
             params={
                 "object_name": self.related_model.model_options.object_name,
-                "value": self.value_from_object(instance),
+                "value": (
+                    "?" if instance is None else self.value_from_object(instance)
+                ),
             },
         )
         return ValidationError({self.name: [error]})

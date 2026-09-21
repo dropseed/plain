@@ -1192,6 +1192,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "plain-admin" },
     { name = "plain-pytest" },
 ]
 
@@ -1206,6 +1207,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.27" },
+    { name = "plain-admin", editable = "plain-admin" },
     { name = "plain-pytest", editable = "plain-pytest" },
 ]
 

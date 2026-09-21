@@ -69,6 +69,7 @@ __all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
     from plain.postgres import Model
+    from plain.postgres.written import Written
 
 
 def conflict_sort_value(field: Field, value: Any) -> str:
@@ -1915,6 +1916,98 @@ class QuerySet[T: "Model"]:
         )
         qs._prefetch_lookups = self._prefetch_lookups[:]
         return qs
+
+    @overload
+    def sql[R: DataclassInstance](
+        self, template: str, *, result_type: type[R], **values: Any
+    ) -> Written[R]: ...
+
+    @overload
+    def sql(
+        self, template: str, *, result_type: None = None, **values: Any
+    ) -> Written[T]: ...
+
+    def sql(self, template: str, *, result_type: Any = None, **values: Any) -> Any:
+        """Write the query out, with `{}` references resolved against the models.
+
+        The written half of the query API: `where()`/`order_by()` build a query
+        the code assembles, `sql()` runs one you wrote.
+
+        The statement is the whole query, so it starts from the bare model --
+        `Model.query.sql(...)`. A queryset that has been narrowed cannot carry
+        its narrowing into written SQL, and silently dropping it would drop
+        whatever that filter was there to enforce. Embed the queryset as a
+        subquery instead: `sql("... FROM {rows} r", rows=narrowed)`.
+
+        See `plain.postgres.written` and the README for the reference table.
+        """
+        self._reject_narrowed_for_sql()
+
+        from plain.postgres.written import Written
+
+        return Written(
+            model=self.model,
+            template=template,
+            values=values,
+            result_type=result_type,
+        )
+
+    def _reject_narrowed_for_sql(self) -> None:
+        """Refuse sql() on a queryset narrowed past the model's own default.
+
+        `Model.query` is the starting point, whatever it is: a model whose
+        default queryset already filters -- a soft-delete scope, say -- can
+        still write SQL. What it can't do is *carry* that scope into the
+        statement, so the comparison is against a fresh `Model.query` and the
+        statement has to state the predicate itself.
+        """
+        if self._compiles_like_the_models_own_queryset():
+            return
+
+        query = self.sql_query
+        narrowings = {
+            "where()/filter()": query.has_filters(),
+            "order_by()": bool(query.order_by),
+            "distinct()": query.distinct,
+            "slicing": bool(query.low_mark) or query.high_mark is not None,
+            "annotate()": bool(query.annotations),
+            "values()/values_list()/select()": self._fields is not None
+            or bool(query.values_select)
+            or bool(query.select),
+            "join()": bool(query.joined_relations),
+            "prefetch()": bool(self._prefetch_lookups),
+            "only()/defer()": bool(query.deferred_loading[0]),
+            "for_update()": query.lock_mode is not None,
+            "returning()": self._returning_fields is not None
+            or self._returning_instances,
+        }
+        applied = [name for name, is_set in narrowings.items() if is_set]
+        raise TypeError(
+            f"sql() takes the whole query, so it starts from "
+            f"{self.model.__name__}.query — this one already has "
+            f"{', '.join(applied) or 'been narrowed'}, which a written "
+            "statement can't carry. Put the queryset in the statement as a "
+            'subquery instead: sql("... FROM {rows} r", rows=queryset).'
+        )
+
+    def _compiles_like_the_models_own_queryset(self) -> bool:
+        """Whether this queryset is still exactly what `Model.query` hands out.
+
+        Compiled SQL is the comparison, so a default scope's own filter counts
+        as unnarrowed while anything added to it doesn't. `elide_empty=False`
+        keeps a queryset that can't match anything compilable instead of
+        raising out of the check.
+        """
+
+        def compiled(queryset: QuerySet[Any]) -> Any:
+            return queryset.sql_query.get_compiler(elide_empty=False).as_sql()
+
+        try:
+            return compiled(self) == compiled(self.model.query)
+        except Exception:
+            # Anything that won't compile is, by definition, not the plain
+            # queryset the model hands out.
+            return False
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()

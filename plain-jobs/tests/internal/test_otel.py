@@ -655,6 +655,62 @@ def test_queue_scheduled_counts_future_jobs_only(metrics) -> None:
 
 
 @pytest.mark.usefixtures("db")
+def test_written_queue_aggregates_match_values_annotate(metrics) -> None:
+    """The gauges' written statements return what `values().annotate()` did.
+
+    Both gauge queries used to be grouped aggregates built with
+    `values("queue").annotate(...)`; they are `sql()` statements now, and the
+    rows have to be the same ones.
+    """
+    from plain.jobs.models import JobRequest
+    from plain.postgres.aggregates import Count, Min
+    from plain.utils import timezone
+
+    _NoopJob().run_in_worker()
+    _NoopJob().run_in_worker()
+    queues = ["default", "empty"]
+    metrics(_WorkerStub(queues=queues))
+
+    counted = {
+        row["queue"]: row["c"]
+        for row in JobRequest.query.ready_to_run()
+        .filter(queue__in=queues)
+        .values("queue")
+        .annotate(c=Count("*"))
+    }
+    assert _by_queue(otel.WorkerMetrics._gauge_queue_depth) == {
+        queue: counted.get(queue, 0) for queue in queues
+    }
+
+    oldest = {
+        row["queue"]: row["oldest"]
+        for row in JobRequest.query.ready_to_run()
+        .where(JobRequest.queue.is_in(queues))
+        .values("queue")
+        .annotate(oldest=Min("created_at"))
+    }
+    now = timezone.now()
+    ages = _by_queue(otel.WorkerMetrics._gauge_queue_oldest_age)
+    assert set(ages) == set(queues)
+    assert ages["empty"] == 0.0
+    assert ages["default"] == pytest.approx(
+        (now - oldest["default"]).total_seconds(), abs=1.0
+    )
+
+
+@pytest.mark.usefixtures("db")
+def test_written_queue_aggregates_are_empty_without_jobs(metrics) -> None:
+    """No rows means no groups -- every handled queue still reports zero."""
+    queues = ["default", "priority"]
+    metrics(_WorkerStub(queues=queues))
+
+    assert _by_queue(otel.WorkerMetrics._gauge_queue_depth) == dict.fromkeys(queues, 0)
+    assert _by_queue(otel.WorkerMetrics._gauge_queue_oldest_age) == dict.fromkeys(
+        queues, 0.0
+    )
+
+
+@pytest.mark.usefixtures("db")
 def test_queue_oldest_age_returns_seconds(metrics) -> None:
     _NoopJob().run_in_worker()
 

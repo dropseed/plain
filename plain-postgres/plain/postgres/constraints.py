@@ -66,12 +66,16 @@ class BaseConstraint:
         return ValidationError(self.violation_error)
 
     def _db_violation_error(
-        self, instance: Model, model: type[Model]
+        self, instance: Model | None, model: type[Model]
     ) -> ValidationError | None:
         """The ValidationError to raise when the database reports a violation
         of this constraint (mapped from an IntegrityError at the write
         boundary), or None if this constraint type can't be mapped — the
         caller then re-raises the original IntegrityError.
+
+        `instance` is the row being written, when there is one: an instance
+        write has it, a written statement (`sql()`) doesn't. A constraint that
+        needs it to describe the violation returns None without it.
 
         Subclasses that can describe their own violations override this.
         """
@@ -157,8 +161,9 @@ class CheckConstraint(BaseConstraint):
             pass
 
     def _db_violation_error(
-        self, instance: Model, model: type[Model]
+        self, instance: Model | None, model: type[Model]
     ) -> ValidationError | None:
+        # A check constraint describes itself; the row adds nothing.
         return self._build_violation_error()
 
     def __repr__(self) -> str:
@@ -398,7 +403,7 @@ class UniqueConstraint(BaseConstraint):
                 pass
 
     def _build_unique_violation(
-        self, instance: Model, model: type[Model]
+        self, instance: Model | None, model: type[Model]
     ) -> ValidationError:
         """Build the ValidationError for a unique violation.
 
@@ -425,7 +430,7 @@ class UniqueConstraint(BaseConstraint):
 
     def _unique_error_message(
         self,
-        instance: Model,
+        instance: Model | None,
         model: type[Model],
         unique_check: tuple[str, ...],
     ) -> ValidationError:
@@ -465,6 +470,6 @@ class UniqueConstraint(BaseConstraint):
         )
 
     def _db_violation_error(
-        self, instance: Model, model: type[Model]
+        self, instance: Model | None, model: type[Model]
     ) -> ValidationError | None:
         return self._build_unique_violation(instance, model)
