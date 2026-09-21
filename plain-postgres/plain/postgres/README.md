@@ -486,7 +486,7 @@ for row in stats:
     print(row.queue, row.n)
 ```
 
-The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one, and it runs on the same connection and transaction as every other query. A statement runs **once** — its rows are cached, the way a queryset caches results — so iterating twice can't repeat a write. Call `sql()` again to run it again.
+The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once** — its rows are cached, the way a queryset caches results — so iterating twice can't repeat a write. Call `sql()` again to run it again.
 
 Only the model matters on the queryset you call it from: `Widget.query.filter(...).sql(...)` ignores the filter.
 
@@ -581,6 +581,8 @@ gone = Widget.query.sql(
     "DELETE FROM {Widget} WHERE {Widget.size} = {size}", size="tiny"
 ).execute()
 ```
+
+`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way.
 
 A violated check or unique constraint raises the same `ValidationError` a model write raises. A written statement has no instance to describe, so only declared constraints map; anything else re-raises as `psycopg.IntegrityError`.
 

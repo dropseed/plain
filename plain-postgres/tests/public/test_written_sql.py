@@ -408,6 +408,17 @@ def test_write_without_returning_gives_a_row_count(widgets):
     assert Widget.query.filter(size="tiny").count() == 1
 
 
+def test_execute_counts_rows_without_shaping_them(widgets):
+    """A write can RETURNING without saying what a row is; execute() counts."""
+    statement = Widget.query.sql(
+        "DELETE FROM {Widget} WHERE {Widget.size} = {size} RETURNING {Widget.id}",
+        size="small",
+    )
+    assert statement.execute() == 1
+    assert statement.count() == 1
+    assert Widget.query.filter(size="small").count() == 0
+
+
 def test_insert_returning_a_result_type(db):
     @dataclass
     class NewWidget:

@@ -545,11 +545,11 @@ def _build_plan(
         )
 
     if result_type is None:
+        star = f"{{{model.__name__}.*}}"
         raise TypeError(
             f"This statement returns columns ({', '.join(names)}) and nothing "
-            "says what a row is. Select {"
-            + model.__name__
-            + ".*} to get instances, or pass result_type= a dataclass."
+            f"says what a row is. Select {star} to get instances, or pass "
+            "result_type= a dataclass."
         )
 
     _check_result_type(result_type, names, columns, fields, connection)
@@ -774,8 +774,11 @@ class Written[R]:
         self._instance_model = next(iter(star_models), None)
         self._sql = rendered.sql
         self._params = rendered.params
+        self._executed = False
+        self._row_count = 0
+        self._raw_rows: list[tuple[Any, ...]] = []
+        self._columns: list[_Column] | None = None
         self._result_cache: list[R] | None = None
-        self._row_count: int | None = None
 
     # -- what it renders to -------------------------------------------------
 
@@ -794,9 +797,10 @@ class Written[R]:
 
     # -- running it ---------------------------------------------------------
 
-    def _fetch(self) -> list[R]:
-        if self._result_cache is not None:
-            return self._result_cache
+    def _run(self) -> None:
+        """Execute the statement, once, and keep its raw rows."""
+        if self._executed:
+            return
 
         connection = get_connection()
         with connection.cursor() as cursor:
@@ -809,16 +813,24 @@ class Written[R]:
                     raise error from exc
                 raise
             self._row_count = cursor.rowcount
-            columns = (
-                _describe_columns(cursor) if cursor.description is not None else None
-            )
-            rows = cursor.fetchall() if columns is not None else []
+            # `description` is None for a statement with no result at all —
+            # a write with no RETURNING clause.
+            if cursor.description is not None:
+                self._columns = _describe_columns(cursor)
+                self._raw_rows = cursor.fetchall()
+        self._executed = True
 
-        if columns is None:
-            # A write with no RETURNING: there is nothing to yield.
+    def _fetch(self) -> list[R]:
+        """The rows, hydrated — instances or `result_type` rows."""
+        self._run()
+        if self._result_cache is not None:
+            return self._result_cache
+
+        if self._columns is None:
             self._result_cache = []
             return self._result_cache
 
+        connection = get_connection()
         key = (self._model, self._template, self._result_type)
         plan = _plans.get(key)
         if plan is None:
@@ -827,12 +839,12 @@ class Written[R]:
                 template=self._template,
                 instance_model=self._instance_model,
                 result_type=self._result_type,
-                columns=columns,
+                columns=self._columns,
                 connection=connection,
             )
             _plans[key] = plan
 
-        self._result_cache = plan.build(rows, connection)
+        self._result_cache = plan.build(self._raw_rows, connection)
         return self._result_cache
 
     def _scalar(self, sql: str) -> Any:
@@ -890,22 +902,23 @@ class Written[R]:
 
     def count(self) -> int:
         """How many rows the statement returns."""
-        if self._result_cache is not None:
-            return len(self._result_cache)
+        if self._executed:
+            return len(self._raw_rows)
         return self._scalar(f'SELECT count(*) FROM ({self._sql}) "written"')
 
     def exists(self) -> bool:
         """Whether the statement returns any row at all."""
-        if self._result_cache is not None:
-            return bool(self._result_cache)
+        if self._executed:
+            return bool(self._raw_rows)
         return self._scalar(f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")')
 
     def execute(self) -> int:
         """Run the statement and return how many rows it affected.
 
-        This is the write without a RETURNING clause — the rows are gone
-        either way, and the count is what an `UPDATE` or `DELETE` has to say.
+        This is the write without a RETURNING clause — the count is what an
+        `UPDATE` or `DELETE` has to say. It runs the statement without
+        shaping any rows, so a statement with no `result_type` and no
+        `{Model.*}` is still runnable this way.
         """
-        self._fetch()
-        assert self._row_count is not None
+        self._run()
         return self._row_count
