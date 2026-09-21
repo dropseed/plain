@@ -235,7 +235,7 @@ class ModelIterable(BaseIterable):
 
             # Add the known related objects to the model.
             for field, rel_objs, rel_getter in known_related_objects:
-                # Avoid overwriting objects loaded by, e.g., select_related().
+                # Avoid overwriting objects loaded by, e.g., join().
                 if field.is_cached(obj):
                     continue
                 rel_obj_id = rel_getter(obj)
@@ -430,7 +430,7 @@ class QuerySet[T: "Model"]:
     _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
-    _prefetch_related_lookups: tuple[Any, ...]
+    _prefetch_lookups: tuple[Any, ...]
     _prefetch_done: bool
     _known_related_objects: dict[Any, dict[Any, Any]]
     _iterable_class: type[BaseIterable]
@@ -458,7 +458,7 @@ class QuerySet[T: "Model"]:
         instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
-        instance._prefetch_related_lookups = ()
+        instance._prefetch_lookups = ()
         instance._prefetch_done = False
         instance._known_related_objects = {}
         instance._iterable_class = ModelIterable
@@ -716,13 +716,13 @@ class QuerySet[T: "Model"]:
             self,
             chunked_fetch=use_chunked_fetch,
         )
-        if not self._prefetch_related_lookups or chunk_size is None:
+        if not self._prefetch_lookups or chunk_size is None:
             yield from iterable
             return
 
         iterator = iter(iterable)
         while results := list(islice(iterator, chunk_size)):
-            prefetch_related_objects(results, *self._prefetch_related_lookups)
+            prefetch_objects(results, *self._prefetch_lookups)
             yield from results
 
     def iterator(self, chunk_size: int | None = None) -> Iterator[T]:
@@ -732,10 +732,10 @@ class QuerySet[T: "Model"]:
         related objects. Otherwise, a default chunk_size of 2000 is supplied.
         """
         if chunk_size is None:
-            if self._prefetch_related_lookups:
+            if self._prefetch_lookups:
                 raise ValueError(
                     "chunk_size must be provided when using QuerySet.iterator() after "
-                    "prefetch_related()."
+                    "prefetch()."
                 )
         elif chunk_size <= 0:
             raise ValueError("Chunk size must be strictly positive.")
@@ -1742,7 +1742,7 @@ class QuerySet[T: "Model"]:
         # The lock is kept: the delete compiler moves it onto the sub-select
         # that picks the rows, which is what makes a locked claim-and-delete
         # safe against a second worker.
-        del_query.sql_query.select_related = False
+        del_query.sql_query.joined_relations = False
         del_query.sql_query.clear_ordering(force=True)
 
         # RESTRICT violations leave the DB transaction aborted. Mark the
@@ -1849,10 +1849,10 @@ class QuerySet[T: "Model"]:
             return self.sql_query.has_results()
         return bool(self._result_cache)
 
-    def _prefetch_related_objects(self) -> None:
+    def _prefetch_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
         assert self._result_cache is not None
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        prefetch_objects(self._result_cache, *self._prefetch_lookups)
         self._prefetch_done = True
 
     def explain(self, *, format: str | None = None, **options: Any) -> str:
@@ -1878,7 +1878,7 @@ class QuerySet[T: "Model"]:
             params=tuple(params),
             translations=translations,
         )
-        qs._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        qs._prefetch_lookups = self._prefetch_lookups[:]
         return qs
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
@@ -2122,13 +2122,13 @@ class QuerySet[T: "Model"]:
                 "the rows a write touched, and a select() queryset cannot "
                 "write. Drop the returning() call."
             )
-        if self._prefetch_related_lookups:
+        if self._prefetch_lookups:
             # A prefetch hangs related objects off each result's attributes,
             # and a row -- tuple, scalar or dataclass -- has nowhere to put
             # them. Left alone it is silently wasted work for tuples and an
             # AttributeError for result_type=.
             raise TypeError(
-                "Cannot call select() after prefetch_related() — prefetched "
+                "Cannot call select() after prefetch() — prefetched "
                 "objects are attached to model instances, and select() returns "
                 "rows. Select the columns you need from the related model "
                 "instead."
@@ -2339,43 +2339,42 @@ class QuerySet[T: "Model"]:
         obj.sql_query.lock_of = of
         return obj
 
-    def select_related(self, *fields: str | None) -> Self:
+    def join(self, *fields: str | None) -> Self:
         """
-        Return a new QuerySet instance that will select related objects.
+        Return a new QuerySet that pulls related objects into the same query
+        with a SQL join, instead of a separate query per related object.
 
         If fields are specified, they must be ForeignKeyField fields and only those
-        related objects are included in the selection.
+        related objects are joined.
 
-        If select_related(None) is called, clear the list.
+        If join(None) is called, clear the list.
         """
         if self._fields is not None:
-            raise TypeError(
-                "Cannot call select_related() after .values() or .values_list()"
-            )
+            raise TypeError("Cannot call join() after .values() or .values_list()")
 
         obj = self._chain()
         if fields == (None,):
-            obj.sql_query.select_related = False
+            obj.sql_query.joined_relations = False
         elif fields:
-            obj.sql_query.add_select_related(list(fields))  # ty: ignore[invalid-argument-type]
+            obj.sql_query.add_joined_relations(list(fields))  # ty: ignore[invalid-argument-type]
         else:
-            obj.sql_query.select_related = True
+            obj.sql_query.joined_relations = True
         return obj
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> Self:
+    def prefetch(self, *lookups: str | Prefetch | None) -> Self:
         """
         Return a new QuerySet instance that will prefetch the specified
         Many-To-One and Many-To-Many related objects when the QuerySet is
         evaluated.
 
-        When prefetch_related() is called more than once, append to the list of
-        prefetch lookups. If prefetch_related(None) is called, clear the list.
+        When prefetch() is called more than once, append to the list of
+        prefetch lookups. If prefetch(None) is called, clear the list.
         """
         clone = self._chain()
         if lookups == (None,):
-            clone._prefetch_related_lookups = ()
+            clone._prefetch_lookups = ()
         else:
-            clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
+            clone._prefetch_lookups = clone._prefetch_lookups + lookups
         return clone
 
     def annotate(self, *args: Any, **kwargs: Any) -> Self:
@@ -2611,7 +2610,7 @@ class QuerySet[T: "Model"]:
             query=self.sql_query.chain(),
         )
         c._sticky_filter = self._sticky_filter
-        c._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        c._prefetch_lookups = self._prefetch_lookups[:]
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
@@ -2624,7 +2623,7 @@ class QuerySet[T: "Model"]:
         """Carry a result cache onto a chained QuerySet.
 
         Whenever a cache is moved onto a new QuerySet, the prefetch state
-        must ride along with it — otherwise prefetch_related() would re-run
+        must ride along with it — otherwise prefetch() would re-run
         (or be skipped). Keep both writes together here so callers can't
         forget the pairing.
         """
@@ -2634,8 +2633,8 @@ class QuerySet[T: "Model"]:
     def _fetch_all(self) -> None:
         if self._result_cache is None:
             self._result_cache = list(self._iterable_class(self))
-        if self._prefetch_related_lookups and not self._prefetch_done:
-            self._prefetch_related_objects()
+        if self._prefetch_lookups and not self._prefetch_done:
+            self._prefetch_objects()
 
     def _next_is_sticky(self) -> Self:
         """
@@ -2894,9 +2893,9 @@ class RowQuerySet[R](QuerySet[Any]):
             "selected type. Annotate first, then select()."
         )
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> Never:
+    def prefetch(self, *lookups: str | Prefetch | None) -> Never:
         raise TypeError(
-            "Cannot call prefetch_related() after select() — prefetched "
+            "Cannot call prefetch() after select() — prefetched "
             "objects are attached to model instances, and select() returns "
             "rows. Select the columns you need from the related model instead."
         )
@@ -3021,7 +3020,7 @@ class RawQuerySet:
         self.params = params
         self.translations = translations or {}
         self._result_cache: list[Model] | None = None
-        self._prefetch_related_lookups: tuple[Any, ...] = ()
+        self._prefetch_lookups: tuple[Any, ...] = ()
         self._prefetch_done = False
 
     def resolve_model_init_order(
@@ -3042,18 +3041,18 @@ class RawQuerySet:
         model_init_names = [f.name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:
-        """Same as QuerySet.prefetch_related()"""
+    def prefetch(self, *lookups: str | Prefetch | None) -> RawQuerySet:
+        """Same as QuerySet.prefetch()"""
         clone = self._clone()
         if lookups == (None,):
-            clone._prefetch_related_lookups = ()
+            clone._prefetch_lookups = ()
         else:
-            clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
+            clone._prefetch_lookups = clone._prefetch_lookups + lookups
         return clone
 
-    def _prefetch_related_objects(self) -> None:
+    def _prefetch_objects(self) -> None:
         assert self._result_cache is not None
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        prefetch_objects(self._result_cache, *self._prefetch_lookups)
         self._prefetch_done = True
 
     def _clone(self) -> RawQuerySet:
@@ -3065,14 +3064,14 @@ class RawQuerySet:
             params=self.params,
             translations=self.translations,
         )
-        c._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        c._prefetch_lookups = self._prefetch_lookups[:]
         return c
 
     def _fetch_all(self) -> None:
         if self._result_cache is None:
             self._result_cache = list(self.iterator())
-        if self._prefetch_related_lookups and not self._prefetch_done:
-            self._prefetch_related_objects()
+        if self._prefetch_lookups and not self._prefetch_done:
+            self._prefetch_objects()
 
     def __len__(self) -> int:
         self._fetch_all()
@@ -3210,7 +3209,7 @@ def normalize_prefetch_lookups(
     return ret
 
 
-def prefetch_related_objects(
+def prefetch_objects(
     model_instances: Sequence[Model], *related_lookups: str | Prefetch
 ) -> None:
     """
@@ -3220,7 +3219,7 @@ def prefetch_related_objects(
     if not model_instances:
         return  # nothing to do
 
-    # We need to be able to dynamically add to the list of prefetch_related
+    # We need to be able to dynamically add to the list of prefetch()
     # lookups that we look up (see below).  So we need some book keeping to
     # ensure we don't do duplicate work.
     done_queries = {}  # dictionary of things like 'foo__bar': [results]
@@ -3270,7 +3269,7 @@ def prefetch_related_objects(
                         # values_list(flat=True), for example (TypeError) or
                         # a QuerySet subclass that isn't returning Model
                         # instances (AttributeError), either in Plain or a 3rd
-                        # party. prefetch_related() doesn't make sense, so quit.
+                        # party. prefetch() doesn't make sense, so quit.
                         good_objects = False
                         break
             if not good_objects:
@@ -3279,7 +3278,7 @@ def prefetch_related_objects(
             # Descend down tree
 
             # We assume that objects retrieved are homogeneous (which is the premise
-            # of prefetch_related), so what applies to first object applies to all.
+            # of prefetch()), so what applies to first object applies to all.
             first_obj = obj_list[0]
             to_attr = lookup.get_current_to_attr(level)[0]
             prefetcher, descriptor, attr_found, is_fetched = get_prefetcher(
@@ -3289,7 +3288,7 @@ def prefetch_related_objects(
             if not attr_found:
                 raise AttributeError(
                     f"Cannot find '{through_attr}' on {first_obj.__class__.__name__} object, '{lookup.prefetch_through}' is an invalid "
-                    "parameter to prefetch_related()"
+                    "parameter to prefetch()"
                 )
 
             if level == len(through_attrs) - 1 and prefetcher is None:
@@ -3299,7 +3298,7 @@ def prefetch_related_objects(
                 raise ValueError(
                     f"'{lookup.prefetch_through}' does not resolve to an item that supports "
                     "prefetching - this is an invalid parameter to "
-                    "prefetch_related()."
+                    "prefetch()."
                 )
 
             obj_to_fetch = None
@@ -3332,7 +3331,7 @@ def prefetch_related_objects(
                 followed_descriptors.add(descriptor)
             else:
                 # Either a singly related object that has already been fetched
-                # (e.g. via select_related), or hopefully some other property
+                # (e.g. via join()), or hopefully some other property
                 # that doesn't support prefetching but needs to be traversed.
 
                 # We replace the current list of parent objects with the list
@@ -3426,13 +3425,13 @@ def prefetch_one_level(
     instances: list[Model], prefetcher: Any, lookup: Prefetch, level: int
 ) -> tuple[list[Model], list[Prefetch]]:
     """
-    Helper function for prefetch_related_objects().
+    Helper function for prefetch_objects().
 
     Run prefetches on all instances using the prefetcher object,
     assigning results to relevant caches in instance.
 
     Return the prefetched objects along with any additional prefetches that
-    must be done due to prefetch_related lookups found from default managers.
+    must be done due to prefetch() lookups found from default managers.
     """
     # prefetcher must have a method _get_prefetch_queryset() which takes a list
     # of instances, and returns a tuple:
@@ -3456,20 +3455,20 @@ def prefetch_one_level(
         is_descriptor,
     ) = prefetcher._get_prefetch_queryset(instances, lookup.get_current_queryset(level))
     # We have to handle the possibility that the QuerySet we just got back
-    # contains some prefetch_related lookups. We don't want to trigger the
-    # prefetch_related functionality by evaluating the query. Rather, we need
-    # to merge in the prefetch_related lookups.
+    # contains some prefetch() lookups. We don't want to trigger the
+    # prefetch() functionality by evaluating the query. Rather, we need
+    # to merge in the prefetch() lookups.
     # Copy the lookups in case it is a Prefetch object which could be reused
-    # later (happens in nested prefetch_related).
+    # later (happens in nested prefetch()).
     additional_lookups = [
         copy.copy(additional_lookup)
-        for additional_lookup in getattr(rel_qs, "_prefetch_related_lookups", ())
+        for additional_lookup in getattr(rel_qs, "_prefetch_lookups", ())
     ]
     if additional_lookups:
         # Don't need to clone because the queryset should have given us a fresh
         # instance, so we access an internal instead of using public interface
         # for performance reasons.
-        rel_qs._prefetch_related_lookups = ()
+        rel_qs._prefetch_lookups = ()
 
     all_related_objects = list(rel_qs)
 
@@ -3482,7 +3481,7 @@ def prefetch_one_level(
     # Make sure `to_attr` does not conflict with a field.
     if as_attr and instances:
         # We assume that objects retrieved are homogeneous (which is the premise
-        # of prefetch_related), so what applies to first object applies to all.
+        # of prefetch()), so what applies to first object applies to all.
         model = instances[0].__class__
         try:
             model._model_meta.get_field(to_attr)
@@ -3531,7 +3530,7 @@ def prefetch_one_level(
                         # The manager's query property returns a properly filtered QuerySet
                         qs = queryset.query
                 qs._result_cache = vals
-                # We don't want the individual qs doing prefetch_related now,
+                # We don't want the individual qs doing prefetch() now,
                 # since we have merged this into the current work.
                 qs._prefetch_done = True
                 obj._prefetched_objects_cache[cache_name] = qs
@@ -3540,9 +3539,9 @@ def prefetch_one_level(
 
 class RelatedPopulator:
     """
-    RelatedPopulator is used for select_related() object instantiation.
+    RelatedPopulator is used for join() object instantiation.
 
-    The idea is that each select_related() model will be populated by a
+    The idea is that each join() model will be populated by a
     different RelatedPopulator instance. The RelatedPopulator instances get
     klass_info and select (computed in SQLCompiler) plus the used db as
     input for initialization. That data is used to compute which columns
@@ -3550,7 +3549,7 @@ class RelatedPopulator:
     between the objects.
 
     The actual creation of the objects is done in populate() method. This
-    method gets row and from_obj as input and populates the select_related()
+    method gets row and from_obj as input and populates the join()
     model instance.
     """
 
@@ -3561,7 +3560,7 @@ class RelatedPopulator:
         #    - cols_start, cols_end: usually the columns in the row are
         #      in the same order model_cls.__init__ expects them, so we
         #      can instantiate by model_cls(*row[cols_start:cols_end])
-        #    - reorder_for_init: When select_related descends to a child
+        #    - reorder_for_init: When join() descends to a child
         #      class, then we want to reuse the already selected parent
         #      data. However, in this case the parent data isn't necessarily
         #      in the same order that Model.__init__ expects it to be, so
@@ -3574,7 +3573,7 @@ class RelatedPopulator:
         #    deferred models this isn't the same as all names of the
         #    model's fields.
         #  - related_populators: a list of RelatedPopulator instances if
-        #    select_related() descends to related models from this model.
+        #    join() descends to related models from this model.
         #  - local_setter, remote_setter: Methods to set cached values on
         #    the object being populated and on the remote object. Usually
         #    these are Field.set_cached_value() methods.

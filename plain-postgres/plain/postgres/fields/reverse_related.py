@@ -161,7 +161,7 @@ class ForeignObjectRel(FieldCacheMixin):
         forward model on the reverse model.
 
         Uses the related_query_name for caching, which provides a stable name
-        for prefetch_related operations.
+        for prefetch() operations.
         """
         return self.field.related_query_name()
 

@@ -426,7 +426,7 @@ class RegisterLookupMixin:
     )
 
 
-def select_related_descend(
+def join_relation_descend(
     field: Any,
     restricted: bool | None,
     requested: dict[str, Any] | None,
@@ -435,7 +435,7 @@ def select_related_descend(
 ) -> TypeGuard[RelatedField]:
     """
     Return True if this field should be used to descend deeper for
-    select_related() purposes. Used by both the query construction code
+    join() purposes. Used by both the query construction code
     (compiler.get_related_selections()) and the model instance creation code
     (compiler.klass_info).
 
@@ -443,9 +443,9 @@ def select_related_descend(
      * field - the field to be checked
      * restricted - a boolean field, indicating if the field list has been
        manually restricted using a requested clause)
-     * requested - The select_related() dictionary.
+     * requested - The join() dictionary.
      * select_mask - the dictionary of selected fields.
-     * reverse - boolean, True if we are checking a reverse select related
+     * reverse - boolean, True if we are checking a reverse join
     """
     from plain.postgres.fields.related import RelatedField
 
@@ -467,7 +467,7 @@ def select_related_descend(
     ):
         raise FieldError(
             f"Field {field.model.model_options.object_name}.{field.name} cannot be both "
-            "deferred and traversed using select_related at the same time."
+            "deferred and traversed using join() at the same time."
         )
     return True
 

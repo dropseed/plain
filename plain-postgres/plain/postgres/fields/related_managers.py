@@ -431,7 +431,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         # each secondary row back to the primary instance that owns it.
         queryset = queryset.annotate(
             **{
-                f"_prefetch_related_val_{fk.name}": RawSQL(
+                f"_prefetch_val_{fk.name}": RawSQL(
                     f"{qn(join_table)}.{qn(fk.column)}", []
                 )
             }
@@ -440,7 +440,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         target_field = fk.target_field
         return (
             queryset,
-            lambda result: getattr(result, f"_prefetch_related_val_{fk.name}"),
+            lambda result: getattr(result, f"_prefetch_val_{fk.name}"),
             lambda inst: target_field.get_db_prep_value(
                 target_field.value_from_object(inst), conn
             ),
