@@ -10,7 +10,12 @@ from plain.postgres.functions import (
     TruncMonth,
 )
 
-from ..field_refs import FieldRef, declared_field_ref, field_lookup_path
+from ..field_refs import (
+    FieldRef,
+    converge_declared_field,
+    field_lookup_path,
+    instance_field_ref,
+)
 from .base import Card
 
 
@@ -55,35 +60,36 @@ class TrendCard(ChartCard):
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        # Resolve the declared field references now, so a reference to another
-        # model's field is a TypeError at class definition rather than when
-        # the card is first rendered.
-        if cls.model is not None:
-            cls.get_datetime_field()
-            cls.get_group_field()
+        # Normalize the declared field references now, so a reference to
+        # another model's field is a TypeError at class definition rather than
+        # when the card is first rendered, and so no `Field` is left sitting
+        # on the class as a live descriptor.
+        converge_declared_field(cls, "datetime_field", model=cls.model)
+        converge_declared_field(cls, "group_field", model=cls.model)
 
-    @classmethod
-    def get_datetime_field(cls) -> str | None:
-        """`datetime_field` as a lookup path, checked against the card's model."""
-        ref = declared_field_ref(cls, "datetime_field")
+    def get_datetime_field(self) -> str | None:
+        """`datetime_field` as a lookup path, checked against the card's model.
+
+        Read off the instance, so a card that sets its own field takes effect.
+        """
+        ref = instance_field_ref(self, "datetime_field")
         if ref is None:
             return None
         return field_lookup_path(
             ref,
-            model=cls.model,
-            declared_as=f"{cls.__qualname__}.datetime_field",
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.datetime_field",
         )
 
-    @classmethod
-    def get_group_field(cls) -> str | None:
+    def get_group_field(self) -> str | None:
         """`group_field` as a lookup path, checked against the card's model."""
-        ref = declared_field_ref(cls, "group_field")
+        ref = instance_field_ref(self, "group_field")
         if ref is None:
             return None
         return field_lookup_path(
             ref,
-            model=cls.model,
-            declared_as=f"{cls.__qualname__}.group_field",
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.group_field",
         )
 
     def get_current_filter(self) -> str:

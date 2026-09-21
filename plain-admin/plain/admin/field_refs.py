@@ -3,13 +3,26 @@
 `search_fields`, `queryset_order` and a `TrendCard`'s datetime/group fields are
 declared as either a typed field reference (`User.email`, or the traversed
 `FlagResult.flag.name`) or the lookup path as a string. Both spellings are
-normalized to the path here, once, so every query site downstream builds the
-same `Q(**{f"{path}__icontains": ...})` / `order_by(path)` it always built --
-the SQL is identical whichever spelling the declaration used.
+normalized to the path, so every query site downstream builds the same
+`Q(**{f"{path}__icontains": ...})` / `order_by(path)` it always built -- the
+SQL is identical whichever spelling the declaration used.
+
+Normalizing happens twice, for two different reasons:
+
+- **At class definition**, over a plain tuple (or a plain `Field`/`str`) found
+  on the class. That is where a reference to another model's field can be
+  refused while the traceback still points at the declaration -- and it also
+  takes the `Field` back off the class attribute. A `Field` is a data
+  descriptor, so one left sitting on a view or card class would run on every
+  `self.search_fields`, which is not what the attribute means there.
+- **At runtime**, over whatever the instance actually has. A declaration can
+  be a `property`, or replaced on the instance from `get()`, and neither goes
+  through class definition.
 
 Strings stay supported because not every path is expressible as a reference:
-traversal starts at a forward foreign key, so reverse and many-to-many paths
-(`"memberships__team__name"`) have no field to reference.
+traversal has to *start* at a forward foreign key, so a path that starts at a
+reverse accessor or a many-to-many (`"memberships__team__name"`) has no field
+to reference.
 """
 
 from __future__ import annotations
@@ -35,6 +48,18 @@ def field_lookup_path(
     """
     if isinstance(ref, str):
         return ref
+
+    if not ref.lookup_path:
+        # A field declared on a `ModelMixin`, or built standalone for an
+        # aggregate, was never named -- only the model that mixes it in has an
+        # attached copy. Left alone it normalizes to "" and surfaces much
+        # later as `FieldError: Cannot resolve keyword ''`.
+        raise TypeError(
+            f"{declared_as} references an unattached "
+            f"{type(ref).__name__} -- a field declared on a mixin, or built "
+            f"on its own, carries no name to look up. Reference the field on "
+            f"the model that declares it."
+        )
 
     # A field reference carries the model a condition built from it would
     # belong to -- the declaring model for a column, the model the traversal
@@ -63,13 +88,53 @@ def field_lookup_paths(
     )
 
 
-def declared_field_ref(cls: type, attr: str) -> FieldRef | None:
-    """Read a `FieldRef | None` declaration off `cls` without the descriptor.
+def _declared(obj: Any, attr: str) -> Any:
+    """Read `attr` off a class or instance without running a descriptor.
 
-    A `Field` is a descriptor, so `SomeCard.datetime_field` would run
-    `Field.__get__`. That is harmless at runtime -- class access hands the
-    field straight back -- but a field is typed as a *model's* descriptor, so
-    a checker rejects reading one off a card or a view. `getattr_static`
-    returns the declaration itself, which is what the declaration means.
+    Class definition has to see the declaration itself, not what `Field`'s
+    descriptor would hand back; an instance read has to see its own override
+    rather than the class default. `getattr_static` does both.
     """
-    return inspect.getattr_static(cls, attr, None)
+    return inspect.getattr_static(obj, attr, None)
+
+
+def converge_declared_tuple(cls: type, attr: str, *, model: type[Model] | None) -> None:
+    """Normalize a tuple of field references declared on `cls`, in place.
+
+    Anything that isn't a plain tuple -- a `property`, a method, a descriptor
+    of someone else's -- is left alone; it computes its value per instance, so
+    it is normalized at runtime instead.
+    """
+    raw = _declared(cls, attr)
+    if not isinstance(raw, tuple):
+        return
+
+    paths = field_lookup_paths(
+        raw, model=model, declared_as=f"{cls.__qualname__}.{attr}"
+    )
+    if paths != raw:
+        setattr(cls, attr, paths)
+
+
+def converge_declared_field(cls: type, attr: str, *, model: type[Model] | None) -> None:
+    """Normalize a single field reference declared on `cls`, in place."""
+    raw = _declared(cls, attr)
+    if not isinstance(raw, Field | str):
+        return
+
+    path = field_lookup_path(raw, model=model, declared_as=f"{cls.__qualname__}.{attr}")
+    if path != raw:
+        setattr(cls, attr, path)
+
+
+def instance_field_ref(obj: Any, attr: str) -> FieldRef | None:
+    """Read a single `FieldRef | None` declaration off a live instance.
+
+    The static read is what picks up an instance's own override. Anything it
+    finds that isn't a reference already is something that computes one -- a
+    `property`, say -- so that one is asked for normally.
+    """
+    ref = _declared(obj, attr)
+    if ref is None or isinstance(ref, Field | str):
+        return ref
+    return getattr(obj, attr)

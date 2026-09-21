@@ -392,19 +392,22 @@ class UserAdmin(AdminViewset):
 
 Each field is matched with `icontains` and the matches are ORed together, so a search for `ann` finds `ann@example.com` and `Joanna` alike.
 
-A reference can traverse a foreign key, carrying the relation path with it:
+A reference can traverse a foreign key, carrying the relation path with it. Traversal has to _start_ at a forward foreign key, but once inside one every further hop is fair game — a many-to-many included:
 
 ```python
 search_fields = (
     FlagResult.key,
     FlagResult.flag.name,
 )  # ... WHERE key ILIKE %s OR flag.name ILIKE %s
+
+search_fields = (Entry.widget.tags.name,)  # a many-to-many, one hop in
 ```
 
-**Strings are the fallback, not the alternative spelling.** Traversal starts at a forward foreign key, so a reverse or many-to-many path has no field to reference and is written out:
+**Strings are the fallback, not the alternative spelling.** A path that _starts_ at a reverse relation or a class-level many-to-many has no field to reference, so it is written out:
 
 ```python
-search_fields = (Team.name, "memberships__user__email")  # reverse relation
+search_fields = (Team.name, "memberships__user__email")  # starts at a reverse relation
+search_fields = (Widget.name, "tags__name")  # starts at Widget's own many-to-many
 ```
 
 Both forms build the same query — a reference is normalized to its lookup path (`User.email` → `"email"`, `FlagResult.flag.name` → `"flag__name"`) before anything reaches the database. What you gain by referencing the field is that a typo, a renamed column, or a field belonging to another model is caught up front: a reference to another model's field raises `TypeError` when the view class is defined.

@@ -247,15 +247,18 @@ class AdminListView(HTMXView, AdminView, ListView):
     def get_filter_names(self) -> tuple[str, ...]:
         return self.filters
 
-    @classmethod
-    def get_search_fields(cls) -> tuple[str, ...]:
-        """`search_fields` as lookup paths, whichever way each was declared."""
+    def get_search_fields(self) -> tuple[str, ...]:
+        """`search_fields` as lookup paths, whichever way each was declared.
+
+        Read off the instance, so a declaration replaced in `get()` or
+        computed by a `property` is normalized like a class-level one.
+        """
         # No model to check references against: this view searches whatever
         # objects get_objects() returns. AdminModelListView has one.
         return field_lookup_paths(
-            cls.search_fields,
+            self.search_fields,
             model=None,
-            declared_as=f"{cls.__qualname__}.search_fields",
+            declared_as=f"{type(self).__qualname__}.search_fields",
         )
 
     def get_object_id(self, obj: Any) -> Any:
