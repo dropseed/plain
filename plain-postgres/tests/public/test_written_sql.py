@@ -18,6 +18,7 @@ from app.examples.models.encrypted import SecretStore
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.returning import ReturningEvent
+from app.examples.models.upsert import UpsertTenant
 from plain.exceptions import ValidationError
 
 
@@ -699,6 +700,72 @@ def test_two_model_fields_never_read_the_same_columns(widgets):
         result_type=Tagged,
     )
     with pytest.raises(TypeError, match="in the outer select list"):
+        statement.all()
+
+
+def test_an_escape_string_does_not_hide_a_subquery(widgets):
+    """`E'it\\'s'` is one string: its backslash-escaped quote doesn't close it.
+
+    Read as `''`-only, the escaped quote would close the string early and the
+    real closing quote would open another, swallowing the `EXISTS (` — so the
+    subquery's `{Tag:*}` would read as the outer list's, and with the outer
+    columns' sources wrapped away nothing else would stop it filling `tag`
+    from the widget's row.
+    """
+
+    @dataclass
+    class OnlyTag:
+        tag: Tag
+
+    statement = Widget.query.sql(
+        t"""
+        SELECT ({Widget.id} + 0) AS id, upper({Widget.name}) AS name
+        FROM {Widget}
+        WHERE {Widget.name} <> E'it\\'s'
+          AND EXISTS (SELECT {Tag:*} FROM {Tag})
+        """,
+        result_type=OnlyTag,
+    )
+    with pytest.raises(TypeError, match="in the outer select list"):
+        statement.all()
+
+
+def test_two_models_on_one_run_of_a_union_are_refused(widgets):
+    """Each branch's rows arrive in the same columns; a row can't say which it is."""
+    UpsertTenant.query.create(name="acme")
+
+    @dataclass
+    class OnlyTag:
+        tag: Tag
+
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Tag:*} FROM {Tag}
+        UNION ALL
+        SELECT {UpsertTenant:*} FROM {UpsertTenant}
+        """,
+        result_type=OnlyTag,
+    )
+    with pytest.raises(
+        TypeError, match=r"\{Tag:\*\} and \{UpsertTenant:\*\} onto the same run"
+    ):
+        statement.all()
+
+
+def test_a_mismatch_says_which_columns_a_model_field_took(widgets):
+    """Even when the expansion took every column the statement returned."""
+
+    @dataclass
+    class Both:
+        widget: Widget
+        id: int
+        name: str
+
+    statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Both)
+    with pytest.raises(
+        TypeError,
+        match=r"returned id, name, size \(widget took id, name, size\)",
+    ):
         statement.all()
 
 

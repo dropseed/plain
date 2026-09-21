@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import pytest
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Tag, Widget
+from app.examples.models.upsert import UpsertTenant
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 from plain.postgres import written
@@ -133,7 +134,39 @@ def test_a_star_records_how_deep_in_parentheses_it_was_written(db):
             t"SELECT $tag$ ( $tag$ AS b, {Widget:*} FROM {Widget}",
             0,
         ),
+        "an escape string's backslash-escaped quote": (
+            t"SELECT E'it\\'s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a lowercase escape string": (
+            t"SELECT e'it\\'s (' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "an escape string ending in an escaped backslash": (
+            t"SELECT E'\\\\' AS b, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "an escape string inside the subquery": (
+            t"SELECT * FROM (SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} <> E'x\\'y') sub",
+            1,
+        ),
+        "a plain string ending in a backslash": (
+            t"SELECT 'c:\\' AS b, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
+        "a word ending in E before a string": (
+            t"SELECT type'(' AS b, {Widget:*} FROM {Widget}",
+            0,
+        ),
+        "a $ inside an identifier": (
+            t"SELECT 1 AS a$b$, * FROM (SELECT {Widget:*} FROM {Widget}) sub",
+            1,
+        ),
         "a line comment": (t"SELECT -- (\n {Widget:*} FROM {Widget}", 0),
+        "a trailing line comment": (
+            t"SELECT {Widget:*} FROM {Widget} -- the end (",
+            0,
+        ),
         "nested block comments": (
             t"SELECT /* ( /* ( */ */ {Widget:*} FROM {Widget}",
             0,
@@ -142,6 +175,56 @@ def test_a_star_records_how_deep_in_parentheses_it_was_written(db):
     for description, (template, depth) in depths.items():
         stars = written._render(template).stars
         assert {star.depth for star in stars} == {depth}, description
+
+
+def test_a_scan_that_ends_inside_a_string_or_comment_knows_no_depths(db):
+    """Postgres would have seen it closed, so the scan misread something."""
+    for template in (
+        t"SELECT {Widget:*} FROM {Widget} /* never closed",
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = 'never closed",
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = $t$ never closed",
+    ):
+        (star,) = written._render(template).stars
+        assert star.depth is None
+
+
+def test_an_unscannable_statement_cannot_fill_a_model_field(db):
+    """An unknown depth is never the outer select list, and the error says why."""
+
+    @dataclass
+    class OnlyTag:
+        tag: Tag
+
+    stars = written._render(t"SELECT {Tag:*} FROM {Tag} /* never closed").stars
+    with pytest.raises(TypeError, match="couldn't be scanned to the end"):
+        written._model_fields_for(
+            result_type=OnlyTag,
+            stars=stars,
+            outer=(),
+            starts=[],
+            names=("id", "name"),
+        )
+
+
+def test_a_run_only_counts_when_every_traced_column_is_the_expansions_own(db):
+    """One column tracing to `Tag` and one to `UpsertTenant` is nobody's run."""
+    (star,) = written._render(t"SELECT {Tag:*} FROM {Tag}").stars
+    tag_id = next(field for field in Tag._model_meta.fields if field.name == "id")
+    tenant_name = next(
+        field for field in UpsertTenant._model_meta.fields if field.name == "name"
+    )
+
+    mixed = written._locate_star(
+        ("id", "name"), [tag_id, tenant_name], star, claimed=[]
+    )
+    assert mixed is None
+
+    own = written._locate_star(("id", "name"), list(star.fields), star, claimed=[])
+    assert own == 0
+
+    # A UNION keeps no sources, so the names are all there is to go on.
+    untraced = written._locate_star(("id", "name"), [None, None], star, claimed=[])
+    assert untraced == 0
 
 
 def test_a_nested_template_carries_the_depth_it_is_rendered_at(db):

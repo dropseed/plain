@@ -99,13 +99,14 @@ class _StarExpansion:
     `depth` is how many parentheses were open where it was written. Depth 0 is
     the statement's own select list (each branch of a UNION included); deeper
     is inside a subquery, a CTE or a function call, where the expansion is
-    just columns and the outer statement names the ones it wants.
+    just columns and the outer statement names the ones it wants. `None` means
+    the statement's text couldn't be scanned to the end, so nobody knows.
     """
 
     model: type[Model]
     fields: tuple[Field, ...]
     columns: tuple[str, ...]
-    depth: int
+    depth: int | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -127,20 +128,29 @@ class _ParenDepth:
 
     What is skipped, because a parenthesis inside it is text and not
     structure: `'a (quoted) string'` (a doubled `''` is an escaped quote and
-    the string goes on), `"a (quoted) identifier"` likewise, `$$ ( $$` and
-    `$tag$ ( $tag$` dollar-quoted strings (only their own tag ends them),
-    `-- ( to end of line`, and `/* ( */` block comments, which nest in
-    Postgres. The one thing it doesn't model is a backslash escape inside an
-    `E'...'` string, which Postgres alone treats as an escape.
+    the string goes on), `E'it\\'s ('` — an escape string, where a backslash
+    also escapes the character after it — `"a (quoted) identifier"` like a
+    plain string, `$$ ( $$` and `$tag$ ( $tag$` dollar-quoted strings (only
+    their own tag ends them), `-- ( to end of line`, and `/* ( */` block
+    comments, which nest in Postgres.
 
     The state carries across calls: one string or comment can span the text on
-    either side of an interpolation.
+    either side of an interpolation. A statement that ends with the scan still
+    inside a string or block comment is one this scan misread — Postgres
+    would have refused it — so `unterminated` says its depths can't be
+    trusted.
     """
 
     def __init__(self) -> None:
         self.depth = 0
         self._inside = ""  # "", "'", '"', "--", "/*", or a dollar-quote tag
+        self._backslash_escapes = False  # inside an E'...' string
         self._comment_depth = 0
+
+    @property
+    def unterminated(self) -> bool:
+        # A trailing `-- comment` is a legitimate way for a statement to end.
+        return self._inside not in ("", "--")
 
     def scan(self, text: str) -> None:
         index = 0
@@ -166,8 +176,12 @@ class _ParenDepth:
             # A statement can't have more `)` than `(`, but a fragment handed
             # in on its own can -- never go below the outer select list.
             self.depth = max(0, self.depth - 1)
-        elif char in ("'", '"'):
+        elif char == "'":
             self._inside = char
+            self._backslash_escapes = _opens_escape_string(text, index)
+        elif char == '"':
+            self._inside = char
+            self._backslash_escapes = False
         elif text.startswith("--", index):
             self._inside = "--"
             return index + 2
@@ -182,6 +196,8 @@ class _ParenDepth:
 
     def _scan_quoted(self, text: str, index: int) -> int:
         quote = self._inside
+        if self._backslash_escapes and text[index] == "\\":
+            return index + 2  # E'...': the next character is taken literally
         if not text.startswith(quote, index):
             return index + 1
         if text.startswith(quote * 2, index):
@@ -208,9 +224,31 @@ class _ParenDepth:
         return index + 1
 
 
+def _follows_identifier(text: str, index: int) -> bool:
+    """Whether the character before `index` is part of a word."""
+    return index > 0 and (text[index - 1].isalnum() or text[index - 1] == "_")
+
+
+def _opens_escape_string(text: str, index: int) -> bool:
+    """Whether the `'` at `index` opens an `E'...'` escape string.
+
+    The `E` has to stand alone: in `TYPE'x'` it ends a word, and the string
+    is an ordinary one.
+    """
+    return (
+        index > 0
+        and text[index - 1] in "Ee"
+        and not _follows_identifier(text, index - 1)
+    )
+
+
 def _dollar_quote_tag(text: str, index: int) -> str | None:
-    """The `$$` or `$tag$` that opens a dollar-quoted string at `index`."""
-    if text[index] != "$":
+    """The `$$` or `$tag$` that opens a dollar-quoted string at `index`.
+
+    A `$` inside a word is part of an identifier (`a$b$` is one), never a
+    quote.
+    """
+    if text[index] != "$" or _follows_identifier(text, index):
         return None
     end = text.find("$", index + 1)
     if end == -1:
@@ -263,6 +301,12 @@ def _render(template: Template) -> _Rendered:
     stars: list[_StarExpansion] = []
 
     _render_template(template, sql, params, stars)
+
+    if sql.paren_depth.unterminated:
+        # The scan ended inside a string or comment Postgres would have seen
+        # closed, so it misread something and no depth it recorded can be
+        # trusted. An unknown depth is never the outer select list.
+        stars = [dataclasses.replace(star, depth=None) for star in stars]
 
     binds_parameters = bool(params)
     return _Rendered(
@@ -936,6 +980,7 @@ def _build_plan(
     )
     _check_result_type(
         result_type=result_type,
+        names=names,
         model_fields=model_fields,
         named_columns=named_columns,
         columns=columns,
@@ -1100,15 +1145,16 @@ def _locate_star(
     if len(candidates) == 1:
         start = candidates[0]
         # Column names alone are weak evidence: every model's columns start
-        # with `id`, so one model's list is often a prefix of another's. When
-        # the columns did keep their source and none of it is this model's,
-        # this run belongs to something else.
+        # with `id`, so one model's list is often a prefix of another's. Every
+        # column that kept its source has to be this expansion's own column in
+        # that place; one that traces anywhere else means this run belongs to
+        # something else. (A UNION keeps no sources, so names are all it has.)
         traced = [
             (offset, fields[start + offset])
             for offset in range(width)
             if fields[start + offset] is not None
         ]
-        if traced and not any(field is star.fields[offset] for offset, field in traced):
+        if not all(field is star.fields[offset] for offset, field in traced):
             return None
         return start
 
@@ -1320,6 +1366,9 @@ def _model_fields_for(
                 "columns you want instead."
             )
 
+    if annotated:
+        _refuse_models_sharing_a_run(outer=outer, starts=starts)
+
     model_fields = []
     for name, model, allow_null in annotated:
         if not any(star.model is model for star in stars):
@@ -1335,6 +1384,18 @@ def _model_fields_for(
             for star, start in zip(outer, starts, strict=True)
             if star.model is model and start is not None
         ]
+        if not located and any(
+            star.model is model and star.depth is None for star in stars
+        ):
+            raise TypeError(
+                f"{result_type.__name__}.{name} is a {model.__name__}, but this "
+                "statement's SQL couldn't be scanned to the end -- it reads as "
+                "ending inside an unterminated string or comment -- so there is "
+                f"no telling whether its {{{model.__name__}:*}} is in the outer "
+                "select list. Check the quoting (an E'...' string, a $tag$ "
+                "string, a /* comment */), or select the columns you want "
+                "instead."
+            )
         if not located:
             # Either every expansion of this model is inside a subquery, or
             # the outer one's columns never arrived under their own names.
@@ -1369,6 +1430,39 @@ def _model_fields_for(
         )
 
     return tuple(model_fields)
+
+
+def _refuse_models_sharing_a_run(
+    *,
+    outer: tuple[_StarExpansion, ...],
+    starts: list[int | None],
+) -> None:
+    """Two models expanded onto one run of columns can't fill a model field.
+
+    An outer expansion that found no run of its own is in a later branch of a
+    UNION: its rows arrive in the same columns as the first branch's, by
+    position. When it is a different model from the one that did find the
+    run, a row can't say which model it is — hydrating it as the first would
+    turn the other's rows into that model's instances.
+    """
+    placed = [
+        star for star, start in zip(outer, starts, strict=True) if start is not None
+    ]
+    unplaced = [
+        star for star, start in zip(outer, starts, strict=True) if start is None
+    ]
+    for other in unplaced:
+        for star in placed:
+            if star.model is other.model:
+                continue
+            raise TypeError(
+                f"This statement expands {{{star.model.__name__}:*}} and "
+                f"{{{other.model.__name__}:*}} onto the same run of result "
+                "columns -- the branches of a UNION share one -- so a row "
+                "can't say which model it is. Give each model its own "
+                "statement, or select the columns you want and map them by "
+                "name."
+            )
 
 
 def _pk_position(star: _StarExpansion) -> int:
@@ -1462,6 +1556,7 @@ def _has_default(field: Any) -> bool:
 def _check_result_type(
     *,
     result_type: Any,
+    names: tuple[str, ...],
     model_fields: tuple[_ModelField, ...],
     named_columns: tuple[tuple[int, str], ...],
     columns: list[_Column],
@@ -1473,10 +1568,10 @@ def _check_result_type(
     The columns an expansion filled are already spoken for — they went into a
     model-annotated field whole — so what is left is matched by name.
     """
-    names = tuple(name for _, name in named_columns)
-    if len(set(names)) != len(names):
+    by_name = tuple(name for _, name in named_columns)
+    if len(set(by_name)) != len(by_name):
         raise TypeError(
-            f"This statement returns duplicate column names ({', '.join(names)}), "
+            f"This statement returns duplicate column names ({', '.join(by_name)}), "
             f"and {result_type.__name__} maps columns by name. Alias them apart."
         )
 
@@ -1489,10 +1584,10 @@ def _check_result_type(
     missing = [
         field.name
         for field in declared
-        if field.name not in names and not _has_default(field)
+        if field.name not in by_name and not _has_default(field)
     ]
     unexpected = [
-        name for name in names if name not in {field.name for field in declared}
+        name for name in by_name if name not in {field.name for field in declared}
     ]
     if missing or unexpected:
         problems = []
@@ -1500,10 +1595,18 @@ def _check_result_type(
             problems.append(f"no column for {', '.join(missing)}")
         if unexpected:
             problems.append(f"no field for column {', '.join(unexpected)}")
+        # Every column the statement returned, and which of them a model field
+        # already took whole — otherwise a statement whose expansion took
+        # everything reads as having returned nothing.
+        taken = "".join(
+            f" ({model_field.name} took "
+            f"{', '.join(names[model_field.start : model_field.start + len(model_field.star.columns)])})"
+            for model_field in model_fields
+        )
         raise TypeError(
             f"This statement doesn't match {result_type.__name__} — "
-            f"{'; '.join(problems)}. It returned {', '.join(names)}, and the "
-            f"dataclass declares\n{_describe_result_type(result_type)}"
+            f"{'; '.join(problems)}. It returned {', '.join(names)}{taken}, "
+            f"and the dataclass declares\n{_describe_result_type(result_type)}"
         )
 
     hints = _type_hints(result_type)
