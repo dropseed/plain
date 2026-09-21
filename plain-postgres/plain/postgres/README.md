@@ -311,6 +311,8 @@ A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no tr
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
 
+`field.lookup_path` is that path — `"email"` for a column on the model, `"user__email"` for a traversed one — so generic code handed a field reference can build a string lookup (`Q(**{f"{field.lookup_path}__icontains": term})`), an `order_by()` term, or a `values()` key without assembling the path itself.
+
 **`where()` preserves the order you wrote; `filter()` sorted its kwargs alphabetically.** Converting a multi-condition `filter()` can change the WHERE clause text and the parameter order, though not which rows it matches:
 
 ```sql

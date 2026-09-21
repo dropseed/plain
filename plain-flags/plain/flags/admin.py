@@ -35,7 +35,7 @@ class FlagAdmin(AdminViewset):
         model = Flag
         description = "Toggle features on/off without deploying code."
         fields = ("name", "enabled", "created_at__date", "used_at__date")
-        search_fields = ("name", "description")
+        search_fields = (Flag.name, Flag.description)
         cards = (UnusedFlagsCard,)
         nav_section = "Feature flags"
         nav_icon = "flag"
@@ -63,7 +63,7 @@ class FlagResultAdmin(AdminViewset):
             "created_at__date",
             "updated_at__date",
         )
-        search_fields = ("flag__name", "key")
+        search_fields = (FlagResult.flag.name, FlagResult.key)
         nav_section = "Feature flags"
         nav_icon = "check2-square"
 

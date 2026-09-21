@@ -14,6 +14,7 @@
     - [Table cards](#table-cards)
     - [Key/value cards](#keyvalue-cards)
 - [Admin forms](#admin-forms)
+- [Search](#search)
 - [List filters](#list-filters)
 - [Actions](#actions)
 - [Toolbar](#toolbar)
@@ -69,7 +70,7 @@ class UserAdmin(AdminViewset):
             "created_at__date",
         )
         queryset_order = ("-created_at",)
-        search_fields = ("email",)
+        search_fields = (User.email,)
 
     class DetailView(AdminModelDetailView):
         model = User
@@ -101,7 +102,7 @@ class ProductAdmin(AdminViewset):
         model = Product
         fields = ("id", "name", "price", "created_at")
         queryset_order = ("-created_at",)
-        search_fields = ("name", "description")
+        search_fields = (Product.name, Product.description)
 
     class DetailView(AdminModelDetailView):
         model = Product
@@ -254,7 +255,7 @@ class SignupsTrendCard(TrendCard):
     title = "User Signups"
     size = TrendCard.Sizes.MEDIUM
     model = User
-    datetime_field = "created_at"
+    datetime_field = User.created_at
     default_preset = DatetimeRangeAliases.SINCE_30_DAYS_AGO
 ```
 
@@ -370,6 +371,52 @@ The admin ships these [Plain elements](/plain/plain/elements/README.md) for buil
 | `<admin.Icon>`          | `<i class="bi bi-{name}">` — pass `name="plus-lg"` etc. (full set: [bootstrap-icons](https://icons.getbootstrap.com/)) |
 
 Source: [`templates/elements/admin/`](./templates/elements/admin/) — read the file directly to see exactly what each element accepts.
+
+## Search
+
+Set `search_fields` on a list view to show a search box above the table. Name the fields you want searched — the reference itself, not its name as a string:
+
+```python
+from plain.admin.views import AdminModelListView, AdminViewset, register_viewset
+
+from .models import User
+
+
+@register_viewset
+class UserAdmin(AdminViewset):
+    class ListView(AdminModelListView):
+        model = User
+        fields = ("id", "email", "created_at")
+        search_fields = (User.email, User.name)
+```
+
+Each field is matched with `icontains` and the matches are ORed together, so a search for `ann` finds `ann@example.com` and `Joanna` alike.
+
+A reference can traverse a foreign key, carrying the relation path with it. Traversal has to _start_ at a forward foreign key, but once inside one every further hop is fair game — a many-to-many included:
+
+```python
+search_fields = (
+    FlagResult.key,
+    FlagResult.flag.name,
+)  # ... WHERE key ILIKE %s OR flag.name ILIKE %s
+
+search_fields = (Entry.widget.tags.name,)  # a many-to-many, one hop in
+```
+
+**Strings are the fallback, not the alternative spelling.** A path that _starts_ at a reverse relation or a class-level many-to-many has no field to reference, so it is written out:
+
+```python
+search_fields = (Team.name, "memberships__user__email")  # starts at a reverse relation
+search_fields = (Widget.name, "tags__name")  # starts at Widget's own many-to-many
+```
+
+Both forms build the same query — a reference is normalized to its lookup path (`User.email` → `"email"`, `FlagResult.flag.name` → `"flag__name"`) before anything reaches the database. What you gain by referencing the field is that a typo, a renamed column, or a field belonging to another model is caught up front: a reference to another model's field raises `TypeError` when the view class is defined.
+
+`queryset_order` and a [trend card](#trend-cards)'s `datetime_field` and `group_field` take the same two forms. A descending ordering term stays a string — a field reference carries no direction:
+
+```python
+queryset_order = ("-created_at",)
+```
 
 ## List filters
 
@@ -955,7 +1002,7 @@ class UserAdmin(AdminViewset):
         model = User
         nav_section = "Users"
         fields = ("id", "email", "is_admin", "created_at")
-        search_fields = ("email",)
+        search_fields = (User.email,)
 
     class DetailView(AdminModelDetailView):
         model = User

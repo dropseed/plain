@@ -9,6 +9,7 @@ from plain.postgres.fields.related_managers import BaseRelatedManager
 
 from plain import postgres
 
+from ..field_refs import FieldRef, converge_declared_tuple, field_lookup_paths
 from ..utils import camelcase_to_title
 from .objects import (
     AdminCreateView,
@@ -48,12 +49,27 @@ class AdminModelListView(AdminListView):
     model: type[postgres.Model]
 
     fields: tuple[str, ...] = ("id",)
-    queryset_order: tuple[str, ...] = ()
-    search_fields: tuple[str, ...] = ("id",)
+    # Field references (`User.email`, `FlagResult.flag.name`) or lookup paths.
+    # A reference has to belong to `model`; a path that traversal can't reach
+    # -- a reverse or many-to-many hop -- is spelled as a string.
+    queryset_order: tuple[FieldRef, ...] = ()
+    search_fields: tuple[FieldRef, ...] = ("id",)
 
-    # Filters can also be a dict mapping a filter name to a Q object,
-    # which filters the queryset automatically.
+    # Filter *names* shown in the UI, not fields. Can also be a dict mapping a
+    # filter name to a Q object, which filters the queryset automatically.
     filters: tuple[str, ...] | dict[str, Q] = ()
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Normalize the declared field references now, so a reference to
+        # another model's field is a TypeError at class definition rather than
+        # when the page is first rendered, and so no `Field` is left sitting
+        # on the class as a live descriptor. An intermediate subclass with no
+        # model yet is still normalized -- only the cross-model check needs
+        # the model.
+        model = getattr(cls, "model", None)
+        converge_declared_tuple(cls, "search_fields", model=model)
+        converge_declared_tuple(cls, "queryset_order", model=model)
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -92,6 +108,26 @@ class AdminModelListView(AdminListView):
             return tuple(filters.keys())
         return super().get_filter_names()
 
+    def get_search_fields(self) -> tuple[str, ...]:
+        """`search_fields` as lookup paths, checked against the view's model."""
+        return field_lookup_paths(
+            self.search_fields,
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.search_fields",
+        )
+
+    def get_queryset_order(self) -> tuple[str, ...]:
+        """`queryset_order` as lookup paths, checked against the view's model.
+
+        A descending term stays a string -- a field reference has no direction
+        to carry, so `"-created_at"` is the only way to write one.
+        """
+        return field_lookup_paths(
+            self.queryset_order,
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.queryset_order",
+        )
+
     def filter_objects(
         self, objects: postgres.QuerySet | list[Any]
     ) -> postgres.QuerySet | list[Any]:
@@ -125,7 +161,7 @@ class AdminModelListView(AdminListView):
         """Override this to customize search behavior."""
         if search := self.request.query_params.get("search"):
             filters = Q()
-            for field in self.search_fields:
+            for field in self.get_search_fields():
                 filters |= Q(**{f"{field}__icontains": search})  # ty: ignore[invalid-argument-type]
             return queryset.filter(filters)
         return queryset
@@ -191,8 +227,8 @@ class AdminModelListView(AdminListView):
                     )
                 return super().order_objects(records)
 
-        if self.queryset_order:
-            return queryset.order_by(*self.queryset_order)
+        if queryset_order := self.get_queryset_order():
+            return queryset.order_by(*queryset_order)
 
         return queryset
 

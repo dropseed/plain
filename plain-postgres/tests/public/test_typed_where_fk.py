@@ -27,6 +27,18 @@ def test_fk_field_access_builds_prefixed_q():
     assert q.children == [("parent__name", "foo")]
 
 
+def test_lookup_path_is_the_column_name_or_the_traversed_path():
+    """The path generic code puts before a lookup suffix.
+
+    Static half: tests/typing/field_access.py, relations_foreign_key.py.
+    """
+    assert DeleteParent.name.lookup_path == "name"
+    assert ChildCascade.parent.name.lookup_path == "parent__name"
+    assert Grandchild.mid_parent.grandparent.name.lookup_path == (
+        "mid_parent__grandparent__name"
+    )
+
+
 def test_fk_field_access_supports_other_lookups():
     assert ChildCascade.parent.name.startswith("a").children == [
         ("parent__name__startswith", "a")

@@ -24,7 +24,7 @@ class APIKeyViewset(AdminViewset):
             "last_used_at__date",
             "expires_at__date",
         )
-        search_fields = ("name", "uuid")
+        search_fields = (APIKey.name, APIKey.uuid)
 
     class DetailView(AdminModelDetailView):
         model = APIKey

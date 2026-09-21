@@ -41,3 +41,10 @@ def must_reject_assigning_the_wrong_value_type(row: DefaultsExample) -> None:
     # Non-nullable rejects None statically even though the runtime would store
     # it and fail later at validate/save time.
     row.name = None  # ty: ignore[invalid-assignment]
+
+
+def must_accept_lookup_path_as_a_string() -> None:
+    # The sanctioned way for generic code to build a string lookup from a
+    # field reference. The traversed half is in relations_foreign_key.py;
+    # the runtime half is tests/public/test_typed_where_fk.py.
+    assert_type(DefaultsExample.name.lookup_path, str)

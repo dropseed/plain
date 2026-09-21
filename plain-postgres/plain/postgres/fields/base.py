@@ -372,6 +372,22 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         to a column reached through a relation, not a column on a model."""
         return bool(self.__dict__.get("_is_lookup_reference"))
 
+    @property
+    def lookup_path(self) -> str:
+        """The path this field is reached by in a lookup -- the part before the
+        suffix in `Q(**{f"{field.lookup_path}__icontains": value})`.
+
+        `"email"` for a column on the model, `"user__email"` for one reached by
+        traversal (`Order.user.email`), which is why generic code that has to
+        build a string lookup, an `order_by()` term or a `values()` key from a
+        field reference reads this rather than assembling a path itself.
+
+        It is the field's `name`: `with_lookup_prefix` renames a traversed copy
+        to its full path precisely so the field's own condition methods build
+        the right `Q`. This is the sanctioned spelling of that fact.
+        """
+        return self.name
+
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]
 

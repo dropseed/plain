@@ -50,9 +50,9 @@ def _td_format(td_object: timedelta) -> str:
 class JobResultsTrendCard(TrendCard):
     title = "Results trend"
     model = JobResult
-    datetime_field = "created_at"
+    datetime_field = JobResult.created_at
     size = TrendCard.Sizes.FULL
-    group_field = "status"
+    group_field = JobResult.status
     group_labels: ClassVar = {
         "SUCCESSFUL": "Successful",
         "ERRORED": "Errored",
@@ -253,10 +253,10 @@ class JobResultViewset(AdminViewset):
             "status": "jobs/values/job_status.html",
         }
         search_fields = (
-            "uuid",
-            "job_process_uuid",
-            "job_request_uuid",
-            "job_class",
+            JobResult.uuid,
+            JobResult.job_process_uuid,
+            JobResult.job_request_uuid,
+            JobResult.job_class,
         )
         cards = (
             JobResultsTrendCard,
@@ -347,8 +347,8 @@ class WorkerHeartbeatViewset(AdminViewset):
             "stale",
         )
         search_fields = (
-            "worker_id",
-            "hostname",
+            WorkerHeartbeat.worker_id,
+            WorkerHeartbeat.hostname,
         )
         filters = (
             "Active",
