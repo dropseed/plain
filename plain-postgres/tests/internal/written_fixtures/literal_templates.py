@@ -1,5 +1,4 @@
-"""Fixture: every template and fragment here is a literal, or a name that can
-only ever be one."""
+"""Fixture: every template and fragment here is a literal at its call site."""
 
 from app.examples.models.relationships import Widget
 from plain.postgres import Fragment
@@ -7,14 +6,16 @@ from plain.postgres import Fragment as ShortFragment
 
 from plain import postgres
 
+# A shared predicate is a Fragment, checked here where its text is written.
 ACTIVE = Fragment("size = 'small'")
 ALIASED = ShortFragment("size = 'large'")
 QUALIFIED = postgres.Fragment("size = 'medium'")
-LISTING: str = "SELECT {Widget.*} FROM {Widget} WHERE {predicate}"
 
 
 def listing():
-    return Widget.query.sql(LISTING, predicate=ACTIVE)
+    return Widget.query.sql(
+        "SELECT {Widget.*} FROM {Widget} WHERE {predicate}", predicate=ACTIVE
+    )
 
 
 def inline(size):
@@ -30,8 +31,10 @@ def by_keyword(size):
     )
 
 
-def through_a_custom_queryset(size):
-    return Widget.query.all().sql(LISTING, predicate=ACTIVE)
+def through_a_chain(size):
+    return Widget.query.all().sql(
+        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {size}", size=size
+    )
 
 
 def not_our_sql(parsed, dialect):

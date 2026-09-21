@@ -542,7 +542,15 @@ from plain.postgres import Fragment
 ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
 ```
 
-**Templates and fragments are literals.** A template built at runtime — an f-string, a concatenation, a value passed in — puts the injection guarantee back in the caller's hands, and at runtime it is indistinguishable from a literal. So the rule is checked by reading the source: `plain preflight` walks the app and reports each one (`postgres.sql_template_not_literal`). A module-level constant holding a literal is still a literal.
+**Templates and fragments are literals, written at the call site.** A template built at runtime — an f-string, a concatenation, a value passed in — puts the injection guarantee back in the caller's hands, and at runtime it is indistinguishable from a literal. So the rule is checked by reading the source: `plain preflight` walks the app and reports each one (`postgres.sql_template_not_literal`).
+
+A _name_ is never accepted, however it was bound — following one would mean tracking every way Python can rebind it, and missing one is a false pass on the thing the check exists for. To share a predicate, share a `Fragment`, which is checked where its text is written:
+
+```python
+ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")  # checked here
+```
+
+A whole template is written where it's used.
 
 An unknown model or field name, a `{name}` with no value, and a format spec on something that doesn't take one all raise where the `sql()` call is written, before anything runs. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
 

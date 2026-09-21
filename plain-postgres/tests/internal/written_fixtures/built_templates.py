@@ -1,15 +1,12 @@
-"""Fixture: every template and fragment here is built at runtime."""
+"""Fixture: every template and fragment here is built rather than written."""
 
 from app.examples.models.relationships import Widget
 from plain.postgres import Fragment, Written
 from plain.postgres import Fragment as ShortFragment
 
-REBOUND = "SELECT {Widget.*} FROM {Widget}"
-REBOUND = REBOUND + " ORDER BY 1"
-
-LOOPED = "SELECT 1"
-for LOOPED in ("SELECT 2", "SELECT 3"):
-    pass
+# A module-level string is not a template written at the call site: inline it,
+# or make the shared thing a Fragment.
+TEMPLATE = "SELECT {Widget.*} FROM {Widget}"
 
 
 def f_string(size):
@@ -32,12 +29,18 @@ def keyword_template(template):
     return Widget.query.sql(template=template)
 
 
-def from_a_rebound_module_name():
-    return Widget.query.sql(REBOUND)
+def from_a_module_constant():
+    return Widget.query.sql(TEMPLATE)
 
 
-def from_a_loop_variable():
-    return Widget.query.sql(LOOPED)
+def from_a_walrus(source):
+    return Widget.query.sql(template := source)  # noqa: F841 -- the point of it
+
+
+def multiline(user_input):
+    return Widget.query.sql(
+        user_input,
+    )
 
 
 def fragment_from_a_variable(text):

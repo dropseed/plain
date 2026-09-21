@@ -1128,7 +1128,11 @@ class Written[R]:
                     transaction.mark_for_rollback_on_error(),
                     suppress_db_tracing(),
                 ):
-                    cursor.execute(sql, params)
+                    # prepare=False: a named statement is the thing a
+                    # transaction-mode pooler can't follow, and
+                    # `prepare_threshold` is configurable, so say it outright
+                    # rather than relying on the connection's default.
+                    cursor.execute(sql, params, prepare=False)
             except psycopg.IntegrityError as exc:
                 error = _integrity_error_to_validation_error(exc)
                 if error is not None:

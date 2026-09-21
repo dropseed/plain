@@ -279,3 +279,33 @@ def test_the_plan_cache_hangs_off_the_connection(db):
         "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
     assert get_connection() in written._plans
+
+
+def test_a_written_statement_is_never_prepared(db):
+    """`prepare=False` has to reach psycopg, not just the docstring.
+
+    A named prepared statement is the one thing a transaction-mode pooler
+    can't follow, and `prepare_threshold` is configurable — at 0 psycopg
+    names every statement it can unless told otherwise.
+    """
+    Widget.query.create(name="one", size="small")
+    connection = get_connection()
+    connection.ensure_connection()
+    assert connection.connection is not None
+    previous = connection.connection.prepare_threshold
+    connection.connection.prepare_threshold = 0
+    try:
+        for _ in range(3):
+            Widget.query.sql(
+                "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
+                size="small",
+                result_type=NameRow,
+            ).all()
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT count(*) FROM pg_prepared_statements")
+            row = cursor.fetchone()
+        assert row is not None
+        assert row[0] == 0
+    finally:
+        connection.connection.prepare_threshold = previous

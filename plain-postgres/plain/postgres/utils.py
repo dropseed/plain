@@ -122,10 +122,24 @@ class CursorWrapper:
     # the code must run when the method is invoked, not just when it is accessed.
 
     def execute(
-        self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
+        self,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
+        *,
+        prepare: bool | None = None,
     ) -> Self:
+        """Run one statement.
+
+        `prepare` is psycopg's: None leaves the decision to the connection's
+        `prepare_threshold`, and False keeps the statement unnamed however
+        that is configured -- which is what a written query wants, since a
+        named statement is the thing a transaction-mode pooler can't follow.
+        """
         return self._execute_with_wrappers(
-            sql, params, many=False, executor=self._execute
+            sql,
+            params,
+            many=False,
+            executor=functools.partial(self._execute, prepare=prepare),
         )
 
     def executemany(self, sql: str, param_list: Sequence[Sequence[Any]]) -> Self:
@@ -142,15 +156,21 @@ class CursorWrapper:
         executor(sql, params, many, context)
         return self
 
-    def _execute(self, sql: str, params: Any, *ignored_wrapper_args: Any) -> None:
+    def _execute(
+        self,
+        sql: str,
+        params: Any,
+        *ignored_wrapper_args: Any,
+        prepare: bool | None = None,
+    ) -> None:
         with db_span(
             self.db, sql, params=params, row_count_provider=lambda: self.cursor.rowcount
         ):
             self.db.validate_no_broken_transaction()
             if params is None:
-                self.cursor.execute(sql)
+                self.cursor.execute(sql, prepare=prepare)
             else:
-                self.cursor.execute(sql, params)
+                self.cursor.execute(sql, params, prepare=prepare)
 
     def _executemany(
         self, sql: str, param_list: Any, *ignored_wrapper_args: Any
@@ -174,10 +194,14 @@ class CursorDebugWrapper(CursorWrapper):
             yield from super().stream(sql, params)
 
     def execute(
-        self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None
+        self,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
+        *,
+        prepare: bool | None = None,
     ) -> Self:
         with self.debug_sql(sql, params, use_last_executed_query=True):
-            super().execute(sql, params)
+            super().execute(sql, params, prepare=prepare)
         return self
 
     def executemany(self, sql: str, param_list: Sequence[Sequence[Any]]) -> Self:

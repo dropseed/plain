@@ -7,7 +7,16 @@ puts that guarantee back in the caller's hands.
 
 Reading the source is the only way to tell: at runtime an f-string is just a
 `str`. So this parses the app's Python files and refuses any `sql()` template
-or `Fragment`/`Written` text that isn't a literal.
+or `Fragment`/`Written` text that isn't a string literal **written at the call
+site**. A name is never accepted, however it was bound: following one means
+tracking every way Python can rebind it — an assignment, a walrus, a
+comprehension target, a `match` capture, an `except ... as`, a `def` — and
+missing one of them is a false pass on the one thing this check exists for.
+
+Sharing is spelled with a `Fragment`: `ACTIVE = Fragment("status = 'active'")`
+at module level is checked where the `Fragment(...)` is written, and passing
+`ACTIVE` around afterwards is passing a checked object, not a string. A whole
+template is written where it is used.
 
 What it does **not** see:
 
@@ -22,7 +31,6 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Sequence
 from pathlib import Path
 
 from plain.preflight import PreflightCheck, PreflightResult, register_check
@@ -34,8 +42,16 @@ RULE = (
     "as parameters"
 )
 
-# Cheap gate before parsing a file at all.
-_MENTIONS = re.compile(r"\b(sql\s*\(|Fragment|Written)\b")
+# What to do instead, which depends on which one was built.
+_INSTEAD = {
+    "sql": "write the template out at the call site",
+    "Fragment": "build the Fragment from a literal, at module level if it is shared",
+    "Written": "write the template out at the call site",
+}
+
+# Cheap gate before parsing a file at all. `sql(` is matched without a
+# trailing word boundary -- there isn't one after `(`.
+_MENTIONS = re.compile(r"\bsql\s*\(|\b(?:Fragment|Written)\b")
 
 # The written-query constructors whose first argument is SQL text, by the name
 # they are defined under. A module's imports are what map a local name back to
@@ -109,91 +125,6 @@ def _argument(call: ast.Call, keyword: str) -> ast.expr | None:
     return None
 
 
-def _literal_names(tree: ast.Module) -> set[str]:
-    """Module-level names that can only ever be one string literal.
-
-    `TEMPLATE = "SELECT ..."` at module level is the SQL written in the
-    source, one step earlier, so passing that name is not a built template.
-    The name has to be bound exactly once, at module level, to a literal, and
-    never rebound anywhere in the module — a later assignment, an augmented
-    assignment, a parameter, a loop variable, a `with ... as`, or a `global`
-    write all disqualify it, because then the name is whatever ran last.
-    """
-    literals: dict[str, int] = {}
-    for node in tree.body:
-        targets: Sequence[ast.expr] = []
-        value: ast.expr | None = None
-        if isinstance(node, ast.Assign):
-            targets, value = node.targets, node.value
-        elif isinstance(node, ast.AnnAssign) and node.value is not None:
-            targets, value = [node.target], node.value
-        if isinstance(value, ast.Constant) and isinstance(value.value, str):
-            for target in targets:
-                if isinstance(target, ast.Name):
-                    literals[target.id] = literals.get(target.id, 0) + 1
-
-    rebound = _rebound_names(tree)
-    return {
-        name for name, times in literals.items() if times == 1 and name not in rebound
-    }
-
-
-def _rebound_names(tree: ast.Module) -> set[str]:
-    """Every name the module binds somewhere other than one module-level literal."""
-    module_level_literals = {
-        id(node)
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
-    }
-    rebound: set[str] = set()
-
-    def names_in(target: ast.expr) -> list[str]:
-        return [
-            node.id
-            for node in ast.walk(target)
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
-        ]
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and id(node) not in module_level_literals:
-            for target in node.targets:
-                rebound.update(names_in(target))
-        elif isinstance(node, ast.AugAssign | ast.AnnAssign):
-            if isinstance(node, ast.AugAssign) or not (
-                isinstance(node.value, ast.Constant)
-                and isinstance(node.value.value, str)
-            ):
-                rebound.update(names_in(node.target))
-        elif isinstance(node, ast.For | ast.AsyncFor):
-            rebound.update(names_in(node.target))
-        elif isinstance(node, ast.withitem) and node.optional_vars is not None:
-            rebound.update(names_in(node.optional_vars))
-        elif isinstance(node, ast.Global | ast.Nonlocal):
-            rebound.update(node.names)
-        elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda):
-            arguments = node.args
-            rebound.update(
-                argument.arg
-                for group in (
-                    arguments.posonlyargs,
-                    arguments.args,
-                    arguments.kwonlyargs,
-                )
-                for argument in group
-            )
-            for maybe in (arguments.vararg, arguments.kwarg):
-                if maybe is not None:
-                    rebound.add(maybe.arg)
-        elif isinstance(node, ast.Import | ast.ImportFrom):
-            rebound.update(
-                alias.asname or alias.name.split(".")[0] for alias in node.names
-            )
-
-    return rebound
-
-
 def _built_sql_calls(source: str, path: Path) -> list[tuple[int, str]]:
     """Every SQL text argument in this file that is built rather than written.
 
@@ -206,7 +137,6 @@ def _built_sql_calls(source: str, path: Path) -> list[tuple[int, str]]:
         return []
 
     imported = _imported_names(tree)
-    literals = _literal_names(tree)
     built = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -223,8 +153,6 @@ def _built_sql_calls(source: str, path: Path) -> list[tuple[int, str]]:
         if argument is None:
             continue
         if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
-            continue
-        if isinstance(argument, ast.Name) and argument.id in literals:
             continue
         built.append((node.lineno, called))
     return built
@@ -249,8 +177,9 @@ class CheckSqlTemplateNotLiteral(PreflightCheck):
                     PreflightResult(
                         # The location goes in the message: `obj` isn't printed.
                         fix=(
-                            f"{where} builds the {called}() template at runtime "
-                            f"— {RULE}."
+                            f"{where} builds the {called}() template at "
+                            f"runtime — {RULE}. Here: "
+                            f"{_INSTEAD[called]}."
                         ),
                         obj=where,
                         id="postgres.sql_template_not_literal",
