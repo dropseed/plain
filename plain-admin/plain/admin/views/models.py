@@ -108,7 +108,10 @@ class AdminModelListView(AdminListView):
         if isinstance(self.filters, dict) and self.filter:
             q = self.filters.get(self.filter)
             if q is not None:
-                return queryset.where(q)
+                # filter(), not where(): this Q comes from user configuration,
+                # so it names no model for where()'s check to test, and
+                # `queryset` is untyped here anyway.
+                return queryset.filter(q)
         return queryset
 
     def search_objects(
@@ -134,17 +137,26 @@ class AdminModelListView(AdminListView):
             return super().select_objects_by_id(objects, ids)
         # get_object_id() returns the primary key, so we match on it and keep
         # the queryset lazy. Coerce each id through the pk field and drop the
-        # ones it won't turn into a primary key, so a stale or malformed id is
-        # ignored (per the base contract) rather than raising.
+        # ones it rejects, so a stale or malformed id is ignored (per the base
+        # contract) rather than raising.
+        #
+        # Everything reads the pk field off `objects.model` rather than
+        # `self.model`: a subclass is free to return another model's queryset
+        # from get_initial_queryset(), and where() rejects a condition built
+        # from a model the queryset isn't querying.
+        pk_field = objects.model.id
         valid_ids: list[int] = []
         for raw_id in ids:
             try:
-                coerced = self.model.id.to_python(raw_id)
+                coerced = pk_field.to_python(raw_id)
             except ValidationError:
                 continue
+            # to_python is typed `int | None` but only returns None for a None
+            # input, which form data can't produce -- this narrows the type,
+            # it doesn't drop anything.
             if coerced is not None:
                 valid_ids.append(coerced)
-        return objects.where(self.model.id.is_in(valid_ids))
+        return objects.where(pk_field.is_in(valid_ids))
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]
