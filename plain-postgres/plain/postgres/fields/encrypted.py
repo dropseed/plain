@@ -5,16 +5,21 @@ import json
 from functools import cache
 from typing import TYPE_CHECKING, Any, Literal, Never, overload
 
-try:
+if TYPE_CHECKING:
     from cryptography.fernet import Fernet, InvalidToken, MultiFernet
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-except ImportError:
-    Fernet = None  # ty: ignore[invalid-assignment]
-    InvalidToken = None  # ty: ignore[invalid-assignment]
-    MultiFernet = None  # ty: ignore[invalid-assignment]
-    hashes = None  # ty: ignore[invalid-assignment]
-    PBKDF2HMAC = None
+else:
+    try:
+        from cryptography.fernet import Fernet, InvalidToken, MultiFernet
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    except ImportError:
+        Fernet = None
+        InvalidToken = None
+        MultiFernet = None
+        hashes = None
+        PBKDF2HMAC = None
 
 from plain.postgres.lookups import Exact, IsNull
 from plain.runtime import settings
