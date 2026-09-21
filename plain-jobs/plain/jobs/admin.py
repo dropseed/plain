@@ -278,6 +278,8 @@ class JobResultViewset(AdminViewset):
             queryset: JobResultQuerySet = super().get_initial_queryset()  # ty: ignore[invalid-assignment]
             return queryset.annotate(
                 retried=Case(
+                    # is_null(False) compiles to IS NOT NULL; ~is_null() would
+                    # compile to NOT (retry_job_request_uuid IS NULL).
                     When(JobResult.retry_job_request_uuid.is_null(False), then=True),
                     default=False,
                     output_field=postgres.BooleanField(),

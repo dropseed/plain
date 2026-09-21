@@ -167,6 +167,8 @@ class JobRequest(postgres.Model):
 
 class JobQuerySet(postgres.QuerySet["JobProcess"]):
     def running(self) -> Self:
+        # is_null(False) compiles to IS NOT NULL; ~is_null() would compile to
+        # NOT (started_at IS NULL).
         return self.where(JobProcess.started_at.is_null(False))
 
     def waiting(self) -> Self:
@@ -548,6 +550,8 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
         return self.where(JobResult.status.equals(JobResultStatuses.ERRORED))
 
     def retried(self) -> Self:
+        # is_null(False) compiles to IS NOT NULL; ~is_null() would compile to
+        # NOT (retry_job_request_uuid IS NULL).
         return self.where(
             JobResult.retry_job_request_uuid.is_null(False)
             | JobResult.retry_attempt.gt(0)
@@ -565,9 +569,9 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
         )
 
     def retryable(self) -> Self:
-        # Still `filter()`: the typed conditions compare against values, so
-        # there is no typed spelling for `retry_attempt < retries` — an F()
-        # column reference is rejected by `Field[int].lt()`.
+        # Still `filter()`: `Field[int].lt()` is annotated to take an `int`,
+        # so `lt(F("retries"))` is a type error even though the ORM compiles it
+        # to exactly the same SQL. Converting would cost a `ty: ignore`.
         return self.failed().filter(
             retry_job_request_uuid__isnull=True,
             retries__gt=0,
@@ -819,6 +823,9 @@ def rescue_stale_workers() -> list[JobResult]:
                 # Atomic claim. If another rescuer also saw this dead
                 # heartbeat, only one of us deletes a row. The loser sees 0
                 # affected and skips.
+                #
+                # Conditions are listed in the order `filter()` sorted its
+                # kwargs, so the compiled SQL is unchanged.
                 claimed = WorkerHeartbeat.query.where(
                     WorkerHeartbeat.last_heartbeat_at.lt(cutoff),
                     WorkerHeartbeat.worker_id.equals(worker.worker_id),

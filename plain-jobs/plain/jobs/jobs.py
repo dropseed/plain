@@ -233,12 +233,18 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        conditions = []
-        if concurrency_key:
-            conditions.append(JobRequest.concurrency_key.equals(concurrency_key))
-        conditions.append(JobRequest.job_class.equals(job_class_name))
+        # `concurrency_key` is listed before `job_class` because `filter()`
+        # sorted its kwargs, so the compiled SQL is unchanged.
+        concurrency_conditions = (
+            [JobRequest.concurrency_key.equals(concurrency_key)]
+            if concurrency_key
+            else []
+        )
 
-        qs = JobRequest.query.where(*conditions)
+        qs = JobRequest.query.where(
+            *concurrency_conditions,
+            JobRequest.job_class.equals(job_class_name),
+        )
 
         if not include_retries:
             qs = qs.where(JobRequest.retry_attempt.equals(0))
@@ -269,12 +275,18 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        conditions = []
-        if concurrency_key:
-            conditions.append(JobProcess.concurrency_key.equals(concurrency_key))
-        conditions.append(JobProcess.job_class.equals(job_class_name))
+        # `concurrency_key` is listed before `job_class` because `filter()`
+        # sorted its kwargs, so the compiled SQL is unchanged.
+        concurrency_conditions = (
+            [JobProcess.concurrency_key.equals(concurrency_key)]
+            if concurrency_key
+            else []
+        )
 
-        qs = JobProcess.query.where(*conditions)
+        qs = JobProcess.query.where(
+            *concurrency_conditions,
+            JobProcess.job_class.equals(job_class_name),
+        )
 
         if not include_retries:
             qs = qs.where(JobProcess.retry_attempt.equals(0))

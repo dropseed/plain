@@ -326,10 +326,9 @@ class WorkerMetrics:
 
 
 def _count_per_queue(queryset: Any, queues: list[str]) -> list[Observation]:
-    # Still `filter()`: this helper is handed JobRequest and JobProcess
-    # querysets alike, and a typed condition belongs to the model whose field
-    # built it — there is no model-agnostic way to say "this queryset's
-    # `queue` column".
+    # Still `filter()`: `queryset` is `Any` (it takes JobRequest and JobProcess
+    # querysets alike), so a typed condition would have to reach its field
+    # through `queryset.model` and would be checked against nothing anyway.
     rows = queryset.filter(queue__in=queues).values("queue").annotate(c=Count("*"))
     counts = {row["queue"]: row["c"] for row in rows}
     return [

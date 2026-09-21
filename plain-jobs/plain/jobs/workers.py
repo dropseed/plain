@@ -622,6 +622,8 @@ class Worker:
         cutoff = timezone.now() - datetime.timedelta(
             seconds=settings.JOBS_HEARTBEAT_TIMEOUT
         )
+        # Conditions are listed in the order `filter()` sorted its kwargs, so
+        # the compiled SQL is unchanged.
         stranded = JobProcess.query.where(
             JobProcess.created_at.lt(cutoff),
             JobProcess.worker_id.equals(self.worker_id),
