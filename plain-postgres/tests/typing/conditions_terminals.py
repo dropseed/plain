@@ -82,9 +82,17 @@ def must_reject_the_primary_key_form_on_a_row_queryset() -> None:
 
     The call isn't a type error -- narrowing the parameter would break the
     override -- but `Never` says it doesn't return, so a caller's trailing
-    code reads as unreachable. Runtime half: tests/public/test_typed_get.py.
+    code reads as unreachable. Which is why this claim gets a function of
+    its own: anything written after it would be unreachable too, and an
+    unreachable `assert_type` pins nothing. Runtime half:
+    tests/public/test_typed_get.py.
     """
     rows = DefaultsExample.query.select(DefaultsExample.name, flat=True)
     assert_type(rows.get(5), Never)
+
+
+def must_accept_conditions_on_a_row_queryset() -> None:
+    rows = DefaultsExample.query.select(DefaultsExample.name, flat=True)
     assert_type(rows.get(DefaultsExample.name.equals("a")), str)
+    assert_type(rows.get_or_none(DefaultsExample.name.equals("a")), str | None)
     assert_type(rows.first(DefaultsExample.name.equals("a")), str | None)

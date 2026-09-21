@@ -127,6 +127,24 @@ def test_mixing_a_primary_key_with_conditions_is_refused(db):
         DefaultsExample.query.get(5, DefaultsExample.name.equals("alice"))  # ty: ignore[invalid-argument-type]
 
 
+def test_a_primary_key_alongside_keyword_lookups_is_refused(db):
+    """A key is the whole lookup -- `get(5, id=5)` would AND it with itself."""
+    with pytest.raises(TypeError, match=r"also got keyword lookups"):
+        DefaultsExample.query.get(5, id=5)  # ty: ignore[invalid-argument-type]
+
+    with pytest.raises(TypeError, match=r"also got keyword lookups"):
+        DefaultsExample.query.get_or_none(5, name="alice")  # ty: ignore[invalid-argument-type]
+
+
+def test_conditions_alongside_keyword_lookups_still_work(db):
+    """Conditions are `filter()` arguments, so they combine with its kwargs."""
+    DefaultsExample.query.create(name="alice", priority=1)
+    DefaultsExample.query.create(name="alice", priority=10)
+
+    row = DefaultsExample.query.get(DefaultsExample.name.equals("alice"), priority=10)
+    assert row.priority == 10
+
+
 def test_a_non_condition_non_key_positional_is_refused(db):
     with pytest.raises(TypeError, match=r"DefaultsExample.id is an int"):
         DefaultsExample.query.get("5")  # ty: ignore[no-matching-overload]

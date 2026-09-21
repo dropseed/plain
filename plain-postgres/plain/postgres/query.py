@@ -797,7 +797,9 @@ class QuerySet[T: "Model"]:
             Model.query.get(Model.email.equals(x))          # conditions
             Model.query.get(5)                              # primary key
         """
-        conditions = self._lookup_conditions("get", args, allow_primary_key=True)
+        conditions = self._lookup_conditions(
+            "get", args, allow_primary_key=True, has_keywords=bool(kwargs)
+        )
         clone = self.filter(*conditions, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
@@ -832,7 +834,7 @@ class QuerySet[T: "Model"]:
         `MultipleObjectsReturned` when more than one row matches.
         """
         conditions = self._lookup_conditions(
-            "get_or_none", args, allow_primary_key=True
+            "get_or_none", args, allow_primary_key=True, has_keywords=bool(kwargs)
         )
         try:
             return self.get(*conditions, **kwargs)
@@ -2294,7 +2296,12 @@ class QuerySet[T: "Model"]:
                 )
 
     def _lookup_conditions(
-        self, method: str, args: tuple[Any, ...], *, allow_primary_key: bool
+        self,
+        method: str,
+        args: tuple[Any, ...],
+        *,
+        allow_primary_key: bool,
+        has_keywords: bool = False,
     ) -> tuple[Q, ...]:
         """Resolve a terminal's positional arguments into `where()` conditions.
 
@@ -2306,7 +2313,8 @@ class QuerySet[T: "Model"]:
         way to write it.
 
         Whatever comes back is handed straight to `filter()`, so the SQL is
-        the same either way.
+        the same either way. Conditions combine with `filter()`'s keyword
+        lookups; a primary key does not, because a key is the whole lookup.
         """
         if not args:
             return ()
@@ -2339,6 +2347,14 @@ class QuerySet[T: "Model"]:
                 f"condition nor a primary key -- {model_name}.id is an int. "
                 f"Parse the value first, or pass a condition like "
                 f"{model_name}.field.equals(value)."
+            )
+
+        if has_keywords:
+            raise TypeError(
+                f"{method}({primary_key!r}, ...) also got keyword lookups. A "
+                f"primary key is the whole lookup, so narrow with conditions "
+                f"instead: {method}({model_name}.id.equals({primary_key!r}), "
+                f"...)."
             )
 
         self._check_primary_key_lookup(method)
