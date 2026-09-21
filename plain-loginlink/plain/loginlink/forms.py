@@ -25,7 +25,7 @@ class LoginLinkForm(forms.Form):
         expires_in = self.link_expires_in
         email = self.cleaned_data["email"]
         try:
-            user = User.query.get(email__iexact=email)
+            user = User.query.where(User.email.iequals(email)).get()
         except User.DoesNotExist:
             user = None
 
