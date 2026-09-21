@@ -877,7 +877,7 @@ requires-dist = [
     { name = "plain", editable = "plain" },
     { name = "ruff", specifier = ">=0.16.2,<0.17" },
     { name = "tomlkit", specifier = ">=0.11.0" },
-    { name = "ty", specifier = "<1.0.0" },
+    { name = "ty", specifier = ">=0.0.82,<1.0.0" },
 ]
 
 [[package]]
