@@ -52,7 +52,7 @@ class ForwardForeignKeyDescriptor:
     In the example::
 
         class Child(Model):
-            parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
+            parent: Field[Parent] = ForeignKeyField(Parent, on_delete=postgres.CASCADE)
 
     ``Child.parent`` is a ``ForwardForeignKeyDescriptor`` instance.
     """

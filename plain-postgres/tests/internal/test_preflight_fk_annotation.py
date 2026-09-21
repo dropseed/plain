@@ -15,7 +15,7 @@ directly, while the registered-model sweep goes through the check itself.
 
 from __future__ import annotations
 
-from plain.postgres import Field, types
+from plain.postgres import Field, ModelMixin, types
 from plain.postgres.base import Model
 from plain.postgres.preflight.models import (
     CheckForeignKeyAnnotatedAsValue,
@@ -85,6 +85,20 @@ def test_no_registered_model_annotates_a_foreign_key_as_a_value():
     )
 
 
+class ValueAnnotatedMixin(ModelMixin):
+    owner: AnnotationTarget = types.ForeignKeyField(
+        "examples.AnnotationTarget", on_delete=postgres.CASCADE
+    )
+
+
+class ReannotatesTheMixinField(ValueAnnotatedMixin, Model):
+    model_options = postgres.Options(package_label="examples")
+
+    owner: Field[AnnotationTarget] = types.ForeignKeyField(
+        "examples.AnnotationTarget", on_delete=postgres.CASCADE
+    )
+
+
 def test_reports_every_foreign_key_annotated_with_the_related_model():
     assert sorted(foreign_keys_annotated_as_values(ValueAnnotated)) == [
         ("backup", "AnnotationTarget | None"),
@@ -101,6 +115,12 @@ def test_an_unannotated_foreign_key_is_not_this_checks_story():
     `postgres.field_leaks_into_constructor`'s counterpart in
     CheckTypedConstruction, not a wrong annotation."""
     assert foreign_keys_annotated_as_values(Unannotated) == []
+
+
+def test_the_nearest_annotation_in_the_mro_is_the_one_read():
+    """The checker reads the subclass's annotation, so a subclass that fixes a
+    mixin's spelling clears the field rather than reporting it twice."""
+    assert foreign_keys_annotated_as_values(ReannotatesTheMixinField) == []
 
 
 def test_non_relation_fields_are_never_reported():

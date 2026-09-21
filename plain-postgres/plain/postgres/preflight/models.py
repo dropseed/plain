@@ -288,20 +288,20 @@ def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
     }
     if not foreign_key_names:
         return []
-    found: list[tuple[str, str]] = []
+    # The nearest annotation in the MRO is the one the checker reads, so a
+    # subclass re-annotating a mixin's foreign key wins -- right or wrong.
+    nearest: dict[str, str] = {}
     for klass in model.__mro__:
         if not _carries_transform(klass):
             continue
         for attr, annotation in inspect.get_annotations(klass).items():
-            if attr not in foreign_key_names:
-                continue
-            if _annotation_names_a_field(annotation):
-                continue
-            found.append((attr, str(annotation)))
-        # The nearest declaration in the MRO wins, the same as the attribute
-        # itself does.
-        foreign_key_names -= {attr for attr, _ in found}
-    return found
+            if attr in foreign_key_names and attr not in nearest:
+                nearest[attr] = str(annotation)
+    return sorted(
+        (attr, annotation)
+        for attr, annotation in nearest.items()
+        if not _annotation_names_a_field(annotation)
+    )
 
 
 def foreign_key_annotation_results(model: type) -> list[PreflightResult]:
