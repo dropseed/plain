@@ -40,17 +40,18 @@ class MCPResource(ABC):
     set `uri_template` instead of `uri` and accept the template params on
     `__init__`:
 
-        class Order(MCPResource):
+        class OrderResource(MCPResource):
             '''An order by ID.'''
 
             uri_template = "orders://{order_id}"
-            mime_type = "application/json"
+            mime_type = "text/plain"
 
             def __init__(self, order_id: int):
                 self.order_id = order_id
 
             def read(self) -> str:
-                return str(Order.query.get(pk=self.order_id))
+                order = Order.query.where(Order.id.equals(self.order_id)).get()
+                return str(order)
 
     Templates match RFC 6570 level 1 — `{name}` placeholders match a
     single path segment (no slashes). Extracted params are coerced to the

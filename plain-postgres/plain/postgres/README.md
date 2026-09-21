@@ -247,6 +247,15 @@ User.query.where(~User.role.equals("guest"))
 User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
 ```
 
+`~` negates whatever it wraps, which is what you want for a composite condition but not for a null check. `is_null()` takes a flag, and the two compile differently:
+
+```python
+User.query.where(~User.age.is_null())  # WHERE NOT ("age" IS NULL)
+User.query.where(User.age.is_null(False))  # WHERE "age" IS NOT NULL
+```
+
+Both match the same rows. `is_null(False)` is the conversion for `filter(age__isnull=False)` and emits the SQL you would write by hand, so reach for it and keep `~` for negating a condition that isn't a null check.
+
 A comparison can also take another column of the same value type, instead of a value:
 
 ```python
@@ -259,6 +268,25 @@ User.query.where(User.updated_at.gt(User.created_at))
 A **nullable column is a different value type** to the checker — `Field[int | None]` is not a `Field[int]` — so the two directions aren't the same. A non-null column accepts a nullable one on the right; a nullable one on the left won't accept a non-null column, because there's no way to name its value type without the `None`. Compare the other way round, or drop to `filter(age__lt=F("other"))`.
 
 An `F()` expression works too, but that arm is untyped: an expression's output type isn't tracked, so nothing checks it against the column. `F()` is the same escape hatch here that it is in `filter()`.
+
+**A condition _is_ a `Q`**, so these replace `Q` everywhere, not just in `filter()`. Anything that takes a `Q` takes one unchanged — `When()`, including the ones inside a `Case()`, and an aggregate's `filter=`:
+
+```python
+from plain.postgres.aggregates import Count
+from plain.postgres.expressions import Case, Value, When
+
+User.query.annotate(
+    tier=Case(When(User.age.gte(18), then=Value("adult")), default=Value("minor"))
+)
+User.query.values("role").annotate(adults=Count("id", filter=User.age.gte(18)))
+```
+
+```sql
+-- the Case annotation
+CASE WHEN "age" >= %s THEN %s ELSE %s END AS "tier"
+-- the Count annotation
+COUNT("id") FILTER (WHERE "age" >= %s) AS "adults"
+```
 
 Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
 
@@ -282,6 +310,21 @@ Traversal starts from a **forward foreign key**. Once inside one, every relation
 A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no traversal wiring, and it is typed `ManyToManyManager[Tag]`, so it could not be typed as one either. Use the string path there — `Widget.query.filter(tags__name="metal")`. Reverse relations aren't traversable for the same reason (a reverse accessor is a `ClassVar`, so there is nothing for the related model to offer the checker), and the error says so.
 
 A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
+
+**`where()` preserves the order you wrote; `filter()` sorted its kwargs alphabetically.** Converting a multi-condition `filter()` can change the WHERE clause text and the parameter order, though not which rows it matches:
+
+```sql
+-- filter(role="admin", email="a@example.com")
+WHERE ("email" = %s AND "role" = %s)  -- params: ('a@example.com', 'admin')
+-- where(User.role.equals("admin"), User.email.equals("a@example.com"))
+WHERE ("role" = %s AND "email" = %s)  -- params: ('admin', 'a@example.com')
+```
+
+Kwargs you already wrote alphabetically convert unchanged. Where the source order wasn't alphabetical, preserving it changes the predicate structure — a test asserting on generated SQL notices, and so can `pg_stat_statements`, which groups by structure rather than literal text and files the reordered statement as a new entry.
+
+**Conditions are strict where `filter()` was lenient — to the type checker.** `equals` takes the field's value type, so `User.age.equals("18")` and a `Field[UUID]`'s `.equals("3f2504e0-4f89-11d3-9a0c-0305e82c3301")` are type errors where `filter(age="18")` and `filter(uuid="3f2504e0-4f89-11d3-9a0c-0305e82c3301")` were not. Runtime coercion is unchanged: `User.age.equals("18")` still coerces the string and runs, exactly as the kwarg did.
+
+So the strictness lands on the caller. Code holding a string from a CLI argument, URL segment, or session parses it first — `int(raw)`, `uuid.UUID(raw)` — and an invalid value raises `ValueError` there, before the ORM is involved, next to the input that was wrong.
 
 **A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
 
