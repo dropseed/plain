@@ -15,7 +15,6 @@ from opentelemetry.semconv.attributes.error_attributes import ERROR_TYPE
 from opentelemetry.trace import Link, SpanContext, SpanKind, TraceFlags
 from plain.logs import get_framework_logger
 from plain.postgres import Field, transaction, types
-from plain.postgres.expressions import F
 from plain.runtime import settings
 from plain.utils import timezone
 
@@ -569,13 +568,12 @@ class JobResultQuerySet(postgres.QuerySet["JobResult"]):
         )
 
     def retryable(self) -> Self:
-        # Still `filter()`: `Field[int].lt()` is annotated to take an `int`,
-        # so `lt(F("retries"))` is a type error even though the ORM compiles it
-        # to exactly the same SQL. Converting would cost a `ty: ignore`.
-        return self.failed().filter(
-            retry_job_request_uuid__isnull=True,
-            retries__gt=0,
-            retry_attempt__lt=F("retries"),
+        # Condition order mirrors the `filter(**kwargs)` this replaced: it
+        # sorted its kwargs, `where()` keeps the order written.
+        return self.failed().where(
+            JobResult.retries.gt(0),
+            JobResult.retry_attempt.lt(JobResult.retries),
+            JobResult.retry_job_request_uuid.is_null(),
         )
 
     def retry_failed_jobs(self) -> None:
