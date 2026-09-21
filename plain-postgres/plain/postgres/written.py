@@ -135,10 +135,14 @@ def _qualified(table: str, column: str) -> str:
     return f"{quote_name(table)}.{quote_name(column)}"
 
 
+def _models_named(name: str) -> list[type[Model]]:
+    """Every registered model class with this name."""
+    return [model for model in models_registry.get_models() if model.__name__ == name]
+
+
 def _model_by_name(name: str, reference: str) -> type[Model]:
-    matches = [
-        model for model in models_registry.get_models() if model.__name__ == name
-    ]
+    """The one registered model this reference names."""
+    matches = _models_named(name)
     if not matches:
         raise ValueError(
             f"{{{reference}}} names no registered model. "
@@ -165,7 +169,7 @@ def _model_field(model: type[Model], field_name: str, reference: str) -> Field:
         )
 
 
-def _render(model: type[Model], template: str, values: dict[str, Any]) -> _Rendered:
+def _render(template: str, values: dict[str, Any]) -> _Rendered:
     """Turn a template into one SQL string and its positional parameters.
 
     Everything binds positionally: psycopg refuses a statement that mixes
@@ -208,13 +212,13 @@ def _render(model: type[Model], template: str, values: dict[str, Any]) -> _Rende
                 parts.append(_qualified(table, field.column))
             continue
 
-        named_model = _bare_model(reference)
-        if named_model is not None:
+        if _models_named(reference):
             if reference in values:
                 raise ValueError(
                     f"{{{reference}}} is both a registered model and a value "
                     "passed to sql(). Rename the value."
                 )
+            named_model = _model_by_name(reference, reference)
             parts.append(quote_name(named_model.model_options.db_table))
             continue
 
@@ -230,16 +234,6 @@ def _render(model: type[Model], template: str, values: dict[str, Any]) -> _Rende
     sql = "".join(parts)
     _refuse_multiple_statements(sql)
     return _Rendered(sql=sql, params=tuple(params), star_models=tuple(star_models))
-
-
-def _bare_model(name: str) -> type[Model] | None:
-    """The registered model called `name`, or None if nothing is."""
-    matches = [
-        model for model in models_registry.get_models() if model.__name__ == name
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    return None
 
 
 def _render_value(value: Any, parts: list[str], params: list[Any]) -> None:
@@ -752,7 +746,7 @@ class Written[R]:
         ):
             raise TypeError("sql(result_type=...) requires a dataclass.")
 
-        rendered = _render(model, template, values)
+        rendered = _render(template, values)
 
         star_models = dict.fromkeys(rendered.star_models)
         if star_models and result_type is not None:
