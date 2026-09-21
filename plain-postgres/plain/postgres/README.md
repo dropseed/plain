@@ -243,6 +243,14 @@ User.query.where(~User.role.equals("guest"))
 User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
 ```
 
+A comparison can also take another column of the same value type, which is the typed spelling of `filter(retry_attempt__lt=F("retries"))`:
+
+```python
+JobResult.query.where(JobResult.retry_attempt.lt(JobResult.retries))
+```
+
+`equals`, `not_equal`, `gt`, `gte`, `lt`, and `lte` all accept one. The column has to be the same value type — comparing an `int` column against a `str` one is a type error — and it has to belong to the same model, which `where()` checks on both sides. An `F()` expression works too.
+
 Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
 
 ```python

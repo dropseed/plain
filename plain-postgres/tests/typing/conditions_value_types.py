@@ -82,3 +82,14 @@ def must_accept_a_condition_from_another_model_because_the_checker_cannot_see_it
     """
     assert_type(StringConditionsExample.label.equals("a"), Q)
     DefaultsExample.query.where(StringConditionsExample.label.equals("a"))
+
+
+def must_accept_a_column_of_the_same_value_type() -> None:
+    """Comparing two columns. Runtime half:
+    tests/internal/test_typed_where_internals.py."""
+    assert_type(DefaultsExample.priority.lt(DefaultsExample.priority), Q)
+    assert_type(DefaultsExample.name.equals(DefaultsExample.name), Q)
+
+
+def must_reject_a_column_of_another_value_type() -> None:
+    DefaultsExample.priority.lt(DefaultsExample.name)  # ty: ignore[invalid-argument-type]

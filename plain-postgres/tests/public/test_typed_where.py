@@ -86,6 +86,18 @@ def test_text_field_string_lookups(db):
     assert [r.name for r in starts] == ["alice", "alpha"]
 
 
+def test_comparison_against_another_column(db):
+    """A comparison takes another column of the same type, not just a value --
+    the typed spelling of `filter(name=F("status"))`."""
+    DefaultsExample.query.create(name="pending")  # status defaults to "pending"
+    DefaultsExample.query.create(name="other")
+
+    rows = list(
+        DefaultsExample.query.where(DefaultsExample.name.equals(DefaultsExample.status))
+    )
+    assert [r.name for r in rows] == ["pending"]
+
+
 def test_where_filters_by_is_in(db):
     DefaultsExample.query.create(name="alice")
     DefaultsExample.query.create(name="bob")

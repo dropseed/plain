@@ -30,7 +30,7 @@ from ..registry import models_registry
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import Col, Func
+    from plain.postgres.expressions import Col, Combinable, Func
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.sql.compiler import SQLCompiler
 
@@ -168,22 +168,26 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     # with type-specific lookups (comparison on numeric, string ops on text).
     # The names are listed once in CONDITION_METHODS below -- anything that
     # needs the set (traversal advice, tests) imports it rather than retyping.
-    def equals(self, value: T) -> Q:
+    # The comparisons take a value, another column of the same value type, or
+    # an expression. `Field[T]` is what makes `retry_attempt.lt(retries)` the
+    # typed spelling of `filter(retry_attempt__lt=F("retries"))` -- and, being
+    # parameterized by the same `T`, it rejects a column of another type.
+    def equals(self, value: T | Field[T] | Combinable) -> Q:
         return self._build_q("equals", "", value)
 
-    def not_equal(self, value: T) -> Q:
+    def not_equal(self, value: T | Field[T] | Combinable) -> Q:
         return ~self._build_q("not_equal", "", value)
 
-    def gt(self, value: T) -> Q:
+    def gt(self, value: T | Field[T] | Combinable) -> Q:
         return self._build_q("gt", "gt", value)
 
-    def gte(self, value: T) -> Q:
+    def gte(self, value: T | Field[T] | Combinable) -> Q:
         return self._build_q("gte", "gte", value)
 
-    def lt(self, value: T) -> Q:
+    def lt(self, value: T | Field[T] | Combinable) -> Q:
         return self._build_q("lt", "lt", value)
 
-    def lte(self, value: T) -> Q:
+    def lte(self, value: T | Field[T] | Combinable) -> Q:
         return self._build_q("lte", "lte", value)
 
     def is_null(self, value: bool = True) -> Q:
@@ -268,12 +272,27 @@ class Field[T](Selectable[T], RegisterLookupMixin):
                 f"{type(self).__name__} {self.name!r} does not support "
                 f".{method}() -- no {suffix!r} lookup is registered for it."
             )
+        other_column = value if isinstance(value, Field) else None
+        if other_column is not None:
+            # Comparing against another column. `F(name)` is the reference the
+            # ORM already understands, and a traversed field's `name` carries
+            # its relation prefix, so this is the whole conversion.
+            from plain.postgres.expressions import F
+
+            value = F(other_column.name)
         name = f"{self.name}{LOOKUP_SEP}{suffix}" if suffix else self.name
         q = Q((name, value))
+        # Which model's where() this condition belongs to, and the field that
+        # built it. See `Q._condition_origins`. A column comparison records
+        # both sides, so a right-hand column from another model is caught the
+        # same way a left-hand one is.
+        origins = set()
         if source := self.source_model:
-            # Which model's where() this condition belongs to, and the field
-            # that built it. See `Q._condition_origins`.
-            q._condition_origins = frozenset({(source, self.name)})
+            origins.add((source, self.name))
+        if other_column is not None and (source := other_column.source_model):
+            origins.add((source, other_column.name))
+        if origins:
+            q._condition_origins = frozenset(origins)
         return q
 
     def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:

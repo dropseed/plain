@@ -13,6 +13,8 @@ import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
+from app.examples.models.relationships import Widget, WidgetTag
+from plain.postgres.expressions import F
 from plain.postgres.fields.base import CONDITION_METHODS, STRING_CONDITION_LOOKUPS
 
 
@@ -117,3 +119,41 @@ def test_string_conditions_compile_like_their_filter_lookup(db, method, lookup):
     untyped = DefaultsExample.query.filter(**{f"name__{lookup}": "alice"})
 
     assert _compiled(typed) == _compiled(untyped)
+
+
+class TestComparingAgainstAnotherColumn:
+    """A `Field` on the right-hand side of a comparison is a column
+    reference. `_build_q` turns it into the `F(...)` the ORM already
+    understands, so the two spellings have to compile identically.
+
+    Public half: tests/public/test_typed_where.py.
+    """
+
+    def test_compiles_like_the_f_expression(self, db):
+        typed = DefaultsExample.query.where(
+            DefaultsExample.priority.lt(DefaultsExample.id)
+        )
+        untyped = DefaultsExample.query.filter(priority__lt=F("id"))
+
+        assert _compiled(typed) == _compiled(untyped)
+
+    def test_a_traversed_column_keeps_its_relation_prefix(self, db):
+        """A traversed field's `name` already carries the prefix, so both
+        sides of the comparison name the joined column."""
+        typed = WidgetTag.query.where(WidgetTag.widget.name.equals(WidgetTag.tag.name))
+        untyped = WidgetTag.query.filter(widget__name=F("tag__name"))
+
+        assert _compiled(typed) == _compiled(untyped)
+
+    def test_a_right_hand_column_from_another_model_is_rejected(self, db):
+        """The cross-model guard reads both sides -- a right-hand column from
+        another model resolves against the queried model just as silently as a
+        left-hand one would."""
+        with pytest.raises(TypeError, match="Widget.size"):
+            DefaultsExample.query.where(DefaultsExample.name.equals(Widget.size))
+
+    def test_both_sides_are_recorded_as_origins(self):
+        q = DefaultsExample.name.equals(Widget.size)
+        assert q._condition_origins == frozenset(
+            {(DefaultsExample, "name"), (Widget, "size")}
+        )
