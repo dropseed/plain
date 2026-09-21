@@ -980,6 +980,7 @@ class Written[R]:
         self._columns: list[_Column] | None = None
         self._result_cache: list[R] | None = None
         self._count_cache: int | None = None
+        self._exists_cache: bool | None = None
 
     # -- what it renders to -------------------------------------------------
 
@@ -1015,6 +1016,7 @@ class Written[R]:
         clone._columns = None
         clone._result_cache = None
         clone._count_cache = None
+        clone._exists_cache = None
         return clone
 
     # -- running it ---------------------------------------------------------
@@ -1209,10 +1211,12 @@ class Written[R]:
             return self.count() > 0
         if self._count_cache is not None:
             return self._count_cache > 0
-        return self._scalar(
-            f'SELECT EXISTS(SELECT 1 FROM ({self._bind_sql}) "written")',
-            f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")',
-        )
+        if self._exists_cache is None:
+            self._exists_cache = self._scalar(
+                f'SELECT EXISTS(SELECT 1 FROM ({self._bind_sql}) "written")',
+                f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")',
+            )
+        return self._exists_cache
 
     def execute(self) -> int:
         """Run the statement and return how many rows it affected.

@@ -193,6 +193,13 @@ def test_count_and_exists_are_memoised(db, capture_queries):
     assert len(counted) == 1
     assert not [query["sql"] for query in queries if "EXISTS" in query["sql"]]
 
+    # exists() on its own memoises too.
+    fresh = Widget.query.sql("SELECT {Widget.*} FROM {Widget}")
+    with capture_queries() as queries:
+        assert fresh.exists() is True
+        assert fresh.exists() is True
+    assert len([q["sql"] for q in queries if "EXISTS" in q["sql"]]) == 1
+
 
 def test_a_write_is_never_wrapped_for_counting(db, capture_queries):
     statement = Widget.query.sql(
