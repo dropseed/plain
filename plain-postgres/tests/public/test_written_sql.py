@@ -286,7 +286,14 @@ def test_instances_decrypt_and_parse_their_fields(db):
     assert secret.config == {"a": 1}
 
 
-def test_extra_columns_become_attributes(widgets):
+def test_a_model_field_is_filled_from_the_star_expansion(widgets):
+    """A statement that selects more than `{Model:*}` declares its own shape."""
+
+    @dataclass
+    class WidgetRow:
+        widget: Widget
+        tag_count: int
+
     statement = Widget.query.sql(
         t"""
         SELECT {Widget:*}, count(wt.id) AS tag_count
@@ -295,37 +302,76 @@ def test_extra_columns_become_attributes(widgets):
         GROUP BY {Widget.id}
         ORDER BY {Widget.name}
         """,
+        result_type=WidgetRow,
     )
     rows = statement.all()
-    assert [(w.name, getattr(w, "tag_count")) for w in rows] == [
+    assert [(row.widget.name, row.tag_count) for row in rows] == [
         ("large-widget", 1),
         ("small-widget", 2),
     ]
+    assert isinstance(rows[0].widget, Widget)
+    assert rows[0].widget._state.adding is False
 
 
-def test_a_repeated_column_is_kept_as_an_extra(widgets):
-    """`{Widget:*}` and `{Widget.name}` in one statement: both arrive."""
+def test_a_model_field_decrypts_and_parses_like_an_instance_row(db):
+    """The expansion hydrates exactly as an instance statement's row does."""
+    SecretStore.query.create(
+        name="prod", api_key="sk-live-123", notes="top secret", config={"a": 1}
+    )
+
+    @dataclass
+    class SecretRow:
+        secret: SecretStore
+        shouted: str
+
+    statement = SecretStore.query.sql(
+        t"""
+        SELECT {SecretStore:*}, upper({SecretStore.name}) AS shouted
+        FROM {SecretStore}
+        """,
+        result_type=SecretRow,
+    )
+    row = statement.get()
+    assert row.secret.api_key == "sk-live-123"
+    assert row.secret.config == {"a": 1}
+    assert row.shouted == "PROD"
+
+
+def test_a_repeated_column_is_its_own_field(widgets):
+    """`{Widget:*}` and an expression over one of its columns: both arrive."""
+
+    @dataclass
+    class DisplayRow:
+        widget: Widget
+        display_name: str
+
     size = "small"
     statement = Widget.query.sql(
         t"""
         SELECT {Widget:*}, upper({Widget.name}) AS display_name
         FROM {Widget}
         WHERE {Widget.size} = {size}
-        """
+        """,
+        result_type=DisplayRow,
     )
-    widget = statement.get()
-    assert widget.name == "small-widget"
-    assert getattr(widget, "display_name") == "SMALL-WIDGET"
+    row = statement.get()
+    assert row.widget.name == "small-widget"
+    assert row.display_name == "SMALL-WIDGET"
 
 
 def test_a_self_join_hydrates_the_row_it_selected(widgets):
     """The instance is `{Widget:*}`'s columns, not whatever traces to Widget.
 
     Both sides of a self-join trace back to the same table, so picking the
-    instance's columns by provenance would mix the two rows together.
+    expansion's columns by provenance would mix the two rows together.
     """
     Widget.query.create(name="other-small", size="small")
     small = Widget.query.get(name="small-widget")
+
+    @dataclass
+    class Neighbour:
+        widget: Widget
+        other_name: str
 
     name = "small-widget"
     statement = Widget.query.sql(
@@ -335,12 +381,66 @@ def test_a_self_join_hydrates_the_row_it_selected(widgets):
         JOIN {Widget} other
           ON other."size" = {Widget.size} AND other."id" <> {Widget.id}
         WHERE {Widget.name} = {name}
-        """
+        """,
+        result_type=Neighbour,
     )
-    widget = statement.get()
-    assert widget.id == small.id
-    assert widget.name == "small-widget"
-    assert getattr(widget, "other_name") == "other-small"
+    row = statement.get()
+    assert row.widget.id == small.id
+    assert row.widget.name == "small-widget"
+    assert row.other_name == "other-small"
+
+
+def test_two_models_fill_two_fields(widgets):
+    """One expansion each, matched to the field annotated with that model."""
+
+    @dataclass
+    class Tagged:
+        widget: Widget
+        tag: Tag
+
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, {Tag:*}
+        FROM {Widget}
+        JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+        JOIN {Tag} ON {Tag.id} = wt.tag_id
+        ORDER BY {Widget.name}, {Tag.name}
+        """,
+        result_type=Tagged,
+    )
+    assert [(row.widget.name, row.tag.name) for row in statement] == [
+        ("large-widget", "red"),
+        ("small-widget", "blue"),
+        ("small-widget", "red"),
+    ]
+
+
+def test_an_outer_join_that_matched_nothing_is_none(widgets):
+    """`Tag | None` is what the outer side of a LEFT JOIN needs."""
+    Widget.query.create(name="bare-widget", size="tiny")
+
+    @dataclass
+    class MaybeTagged:
+        widget: Widget
+        tag: Tag | None
+
+    names = ["bare-widget", "large-widget"]
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, {Tag:*}
+        FROM {Widget}
+        LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+        LEFT JOIN {Tag} ON {Tag.id} = wt.tag_id
+        WHERE {Widget.name} = ANY({names})
+        ORDER BY {Widget.name}
+        """,
+        result_type=MaybeTagged,
+    )
+    rows = statement.all()
+    assert [row.widget.name for row in rows] == ["bare-widget", "large-widget"]
+    assert rows[0].tag is None
+    assert rows[1].tag is not None
+    assert rows[1].tag.name == "red"
 
 
 def test_star_columns_work_through_a_union(widgets):
@@ -359,16 +459,114 @@ def test_star_columns_work_through_a_union(widgets):
     assert all(isinstance(widget, Widget) for widget in statement)
 
 
-def test_an_unaliased_duplicate_column_is_refused(widgets):
+def test_extra_columns_without_a_result_type_are_refused(widgets):
+    """An instance is complete and carries only its columns; nothing is attached."""
     statement = Widget.query.sql(
         t"""
-        SELECT {Widget:*}, other."name"
+        SELECT {Widget:*}, count(wt.id) AS tag_count
         FROM {Widget}
-        JOIN {Widget} other ON other."id" <> {Widget.id}
+        LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+        GROUP BY {Widget.id}
         """,
     )
-    with pytest.raises(TypeError, match="Alias the extra column"):
+    with pytest.raises(TypeError, match="shape of its own"):
         statement.all()
+
+
+def test_a_model_field_with_no_expansion_is_refused(widgets):
+    @dataclass
+    class WidgetRow:
+        widget: Widget
+
+    statement = Widget.query.sql(
+        t"SELECT {Widget.name} AS name FROM {Widget}", result_type=WidgetRow
+    )
+    with pytest.raises(TypeError, match=r"nothing in this statement selects"):
+        statement.all()
+
+
+def test_an_expansion_with_no_model_field_is_refused(widgets):
+    """In the outer select list there is nothing else a `{Model:*}` could be."""
+    statement = Widget.query.sql(
+        t"SELECT {Widget:*} FROM {Widget}", result_type=NameRow
+    )
+    with pytest.raises(TypeError, match="no Widget field to put it in"):
+        statement.all()
+
+
+def test_a_non_nullable_model_field_that_came_back_null_is_refused(widgets):
+    Widget.query.create(name="bare-widget", size="tiny")
+
+    @dataclass
+    class Tagged:
+        widget: Widget
+        tag: Tag
+
+    name = "bare-widget"
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, {Tag:*}
+        FROM {Widget}
+        LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+        LEFT JOIN {Tag} ON {Tag.id} = wt.tag_id
+        WHERE {Widget.name} = {name}
+        """,
+        result_type=Tagged,
+    )
+    with pytest.raises(TypeError, match=r"Annotate it `Tag \| None`"):
+        statement.all()
+
+
+def test_the_same_model_expanded_twice_is_refused(widgets):
+    """Which expansion fills the field is the question a self-join can't answer."""
+
+    @dataclass
+    class Ranked:
+        widget: Widget
+        rank: int
+
+    size = "small"
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, 1 AS rank FROM {Widget} WHERE {Widget.size} = {size}
+        UNION ALL
+        SELECT {Widget:*}, 2 AS rank FROM {Widget}
+        """,
+        result_type=Ranked,
+    )
+    with pytest.raises(TypeError, match=r"expands \{Widget:\*\} 2 times"):
+        statement.all()
+
+
+def test_two_fields_of_one_model_are_refused(widgets):
+    @dataclass
+    class Pair:
+        widget: Widget
+        other: Widget
+
+    statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Pair)
+    with pytest.raises(TypeError, match="more than one Widget field"):
+        statement.all()
+
+
+def test_prefetch_is_refused_on_a_result_type_statement(widgets):
+    """`prefetch()` attaches to instances; a declared row is not one."""
+
+    @dataclass
+    class WidgetRow:
+        widget: Widget
+        tag_count: int
+
+    with pytest.raises(TypeError, match="returns rows"):
+        Widget.query.sql(
+            t"""
+            SELECT {Widget:*}, count(wt.id) AS tag_count
+            FROM {Widget}
+            LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+            GROUP BY {Widget.id}
+            """,
+            result_type=WidgetRow,
+        ).prefetch("tags")
 
 
 def test_result_type_maps_columns_by_name(widgets):

@@ -6,7 +6,8 @@ source-reading lint. What the type buys is that no string reaches `sql()` by
 accident; hand-building a `Template` out of one is still possible, and is the
 thing never to do with text from outside the program.
 
-`{Model:*}` hands back the model; `result_type=` hands back the dataclass; a
+`{Model:*}` hands back the model; `result_type=` hands back the dataclass —
+including the fields of it that are annotated with a model class; a
 `result_type` that isn't a dataclass is a type error, not just a runtime one.
 The runtime half is in tests/public/test_written_sql.py.
 """
@@ -27,6 +28,12 @@ SMALL = t"{Widget.size} = 'small'"
 class SizeCount:
     size: str
     n: int
+
+
+@dataclass
+class WidgetRow:
+    widget: Widget
+    tag_count: int
 
 
 def star_statements_yield_instances() -> None:
@@ -52,6 +59,24 @@ def result_type_statements_yield_rows() -> None:
     assert_type(statement.first(), SizeCount | None)
     for row in statement:
         assert_type(row, SizeCount)
+
+
+def a_model_typed_field_is_the_model() -> None:
+    """A statement with a shape of its own is still typed by its dataclass."""
+    statement = Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, count(*) AS tag_count
+        FROM {Widget}
+        GROUP BY {Widget.id}
+        """,
+        result_type=WidgetRow,
+    )
+    assert_type(statement, Written[WidgetRow])
+    assert_type(statement.all(), list[WidgetRow])
+    for row in statement:
+        assert_type(row, WidgetRow)
+        assert_type(row.widget, Widget)
+        assert_type(row.tag_count, int)
 
 
 def a_module_level_template_is_a_template() -> None:

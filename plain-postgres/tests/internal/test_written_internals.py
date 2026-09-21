@@ -212,6 +212,36 @@ def test_converters_are_attached_to_the_columns_that_have_a_field(db):
     assert converters
 
 
+def test_a_model_field_plan_records_where_its_expansion_starts(db):
+    """Each expansion is a run of columns, found by name and matched by model."""
+
+    @dataclass
+    class Tagged:
+        widget: Widget
+        tag: Tag
+        shouted: str
+
+    Widget.query.sql(
+        t"""
+        SELECT {Widget:*}, {Tag:*}, upper({Widget.name}) AS shouted
+        FROM {Widget}
+        JOIN {Tag} ON true
+        """,
+        result_type=Tagged,
+    ).all()
+
+    (plan,) = _plans().values()
+    assert [
+        (model_field.name, model_field.star.model, model_field.start)
+        for model_field in plan.model_fields
+    ] == [("widget", Widget, 0), ("tag", Tag, 3)]
+    # The primary key is what says an expansion came back all NULL, and it
+    # leads the model's columns.
+    assert [model_field.pk_position for model_field in plan.model_fields] == [0, 0]
+    # The expansions' columns are spoken for; only `shouted` maps by name.
+    assert plan.named_columns == ((5, "shouted"),)
+
+
 def test_an_expression_column_resolves_to_no_field(db):
     Widget.query.create(name="one", size="small")
 

@@ -548,16 +548,16 @@ The call renders the statement; iterating it runs it. `all()`, `get()`, `first()
 
 What an interpolation renders as is decided by **what the object is**, never by how it was spelled:
 
-| Interpolation                                          | Renders as                                                                      |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `{Model}`                                              | the table, quoted                                                               |
-| `{Model:*}`                                            | every column of the model; rows come back as **model instances**                |
-| `{Model.field}`                                        | the qualified column, `"table"."column"` (a foreign key gives its `_id` column) |
-| `{Model.field:name}`                                   | just the column, for an `INSERT` column list or an `UPDATE SET` target          |
-| `{value}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged           |
-| `{value}` where the value is another `sql()` statement | the same, rendered without running                                              |
-| `{value}` where the value is another t-string          | rendered inline, recursively, into the same statement                           |
-| `{value}` otherwise                                    | a bound parameter, always                                                       |
+| Interpolation                                          | Renders as                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `{Model}`                                              | the table, quoted                                                                                      |
+| `{Model:*}`                                            | every column of the model; rows are **model instances**, or fill a model-annotated `result_type` field |
+| `{Model.field}`                                        | the qualified column, `"table"."column"` (a foreign key gives its `_id` column)                        |
+| `{Model.field:name}`                                   | just the column, for an `INSERT` column list or an `UPDATE SET` target                                 |
+| `{value}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged                                  |
+| `{value}` where the value is another `sql()` statement | the same, rendered without running                                                                     |
+| `{value}` where the value is another t-string          | rendered inline, recursively, into the same statement                                                  |
+| `{value}` otherwise                                    | a bound parameter, always                                                                              |
 
 A value interpolated twice binds twice. **A list binds as an array, never as an `IN` list**, so membership is written `= ANY(...)`:
 
@@ -602,24 +602,31 @@ An unknown model or field is a Python `NameError` or `AttributeError` where you 
 
 #### Results
 
-`{Model:*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. The instance is built from the columns that expansion put in the statement, so a self-join or a UNION can't shift its fields. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
+**A query has a shape, and the shape is a type.** `{Model:*}` on its own is the one shape you don't have to declare: rows are live model instances, with encrypted and JSON fields decrypted and parsed like any other read, built from the columns that expansion put in the statement so a self-join or a UNION can't shift them. An instance is always complete and carries only its own columns — nothing is ever attached to it after the fact — so the moment a statement selects anything beyond the expansion, the row has a shape of its own and you declare it:
 
 ```python
-widgets = Widget.query.sql(
+@dataclass
+class WidgetRow:
+    widget: Widget
+    tag_count: int
+
+
+rows = Widget.query.sql(
     t"""
     SELECT {Widget:*}, count(wt.id) AS tag_count
     FROM {Widget}
     LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
     GROUP BY {Widget.id}
-    """
+    """,
+    result_type=WidgetRow,
 )
-for widget in widgets:
-    print(widget.name, widget.tag_count)
+for row in rows:
+    print(row.widget.name, row.tag_count)
 ```
 
-An extra column that shares a name with one of the model's own has to be aliased apart — otherwise it would overwrite the instance's value, and the statement says so. `prefetch()` works on an instance statement exactly as it does on a queryset.
+A field annotated with a **model class** is filled from that model's `{Model:*}` expansion, hydrated exactly as an instance row is; the other columns map onto the other fields by name. The two find each other by model class, so one model can be starred once and annotated once in a statement — a self-join needs aliases an expansion can't give, and there you select the columns yourself. `Widget | None` is what the outer side of a `LEFT JOIN` wants: an expansion that came back all NULL is `None` rather than a hollow instance, and without the `| None` it raises and says to add it. `prefetch()` works on an **instance** statement only — a declared row is not an instance, so join the related table into the statement or query it yourself.
 
-Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. It also _is_ the answer to what a row is, so a `{Model:*}` below it — inside a subquery, say — is just columns. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
+`result_type=` has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is. A `{Model:*}` below the outer select list — inside a subquery, say — is just columns, and the outer statement names the ones it wants; a `{Model:*}` _in_ the outer select list with no field to land in is an error, because those columns would otherwise be dropped.
 
 The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
 
@@ -652,7 +659,7 @@ A violated check, unique or foreign key constraint raises the same `ValidationEr
 The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and the result is cached per set of result columns — so the cost is one extra catalog query the first time a shape is seen, and nothing after:
 
 - **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. A text-shaped one is watched: any value that arrives still encrypted is refused rather than handed back as ciphertext, since nothing can decrypt it. (Checked on every row of every execution, so a plain column holding a string that looks encrypted is refused too — which is the safe way to be wrong.)
-- **Check `result_type`.** Every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
+- **Check `result_type`.** A model-annotated field takes its model's whole expansion; of what's left, every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
 
 The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same statement with a different embedded queryset is checked again rather than hydrated from the wrong plan.
 
