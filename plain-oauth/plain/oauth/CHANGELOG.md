@@ -1,5 +1,16 @@
 # plain-oauth changelog
 
+## [0.50.6](https://github.com/dropseed/plain/releases/plain-oauth@0.50.6) (2026-09-21)
+
+### What's changed
+
+- The connection lookups use typed `where()` conditions and the provider-key preflight uses `select()`; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f)) ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+- `OAuthConnection.user` is annotated `Field[User]`, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
 ## [0.50.5](https://github.com/dropseed/plain/releases/plain-oauth@0.50.5) (2026-09-20)
 
 ### What's changed
