@@ -1478,9 +1478,57 @@ from plain.postgres import Field, types
 @postgres.register_model
 class Book(postgres.Model):
     title: Field[str] = types.TextField(max_length=200)
-    author: Author = types.ForeignKeyField("Author", on_delete=postgres.CASCADE)
+    author: Field[Author] = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
     tags = types.ManyToManyField("Tag")
 ```
+
+### Referring to a model by name
+
+`ForeignKeyField` also takes a `"package.Model"` string (or `"self"`) instead of
+the class. That is a **runtime** device, for the cases where the class isn't
+importable at the point of declaration: a circular reference between two models,
+a self-reference, or a framework package pointing at the app's own `User`.
+
+The annotation is unaffected — a string-referenced foreign key is annotated
+`Field[Related]` exactly like a class-referenced one, and gets the same typed
+surface: `Model.user.email.equals(...)` traversal, `Model.user.id.equals(...)`
+conditions, and a typed `Model(user=...)` constructor. The string says nothing
+to the checker, so the annotation is where `Related` comes from; import it under
+`TYPE_CHECKING` when importing it for real would be the cycle you were avoiding:
+
+```python
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from plain import postgres
+from plain.postgres import Field, types
+
+if TYPE_CHECKING:
+    from app.users.models import User
+
+
+@postgres.register_model
+class PinnedNavItem(postgres.Model):
+    # Cross-package: plain.admin can't import the app's User at runtime.
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+
+
+@postgres.register_model
+class TreeNode(postgres.Model):
+    name: Field[str] = types.TextField(max_length=100)
+    # Self-reference, nullable: `Field[T | None]` plus `default=None`.
+    parent: Field[TreeNode | None] = types.ForeignKeyField(
+        "self", on_delete=postgres.CASCADE, allow_null=True, default=None
+    )
+```
+
+What does _not_ work is annotating the field with the related model itself
+(`user: User = types.ForeignKeyField("users.User", ...)`). That names a model
+instance rather than a field, so the checker never sees a descriptor: class
+access is a `User` rather than `type[User]`, `Model.user.id` is an `int`, and
+the condition methods are gone. `plain preflight` reports any field still
+spelled that way as `postgres.foreign_key_annotated_as_value`.
 
 ### Foreign key access
 
@@ -1764,12 +1812,12 @@ CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional 
 
 ```python
 # Bad — blindly using CASCADE everywhere
-company: Company = types.ForeignKeyField(
-    "Company", on_delete=postgres.CASCADE
+company: Field[Company] = types.ForeignKeyField(
+    Company, on_delete=postgres.CASCADE
 )  # deleting company deletes invoices!
 
 # Good — block the delete while invoices reference the company
-company: Company = types.ForeignKeyField("Company", on_delete=postgres.RESTRICT)
+company: Field[Company] = types.ForeignKeyField(Company, on_delete=postgres.RESTRICT)
 ```
 
 #### No `allow_null` on string fields
