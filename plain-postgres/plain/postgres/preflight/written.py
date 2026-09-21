@@ -25,6 +25,14 @@ RULE = (
 )
 
 
+def _relative(path: Path) -> str:
+    """The path as the person running preflight would type it."""
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
 def _called_name(func: ast.expr) -> str | None:
     """The plain name of what's being called: `qs.sql(...)` -> `sql`."""
     if isinstance(func, ast.Attribute):
@@ -112,12 +120,15 @@ class CheckSqlTemplateNotLiteral(PreflightCheck):
             if "sql(" not in source and "Fragment(" not in source:
                 continue
             for line, called in _built_sql_calls(source, path):
+                where = f"{_relative(path)}:{line}"
                 results.append(
                     PreflightResult(
+                        # The location goes in the message: `obj` isn't printed.
                         fix=(
-                            f"{called}() is given a template built at runtime — {RULE}."
+                            f"{where} builds the {called}() template at runtime "
+                            f"— {RULE}."
                         ),
-                        obj=f"{path}:{line}",
+                        obj=where,
                         id="postgres.sql_template_not_literal",
                     )
                 )

@@ -4,7 +4,12 @@ SECRET_KEY = "test"
 URLS_ROUTER = "app.urls.AppRouter"
 INSTALLED_PACKAGES = [
     "plain.templates",
+    # plain.admin and the packages it renders with: the providers chart card
+    # lives in plain/oauth/admin.py, and testing it means importing it.
     "plain.admin",
+    "plain.elements",
+    "plain.htmx",
+    "plain.tailwind",
     "plain.auth",
     "plain.sessions",
     "plain.postgres",

@@ -28,6 +28,11 @@ def star_statements_yield_instances() -> None:
     assert_type(statement.get(), Widget)
 
 
+def prefetch_keeps_the_statement_type() -> None:
+    statement = Widget.query.sql("SELECT {Widget.*} FROM {Widget}").prefetch("tags")
+    assert_type(statement, Written[Widget])
+
+
 def result_type_statements_yield_rows() -> None:
     statement = Widget.query.sql(
         "SELECT {Widget.size} AS size, count(*) AS n FROM {Widget} GROUP BY 1",

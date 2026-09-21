@@ -486,9 +486,9 @@ for row in stats:
     print(row.queue, row.n)
 ```
 
-The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once** — its rows are cached, the way a queryset caches results — so iterating twice can't repeat a write. Call `sql()` again to run it again.
+The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once**: its rows are cached, the way a queryset caches results, so iterating twice can't repeat a write. Call `sql()` again to run it again.
 
-Only the model matters on the queryset you call it from: `Widget.query.filter(...).sql(...)` ignores the filter.
+`sql()` starts from the bare `Model.query`. A queryset that's already been narrowed — `where()`, `order_by()`, a slice — raises, because a written statement can't carry that narrowing and quietly dropping it would drop whatever the filter was enforcing. Put the queryset into the statement as a subquery instead.
 
 #### Interpolation
 
@@ -498,6 +498,7 @@ Everything in a template that isn't SQL is a `{}` reference, and what it names d
 | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `{Model}`                                             | the table, quoted                                                               |
 | `{Model.field}`                                       | the qualified column, `"table"."column"` (a foreign key gives its `_id` column) |
+| `{Model.field:name}`                                  | just the column, for an `INSERT` column list or an `UPDATE SET` target          |
 | `{Model.*}`                                           | every column of the model; rows come back as **model instances**                |
 | `{name}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged           |
 | `{name}` where the value is another `sql()` statement | the same, rendered without running                                              |
@@ -515,6 +516,8 @@ Widget.query.sql(
 
 A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
 
+A `{` that isn't a reference — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any format string.
+
 A queryset goes in as a subquery, which is the seam between the two halves — the built query decides the rows, the written one does what the ORM can't say:
 
 ```python
@@ -531,7 +534,7 @@ JobRequest.query.sql(
 )
 ```
 
-A [`Fragment`](./written.py#Fragment) is the only way to put text into a statement that the template doesn't spell out, and it has to be a string literal written at the call site — a variable or an f-string raises, because a fragment is inlined and a literal is the one shape that can't carry input:
+A [`Fragment`](./written.py#Fragment) is the only way to put text into a statement that the template doesn't spell out:
 
 ```python
 from plain.postgres import Fragment
@@ -539,11 +542,13 @@ from plain.postgres import Fragment
 ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
 ```
 
-An unknown model or field name, a `{name}` with no value, and a template holding more than one statement all raise where the `sql()` call is written, before anything runs.
+**Templates and fragments are literals.** A template built at runtime — an f-string, a concatenation, a value passed in — puts the injection guarantee back in the caller's hands, and at runtime it is indistinguishable from a literal. So the rule is checked by reading the source: `plain preflight` walks the app and reports each one (`postgres.sql_template_not_literal`). A module-level constant holding a literal is still a literal.
+
+An unknown model or field name, a `{name}` with no value, and a format spec on something that doesn't take one all raise where the `sql()` call is written, before anything runs. A second statement smuggled into a template is refused by Postgres itself: a written statement goes over the protocol that carries exactly one command.
 
 #### Results
 
-`{Model.*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
+`{Model.*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. The instance is built from the columns that expansion put in the statement, so a self-join or a UNION can't shift its fields. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
 
 ```python
 widgets = Widget.query.sql(
@@ -558,7 +563,9 @@ for widget in widgets:
     print(widget.name, widget.tag_count)
 ```
 
-Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter, but a missing or an extra column is an error.
+An extra column that shares a name with one of the model's own has to be aliased apart — otherwise it would overwrite the instance's value, and the statement says so. `prefetch()` works on an instance statement exactly as it does on a queryset.
+
+Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
 
 The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
 
@@ -569,7 +576,7 @@ The sqlx alias convention says in the statement what the SQL itself leaves ambig
 ```python
 updated = Widget.query.sql(
     """
-    UPDATE {Widget} SET "size" = {size}
+    UPDATE {Widget} SET {Widget.size:name} = {size}
     WHERE {Widget.id} = {id}
     RETURNING {Widget.*}
     """,
@@ -582,20 +589,20 @@ gone = Widget.query.sql(
 ).execute()
 ```
 
-`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way.
+`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way. A write runs exactly once however it's asked — `count()` and `first()` on one read what that single execution returned rather than running it again.
 
-A violated check or unique constraint raises the same `ValidationError` a model write raises. A written statement has no instance to describe, so only declared constraints map; anything else re-raises as `psycopg.IntegrityError`.
+A violated check, unique or foreign key constraint raises the same `ValidationError` a model write raises, looked up by the constraint name across every model — a written statement can write any table. Where the ORM's message would name the offending value, a written one can't: it has rows, not instances.
 
 #### What Postgres checks, and when
 
-The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and both are cached per template — so the cost is one extra catalog query the first time a statement runs, and nothing after:
+The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and the result is cached per set of result columns — so the cost is one extra catalog query the first time a shape is seen, and nothing after:
 
-- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would.
-- **Check `result_type`.** Every column has to have a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
+- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. An encrypted one is refused outright rather than handed back as ciphertext, since nothing can decrypt it.
+- **Check `result_type`.** Every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
+
+The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same template with a different embedded queryset is checked again rather than hydrated from the wrong plan.
 
 What it does **not** check: **nullability** — the annotation is the declaration, and `!`/`?` documents it. And the check runs at first execution, not before deploy, so a statement no test and no code path ever runs is unverified.
-
-One trap worth knowing: Plain loads `jsonb` as text and a `JSONField`'s converter is what parses it, so a `jsonb` column that _doesn't_ come from a model field arrives as a `str`. Select it through the field, or annotate it `str`.
 
 ### Raw SQL
 

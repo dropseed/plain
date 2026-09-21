@@ -699,6 +699,18 @@ def test_written_queue_aggregates_match_values_annotate(metrics) -> None:
 
 
 @pytest.mark.usefixtures("db")
+def test_written_queue_aggregates_are_empty_without_jobs(metrics) -> None:
+    """No rows means no groups -- every handled queue still reports zero."""
+    queues = ["default", "priority"]
+    metrics(_WorkerStub(queues=queues))
+
+    assert _by_queue(otel.WorkerMetrics._gauge_queue_depth) == dict.fromkeys(queues, 0)
+    assert _by_queue(otel.WorkerMetrics._gauge_queue_oldest_age) == dict.fromkeys(
+        queues, 0.0
+    )
+
+
+@pytest.mark.usefixtures("db")
 def test_queue_oldest_age_returns_seconds(metrics) -> None:
     _NoopJob().run_in_worker()
 

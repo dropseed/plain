@@ -40,3 +40,9 @@ def test_provider_chart_matches_the_grouped_aggregate(db):
     counts = data["data"]["datasets"][0]["data"]
     assert dict(zip(labels, counts)) == expected
     assert expected == {"bitbucket": 1, "github": 2}
+
+
+def test_provider_chart_is_empty_without_connections(db):
+    data = ProvidersChartCard().get_chart_data()
+    assert data["data"]["labels"] == []
+    assert data["data"]["datasets"][0]["data"] == []
