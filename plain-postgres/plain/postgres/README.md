@@ -488,7 +488,7 @@ for row in stats:
 
 The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once**: its rows are cached, the way a queryset caches results, so iterating twice can't repeat a write. Call `sql()` again to run it again.
 
-`sql()` starts from the bare `Model.query`. A queryset that's already been narrowed — `where()`, `order_by()`, a slice — raises, because a written statement can't carry that narrowing and quietly dropping it would drop whatever the filter was enforcing. Put the queryset into the statement as a subquery instead.
+`sql()` starts from `Model.query`. A queryset narrowed past that — `where()`, `order_by()`, a slice — raises, because a written statement can't carry the narrowing and quietly dropping it would drop whatever the filter was enforcing. Put the queryset into the statement as a subquery instead. A model whose _default_ queryset filters can still write SQL, but that scope is **not** applied either: write the predicate into the statement, or embed `Model.query` as `{rows}`.
 
 #### Interpolation
 
@@ -544,7 +544,7 @@ ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
 
 **Templates and fragments are literals.** A template built at runtime — an f-string, a concatenation, a value passed in — puts the injection guarantee back in the caller's hands, and at runtime it is indistinguishable from a literal. So the rule is checked by reading the source: `plain preflight` walks the app and reports each one (`postgres.sql_template_not_literal`). A module-level constant holding a literal is still a literal.
 
-An unknown model or field name, a `{name}` with no value, and a format spec on something that doesn't take one all raise where the `sql()` call is written, before anything runs. A second statement smuggled into a template is refused by Postgres itself: a written statement goes over the protocol that carries exactly one command.
+An unknown model or field name, a `{name}` with no value, and a format spec on something that doesn't take one all raise where the `sql()` call is written, before anything runs. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
 
 #### Results
 
@@ -565,7 +565,7 @@ for widget in widgets:
 
 An extra column that shares a name with one of the model's own has to be aliased apart — otherwise it would overwrite the instance's value, and the statement says so. `prefetch()` works on an instance statement exactly as it does on a queryset.
 
-Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
+Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. It also _is_ the answer to what a row is, so a `{Model.*}` below it — inside a subquery, say — is just columns. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
 
 The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
 
@@ -589,7 +589,7 @@ gone = Widget.query.sql(
 ).execute()
 ```
 
-`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way. A write runs exactly once however it's asked — `count()` and `first()` on one read what that single execution returned rather than running it again.
+`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way. A write runs exactly once however it's asked — `count()` and `first()` on one read what that single execution returned rather than running it again, and adding a `prefetch()` afterwards doesn't re-run it. Asking a write with no `RETURNING` clause how many rows it _returns_ raises: 0 would read like "the UPDATE matched nothing", and `execute()` is the question with an answer.
 
 A violated check, unique or foreign key constraint raises the same `ValidationError` a model write raises, looked up by the constraint name across every model — a written statement can write any table. Where the ORM's message would name the offending value, a written one can't: it has rows, not instances.
 
@@ -597,7 +597,7 @@ A violated check, unique or foreign key constraint raises the same `ValidationEr
 
 The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and the result is cached per set of result columns — so the cost is one extra catalog query the first time a shape is seen, and nothing after:
 
-- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. An encrypted one is refused outright rather than handed back as ciphertext, since nothing can decrypt it.
+- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. A text-shaped one is watched: any value that arrives still encrypted is refused rather than handed back as ciphertext, since nothing can decrypt it. (Checked on every row of every execution, so a plain column holding a string that looks encrypted is refused too — which is the safe way to be wrong.)
 - **Check `result_type`.** Every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
 
 The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same template with a different embedded queryset is checked again rather than hydrated from the wrong plan.

@@ -29,6 +29,15 @@ def _empty_caches():
     written._catalog_cache.clear()
 
 
+def _plans() -> dict:
+    """The plans learned on this connection.
+
+    Both caches hang off the connection: a signature carries table OIDs, and
+    those belong to one database.
+    """
+    return written._plans.get(get_connection(), {})
+
+
 @dataclass
 class NameRow:
     name: str
@@ -49,14 +58,14 @@ def test_the_plan_is_built_once_per_result_shape(db, capture_queries):
     with capture_queries() as first:
         run()
     assert len(_catalog_queries(first)) == 1
-    assert len(written._plans) == 1
+    assert len(_plans()) == 1
 
     with capture_queries() as second:
         run()
     # The same columns came back, so the plan is reused and nothing goes back
     # to the catalog.
     assert _catalog_queries(second) == []
-    assert len(written._plans) == 1
+    assert len(_plans()) == 1
 
 
 def test_a_different_result_shape_gets_its_own_plan(db):
@@ -73,7 +82,7 @@ def test_a_different_result_shape_gets_its_own_plan(db):
         "SELECT {Widget.size} AS size FROM {Widget}", result_type=SizeRow
     ).all()
 
-    assert len(written._plans) == 2
+    assert len(_plans()) == 2
 
 
 def test_a_per_call_result_type_does_not_grow_the_cache(db):
@@ -91,7 +100,7 @@ def test_a_per_call_result_type_does_not_grow_the_cache(db):
     for _ in range(3):
         run()
 
-    assert len(written._plans) == 1
+    assert len(_plans()) == 1
 
 
 def test_the_catalog_lookup_is_one_query_for_every_column(db, capture_queries):
@@ -135,7 +144,7 @@ def test_converters_are_attached_to_the_columns_that_have_a_field(db):
         result_type=SecretRow,
     ).all()
 
-    (plan,) = written._plans.values()
+    (plan,) = _plans().values()
     # `name` is a plain TextField and needs no converter; `api_key` decrypts.
     assert list(plan.converters) == [1]
     converters, expression = plan.converters[1]
@@ -155,7 +164,7 @@ def test_an_expression_column_resolves_to_no_field(db):
         result_type=UpperRow,
     ).all()
 
-    (plan,) = written._plans.values()
+    (plan,) = _plans().values()
     assert plan.converters == {}
 
 
@@ -263,3 +272,10 @@ def test_the_catalog_cache_is_per_connection(db):
         "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
     assert get_connection() in written._catalog_cache
+
+
+def test_the_plan_cache_hangs_off_the_connection(db):
+    Widget.query.sql(
+        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+    ).all()
+    assert get_connection() in written._plans

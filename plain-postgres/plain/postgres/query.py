@@ -1918,7 +1918,17 @@ class QuerySet[T: "Model"]:
         )
 
     def _reject_narrowed_for_sql(self) -> None:
-        """Refuse sql() on anything but a bare `Model.query`."""
+        """Refuse sql() on a queryset narrowed past the model's own default.
+
+        `Model.query` is the starting point, whatever it is: a model whose
+        default queryset already filters -- a soft-delete scope, say -- can
+        still write SQL. What it can't do is *carry* that scope into the
+        statement, so the comparison is against a fresh `Model.query` and the
+        statement has to state the predicate itself.
+        """
+        if self._compiles_like_the_models_own_queryset():
+            return
+
         query = self.sql_query
         narrowings = {
             "where()/filter()": query.has_filters(),
@@ -1937,14 +1947,32 @@ class QuerySet[T: "Model"]:
             or self._returning_instances,
         }
         applied = [name for name, is_set in narrowings.items() if is_set]
-        if applied:
-            raise TypeError(
-                f"sql() takes the whole query, so it starts from "
-                f"{self.model.__name__}.query — this one already has "
-                f"{', '.join(applied)} on it, which a written statement can't "
-                "carry. Put the queryset in the statement as a subquery "
-                'instead: sql("... FROM {rows} r", rows=queryset).'
-            )
+        raise TypeError(
+            f"sql() takes the whole query, so it starts from "
+            f"{self.model.__name__}.query — this one already has "
+            f"{', '.join(applied) or 'been narrowed'}, which a written "
+            "statement can't carry. Put the queryset in the statement as a "
+            'subquery instead: sql("... FROM {rows} r", rows=queryset).'
+        )
+
+    def _compiles_like_the_models_own_queryset(self) -> bool:
+        """Whether this queryset is still exactly what `Model.query` hands out.
+
+        Compiled SQL is the comparison, so a default scope's own filter counts
+        as unnarrowed while anything added to it doesn't. `elide_empty=False`
+        keeps a queryset that can't match anything compilable instead of
+        raising out of the check.
+        """
+
+        def compiled(queryset: QuerySet[Any]) -> Any:
+            return queryset.sql_query.get_compiler(elide_empty=False).as_sql()
+
+        try:
+            return compiled(self) == compiled(self.model.query)
+        except Exception:
+            # Anything that won't compile is, by definition, not the plain
+            # queryset the model hands out.
+            return False
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()

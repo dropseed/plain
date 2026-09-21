@@ -544,6 +544,21 @@ def test_write_without_returning_gives_a_row_count(widgets):
     assert Widget.query.filter(size="tiny").count() == 1
 
 
+def test_asking_a_resultless_write_about_rows_is_refused(widgets):
+    """0 would read like "the UPDATE matched nothing"."""
+    statement = Widget.query.sql(
+        "UPDATE {Widget} SET {Widget.size:name} = {size}", size="tiny"
+    )
+    with pytest.raises(TypeError, match="use execute\\(\\)"):
+        statement.count()
+    with pytest.raises(TypeError, match="use execute\\(\\)"):
+        statement.exists()
+    with pytest.raises(TypeError, match="use execute\\(\\)"):
+        bool(statement)
+    # ...and it still ran exactly once.
+    assert Widget.query.filter(size="tiny").count() == 2
+
+
 def test_execute_counts_rows_without_shaping_them(widgets):
     """A write can RETURNING without saying what a row is; execute() counts."""
     statement = Widget.query.sql(
@@ -650,7 +665,8 @@ def test_a_trailing_semicolon_is_dropped(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_a_second_statement_is_refused(widgets):
+def test_a_second_statement_is_refused_when_a_parameter_binds(widgets):
+    """With a parameter the statement goes over the extended protocol."""
     statement = Widget.query.sql(
         "SELECT {Widget.id} FROM {Widget} WHERE {Widget.size} = {size}; "
         "DELETE FROM {Widget}",
@@ -658,6 +674,13 @@ def test_a_second_statement_is_refused(widgets):
     )
     with pytest.raises(psycopg.errors.SyntaxError, match="multiple commands"):
         statement.execute()
+
+
+def test_a_second_statement_is_refused_without_parameters(widgets):
+    """With nothing to bind psycopg sends a simple query, which would run both."""
+    with pytest.raises(ValueError, match="single statement"):
+        Widget.query.sql("SELECT 1 AS n; DELETE FROM {Widget}")
+    assert Widget.query.count() == 2
 
 
 def test_sql_needs_a_bare_queryset(db):
@@ -678,9 +701,29 @@ def test_result_type_must_be_a_dataclass(db):
         )
 
 
-def test_star_and_result_type_together_are_refused(db):
-    with pytest.raises(TypeError, match="not both"):
-        Widget.query.sql("SELECT {Widget.*} FROM {Widget}", result_type=SizeCount)
+def test_a_star_inside_a_subquery_is_just_columns(widgets):
+    """`result_type=` says what a row is; a `{Model.*}` below it is columns."""
+    statement = Widget.query.sql(
+        """
+        SELECT count(*) AS n, {Widget.size} AS size
+        FROM (SELECT {Widget.*} FROM {Widget}) AS {Widget}
+        GROUP BY 2
+        ORDER BY 2
+        """,
+        result_type=SizeCount,
+    )
+    assert statement.all() == [
+        SizeCount(size="large", n=1),
+        SizeCount(size="small", n=1),
+    ]
+
+
+def test_a_star_that_cannot_be_found_says_where_to_look(widgets):
+    statement = Widget.query.sql(
+        "SELECT count(*) AS n FROM (SELECT {Widget.*} FROM {Widget}) sub"
+    )
+    with pytest.raises(TypeError, match="inside a subquery"):
+        statement.all()
 
 
 def test_two_models_starred_are_refused(db):
@@ -737,3 +780,104 @@ def test_the_plan_follows_the_columns_not_the_template(widgets):
     )
     with pytest.raises(psycopg.errors.UndefinedColumn):
         sizes.all()
+
+
+def test_a_trailing_comment_survives_the_row_limit(widgets):
+    """first()/get()/count() wrap the statement; a `-- comment` can't swallow it."""
+    statement = Widget.query.sql(
+        """
+        SELECT {Widget.*} FROM {Widget} ORDER BY {Widget.name}
+        -- the oldest one
+        """
+    )
+    first = statement.first()
+    assert first is not None
+    assert first.name == "large-widget"
+    assert statement.count() == 2
+
+
+def test_a_trailing_semicolon_is_dropped_from_the_sql_too(widgets):
+    statement = Widget.query.sql(
+        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {size};  ",
+        size="small",
+    )
+    assert not statement.sql.rstrip().endswith(";")
+
+
+def test_prefetch_after_a_write_does_not_run_it_again(widgets):
+    statement = Widget.query.sql(
+        """
+        INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
+        VALUES ({name}, {size})
+        RETURNING {Widget.*}
+        """,
+        name="once",
+        size="small",
+    )
+    assert statement.execute() == 1
+    assert statement.prefetch("tags").all()[0].name == "once"
+    assert Widget.query.filter(name="once").count() == 1
+
+
+def test_a_ciphertext_column_is_refused_on_every_execution(db):
+    """A NULL first row, or a plan built by another statement, is no excuse."""
+    SecretStore.query.create(name="null-one", api_key="k")
+
+    @dataclass
+    class Row:
+        v: str | None
+
+    # A statement with the same column signature (`v`, text, no source) runs
+    # first and builds the plan.
+    Widget.query.sql("SELECT {value}::text AS v", value="plain", result_type=Row).all()
+
+    leaky = SecretStore.query.sql(
+        "SELECT coalesce({SecretStore.api_key}, '') AS v FROM {SecretStore}",
+        result_type=Row,
+    )
+    with pytest.raises(TypeError, match="nothing can decrypt it"):
+        leaky.all()
+
+
+def test_a_ciphertext_column_is_caught_past_the_first_row(db):
+    SecretStore.query.create(name="a", api_key="k1", notes="")
+    SecretStore.query.create(name="b", api_key="k2", notes="")
+
+    @dataclass
+    class Row:
+        v: str | None
+
+    statement = SecretStore.query.sql(
+        """
+        SELECT CASE WHEN {SecretStore.name} = {first} THEN NULL
+                    ELSE {SecretStore.api_key} END AS v
+        FROM {SecretStore}
+        ORDER BY {SecretStore.name}
+        """,
+        first="a",
+        result_type=Row,
+    )
+    with pytest.raises(TypeError, match="nothing can decrypt it"):
+        statement.all()
+
+
+def test_a_model_with_a_default_scope_can_still_write_sql(widgets, monkeypatch):
+    """A default-filtering queryset is the starting point, not a narrowing.
+
+    The scope is *not* applied to the statement — that's the whole point of
+    writing it — so the statement states its own predicate.
+    """
+    from plain import postgres
+
+    class SmallOnlyQuerySet(postgres.QuerySet):
+        def __get__(self, instance, owner):
+            return super().__get__(instance, owner).filter(size="small")
+
+    monkeypatch.setattr(Widget, "query", SmallOnlyQuerySet())
+    assert Widget.query.count() == 1  # the scope is live
+
+    statement = Widget.query.sql("SELECT {Widget.*} FROM {Widget}")
+    assert len(statement.all()) == 2  # and not applied to written SQL
+
+    with pytest.raises(TypeError, match="order_by"):
+        Widget.query.order_by("name").sql("SELECT {Widget.*} FROM {Widget}")

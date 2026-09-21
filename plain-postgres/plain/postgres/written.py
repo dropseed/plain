@@ -268,9 +268,12 @@ def _render(template: str, values: dict[str, Any]) -> _Rendered:
 
         _render_value(values[reference], sql, params)
 
+    binds_parameters = bool(params)
     return _Rendered(
-        sql="".join(sql.display),
-        bind_sql=_one_statement("".join(sql.bind)),
+        # The trailing `;` comes off both forms, so `.sql` and the span show
+        # the statement that actually ran.
+        sql=_one_statement("".join(sql.display), binds_parameters=binds_parameters),
+        bind_sql=_one_statement("".join(sql.bind), binds_parameters=binds_parameters),
         params=tuple(params),
         stars=tuple(stars),
     )
@@ -319,16 +322,57 @@ def _render_value(value: Any, sql: _Sql, params: list[Any]) -> None:
         params.append(value)
 
 
-def _one_statement(sql: str) -> str:
-    """Drop a trailing semicolon; Postgres refuses the rest.
+def _one_statement(sql: str, *, binds_parameters: bool) -> str:
+    """One written query is one statement.
 
-    A statement with parameters goes to the server through the extended query
-    protocol, which carries exactly one command — `SELECT 1; DROP TABLE x` is
-    refused by Postgres itself, with no scanner here to get wrong. A trailing
-    `;` is the one thing that refusal would catch that nobody means, so it
-    comes off.
+    A statement that binds a parameter goes to the server over the extended
+    query protocol, which carries exactly one command, so Postgres refuses
+    `SELECT 1; DROP TABLE x` itself. With no parameters to bind psycopg sends
+    the statement as a simple query instead, and the server will happily run
+    both halves — so that case is refused here.
+
+    The check is deliberately blunt: any `;` left after the trailing one comes
+    off is refused, quoted or not. A template is a literal the author wrote,
+    so the cost of being wrong is a rewrite, not a mystery.
     """
-    return sql.rstrip().removesuffix(";")
+    sql = sql.rstrip().removesuffix(";")
+    if not binds_parameters and ";" in sql:
+        raise ValueError(
+            "A written query is a single statement, and this one contains a "
+            "';'. Split it into separate sql() calls. (A ';' inside a string "
+            "literal counts too: bind the string as {name} instead, or write "
+            "the `{` of a literal as `{{`.)"
+        )
+    return sql
+
+
+def _wrap(sql: str, suffix: str = "", *, prefix: str = "SELECT * FROM ") -> str:
+    """Put a statement in a derived table.
+
+    The newlines matter: a statement can end in a `-- comment`, and anything
+    appended to that line would be inside it.
+    """
+    return f'{prefix}(\n{sql}\n) "written"{" " + suffix if suffix else ""}'
+
+
+def _leading_keyword(sql: str) -> str:
+    """The first word of a statement, past whitespace and leading comments."""
+    index = 0
+    while index < len(sql):
+        if sql[index].isspace():
+            index += 1
+        elif sql.startswith("--", index):
+            end = sql.find("\n", index)
+            index = len(sql) if end == -1 else end + 1
+        elif sql.startswith("/*", index):
+            end = sql.find("*/", index + 2)
+            index = len(sql) if end == -1 else end + 2
+        else:
+            break
+    rest = sql[index:]
+    if rest.startswith("("):
+        return "("
+    return rest.split(maxsplit=1)[0].upper() if rest.split() else ""
 
 
 # --------------------------------------------------------------------------
@@ -345,8 +389,11 @@ def _written_cursor(connection: DatabaseConnection) -> Generator[Any]:
     transaction-mode pooler like pgbouncer. A written statement uses psycopg's
     ordinary `Cursor` instead, for one reason: the extended query protocol
     carries exactly one command, so Postgres refuses a second statement
-    smuggled into a template. It stays pooler-safe because the statement is
-    UNNAMED and one-shot — `prepare=True` is the named kind that isn't.
+    smuggled into a template whenever the statement binds a parameter. (With
+    no parameters psycopg sends a simple query, so `_one_statement` covers
+    that case.) It stays pooler-safe because the statement is UNNAMED and
+    one-shot — `prepare=True` is the named kind that isn't, and every execute
+    here passes `prepare=False` to say so.
 
     Wrapped in Plain's own cursor wrapper so the statement is logged and
     guarded like every other query.
@@ -378,7 +425,14 @@ _catalog_cache: weakref.WeakKeyDictionary[
 # return the same columns share a plan; anything that changes the columns
 # (a different embedded queryset, a schema change) builds a new one, and the
 # cache can only grow to the number of distinct result shapes.
-_plans: dict[_Signature, _Plan] = {}
+#
+# Per connection, like the catalog cache and for the same reason: a signature
+# carries table OIDs, and those belong to one database. Two databases with the
+# same schema -- a checkout and the fork it came from -- assign them
+# independently.
+_plans: weakref.WeakKeyDictionary[DatabaseConnection, dict[_Signature, _Plan]] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -517,6 +571,7 @@ class _Plan:
     signature: _Signature
     names: tuple[str, ...]
     converters: dict[int, tuple[list[Any], Any]]
+    decryptable: tuple[int, ...]
     star: _StarExpansion | None
     star_start: int
     extras: tuple[tuple[int, str], ...]
@@ -526,6 +581,8 @@ class _Plan:
     def build(
         self, rows: list[tuple[Any, ...]], connection: DatabaseConnection
     ) -> list[Any]:
+        self._refuse_ciphertext(rows)
+
         converted: Any = rows
         if self.converters:
             converted = apply_converters(iter(rows), self.converters, connection)
@@ -538,6 +595,37 @@ class _Plan:
             self.result_type(**dict(zip(self.names, row, strict=True)))
             for row in converted
         ]
+
+    def _refuse_ciphertext(self, rows: list[tuple[Any, ...]]) -> None:
+        """Refuse a column that lost its source and came back as ciphertext.
+
+        Provenance is what attaches the decrypting converter, and an
+        expression, an aggregate or a UNION drops it — so
+        `coalesce({Secret.api_key}, '')` would otherwise hand back the stored
+        token as a perfectly well-typed `str`.
+
+        Every value in a column that *could* hold one is checked, on every
+        execution: the first row of the first execution is no evidence (it can
+        be NULL, or there can be no rows at all), and a plan is reused by any
+        statement with the same column signature.
+
+        The cost is a false positive on a plain text column whose value
+        happens to start with the prefix, which is a refusal to hand back a
+        string that looks exactly like a leaked secret.
+        """
+        if not self.decryptable:
+            return
+        for row in rows:
+            for position in self.decryptable:
+                value = row[position]
+                if isinstance(value, str) and value.startswith(_ENCRYPTED_PREFIX):
+                    raise TypeError(
+                        f"Column {self.names[position]!r} holds an encrypted "
+                        "value but lost track of the column it came from, so "
+                        "nothing can decrypt it — an expression, an aggregate "
+                        "or a UNION does that. Select it as {Model.field} on "
+                        "its own."
+                    )
 
     def _instance(self, row: Sequence[Any]) -> Model:
         assert self.star is not None
@@ -557,13 +645,12 @@ def _build_plan(
     stars: tuple[_StarExpansion, ...],
     result_type: Any,
     columns: list[_Column],
-    rows: list[tuple[Any, ...]],
     connection: DatabaseConnection,
 ) -> _Plan:
     names = tuple(_strip_alias_marker(column.name) for column in columns)
     fields = _fields_for_columns(columns, connection)
-    _refuse_unconverted_ciphertext(names, fields, rows)
     converters = _converters_for(columns, fields, connection)
+    decryptable = _decryptable_positions(columns, fields)
 
     if stars:
         star = stars[0]
@@ -585,6 +672,7 @@ def _build_plan(
             signature=_signature(columns),
             names=names,
             converters=converters,
+            decryptable=decryptable,
             star=star,
             star_start=star_start,
             extras=extras,
@@ -605,6 +693,7 @@ def _build_plan(
         signature=_signature(columns),
         names=names,
         converters=converters,
+        decryptable=decryptable,
         star=None,
         star_start=0,
         extras=(),
@@ -635,8 +724,11 @@ def _star_start(
         raise TypeError(
             f"This statement returns ({', '.join(names)}), which doesn't "
             f"contain {star.model.__name__}'s columns "
-            f"({', '.join(star.columns)}) in order — something renamed them. "
-            f"Select {{{star.model.__name__}.*}} without aliasing its columns."
+            f"({', '.join(star.columns)}) in order. If the "
+            f"{{{star.model.__name__}.*}} is inside a subquery, select the "
+            "columns you want in the outer statement and pass result_type= a "
+            "dataclass; otherwise something renamed them, and a "
+            f"{{{star.model.__name__}.*}} row can't be aliased."
         )
     if len(candidates) > 1:
         # Two runs of columns have those names. Provenance breaks the tie when
@@ -694,29 +786,24 @@ def _parse_json(value: Any, expression: Any, connection: Any) -> Any:
     return value
 
 
-def _refuse_unconverted_ciphertext(
-    names: tuple[str, ...], fields: list[Field | None], rows: list[tuple[Any, ...]]
-) -> None:
-    """Refuse a column that lost its source and came back as ciphertext.
+# The column types an encrypted value could arrive in: it is stored as text,
+# and an expression can put it through a json type on the way out.
+_MAYBE_CIPHERTEXT_OIDS = frozenset({25, 1043, 114, 3802})  # text, varchar, json, jsonb
 
-    Provenance is what attaches the decrypting converter, and an expression, an
-    aggregate or a UNION drops it — so `coalesce({Secret.api_key}, '')` would
-    otherwise hand back the stored token as a perfectly well-typed `str`.
+
+def _decryptable_positions(
+    columns: list[_Column], fields: list[Field | None]
+) -> tuple[int, ...]:
+    """The positions where an undecrypted value could turn up.
+
+    A column with a field is decrypted by that field's converter. One without
+    has nothing to decrypt it, so if it is text-shaped its values get checked.
     """
-    if not rows:
-        return
-    for position, value in enumerate(rows[0]):  # every row has the same shape
-        if (
-            fields[position] is None
-            and isinstance(value, str)
-            and value.startswith(_ENCRYPTED_PREFIX)
-        ):
-            raise TypeError(
-                f"Column {names[position]!r} holds an encrypted value but lost "
-                "track of the column it came from, so nothing can decrypt it — "
-                "an expression, an aggregate or a UNION does that. Select it "
-                "as {Model.field} on its own."
-            )
+    return tuple(
+        position
+        for position, (column, field) in enumerate(zip(columns, fields, strict=True))
+        if field is None and column.type_oid in _MAYBE_CIPHERTEXT_OIDS
+    )
 
 
 # --------------------------------------------------------------------------
@@ -949,15 +1036,15 @@ class Written[R]:
 
         rendered = _render(template, values)
 
-        if rendered.stars and result_type is not None:
-            raise TypeError(
-                "sql() takes {Model.*} or result_type=, not both — "
-                "{Model.*} already says a row is a model instance."
-            )
+        # `result_type=` says what a row is, so any `{Model.*}` in the
+        # template is just columns -- inside a subquery, most likely. What
+        # comes back is checked against the dataclass either way.
+        stars = () if result_type is not None else rendered.stars
+
         # The same model's columns can be expanded more than once -- that is
         # what each branch of a UNION needs -- but two models can't both be
         # the row.
-        star_models = dict.fromkeys(star.model for star in rendered.stars)
+        star_models = dict.fromkeys(star.model for star in stars)
         if len(star_models) > 1:
             names = ", ".join(model.__name__ for model in star_models)
             raise TypeError(
@@ -968,7 +1055,7 @@ class Written[R]:
 
         self._model = model
         self._result_type = result_type
-        self._stars = rendered.stars
+        self._stars = stars
         self._instance_model = next(iter(star_models), None)
         self._sql = rendered.sql
         self._bind_sql = rendered.bind_sql
@@ -1009,14 +1096,12 @@ class Written[R]:
                 "this statement returns rows. Select {Model.*}, or join the "
                 "related table into the statement."
             )
+        # The clone carries whatever this statement already ran -- a write
+        # must not run a second time just because a prefetch was added -- and
+        # only drops the hydrated rows, which is what the prefetch changes.
         clone = copy.copy(self)
         clone._prefetch_lookups = self._prefetch_lookups + lookups
-        clone._executed = False
-        clone._raw_rows = []
-        clone._columns = None
         clone._result_cache = None
-        clone._count_cache = None
-        clone._exists_cache = None
         return clone
 
     # -- running it ---------------------------------------------------------
@@ -1065,7 +1150,7 @@ class Written[R]:
                 self._raw_rows = cursor.fetchall()
         self._executed = True
 
-    def _plan_for(self, columns: list[_Column], rows: list[tuple[Any, ...]]) -> _Plan:
+    def _plan_for(self, columns: list[_Column]) -> _Plan:
         """The plan for these result columns, built once per column signature.
 
         A cached plan is only reused when the statement came back with exactly
@@ -1073,8 +1158,10 @@ class Written[R]:
         A different embedded queryset, or a changed schema, gets a new plan
         instead of the wrong one.
         """
+        connection = get_connection()
+        plans = _plans.setdefault(connection, {})
         signature = _signature(columns)
-        plan = _plans.get(signature)
+        plan = plans.get(signature)
         if (
             plan is not None
             and plan.result_type is self._result_type
@@ -1087,10 +1174,9 @@ class Written[R]:
             stars=self._stars,
             result_type=self._result_type,
             columns=columns,
-            rows=rows,
-            connection=get_connection(),
+            connection=connection,
         )
-        _plans[signature] = plan
+        plans[signature] = plan
         return plan
 
     def _fetch(self) -> list[R]:
@@ -1103,7 +1189,7 @@ class Written[R]:
             self._result_cache = []
             return self._result_cache
 
-        plan = self._plan_for(self._columns, self._raw_rows)
+        plan = self._plan_for(self._columns)
         self._result_cache = plan.build(self._raw_rows, get_connection())
         if self._prefetch_lookups:
             prefetch_objects(self._result_cache, *self._prefetch_lookups)
@@ -1119,13 +1205,17 @@ class Written[R]:
         if self._executed:
             return self._fetch()[:limit]
 
-        sql = f'SELECT * FROM ({self._bind_sql}) "written" LIMIT {limit}'
-        display = f'SELECT * FROM ({self._sql}) "written" LIMIT {limit}'
+        # The statement's own ORDER BY is inside the subquery. Postgres
+        # doesn't promise to keep a subquery's ordering, but it does keep it
+        # in practice for a plain wrapper like this one -- and `first()` on an
+        # unordered statement was already arbitrary.
+        sql = _wrap(self._bind_sql, f"LIMIT {limit}")
+        display = _wrap(self._sql, f"LIMIT {limit}")
         with self._run_statement(sql, display) as cursor:
             columns = _describe_columns(cursor)
             rows = cursor.fetchall()
 
-        results = self._plan_for(columns, rows).build(rows, get_connection())
+        results = self._plan_for(columns).build(rows, get_connection())
         if self._prefetch_lookups:
             prefetch_objects(results, *self._prefetch_lookups)
         return results
@@ -1137,20 +1227,38 @@ class Written[R]:
         return row[0]
 
     def _reads_rows(self) -> bool:
-        """Whether this statement is a plain read, and so safe to run twice.
+        """Whether this statement is a read, and so safe to run twice.
 
-        Only a leading SELECT counts. A `WITH` can hold a write, and a write
-        has to run exactly once, so both go through the single execution.
+        A `SELECT`, a `VALUES`, a parenthesised one, or a `WITH` — a `WITH`
+        that holds a write can't be wrapped at all, because Postgres requires
+        a data-modifying CTE to be at the top level of its statement and says
+        so rather than running it twice.
         """
-        return self._sql.lstrip().upper().startswith("SELECT")
+        return _leading_keyword(self._sql) in ("SELECT", "WITH", "VALUES", "TABLE", "(")
+
+    def _require_a_result(self) -> None:
+        """Refuse to answer a question about rows a statement doesn't have.
+
+        A write with no RETURNING clause produces no result at all. Counting
+        it would answer 0, which reads like "the UPDATE matched nothing" —
+        `execute()` is the question that has an answer.
+        """
+        self._run()
+        if self._columns is None:
+            raise TypeError(
+                "This statement returns no rows; use execute() for the number "
+                "of rows affected."
+            )
 
     def __iter__(self) -> Iterator[R]:
         return iter(self._fetch())
 
     def __len__(self) -> int:
+        self._require_a_result()
         return len(self._fetch())
 
     def __bool__(self) -> bool:
+        self._require_a_result()
         return bool(self._fetch())
 
     def all(self) -> list[R]:
@@ -1190,31 +1298,31 @@ class Written[R]:
 
     def count(self) -> int:
         """How many rows the statement returns."""
-        if self._executed:
-            return len(self._raw_rows)
-        if not self._reads_rows():
+        if self._executed or not self._reads_rows():
             # A write counts the rows it returned, from its one execution —
             # wrapping it in a count() would run the write to throw the rows
             # away.
-            self._run()
+            self._require_a_result()
             return len(self._raw_rows)
         if self._count_cache is None:
             self._count_cache = self._scalar(
-                f'SELECT count(*) FROM ({self._bind_sql}) "written"',
-                f'SELECT count(*) FROM ({self._sql}) "written"',
+                _wrap(self._bind_sql, prefix="SELECT count(*) FROM "),
+                _wrap(self._sql, prefix="SELECT count(*) FROM "),
             )
         return self._count_cache
 
     def exists(self) -> bool:
         """Whether the statement returns any row at all."""
         if self._executed or not self._reads_rows():
-            return self.count() > 0
+            return self.count() > 0  # runs it once, and refuses a resultless one
         if self._count_cache is not None:
             return self._count_cache > 0
         if self._exists_cache is None:
             self._exists_cache = self._scalar(
-                f'SELECT EXISTS(SELECT 1 FROM ({self._bind_sql}) "written")',
-                f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")',
+                _wrap(
+                    self._bind_sql, prefix="SELECT EXISTS(SELECT 1 FROM ", suffix=")"
+                ),
+                _wrap(self._sql, prefix="SELECT EXISTS(SELECT 1 FROM ", suffix=")"),
             )
         return self._exists_cache
 
