@@ -70,7 +70,7 @@ class PinNavView(AdminView):
         max_order = (
             PinnedNavItem.query.filter(user=self.user)
             .order_by("-order")
-            .values_list("order", flat=True)
+            .select(PinnedNavItem.order, flat=True)
             .first()
         )
         next_order = (max_order or 0) + 1
@@ -122,8 +122,8 @@ class ReorderPinnedView(AdminView):
             return Response("Invalid slugs JSON", status_code=400)
 
         user_pinned = set(
-            PinnedNavItem.query.filter(user=self.user).values_list(
-                "view_slug", flat=True
+            PinnedNavItem.query.filter(user=self.user).select(
+                PinnedNavItem.view_slug, flat=True
             )
         )
         for i, slug in enumerate(slugs):
