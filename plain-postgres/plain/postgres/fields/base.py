@@ -215,6 +215,9 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         `"col" = ANY(%s::text[])` -- so the statement has the same shape for
         any number of values, an empty list included. A queryset stays a
         subquery: `"col" IN (SELECT ...)`.
+
+        A None in the collection raises `ValueError`: NULL is not a value a
+        comparison can match, so it belongs in `is_null()`, not here.
         """
         from plain.postgres.query import QuerySet
         from plain.postgres.sql.query import Query
@@ -298,6 +301,21 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             # compiler -- a generator would be exhausted by the first of those
             # and bind an empty array.
             value = list(value)
+            if any(item is None for item in value):
+                # Neither of the two things a None could mean is honest.
+                # Matching it means comparing against NULL, which is never
+                # true; dropping it silently changes what the caller asked
+                # for, and the negation is worse -- `NOT (col = ANY(ARRAY[1,
+                # NULL]))` is unknown for every row, so `~is_in([1, None])`
+                # would match nothing at all. Say so instead.
+                raise ValueError(
+                    f"{type(self).__name__} {self.name!r}: .is_in() does not "
+                    f"accept None -- a SQL comparison against NULL is never "
+                    f"true, so a None in the list matches nothing and, "
+                    f"negated, excludes every row. Use .is_null() instead, or "
+                    f"combine the two for both: "
+                    f"field.is_in([...]) | field.is_null()."
+                )
         if suffix and not self.get_lookup(suffix):
             # The type checker rejects most of these already (a `Field[int]`
             # has no `.startswith`); this catches what it can't see.

@@ -249,6 +249,12 @@ User.query.where(User.email.endswith("@example.com") | User.role.equals("admin")
 
 `is_in` binds the whole collection as one array parameter -- `WHERE "role" = ANY(%s::text[])` rather than `IN (%s, %s)` -- so the statement has a single shape for any number of values, an empty list included (it matches nothing, running a real query rather than skipping one). Pass a queryset instead of a collection and it stays a subquery: `WHERE "id" IN (SELECT ...)`.
 
+A `None` in the collection raises `ValueError`. NULL is not a value a comparison can match -- it would match nothing, and negated it would exclude every row -- so it belongs in `is_null()`. Combine them when you want both:
+
+```python
+User.query.where(User.role.is_in(["admin"]) | User.role.is_null())
+```
+
 `~` negates whatever it wraps, which is what you want for a composite condition but not for a null check. `is_null()` takes a flag, and the two compile differently:
 
 ```python

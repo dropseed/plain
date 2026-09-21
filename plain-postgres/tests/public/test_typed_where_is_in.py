@@ -207,14 +207,23 @@ def test_a_set_works(db):
     assert [r.name for r in rows] == ["alice"]
 
 
-def test_a_none_in_the_list_matches_nothing(db):
-    """SQL `= ANY` semantics, the same ones `IN` has: NULL never equals
-    anything, so the None neither matches a row nor excludes one."""
+def test_a_none_in_the_list_is_refused(db):
+    """NULL is not a value a comparison can match: it would match nothing, and
+    negated it would exclude every row. `is_null()` is where it belongs."""
+    with pytest.raises(ValueError, match=r"\.is_in\(\) does not accept None"):
+        DefaultsExample.note.is_in(["keep", None])
+
+
+def test_null_and_values_are_matched_by_combining_the_two_conditions(db):
+    """The spelling the refusal points at."""
     DefaultsExample.query.create(name="has-note", note="keep")
+    DefaultsExample.query.create(name="other-note", note="drop")
     DefaultsExample.query.create(name="no-note", note=None)
 
-    matched = DefaultsExample.query.where(DefaultsExample.note.is_in(["keep", None]))
-    assert [r.name for r in matched] == ["has-note"]
+    rows = DefaultsExample.query.where(
+        DefaultsExample.note.is_in(["keep"]) | DefaultsExample.note.is_null()
+    ).order_by("name")
+    assert [r.name for r in rows] == ["has-note", "no-note"]
 
 
 def test_a_single_string_is_refused(db):

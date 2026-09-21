@@ -550,9 +550,10 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     `IN (%s, %s, ...)`: a placeholder per value, so the statement text changes
     with the list's length and an empty list has no statement at all.
 
-    NULL behaves exactly as it does in SQL `IN`: `col = ANY(ARRAY[1, NULL])`
-    matches a 1 and yields NULL (no match) for anything else, so a NULL in the
-    list never matches a row and never excludes one under negation either.
+    The values never contain None -- `is_in()` refuses one at the call site,
+    because `col = ANY(ARRAY[1, NULL])` is unknown for every row but a 1, and
+    its negation is unknown for every row full stop. NULL belongs in
+    `is_null()`, so this lookup only ever binds real values.
     """
 
     lookup_name: str = "any_of"
