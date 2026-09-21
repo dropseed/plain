@@ -1,5 +1,15 @@
 # plain-mcp changelog
 
+## [0.7.3](https://github.com/dropseed/plain/releases/plain-mcp@0.7.3) (2026-09-21)
+
+### What's changed
+
+- The `MCPResource` example uses the typed `Order.query.where(Order.id.equals(...)).get()` instead of the Django-ism `get(pk=...)`, names the resource `OrderResource` so it doesn't shadow the model, and declares `text/plain` since it returns `str(order)` ([10236185ea](https://github.com/dropseed/plain/commit/10236185ea))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.7.2](https://github.com/dropseed/plain/releases/plain-mcp@0.7.2) (2026-09-20)
 
 ### What's changed
