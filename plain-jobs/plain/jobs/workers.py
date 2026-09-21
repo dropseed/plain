@@ -712,7 +712,7 @@ def future_finished_callback(job_process_uuid: str, future: Future) -> None:
                 # blip during convert_to_result, etc.). The future completes cleanly
                 # but the JobProcess row was never converted, and since our parent
                 # is still heartbeating, rescue_stale_workers won't see it as orphaned.
-                job = JobProcess.query.where(JobProcess.uuid.equals(job_uuid)).first()
+                job = JobProcess.query.first(JobProcess.uuid.equals(job_uuid))
                 if job is None:
                     return
                 logger.warning(
@@ -752,9 +752,9 @@ def process_job(job_process_uuid: str) -> None:
     try:
         worker_pid = os.getpid()
 
-        job_process = JobProcess.query.where(
+        job_process = JobProcess.query.get(
             JobProcess.uuid.equals(uuid.UUID(job_process_uuid))
-        ).get()
+        )
 
         logger.info(
             "Executing job",

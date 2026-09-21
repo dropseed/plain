@@ -107,10 +107,10 @@ class OAuthConnection(postgres.Model):
         cls, *, provider_key: str, oauth_token: OAuthToken, oauth_user: OAuthUser
     ) -> OAuthConnection:
         try:
-            connection = cls.query.where(
+            connection = cls.query.get(
                 cls.provider_key.equals(provider_key),
                 cls.provider_user_id.equals(oauth_user.provider_id),
-            ).get()
+            )
             connection.set_token_fields(oauth_token)
             connection.update()
             return connection
@@ -152,11 +152,11 @@ class OAuthConnection(postgres.Model):
         try:
             # Conditions in the order get() sorted its kwargs, so the SQL is
             # byte-identical to the string form this replaced.
-            connection = cls.query.where(
+            connection = cls.query.get(
                 cls.provider_key.equals(provider_key),
                 cls.provider_user_id.equals(oauth_user.provider_id),
                 cls.user.id.equals(user.id),
-            ).get()
+            )
         except cls.DoesNotExist:
             # Create our own instance (not using get_or_create)
             # so that any created signals contain the token fields too

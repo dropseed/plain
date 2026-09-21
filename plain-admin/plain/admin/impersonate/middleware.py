@@ -21,10 +21,14 @@ class ImpersonateMiddleware(HttpMiddleware):
             and can_be_impersonator(user)
         ):
             try:
-                user_to_impersonate = User.query.where(
-                    User.id.equals(session[_IMPERSONATE_SESSION_KEY])
-                ).get()
-            except User.DoesNotExist:
+                # The session is JSON, so parse the key at the boundary --
+                # `get()` takes the id's own type. A value that won't parse
+                # (a session written before this route took `<int:id>`) just
+                # ends the impersonation.
+                user_to_impersonate = User.query.get(
+                    int(session[_IMPERSONATE_SESSION_KEY])
+                )
+            except (User.DoesNotExist, TypeError, ValueError):
                 user_to_impersonate = None
 
             if user_to_impersonate:

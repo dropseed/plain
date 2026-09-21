@@ -77,3 +77,31 @@ def test_login_as_different_user_replaces_session(db):
 
     client.post("/session-login", data={"user_id": second.id})
     assert client.get("/whoami").content == b"second"
+
+
+def test_session_holding_a_string_user_id_still_resolves(db):
+    """The id is parsed at the boundary, so an older session keeps working."""
+    user = User.query.create(username="dave")
+    client = Client()
+
+    client.post(
+        "/legacy-session-id",
+        data={"user_id": user.id, "stored_id": str(user.id)},
+    )
+
+    resp = client.get("/whoami")
+    assert resp.status_code == 200
+    assert resp.content == b"dave"
+
+
+def test_session_holding_an_unparseable_user_id_is_no_user(db):
+    """A value that isn't an id ends the session rather than erroring."""
+    user = User.query.create(username="erin")
+    client = Client()
+
+    client.post(
+        "/legacy-session-id",
+        data={"user_id": user.id, "stored_id": "not-an-id"},
+    )
+
+    assert client.get("/whoami").status_code == 302

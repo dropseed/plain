@@ -780,12 +780,27 @@ class QuerySet[T: "Model"]:
 
         return self.sql_query.get_count()
 
+    @overload
+    def get(self, primary_key: int, /) -> T: ...
+
+    @overload
+    def get(self, *conditions: Q, **kwargs: Any) -> T: ...
+
     def get(self, *args: Any, **kwargs: Any) -> T:
         """
-        Perform the query and return a single object matching the given
-        keyword arguments.
+        Perform the query and return the single object it matches.
+
+        Three entry points, all ending in the same assertion -- exactly one
+        row, or `DoesNotExist`/`MultipleObjectsReturned`:
+
+            Model.query.where(Model.email.equals(x)).get()  # a built query
+            Model.query.get(Model.email.equals(x))          # conditions
+            Model.query.get(5)                              # primary key
         """
-        clone = self.filter(*args, **kwargs)
+        conditions = self._lookup_conditions(
+            "get", args, allow_primary_key=True, has_keywords=bool(kwargs)
+        )
+        clone = self.filter(*conditions, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
         limit = MAX_GET_RESULTS
@@ -805,13 +820,24 @@ class QuerySet[T: "Model"]:
             )
         )
 
+    @overload
+    def get_or_none(self, primary_key: int, /) -> T | None: ...
+
+    @overload
+    def get_or_none(self, *conditions: Q, **kwargs: Any) -> T | None: ...
+
     def get_or_none(self, *args: Any, **kwargs: Any) -> T | None:
         """
-        Perform the query and return a single object matching the given
-        keyword arguments, or None if no object is found.
+        `get()` without the missing-row exception -- return None instead.
+
+        Takes the same three entry points as `get()`, and still raises
+        `MultipleObjectsReturned` when more than one row matches.
         """
+        conditions = self._lookup_conditions(
+            "get_or_none", args, allow_primary_key=True, has_keywords=bool(kwargs)
+        )
         try:
-            return self.get(*args, **kwargs)
+            return self.get(*conditions, **kwargs)
         except self.model.DoesNotExist:
             return None
 
@@ -1506,15 +1532,24 @@ class QuerySet[T: "Model"]:
                 )
             )
 
-    def first(self) -> T | None:
-        """Return the first object of a query or None if no match is found."""
-        for obj in self[:1]:
+    def first(self, *conditions: Q) -> T | None:
+        """Return the first object of a query or None if no match is found.
+
+        Conditions narrow the query first, so `first(Model.role.equals("x"))`
+        is `where(Model.role.equals("x")).first()`. There is no primary key
+        form -- `first(5)` would read as "the first 5".
+        """
+        narrowed = self._narrowed_by("first", conditions)
+        for obj in narrowed[:1]:
             return obj
         return None
 
-    def last(self) -> T | None:
-        """Return the last object of a query or None if no match is found."""
-        queryset = self.reverse()
+    def last(self, *conditions: Q) -> T | None:
+        """Return the last object of a query or None if no match is found.
+
+        Takes conditions the same way `first()` does.
+        """
+        queryset = self._narrowed_by("last", conditions).reverse()
         for obj in queryset[:1]:
             return obj
         return None
@@ -2200,7 +2235,7 @@ class QuerySet[T: "Model"]:
         site.
         """
         for condition in conditions:
-            self._check_condition_model(condition)
+            self._check_condition_model(condition, method="where")
         return self.filter(*conditions)
 
     def _check_column_model(self, item: Selectable[Any]) -> None:
@@ -2233,7 +2268,7 @@ class QuerySet[T: "Model"]:
                 f"{self.model.__name__}."
             )
 
-    def _check_condition_model(self, condition: Q) -> None:
+    def _check_condition_model(self, condition: Q, *, method: str) -> None:
         """Reject a condition built from another model's fields.
 
         `Field[T]` carries no model identity, so `Order.query.where(
@@ -2253,12 +2288,93 @@ class QuerySet[T: "Model"]:
         ):
             if source_model is not self.model:
                 raise TypeError(
-                    f"where() got a condition built from "
+                    f"{method}() got a condition built from "
                     f"{source_model.__name__}.{field_name}, but this is a "
                     f"{self.model.__name__} queryset. Build the condition on "
                     f"{self.model.__name__}'s own field, or traverse to it "
                     f"from {self.model.__name__}."
                 )
+
+    def _lookup_conditions(
+        self,
+        method: str,
+        args: tuple[Any, ...],
+        *,
+        allow_primary_key: bool,
+        has_keywords: bool = False,
+    ) -> tuple[Q, ...]:
+        """Resolve a terminal's positional arguments into `where()` conditions.
+
+        `get()`, `get_or_none()`, `first()` and `last()` all accept the same
+        typed conditions `where()` does, so that narrowing and asserting can
+        be one call instead of two. `get()` and `get_or_none()` additionally
+        accept a bare primary key, because looking a row up by key is the most
+        common query there is and `where(Model.id.equals(5)).get()` is a long
+        way to write it.
+
+        Whatever comes back is handed straight to `filter()`, so the SQL is
+        the same either way. Conditions combine with `filter()`'s keyword
+        lookups; a primary key does not, because a key is the whole lookup.
+        """
+        if not args:
+            return ()
+
+        model_name = self.model.__name__
+
+        if all(isinstance(arg, Q) for arg in args):
+            for condition in args:
+                self._check_condition_model(condition, method=method)
+            return args
+
+        if not allow_primary_key:
+            raise TypeError(
+                f"{method}() takes typed conditions like "
+                f"{model_name}.field.equals(value). To look a row up by key, "
+                f"use get() or get_or_none()."
+            )
+
+        if len(args) > 1:
+            raise TypeError(
+                f"{method}() takes a single primary key or typed conditions, "
+                f"not a mix of the two. Write the key as a condition: "
+                f"{method}({model_name}.id.equals(...), ...)."
+            )
+
+        primary_key = args[0]
+        if not isinstance(primary_key, int) or isinstance(primary_key, bool):
+            raise TypeError(
+                f"{method}() got {primary_key!r}, which is neither a typed "
+                f"condition nor a primary key -- {model_name}.id is an int. "
+                f"Parse the value first, or pass a condition like "
+                f"{model_name}.field.equals(value)."
+            )
+
+        if has_keywords:
+            raise TypeError(
+                f"{method}({primary_key!r}, ...) also got keyword lookups. A "
+                f"primary key is the whole lookup, so narrow with conditions "
+                f"instead: {method}({model_name}.id.equals({primary_key!r}), "
+                f"...)."
+            )
+
+        self._check_primary_key_lookup(method)
+        return (self.model.id.equals(primary_key),)
+
+    def _check_primary_key_lookup(self, method: str) -> None:
+        """Hook for the `get(5)` form. A model queryset always allows it."""
+
+    def _narrowed_by(self, method: str, conditions: tuple[Q, ...]) -> Self:
+        """`self`, narrowed by `conditions` -- untouched when there are none.
+
+        Calling `filter()` with nothing would clone the queryset and AND an
+        empty `Q` onto it. Harmless, but `first()` and `last()` are the same
+        query they always were when called with no conditions, and this keeps
+        them on the same code path they were on before.
+        """
+        resolved = self._lookup_conditions(method, conditions, allow_primary_key=False)
+        if not resolved:
+            return self
+        return self.filter(*resolved)
 
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
@@ -2928,13 +3044,25 @@ class RowQuerySet[R](QuerySet[Any]):
 
         def __iter__(self) -> Iterator[R]: ...
 
-        def first(self) -> R | None: ...
+        def first(self, *conditions: Q) -> R | None: ...
 
-        def last(self) -> R | None: ...
+        def last(self, *conditions: Q) -> R | None: ...
 
-        def get(self, *args: Any, **kwargs: Any) -> R: ...
+        # The primary key form is refused -- see _check_primary_key_lookup
+        # below. It stays in the signature because dropping it would narrow
+        # the parameter type the base declares; `Never` is what tells the
+        # checker the call doesn't come back.
+        @overload
+        def get(self, primary_key: int, /) -> Never: ...
 
-        def get_or_none(self, *args: Any, **kwargs: Any) -> R | None: ...
+        @overload
+        def get(self, *conditions: Q, **kwargs: Any) -> R: ...
+
+        @overload
+        def get_or_none(self, primary_key: int, /) -> Never: ...
+
+        @overload
+        def get_or_none(self, *conditions: Q, **kwargs: Any) -> R | None: ...
 
         def iterator(self, chunk_size: int | None = None) -> Iterator[R]: ...
 
@@ -2947,6 +3075,17 @@ class RowQuerySet[R](QuerySet[Any]):
     # `Never` doesn't reject the call itself — the TypeError does that — but it
     # does tell the checker control never returns, so a caller's trailing code
     # reads as unreachable rather than as a QuerySet or a model instance.
+
+    def _check_primary_key_lookup(self, method: str) -> None:
+        # `rows[5]` already means the sixth row, so `rows.get(5)` would read
+        # as an index rather than a key -- and a row has no primary key of its
+        # own to disambiguate it. Narrow before selecting instead.
+        raise TypeError(
+            f"Cannot call {method}(primary_key) after select() -- a row is "
+            f"not a model instance, and `rows[5]` already means the sixth "
+            f"row. Narrow first: "
+            f"query.where(Model.id.equals(5)).select(...).{method}()."
+        )
 
     def annotate(self, *args: Any, **kwargs: Any) -> Never:
         # An annotation appends a column, so the rows would gain a member the

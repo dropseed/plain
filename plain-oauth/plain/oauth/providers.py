@@ -166,11 +166,11 @@ class OAuthProvider(ABC):
         assert user is not None, "OAuthDisconnectView sets login_required"
         # Conditions in the order get() sorted its kwargs, so the SQL is
         # byte-identical to the string form this replaced.
-        connection = OAuthConnection.query.where(
+        connection = OAuthConnection.query.get(
             OAuthConnection.provider_key.equals(self.provider_key),
             OAuthConnection.provider_user_id.equals(provider_user_id),
             OAuthConnection.user.id.equals(user.id),
-        ).get()
+        )
         connection.delete()
         redirect_url = self.get_disconnect_redirect_url(request=request)
         return self.get_redirect_response(redirect_url)

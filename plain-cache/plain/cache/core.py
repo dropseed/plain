@@ -77,7 +77,7 @@ class Cache:
     def get(self, key: str, default: Any = None) -> Any:
         """Return the value for `key`, or `default` if it's absent or expired."""
         model = self._model
-        item = model.query.live().where(model.key.equals(key)).first()
+        item = model.query.live().first(model.key.equals(key))
         return item.value if item is not None else default
 
     def get_many(self, keys: Iterable[str]) -> dict[str, Any]:
@@ -145,7 +145,7 @@ class Cache:
         stored `None` counts as a hit (it won't recompute).
         """
         model = self._model
-        item = model.query.live().where(model.key.equals(key)).first()
+        item = model.query.live().first(model.key.equals(key))
         if item is not None:
             return item.value
 

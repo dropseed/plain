@@ -54,10 +54,10 @@ def get_link_token_user(token: str) -> User:
 
     try:
         # Condition order mirrors the `filter(**kwargs)` this replaced: it
-        # sorted its kwargs, `where()` keeps the order written.
-        return User.query.where(
+        # sorted its kwargs, typed conditions keep the order written.
+        return User.query.get(
             User.email.iequals(email),
             User.id.equals(user_id),
-        ).get()
+        )
     except User.DoesNotExist:
         raise LoginLinkChanged()

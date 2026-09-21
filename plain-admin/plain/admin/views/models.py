@@ -309,7 +309,7 @@ class AdminModelDetailView(AdminDetailView):
             return get_model_field(obj, field)
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
+        return self.model.query.get(self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -349,7 +349,7 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
+        return self.model.query.get(self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -366,4 +366,4 @@ class AdminModelDeleteView(AdminDeleteView):
         return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
+        return self.model.query.get(self.url_kwargs["id"])
