@@ -196,7 +196,7 @@ class AdminViewRegistry:
         pinned_slugs = list(
             PinnedNavItem.query.filter(user=user)
             .order_by("order", "created_at")
-            .values_list("view_slug", flat=True)[:max_pinned]
+            .select(PinnedNavItem.view_slug, flat=True)[:max_pinned]
         )
 
         # Get recent items from session

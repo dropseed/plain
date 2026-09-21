@@ -108,6 +108,9 @@ class AdminModelListView(AdminListView):
         if isinstance(self.filters, dict) and self.filter:
             q = self.filters.get(self.filter)
             if q is not None:
+                # filter(), not where(): this Q comes from user configuration,
+                # so it names no model for where()'s check to test, and
+                # `queryset` is untyped here anyway.
                 return queryset.filter(q)
         return queryset
 
@@ -136,14 +139,24 @@ class AdminModelListView(AdminListView):
         # the queryset lazy. Coerce each id through the pk field and drop the
         # ones it rejects, so a stale or malformed id is ignored (per the base
         # contract) rather than raising.
-        pk_field = self.model._model_meta.get_forward_field("id")
-        valid_ids = []
+        #
+        # Everything reads the pk field off `objects.model` rather than
+        # `self.model`: a subclass is free to return another model's queryset
+        # from get_initial_queryset(), and where() rejects a condition built
+        # from a model the queryset isn't querying.
+        pk_field = objects.model.id
+        valid_ids: list[int] = []
         for raw_id in ids:
             try:
-                valid_ids.append(pk_field.to_python(raw_id))
+                coerced = pk_field.to_python(raw_id)
             except ValidationError:
                 continue
-        return objects.filter(id__in=valid_ids)
+            # to_python is typed `int | None` but only returns None for a None
+            # input, which form data can't produce -- this narrows the type,
+            # it doesn't drop anything.
+            if coerced is not None:
+                valid_ids.append(coerced)
+        return objects.where(pk_field.is_in(valid_ids))
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]
@@ -260,7 +273,7 @@ class AdminModelDetailView(AdminDetailView):
             return get_model_field(obj, field)
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -300,7 +313,7 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -317,4 +330,4 @@ class AdminModelDeleteView(AdminDeleteView):
         return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.where(self.model.id.equals(self.url_kwargs["id"])).get()
