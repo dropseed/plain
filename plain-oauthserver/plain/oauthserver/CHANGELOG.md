@@ -1,5 +1,16 @@
 # plain-oauthserver changelog
 
+## [0.1.6](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.6) (2026-09-21)
+
+### What's changed
+
+- The token endpoint's code, refresh-token and application lookups, the revocation updates and the cleanup chores use typed `where()` conditions; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+- The `user` foreign keys on `AuthorizationCode`, `AccessToken` and `RefreshToken` are annotated `Field[User]`, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
 ## [0.1.5](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.5) (2026-09-20)
 
 ### What's changed
