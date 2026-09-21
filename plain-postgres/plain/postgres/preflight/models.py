@@ -254,6 +254,103 @@ class CheckNullableFieldWithoutDefault(PreflightCheck):
         return results
 
 
+def _annotation_names_a_field(annotation: str | object) -> bool:
+    """Whether `annotation` is a `Field[...]`/`EncryptedField[...]` form.
+
+    Read textually, never resolved: `inspect.get_annotations` is called with
+    `eval_str=False`, so under `from __future__ import annotations` every
+    annotation is a string -- and a string model reference exists precisely
+    because the related class isn't importable here.
+    """
+    text = annotation if isinstance(annotation, str) else str(annotation)
+    text = text.strip().lstrip("'\"").lstrip()
+    # `Field[User]`, `EncryptedField[User]`, and their dotted spellings
+    # (`postgres.Field[...]`, `plain.postgres.Field[...]`).
+    head = text.split("[", 1)[0].strip()
+    return head.rsplit(".", 1)[-1] in {"Field", "EncryptedField"}
+
+
+def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
+    """``(field name, annotation)`` for `model`'s foreign keys whose class
+    annotation names something other than a ``Field[...]`` form.
+
+    An unannotated foreign key isn't reported here -- that's
+    ``CheckTypedConstruction``'s story (it isn't a constructor argument at all).
+    Only an annotation that names a non-Field type is a foreign key the checker
+    reads as a model *instance*.
+    """
+    from plain.postgres.fields.related import ForeignKeyField
+
+    foreign_key_names = {
+        field.name
+        for field in model._model_meta.fields  # ty: ignore[unresolved-attribute]
+        if isinstance(field, ForeignKeyField)
+    }
+    if not foreign_key_names:
+        return []
+    found: list[tuple[str, str]] = []
+    for klass in model.__mro__:
+        if not _carries_transform(klass):
+            continue
+        for attr, annotation in inspect.get_annotations(klass).items():
+            if attr not in foreign_key_names:
+                continue
+            if _annotation_names_a_field(annotation):
+                continue
+            found.append((attr, str(annotation)))
+        # The nearest declaration in the MRO wins, the same as the attribute
+        # itself does.
+        foreign_key_names -= {attr for attr, _ in found}
+    return found
+
+
+def foreign_key_annotation_results(model: type) -> list[PreflightResult]:
+    """A warning per foreign key `foreign_keys_annotated_as_values` reports."""
+    return [
+        PreflightResult(
+            fix=(
+                f"'{model.__name__}.{field_name}' is a ForeignKeyField annotated "
+                f"'{annotation}', which names a model instance rather than a "
+                "field, so a type checker sees no field there: class access "
+                f"yields a {annotation} instead of type[{annotation}], "
+                f"{model.__name__}.{field_name}.id is a plain value, and the "
+                "where() condition methods are gone. Annotate it "
+                f"'Field[{annotation}]' instead (nullable: "
+                f"'Field[{annotation} | None]' with default=None), importing the "
+                "related model under `if TYPE_CHECKING:` when a runtime import "
+                "would be the cycle the string reference avoids."
+            ),
+            obj=f"{model.model_options.label}.{field_name}",  # ty: ignore[unresolved-attribute]
+            id="postgres.foreign_key_annotated_as_value",
+            warning=True,
+        )
+        for field_name, annotation in foreign_keys_annotated_as_values(model)
+    ]
+
+
+@register_check("postgres.foreign_key_annotated_as_value")
+class CheckForeignKeyAnnotatedAsValue(PreflightCheck):
+    """Warns about a ``ForeignKeyField`` annotated with the related model itself.
+
+    ``ForeignKeyField`` returns a descriptor that is a ``Field[V]``, and
+    ``Field.__get__`` is what makes class access ``type[Related]`` (traversal)
+    and instance access ``Related``. Annotating the attribute ``Related``
+    instead of ``Field[Related]`` throws that away: the checker records a model
+    instance, so ``Model.user`` is a ``User``, ``Model.user.id`` is an ``int``,
+    and ``Model.user.id.equals(...)`` doesn't exist.
+
+    This used to be the required spelling for a string model reference, back
+    when those overloads returned a bare ``T``. They return the descriptor now,
+    so ``Field[Related]`` is the one spelling for every foreign key.
+    """
+
+    def run(self) -> list[PreflightResult]:
+        results = []
+        for model in models_registry.get_models():
+            results.extend(foreign_key_annotation_results(model))
+        return results
+
+
 def _check_lazy_references(
     models_registry: ModelsRegistry, packages_registry: Any
 ) -> list[PreflightResult]:
