@@ -1,5 +1,17 @@
 # plain-oauth changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-oauth@0.51.0) (2026-09-21)
+
+### What's changed
+
+- The providers chart card counts connections per provider with a written query (`sql(t"...")`); the SQL it runs is the same grouped count as before ([ca91eec03c](https://github.com/dropseed/plain/commit/ca91eec03c)) ([5bcf431297](https://github.com/dropseed/plain/commit/5bcf431297))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.50.6](https://github.com/dropseed/plain/releases/plain-oauth@0.50.6) (2026-09-21)
 
 ### What's changed
