@@ -145,6 +145,18 @@ class TestComparingAgainstAnotherColumn:
 
         assert _compiled(typed) == _compiled(untyped)
 
+    def test_a_nullable_column_on_the_right(self, db):
+        """The `Field[T | None]` arm. Nothing distinguishes it at runtime --
+        it compiles like any other column reference -- but the checker needs
+        the arm, so the runtime half is pinned here too. Static halves:
+        tests/typing/conditions_value_types.py."""
+        typed = DefaultsExample.query.where(
+            DefaultsExample.name.equals(DefaultsExample.note)
+        )
+        untyped = DefaultsExample.query.filter(name=F("note"))
+
+        assert _compiled(typed) == _compiled(untyped)
+
     def test_a_right_hand_column_from_another_model_is_rejected(self, db):
         """The cross-model guard reads both sides -- a right-hand column from
         another model resolves against the queried model just as silently as a
@@ -156,4 +168,37 @@ class TestComparingAgainstAnotherColumn:
         q = DefaultsExample.name.equals(Widget.size)
         assert q._condition_origins == frozenset(
             {(DefaultsExample, "name"), (Widget, "size")}
+        )
+
+
+class TestAnEncryptedColumnIsRefusedOnEitherSide:
+    """`EncryptedField`'s block lives in its `_build_q`, which only runs on
+    the field the condition was built *from*. A right-hand encrypted column
+    reaches `Field._build_q` instead, so it needs its own refusal.
+
+    There is no static fix available: `EncryptedField[str]` *is* a
+    `Field[str]`, so it satisfies `equals`'s `Field[T]` arm exactly like any
+    other string column, and the `Never` declarations only shadow the methods
+    called *on* the encrypted field. The runtime hook is the whole guard,
+    which is why these have no corpus counterpart.
+    """
+
+    @pytest.mark.parametrize("method", ["equals", "not_equal", "gt", "lt"])
+    def test_an_encrypted_right_hand_column_is_refused(self, method):
+        # Without the hook this compiled to `name = api_key` -- plaintext
+        # against ciphertext, which matches nothing and says nothing.
+        with pytest.raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+            getattr(SecretStore.name, method)(SecretStore.api_key)
+
+    @pytest.mark.parametrize("method", ["equals", "not_equal", "gt", "lt"])
+    def test_the_mirror_case_is_still_refused(self, method):
+        """The left-hand side was already blocked, by EncryptedField's own
+        `_build_q`. A Field is not a deterministically matchable value."""
+        with pytest.raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+            getattr(SecretStore.api_key, method)(SecretStore.name)
+
+    def test_an_ordinary_column_is_unaffected(self, db):
+        assert (
+            SecretStore.query.where(SecretStore.name.equals(SecretStore.name)).count()
+            == 0
         )

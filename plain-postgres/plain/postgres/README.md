@@ -216,6 +216,8 @@ For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) cl
 `where()` is a typed alternative to `filter()`. Instead of string keyword lookups, you build each condition from a field, so a type checker catches a misspelled field or a wrong value type at the call site:
 
 ```python
+from datetime import datetime
+
 from plain import postgres
 from plain.postgres import Field, types
 
@@ -225,6 +227,8 @@ class User(postgres.Model):
     email: Field[str] = types.EmailField()
     role: Field[str] = types.TextField(max_length=20)
     age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
 
 
 # Each argument is a condition; multiple arguments are ANDed together.
@@ -247,10 +251,14 @@ A comparison can also take another column of the same value type, instead of a v
 
 ```python
 # Q(updated_at__gt=F("created_at"))
-Post.query.where(Post.updated_at.gt(Post.created_at))
+User.query.where(User.updated_at.gt(User.created_at))
 ```
 
-`equals`, `not_equal`, `gt`, `gte`, `lt`, and `lte` all accept one. The column has to be the same value type — comparing an `int` column against a `str` one is a type error — and it has to belong to the same model, which `where()` checks on both sides. An `F()` expression works too.
+`equals`, `not_equal`, `gt`, `gte`, `lt`, and `lte` all accept one. The column has to belong to the same model, which `where()` checks on both sides, and it has to be the same value type — comparing an `int` column against a `str` one is a type error.
+
+A **nullable column is a different value type** to the checker — `Field[int | None]` is not a `Field[int]` — so the two directions aren't the same. A non-null column accepts a nullable one on the right; a nullable one on the left won't accept a non-null column, because there's no way to name its value type without the `None`. Compare the other way round, or drop to `filter(age__lt=F("other"))`.
+
+An `F()` expression works too, but that arm is untyped: an expression's output type isn't tracked, so nothing checks it against the column. `F()` is the same escape hatch here that it is in `filter()`.
 
 Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
 
@@ -277,7 +285,7 @@ A traversed field _is_ the related field, carrying the relation path as its name
 
 **A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
 
-[Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`.
+[Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`. That holds on either side of a comparison: an encrypted column can't be the column another column is compared _against_ either, since that would match plaintext against ciphertext.
 
 ### Selecting columns with select()
 

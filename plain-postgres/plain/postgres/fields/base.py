@@ -172,22 +172,33 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     # an expression. `Field[T]` is what makes `retry_attempt.lt(retries)` the
     # typed spelling of `filter(retry_attempt__lt=F("retries"))` -- and, being
     # parameterized by the same `T`, it rejects a column of another type.
-    def equals(self, value: T | Field[T] | Combinable) -> Q:
+    #
+    # `Field[T | None]` is the second arm because `Field` is invariant in `T`,
+    # so a nullable column is a different type to the checker and a non-null
+    # one wouldn't otherwise accept it. Only that direction is expressible:
+    # from a nullable left there is no way to name `T` without its `None`, so
+    # `note.equals(name)` is rejected while `name.equals(note)` is accepted.
+    #
+    # `Combinable` is deliberately unconstrained: an expression's output type
+    # isn't tracked, so `priority.lt(F("name"))` type-checks. `F()` is the
+    # untyped escape hatch here exactly as it is in `filter()`, and narrowing
+    # it would mean typing expressions first.
+    def equals(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("equals", "", value)
 
-    def not_equal(self, value: T | Field[T] | Combinable) -> Q:
+    def not_equal(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return ~self._build_q("not_equal", "", value)
 
-    def gt(self, value: T | Field[T] | Combinable) -> Q:
+    def gt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("gt", "gt", value)
 
-    def gte(self, value: T | Field[T] | Combinable) -> Q:
+    def gte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("gte", "gte", value)
 
-    def lt(self, value: T | Field[T] | Combinable) -> Q:
+    def lt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("lt", "lt", value)
 
-    def lte(self, value: T | Field[T] | Combinable) -> Q:
+    def lte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
         return self._build_q("lte", "lte", value)
 
     def is_null(self, value: bool = True) -> Q:
@@ -274,9 +285,12 @@ class Field[T](Selectable[T], RegisterLookupMixin):
             )
         other_column = value if isinstance(value, Field) else None
         if other_column is not None:
-            # Comparing against another column. `F(name)` is the reference the
-            # ORM already understands, and a traversed field's `name` carries
-            # its relation prefix, so this is the whole conversion.
+            # Comparing against another column. Everything above guards the
+            # left-hand field; the right-hand one gets its own say here.
+            other_column.check_usable_as_comparison_column(method)
+            # `F(name)` is the reference the ORM already understands, and a
+            # traversed field's `name` carries its relation prefix, so this is
+            # the whole conversion.
             from plain.postgres.expressions import F
 
             value = F(other_column.name)
@@ -294,6 +308,19 @@ class Field[T](Selectable[T], RegisterLookupMixin):
         if origins:
             q._condition_origins = frozenset(origins)
         return q
+
+    def check_usable_as_comparison_column(self, method: str) -> None:
+        """Hook for a field used as the *right-hand* column of a comparison.
+
+        A no-op for an ordinary column. `EncryptedField` overrides it to
+        refuse: its own block lives in `_build_q`, which only ever runs on the
+        field the condition was built *from*, and the type checker can't help
+        either -- `EncryptedField[str]` is a `Field[str]`, so it satisfies
+        `equals`'s `Field[T]` arm like any other string column.
+
+        `method` is the condition the caller wrote on the left-hand field, so
+        a refusal can name it.
+        """
 
     def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:
         """Return a detached copy of this field whose name carries `prefix`.

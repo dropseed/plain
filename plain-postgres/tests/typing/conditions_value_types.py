@@ -17,6 +17,7 @@ from typing import assert_type
 
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.string_conditions import StringConditionsExample
+from plain.postgres.expressions import F
 from plain.postgres.query_utils import Q
 
 
@@ -93,3 +94,25 @@ def must_accept_a_column_of_the_same_value_type() -> None:
 
 def must_reject_a_column_of_another_value_type() -> None:
     DefaultsExample.priority.lt(DefaultsExample.name)  # ty: ignore[invalid-argument-type]
+
+
+def must_accept_a_nullable_column_on_the_right_of_a_non_null_one() -> None:
+    """`Field` is invariant in `T`, so `Field[str | None]` is not a
+    `Field[str]`. The `Field[T | None]` arm is what lets a non-null column
+    compare against a nullable one."""
+    assert_type(DefaultsExample.name.equals(DefaultsExample.note), Q)
+
+
+def must_reject_a_non_null_column_on_the_right_of_a_nullable_one() -> None:
+    """The direction that isn't expressible: from `Field[str | None]` there
+    is no way to name `str` without its `None`, so the `Field[T]` arm solves
+    to `Field[str | None]` and a plain `Field[str]` misses it. Compare the
+    other way round, or use `filter(note=F("name"))`."""
+    DefaultsExample.note.equals(DefaultsExample.name)  # ty: ignore[invalid-argument-type]
+
+
+def must_accept_an_expression_of_any_output_type() -> None:
+    """The `Combinable` arm is untyped on purpose -- an expression's output
+    type isn't tracked, so this int column happily takes an `F()` naming a
+    text one. `F()` is `filter()`'s escape hatch and behaves like it."""
+    assert_type(DefaultsExample.priority.lt(F("name")), Q)
