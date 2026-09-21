@@ -112,6 +112,10 @@ Run `uv run plain docs postgres` for full workflow details.
 Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
 - `where()` takes typed conditions built off fields (`User.query.where(User.role.equals("admin"))`) instead of `filter()`'s string kwargs, so a typo or wrong value type is caught at the call site.
+- `__isnull=False` converts to `is_null(False)` (`"x" IS NOT NULL`), not `~...is_null()` (`NOT ("x" IS NULL)`) — same rows, different SQL.
+- A condition **is** a `Q`, so it goes anywhere a `Q` goes — `When(...)`, `Case`, `Count("id", filter=...)` — not just `where()`.
+- `where()` keeps conditions in the order written; `filter()` sorted its kwargs alphabetically. A converted multi-condition `filter()` emits different WHERE text and parameter order (same rows) — matters for tests pinning SQL and for `pg_stat_statements` fingerprints.
+- Conditions take the field's value type where string kwargs coerced: `Field[UUID].equals("...")` and `Field[int].equals("1")` are type errors. Parse a CLI/URL/session string first (`uuid.UUID(raw)`, `int(raw)`) — a bad value then raises `ValueError` at the call site instead of failing inside the ORM.
 - **Conditions on a relation go through its key**: `Post.query.where(Post.author.id.equals(author.id))`, `.id.is_in([...])`, `.id.is_null()` — the typed spelling of `filter(author=author)`, same SQL. `Post.author.equals(author)` raises `AttributeError`: `Post.author` is `type[Author]` to the checker (which is what makes `Post.author.email.equals(...)` work), so it offers the related model's fields, not conditions. Traversal only _starts_ from a forward FK; a many-to-many is traversable as a later hop (`WidgetTag.widget.tags.name`), but `Widget.tags` and reverse accessors are not entry points — use `filter(tags__name=...)` there.
 - Encrypted fields can't be looked up at all: `get_or_create(secret=...)` raises — put the value in `defaults=`.
 - Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
