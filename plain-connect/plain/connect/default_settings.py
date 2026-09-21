@@ -21,6 +21,6 @@ CONNECT_SECRET_KEY: Secret[str] = ""
 
 # Pageview tracking — injected via the {% connect_pageviews %} template tag.
 # Public endpoint token; safe to expose in page HTML.
-CONNECT_PAGEVIEWS_TOKEN: str = ""
+CONNECT_PAGEVIEWS_PUBLIC_TOKEN: str = ""
 # Pageview ingest endpoint.
 CONNECT_PAGEVIEWS_URL: str = "https://beacon.plainframework.com"

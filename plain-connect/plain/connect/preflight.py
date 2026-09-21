@@ -9,12 +9,12 @@ class CheckConnectSecretKey(PreflightCheck):
     def run(self) -> list[PreflightResult]:
         if str(settings.CONNECT_SECRET_KEY):
             return []
-        if not settings.CONNECT_PAGEVIEWS_TOKEN:
+        if not settings.CONNECT_PAGEVIEWS_PUBLIC_TOKEN:
             return []
         return [
             PreflightResult(
                 fix=(
-                    "CONNECT_PAGEVIEWS_TOKEN is set but CONNECT_SECRET_KEY is empty. "
+                    "CONNECT_PAGEVIEWS_PUBLIC_TOKEN is set but CONNECT_SECRET_KEY is empty. "
                     "Get the shared secret from the App settings page on Plain Cloud "
                     "and set CONNECT_SECRET_KEY in app/settings.py (or the "
                     "PLAIN_CONNECT_SECRET_KEY env var), or unset the token."
