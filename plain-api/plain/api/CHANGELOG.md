@@ -1,5 +1,17 @@
 # plain-api changelog
 
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-api@0.36.0) (2026-09-21)
+
+### What's changed
+
+- The API key admin declares its `search_fields` as field references, which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.35.3](https://github.com/dropseed/plain/releases/plain-api@0.35.3) (2026-09-21)
 
 ### What's changed
