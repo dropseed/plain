@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import annotationlib
 import inspect
 import sys
 import typing
@@ -149,9 +150,17 @@ class CheckTypedConstruction(PreflightCheck):
                 # Fields on a mixin without it are reported below instead.
                 if not _carries_transform(klass):
                     continue
-                # eval_str=False (the default) keeps string annotations as
-                # strings, so forward refs are never resolved here.
-                for attr, ann in inspect.get_annotations(klass).items():
+                # FORWARDREF: under PEP 649 deferred evaluation (Python 3.14+),
+                # the default (VALUE) format evaluates every annotation and
+                # raises NameError for a name that's only imported under
+                # `TYPE_CHECKING` -- exactly the documented string-reference
+                # FK pattern. FORWARDREF evaluates what it can and returns an
+                # `annotationlib.ForwardRef` for what it can't, so a
+                # TYPE_CHECKING-only name must never raise here.
+                annotations = inspect.get_annotations(
+                    klass, format=annotationlib.Format.FORWARDREF
+                )
+                for attr, ann in annotations.items():
                     if attr.startswith("__") or _is_classvar(ann) or attr in real:
                         continue
                     errors.append(
@@ -252,8 +261,13 @@ def _is_classvar(annotation: object) -> bool:
     """Whether `annotation` is a ``ClassVar[...]`` form.
 
     Annotations are strings under ``from __future__ import annotations``,
-    objects otherwise -- handle both without resolving forward refs.
+    objects otherwise -- handle both without resolving forward refs. A
+    ``ForwardRef`` (FORWARDREF format's stand-in for a name that couldn't be
+    evaluated) carries its unresolved source text in ``__forward_arg__``, so
+    it's treated exactly like a string annotation.
     """
+    if isinstance(annotation, annotationlib.ForwardRef):
+        annotation = annotation.__forward_arg__
     if isinstance(annotation, str):
         return (
             annotation.strip().strip("\"'").startswith(("ClassVar", "typing.ClassVar"))
@@ -409,10 +423,20 @@ def _classify(annotation: object, owner: type, field: Any) -> str:
                 return _VALUE
         return _UNKNOWN
 
+    # A ForwardRef is FORWARDREF format's stand-in for source text that
+    # couldn't be evaluated -- either the whole annotation (a bare
+    # TYPE_CHECKING-only name) or a piece of it that `_unwrap_evaluated`
+    # peels down to one. Its `__forward_arg__` is exactly the text a string
+    # annotation would have held, so hand it to the same string path below.
+    if isinstance(annotation, annotationlib.ForwardRef):
+        return _classify(annotation.__forward_arg__, owner, field)
+
     if not isinstance(annotation, str):
         target = _unwrap_evaluated(annotation)
         if target is None:
             return _UNKNOWN
+        if isinstance(target, annotationlib.ForwardRef):
+            return _classify(target.__forward_arg__, owner, field)
         return by_type(typing.get_origin(target) or target)
 
     text = _string_target(annotation)
@@ -491,7 +515,12 @@ def foreign_keys_annotated_as_values(model: type) -> list[tuple[str, str]]:
     # transformless base; it has nothing to say about attribute types.)
     nearest: dict[str, tuple[type, object]] = {}
     for klass in model.__mro__:
-        for attr, annotation in inspect.get_annotations(klass).items():
+        # FORWARDREF: see the comment in CheckTypedConstruction.run() -- same
+        # reason, same format.
+        annotations = inspect.get_annotations(
+            klass, format=annotationlib.Format.FORWARDREF
+        )
+        for attr, annotation in annotations.items():
             if attr in foreign_keys and attr not in nearest:
                 nearest[attr] = (klass, annotation)
 
