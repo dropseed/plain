@@ -227,7 +227,9 @@ class AuthorizeView(AuthView):
         if not client_id:
             return None, "Missing client_id"
         try:
-            application = OAuthApplication.query.get(client_id=client_id)
+            application = OAuthApplication.query.where(
+                OAuthApplication.client_id.equals(client_id)
+            ).get()
         except OAuthApplication.DoesNotExist:
             return None, f"Unknown client_id: {client_id}"
 
@@ -285,8 +287,15 @@ class TokenView(View):
         # Lock the code row so two concurrent exchanges can't both spend it.
         with transaction.atomic():
             try:
-                auth_code = AuthorizationCode.query.for_update().get(
-                    code=code_value, application=application
+                # Condition order mirrors the `filter(**kwargs)` this replaced:
+                # it sorted its kwargs, `where()` keeps the order written.
+                auth_code = (
+                    AuthorizationCode.query.for_update()
+                    .where(
+                        AuthorizationCode.application.id.equals(application.id),
+                        AuthorizationCode.code.equals(code_value),
+                    )
+                    .get()
                 )
             except AuthorizationCode.DoesNotExist:
                 return _oauth_error("invalid_grant", "Invalid authorization code")
@@ -323,7 +332,11 @@ class TokenView(View):
                 refresh = (
                     RefreshToken.query.for_update()
                     .select_related("access_token")
-                    .get(token_hash=_hash_token(token_value), application=application)
+                    .where(
+                        RefreshToken.application.id.equals(application.id),
+                        RefreshToken.token_hash.equals(_hash_token(token_value)),
+                    )
+                    .get()
                 )
             except RefreshToken.DoesNotExist:
                 return _oauth_error("invalid_grant", "Invalid refresh token")
@@ -357,22 +370,26 @@ class RevocationView(View):
             return Response(status_code=200)
         token_hash = _hash_token(token_value)
 
-        revoked = AccessToken.query.filter(
-            token_hash=token_hash, application=application
+        revoked = AccessToken.query.where(
+            AccessToken.application.id.equals(application.id),
+            AccessToken.token_hash.equals(token_hash),
         ).update(revoked=True)
         if revoked:
             return Response(status_code=200)
 
         try:
-            refresh = RefreshToken.query.get(
-                token_hash=token_hash, application=application
-            )
+            refresh = RefreshToken.query.where(
+                RefreshToken.application.id.equals(application.id),
+                RefreshToken.token_hash.equals(token_hash),
+            ).get()
         except RefreshToken.DoesNotExist:
             return Response(status_code=200)
 
         refresh.revoked = True
         refresh.update(fields=["revoked"])
-        AccessToken.query.filter(id=refresh.access_token.id).update(revoked=True)
+        AccessToken.query.where(AccessToken.id.equals(refresh.access_token.id)).update(
+            revoked=True
+        )
         return Response(status_code=200)
 
 
@@ -383,7 +400,9 @@ def _resolve_client(request: Request) -> OAuthApplication | JsonResponse:
         return _oauth_error("invalid_client", "Missing client_id", status_code=401)
 
     try:
-        return OAuthApplication.query.get(client_id=client_id)
+        return OAuthApplication.query.where(
+            OAuthApplication.client_id.equals(client_id)
+        ).get()
     except OAuthApplication.DoesNotExist:
         return _oauth_error("invalid_client", "Unknown client", status_code=401)
 
