@@ -22,8 +22,10 @@ from plain.postgres.expressions import Expression, Func, ResolvableExpression, V
 from plain.postgres.fields import (
     BooleanField,
     DateTimeField,
+    DecimalField,
     Field,
     IntegerField,
+    PrimaryKeyField,
     UUIDField,
 )
 from plain.postgres.query_utils import RegisterLookupMixin
@@ -255,6 +257,12 @@ class BuiltinLookup(Lookup):
             "lookup_name must be set on Lookup subclass"
         )
         return OPERATORS[self.lookup_name] % rhs
+
+
+# Postgres's bigint bounds. `AnyOf` compares every integer column as bigint,
+# so a candidate outside these can't equal a row in one -- see its process_rhs.
+_BIGINT_MIN = -9223372036854775808
+_BIGINT_MAX = 9223372036854775807
 
 
 def lookup_value_field(lhs: Any) -> Any:
@@ -550,6 +558,10 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     `IN (%s, %s, ...)`: a placeholder per value, so the statement text changes
     with the list's length and an empty list has no statement at all.
 
+    The array is cast to the type the column *compares* as, not the one it is
+    stored in -- see `process_rhs` for why that distinction decides which rows
+    come back.
+
     The values never contain None -- `is_in()` refuses one at the call site,
     because `col = ANY(ARRAY[1, NULL])` is unknown for every row but a 1, and
     its negation is unknown for every row full stop. NULL belongs in
@@ -558,29 +570,58 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 
     lookup_name: str = "any_of"
 
-    def array_db_type(self) -> str:
-        """The Postgres array type the bound list is cast to.
+    def process_rhs(
+        self, compiler: SQLCompiler, connection: DatabaseConnection
+    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
+        """Bind the whole collection as one array parameter, cast to the type
+        the column *compares* as.
 
-        The cast is the point: psycopg picks an array's element type from the
-        Python values it is handed, so `[]` carries no type at all and
-        `[1, 2]` can come out narrower than the column. Naming the column's
-        own type settles the comparison before Postgres has to guess.
+        The cast has to be there: psycopg picks an array's element type from
+        the Python values it is handed, so `[]` carries no type at all and
+        `[1, 2]` can come out narrower than the column.
+
+        It must not be the column's *storage* type, though, because a cast to
+        a constrained type rewrites the candidates before the comparison ever
+        happens:
+
+        - `numeric(10,2)[]` rounds every candidate to two decimal places, so
+          `amount = ANY(ARRAY[1.504]::numeric(10,2)[])` matches a row holding
+          1.50 where `IN (1.504)` does not -- and a candidate wider than the
+          declared precision raises instead of matching nothing.
+        - `integer[]`/`smallint[]` raise on a candidate the column could never
+          hold, where `IN (...)` simply matched no rows.
+
+        So each column is cast to the widest type that compares identically:
+        unconstrained `numeric` for a decimal, `bigint` for every integer
+        column (the cross-type `int2 = int8` and `int4 = int8` operators are
+        real, and an index on the column is still usable through them), and
+        the column's own type for everything else -- text, uuid, timestamptz,
+        date, time, interval, bytea, boolean and jsonb are all unconstrained
+        already, so their storage type *is* their comparison type.
         """
         prep_field = lookup_value_field(self.lhs)
+
+        if isinstance(prep_field, IntegerField | PrimaryKeyField):
+            # Bind plain ints rather than the field's psycopg wrapper: an
+            # `Int2`/`Int4` would force the narrow OID straight back on.
+            # Candidates outside the bigint range can't equal a row in any
+            # integer column, so drop them -- the array still binds as one
+            # parameter, and an all-dropped list is the empty-array case.
+            values = [
+                int(value) for value in self.rhs if _BIGINT_MIN <= value <= _BIGINT_MAX
+            ]
+            return "%s::bigint[]", [values]
+
+        _, values = self.get_db_prep_lookup(self.rhs, connection)
+        if isinstance(prep_field, DecimalField):
+            return "%s::numeric[]", [values]
+
         db_type = prep_field.db_type()
         assert db_type, (
             f"{prep_field!r} has no column type, so `= ANY()` has no array "
             f"type to cast to."
         )
-        return db_type
-
-    def process_rhs(
-        self, compiler: SQLCompiler, connection: DatabaseConnection
-    ) -> tuple[str, list[Any]] | tuple[list[str], list[Any]]:
-        # `get_db_prep_lookup` hands back one prepared value per element; bind
-        # the whole list as the single array parameter.
-        _, values = self.get_db_prep_lookup(self.rhs, connection)
-        return f"%s::{self.array_db_type()}[]", [values]
+        return f"%s::{db_type}[]", [values]
 
     def get_rhs_op(self, connection: DatabaseConnection, rhs: str | list[str]) -> str:
         return f"= ANY({rhs})"

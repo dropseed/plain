@@ -1,8 +1,11 @@
 """Statement pins for the `any_of` lookup `Field.is_in()` builds.
 
 Change detector: the point of `= ANY(%s::<type>[])` is that the statement
-text doesn't move with the values, and that the cast names the column's own
-type. If either drifts these fail and you decide whether it should have.
+text doesn't move with the values, and that the cast names the type the
+column *compares* as -- which is the column's own type for most of them, but
+deliberately wider for the constrained ones (`numeric[]`, not
+`numeric(10,2)[]`; `bigint[]`, not `integer[]`). If either drifts these fail
+and you decide whether it should have.
 
 The contract -- which rows come back -- lives in
 `tests/public/test_typed_where_is_in.py`.
@@ -46,12 +49,18 @@ def where_clause(queryset) -> tuple[str, tuple]:
         ),
         pytest.param(
             FormsExample.count.is_in([1, 2]),
-            '"examples_formsexample"."count" = ANY(%s::integer[])',
+            # `bigint[]`, not the column's `integer[]`: a candidate an
+            # `integer` can't hold would raise on the cast instead of simply
+            # matching no rows.
+            '"examples_formsexample"."count" = ANY(%s::bigint[])',
             id="integer",
         ),
         pytest.param(
             FormsExample.amount.is_in([Decimal("1.50")]),
-            '"examples_formsexample"."amount" = ANY(%s::numeric(10,2)[])',
+            # Unconstrained `numeric[]`, not the column's `numeric(10,2)[]`:
+            # that cast would round each candidate to two decimal places
+            # before comparing it.
+            '"examples_formsexample"."amount" = ANY(%s::numeric[])',
             id="decimal",
         ),
         pytest.param(
@@ -74,7 +83,7 @@ def where_clause(queryset) -> tuple[str, tuple]:
         ),
     ],
 )
-def test_the_cast_names_the_columns_own_type(db, condition, expected):
+def test_the_cast_names_the_columns_comparison_type(db, condition, expected):
     clause, params = where_clause(FormsExample.query.where(condition))
     assert clause == expected
     # One parameter, and it is the whole list.
@@ -84,7 +93,8 @@ def test_the_cast_names_the_columns_own_type(db, condition, expected):
 
 def test_a_relation_key_casts_to_the_target_columns_type(db):
     """`parent.id` compiles against the local `parent_id` column, so the array
-    type has to come from the column the relation targets."""
+    type has to come from the column the relation targets -- a `bigint` key
+    either way."""
     clause, _ = where_clause(
         ChildCascade.query.where(ChildCascade.parent.id.is_in([1, 2]))
     )
@@ -128,3 +138,28 @@ def test_the_in_kwarg_keeps_a_placeholder_per_value(db):
     clause, params = where_clause(FormsExample.query.filter(name__in=["a", "b"]))
     assert clause == '"examples_formsexample"."name" IN (%s, %s)'
     assert params == ("a", "b")
+
+
+def test_an_integer_candidate_out_of_bigint_range_is_dropped(db):
+    """It can't equal a row in any integer column, and casting it would raise.
+    Dropping it keeps the single-array parameter and the shape."""
+    clause, params = where_clause(
+        FormsExample.query.where(FormsExample.count.is_in([1, 2**70, 2]))
+    )
+    assert clause == '"examples_formsexample"."count" = ANY(%s::bigint[])'
+    assert params == ([1, 2],)
+
+
+def test_an_all_out_of_range_list_binds_the_empty_array(db):
+    clause, params = where_clause(
+        FormsExample.query.where(FormsExample.count.is_in([2**70]))
+    )
+    assert clause == '"examples_formsexample"."count" = ANY(%s::bigint[])'
+    assert params == ([],)
+
+
+def test_integer_values_bind_as_plain_ints(db):
+    """Not psycopg's `Int2`/`Int4` wrapper, which would force the narrow OID
+    back on and defeat the `bigint[]` cast."""
+    _, params = where_clause(FormsExample.query.where(FormsExample.count.is_in([1, 2])))
+    assert [type(value) for value in params[0]] == [int, int]

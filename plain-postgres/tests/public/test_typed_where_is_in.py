@@ -232,6 +232,99 @@ def test_a_single_string_is_refused(db):
 
 
 # ---------------------------------------------------------------------------
+# A candidate the column can't hold
+#
+# The array is cast to the type the column *compares* as, not the one it's
+# stored in. Casting to the storage type would let a constrained column
+# rewrite the candidates -- rounding a decimal, or refusing an integer -- and
+# change which rows come back. Every case here is checked against
+# `filter(__in=...)`, which is the behavior being preserved.
+# ---------------------------------------------------------------------------
+
+
+def test_a_decimal_with_more_fractional_digits_than_the_column_matches_nothing(db):
+    """`amount` is `numeric(10,2)`. Casting the array to `numeric(10,2)[]`
+    would round 1.504 to 1.50 and match the row -- `IN (1.504)` does not."""
+    make_form_example(name="cheap", amount=Decimal("1.50"))
+
+    candidate = Decimal("1.504")
+    assert [
+        r.name for r in FormsExample.query.where(FormsExample.amount.is_in([candidate]))
+    ] == []
+    assert [r.name for r in FormsExample.query.filter(amount__in=[candidate])] == []
+
+
+def test_a_decimal_beyond_the_columns_precision_matches_nothing(db):
+    """No row can hold it, so it matches nothing -- it does not raise."""
+    make_form_example(name="cheap", amount=Decimal("1.50"))
+
+    candidate = Decimal("12345678901.50")  # max_digits=10
+    assert [
+        r.name for r in FormsExample.query.where(FormsExample.amount.is_in([candidate]))
+    ] == []
+    assert [r.name for r in FormsExample.query.filter(amount__in=[candidate])] == []
+
+
+def test_a_decimal_that_does_fit_still_matches(db):
+    make_form_example(name="cheap", amount=Decimal("1.50"))
+    make_form_example(name="dear", amount=Decimal("99.00"))
+
+    rows = FormsExample.query.where(FormsExample.amount.is_in([Decimal("1.50")]))
+    assert [r.name for r in rows] == ["cheap"]
+
+
+def test_an_integer_out_of_the_columns_range_matches_nothing(db):
+    """`count` is an `integer`. A candidate no `integer` can hold matches no
+    rows -- casting the array to `integer[]` would raise instead."""
+    make_form_example(name="one", count=1)
+
+    too_big = 2**40
+    assert [
+        r.name for r in FormsExample.query.where(FormsExample.count.is_in([too_big]))
+    ] == []
+    assert [r.name for r in FormsExample.query.filter(count__in=[too_big])] == []
+
+
+def test_an_out_of_range_integer_mixed_with_valid_ones_matches_the_valid_ones(db):
+    make_form_example(name="one", count=1)
+    make_form_example(name="nine", count=9)
+
+    candidates = [1, 2**40, 2**70]
+    rows = FormsExample.query.where(FormsExample.count.is_in(candidates))
+    assert [r.name for r in rows] == ["one"]
+    assert [r.name for r in FormsExample.query.filter(count__in=candidates)] == ["one"]
+
+
+def test_negating_an_out_of_range_integer_excludes_only_the_valid_ones(db):
+    make_form_example(name="one", count=1)
+    make_form_example(name="nine", count=9)
+
+    candidates = [1, 2**40]
+    rows = FormsExample.query.where(~FormsExample.count.is_in(candidates))
+    assert [r.name for r in rows] == ["nine"]
+    assert [r.name for r in FormsExample.query.exclude(count__in=candidates)] == [
+        "nine"
+    ]
+
+
+def test_negating_an_all_out_of_range_integer_list_excludes_nothing(db):
+    make_form_example(name="one", count=1)
+
+    rows = FormsExample.query.where(~FormsExample.count.is_in([2**70]))
+    assert [r.name for r in rows] == ["one"]
+    assert [r.name for r in FormsExample.query.exclude(count__in=[2**70])] == ["one"]
+
+
+def test_a_primary_key_out_of_bigint_range_matches_nothing(db):
+    make_form_example(name="one")
+
+    assert [
+        r.name for r in FormsExample.query.where(FormsExample.id.is_in([2**70]))
+    ] == []
+    assert [r.name for r in FormsExample.query.filter(id__in=[2**70])] == []
+
+
+# ---------------------------------------------------------------------------
 # What did not change
 # ---------------------------------------------------------------------------
 
