@@ -1,5 +1,15 @@
 # plain-start changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-start@0.4.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.3.1](https://github.com/dropseed/plain/releases/plain-start@0.3.1) (2026-05-05)
 
 ### What's changed
