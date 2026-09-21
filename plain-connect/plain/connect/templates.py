@@ -33,7 +33,7 @@ class ConnectPageviewsExtension(InclusionTagExtension):
         self, context: Context, *args: Any, **kwargs: Any
     ) -> dict[str, Any]:
         request = context.get("request")
-        token = settings.CONNECT_PAGEVIEWS_TOKEN
+        token = settings.CONNECT_PAGEVIEWS_PUBLIC_TOKEN
         secret = str(settings.CONNECT_SECRET_KEY) if token else ""
         return {
             "request": request,
