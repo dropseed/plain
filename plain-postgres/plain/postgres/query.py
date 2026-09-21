@@ -1933,9 +1933,13 @@ class QuerySet[T: "Model"]:
         The written half of the query API: `where()`/`order_by()` build a query
         the code assembles, `sql()` runs one you wrote.
 
-        The template is a `Template` (PEP 750), so Python interpolates it and
-        this never sees a string it has to trust -- a `str`, however it was
-        made, is not a `Template` and the type checker says so.
+        The template is a `Template` (PEP 750): Python interpolates it, so the
+        SQL is the literal halves the author wrote and every interpolated
+        object is dispatched on its type, a value always binding as a
+        parameter. A `str` cannot be passed at all -- literal, f-string or
+        built at runtime, it is not a `Template` and the type checker says so.
+        Building a `Template` out of a string by hand is the one way past
+        that, and never something to do with text from outside the program.
 
         The statement is the whole query, so it starts from the bare model --
         `Model.query.sql(...)`. A queryset that has been narrowed cannot carry

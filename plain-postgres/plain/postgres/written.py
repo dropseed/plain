@@ -14,16 +14,25 @@ What the object is decides what it renders as:
     {Model.field}        the qualified column, "table"."column"
     {Model.field:name}   just the column, for an INSERT list or an UPDATE SET
     {queryset}           the built query, embedded as a subquery
+    {statement}          another sql() statement, embedded the same way
     {template}           another t-string, rendered inline
     {value}              anything else, bound as a parameter
 
-No string can stand in for a template. `sql()` takes a `Template`, and a `str`
-— a literal, an f-string, or one built at runtime — is not one, so the type
-checker refuses it and nothing a user typed can reach the SQL text.
+What that guarantees, exactly: the literal halves of a t-string are SQL the
+author wrote in the source, and every interpolated object is dispatched on
+its type, where a value always binds as a parameter. `sql()` takes a
+`Template`, so a `str` can't be passed at all — the type checker refuses a
+literal, an f-string and a runtime-built string alike.
+
+The one way to put runtime text into a statement is to build a `Template`
+from a string yourself (`Template(text)`, or concatenating one onto a
+t-string). That is a deliberate escape hatch, and it is exactly what must
+never be done with anything that came from outside the program.
 """
 
 from __future__ import annotations
 
+import ast
 import copy
 import dataclasses
 import datetime
@@ -47,7 +56,12 @@ from plain.postgres.dialect import adapt_json_value, quote_name
 from plain.postgres.fields import Field
 from plain.postgres.fields.encrypted import _ENCRYPTED_PREFIX
 from plain.postgres.fields.json import JSONField
-from plain.postgres.fields.related_descriptors import ForwardForeignKeyDescriptor
+from plain.postgres.fields.related_descriptors import (
+    ForwardForeignKeyDescriptor,
+    ForwardManyToManyDescriptor,
+)
+from plain.postgres.fields.related_managers import BaseRelatedManager
+from plain.postgres.fields.reverse_descriptors import BaseReverseDescriptor
 from plain.postgres.fields.timezones import TimeZoneField
 from plain.postgres.otel import db_span, suppress_db_tracing
 from plain.postgres.query import QuerySet, prefetch_objects
@@ -161,6 +175,48 @@ def _render_template(
     sql.author(template.strings[-1])
 
 
+# The relation accessors a model class carries. A forward foreign key is not
+# one of them: it has a column of its own, and `_field_of` renders it.
+_RELATIONS = (
+    ForwardManyToManyDescriptor,
+    BaseReverseDescriptor,
+    BaseRelatedManager,
+)
+
+# Everything a literal expression can be made of. A node outside this set --
+# a name, an attribute, a call, a subscript -- means the braces refer to
+# something in the program.
+_LITERAL_NODES = (
+    ast.Expression,
+    ast.Constant,
+    ast.Tuple,
+    ast.List,
+    ast.Dict,
+    ast.Set,
+    ast.UnaryOp,
+    ast.BinOp,
+    ast.unaryop,
+    ast.operator,
+    ast.expr_context,
+)
+
+
+def _interpolates_a_literal(expression: str) -> bool:
+    """Whether the braces hold a literal instead of naming anything.
+
+    `'^\\d{2}$'` is a regex the author forgot to double the braces in, and
+    Python read `{2}` as an interpolation of the int 2. By the time it is a
+    value there is no way to tell that from a parameter someone meant to
+    bind, so the source text between the braces is what answers it: nothing
+    in the program is named, so nothing was meant to bind.
+    """
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return False
+    return all(isinstance(node, _LITERAL_NODES) for node in ast.walk(tree))
+
+
 def _render_interpolation(
     interpolation: Interpolation,
     sql: _Sql,
@@ -175,6 +231,15 @@ def _render_interpolation(
     written = interpolation.expression
     value = interpolation.value
     format_spec = interpolation.format_spec
+
+    if _interpolates_a_literal(written):
+        raise ValueError(
+            f"{{{written}}} interpolates a literal, which is never a value "
+            "worth binding — it is almost always a brace that should have "
+            "been doubled. A literal brace in SQL — a regex quantifier like "
+            "\\d{2}, an array or jsonb literal — is written `{{`, and `}` is "
+            "written `}}`."
+        )
 
     if interpolation.conversion:
         raise ValueError(
@@ -201,10 +266,27 @@ def _render_interpolation(
         _render_template(value, sql, params, stars)
         return
 
+    if isinstance(value, Model):
+        # Caught here rather than at execute, where psycopg's "cannot adapt
+        # type" names the class and nothing else.
+        raise TypeError(
+            f"{{{written}}} is a {type(value).__name__} instance, not something "
+            f"a statement can hold. Interpolate a field of it "
+            f"({{{written}.id}}), or the value you meant."
+        )
+
+    if isinstance(value, _RELATIONS):
+        raise TypeError(
+            f"{{{written}}} is a relation, not a column. A written query has no "
+            "relations to follow — write the JOIN out and interpolate the "
+            "related model's own columns."
+        )
+
     if format_spec:
         raise ValueError(
             f"{{{written}:{format_spec}}} — a value takes no format spec. It "
-            "binds as a parameter; formatting it would put it in the SQL."
+            "binds as a parameter; formatting it would put it in the SQL. (If "
+            "you meant a literal brace in the SQL, double it: `{{` and `}}`.)"
         )
 
     _render_value(value, sql, params)
@@ -258,6 +340,22 @@ def _render_model(
 
 def _render_field(field: Field, format_spec: str, written: str, sql: _Sql) -> None:
     """`{Model.field}` is the qualified column; `{Model.field:name}` is bare."""
+    if field.is_lookup_reference:
+        # `WidgetTag.widget.name` is the traversal `where()` follows through a
+        # join it builds. A written statement builds nothing, and the field
+        # handed back doesn't even carry the table its column lives on.
+        raise ValueError(
+            f"{{{written}}} is a traversal, not a column of this statement. A "
+            "written query has no relations to follow — write the JOIN out and "
+            "interpolate the related model's own field."
+        )
+
+    if "model" not in field.__dict__:
+        raise ValueError(
+            f"{{{written}}} is a field that belongs to no model, so there is no "
+            "table to qualify its column with. Interpolate a model's own field."
+        )
+
     if not format_spec:
         sql.rendered(_qualified(field.model.model_options.db_table, field.column))
         return
@@ -277,7 +375,9 @@ def _render_field(field: Field, format_spec: str, written: str, sql: _Sql) -> No
 def _render_value(value: Any, sql: _Sql, params: list[Any]) -> None:
     """Render a value that names nothing in the models."""
     if isinstance(value, Written):
-        sql.rendered(f"({value._bind_sql})", f"({value.sql})")
+        # The newlines matter, the same way they do in `_wrap`: the embedded
+        # statement can end in a `-- comment`, and the `)` would be inside it.
+        sql.rendered(f"(\n{value._bind_sql}\n)", f"(\n{value.sql}\n)")
         params.extend(value.params)
     elif isinstance(value, QuerySet):
         # elide_empty=False so a queryset that can't match anything (an empty

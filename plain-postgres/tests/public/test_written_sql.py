@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field
 from decimal import Decimal
+from string.templatelib import Template
 
 import psycopg
 import pytest
@@ -233,6 +234,23 @@ def test_written_embeds_in_another_written(widgets):
         result_type=NameRow,
     )
     assert outer.params == ("small",)
+    assert outer.all() == [NameRow(name="small-widget")]
+
+
+def test_an_embedded_statement_ending_in_a_comment_survives(widgets):
+    """The embed is put on its own lines, so a `-- comment` can't eat the `)`."""
+    size = "small"
+    inner = Widget.query.sql(
+        t"""
+        SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}
+        -- the small ones
+        """,
+        result_type=NameRow,
+    )
+    outer = Widget.query.sql(
+        t"SELECT sub.name AS name FROM {inner} sub",
+        result_type=NameRow,
+    )
     assert outer.all() == [NameRow(name="small-widget")]
 
 
@@ -664,6 +682,23 @@ def test_a_string_is_not_a_template(db):
         Widget.query.sql(statement)  # ty: ignore[invalid-argument-type]
 
 
+def test_a_hand_built_template_is_the_deliberate_escape_hatch(db):
+    """What the type actually guarantees, stated honestly.
+
+    `sql()` refuses a `str`, so no string reaches it by accident. Building a
+    `Template` out of one yourself is the way past that, and it runs — which
+    is why the rule is "never build one from anything outside the program",
+    not "injection is impossible".
+    """
+
+    @dataclass
+    class Row:
+        n: int
+
+    built = Template("SELECT 1 AS n")
+    assert Widget.query.sql(built, result_type=Row).get() == Row(n=1)
+
+
 def test_values_are_not_passed_by_keyword(db):
     """A t-string already carries its values; there is no `**values`."""
     with pytest.raises(TypeError, match="unexpected keyword argument"):
@@ -702,6 +737,84 @@ def test_a_format_spec_on_a_nested_template_is_refused(db):
     predicate = t"{Widget.size} = 'small'"
     with pytest.raises(ValueError, match="nested template takes no format spec"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {predicate:x}")
+
+
+# ---------------------------------------------------------------------------
+# Braces that were meant to be braces
+# ---------------------------------------------------------------------------
+
+
+def test_an_undoubled_regex_quantifier_is_refused(db):
+    """`{2}` is a quantifier the braces weren't doubled in, not a parameter."""
+    with pytest.raises(ValueError, match="interpolates a literal"):
+        Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE name ~ '^a{2}$'")
+
+
+def test_a_doubled_regex_quantifier_renders_the_brace(widgets):
+    Widget.query.create(name="aa", size="small")
+    statement = Widget.query.sql(
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} ~ '^a{{2}}$'"
+    )
+    assert "'^a{2}$'" in statement.sql
+    assert statement.get().name == "aa"
+
+
+def test_an_undoubled_array_literal_is_refused(db):
+    with pytest.raises(ValueError, match="interpolates a literal"):
+        Widget.query.sql(t"SELECT '{1, 2, 3}'::int[] AS ids")
+
+
+def test_a_doubled_array_literal_renders(db):
+    @dataclass
+    class Ids:
+        ids: list
+
+    statement = Widget.query.sql(t"SELECT '{{1,2,3}}'::int[] AS ids", result_type=Ids)
+    assert statement.get() == Ids(ids=[1, 2, 3])
+
+
+def test_an_undoubled_jsonb_literal_is_refused(db):
+    with pytest.raises(ValueError, match="interpolates a literal"):
+        Widget.query.sql(t"""SELECT '{"a": 1}'::jsonb AS payload""")
+
+
+def test_a_doubled_jsonb_literal_renders(db):
+    @dataclass
+    class Payload:
+        payload: dict
+
+    statement = Widget.query.sql(
+        t"""SELECT '{{"a": 1}}'::jsonb AS payload""", result_type=Payload
+    )
+    assert statement.get() == Payload(payload={"a": 1})
+
+
+# ---------------------------------------------------------------------------
+# Things that look like columns and aren't
+# ---------------------------------------------------------------------------
+
+
+def test_a_traversal_is_not_a_column(db):
+    """`where()` follows a relation by building a join; a written query can't."""
+    with pytest.raises(ValueError, match="is a traversal"):
+        WidgetTag.query.sql(t"SELECT {WidgetTag.widget.name} FROM {WidgetTag}")
+
+
+def test_a_model_instance_is_not_a_value(widgets):
+    """`{job}` where `{job.id}` was meant, caught before it reaches psycopg."""
+    small, _ = widgets
+    with pytest.raises(TypeError, match="instance, not something"):
+        Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = {small}")
+
+
+def test_a_many_to_many_accessor_is_not_a_column(db):
+    with pytest.raises(TypeError, match="is a relation"):
+        Widget.query.sql(t"SELECT {Widget.tags} FROM {Widget}")
+
+
+def test_a_reverse_accessor_is_not_a_column(db):
+    with pytest.raises(TypeError, match="is a relation"):
+        Tag.query.sql(t"SELECT {Tag.widgets} FROM {Tag}")
 
 
 def test_a_trailing_semicolon_is_dropped(widgets):

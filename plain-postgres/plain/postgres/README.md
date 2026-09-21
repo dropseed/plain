@@ -534,7 +534,11 @@ for row in stats:
     print(row.queue, row.n)
 ```
 
-A t-string is not a string. Python evaluates each `{...}` and hands `sql()` the literal text and the interpolated **objects**, separately — so `JobRequest.queue` arrives as the field it is and becomes a quoted column, while `queues` arrives as a list and binds as a parameter. Nothing a value contains can become SQL, and there is no way to smuggle a string in: `sql()` takes a `Template`, and a `str` — a literal, an f-string, or one built at runtime — is not one, which the type checker says at the call site.
+A t-string is not a string. Python evaluates each `{...}` and hands `sql()` the literal text and the interpolated **objects**, separately — so `JobRequest.queue` arrives as the field it is and becomes a quoted column, while `queues` arrives as a list and binds as a parameter.
+
+That is the guarantee, stated exactly: **the SQL is the literal halves of the t-string, written in your source; every interpolated object is dispatched on its type, and a value always binds as a parameter**. A `str` can't be passed to `sql()` at all — a literal, an f-string and a runtime-built string are all refused by the type checker, because none of them is a `Template`.
+
+The one way to put runtime text into a statement is to build a `Template` out of a string yourself — `Template(text)`, or concatenating one onto a t-string. It type-checks and it runs, because a `Template` is what `sql()` asked for. It is the escape hatch, and **it is exactly what you must never do with anything that came from outside the program.**
 
 The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once**: its rows are cached, the way a queryset caches results, so iterating twice can't repeat a write. Call `sql()` again to run it again.
 
@@ -565,7 +569,9 @@ Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = ANY({ids}
 
 A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
 
-`!r` and `!s` are refused — there is nothing to convert — and the only format specs are the two in the table: `:*` on a model and `:name` on a column. Anything else raises, quoting what you wrote between the braces.
+A `{` that isn't an interpolation — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any f-string. Forget it and Python reads the braces as an interpolation, so `'^\d{2}$'` would quietly bind the number 2; `sql()` refuses an interpolation whose braces hold nothing but a literal, and says to double them.
+
+`!r` and `!s` are refused — there is nothing to convert — and the only format specs are the two in the table: `:*` on a model and `:name` on a column. Anything else raises, quoting what you wrote between the braces. So does a model **instance** or a relation accessor: `{job}` and `{Widget.tags}` are not columns, and the message says what to write instead.
 
 A queryset goes in as a subquery, which is the seam between the two halves — the built query decides the rows, the written one does what the ORM can't say:
 
@@ -589,6 +595,8 @@ ACTIVE = t"{Job.status} = 'active' AND {Job.deleted_at} IS NULL"
 
 Job.query.sql(t"SELECT {Job:*} FROM {Job} WHERE {ACTIVE} ORDER BY {Job.created_at}")
 ```
+
+Don't end a shared template with a `--` line comment. It is inlined mid-line, so the comment would swallow whatever the outer statement wrote after it — the `ORDER BY` above, for instance. (An embedded queryset or `sql()` statement is put on its own lines, so only a nested t-string has this edge.)
 
 An unknown model or field is a Python `NameError` or `AttributeError` where you wrote it, before `sql()` is called at all. A format spec on something that doesn't take one raises when the statement is rendered, which is still at the `sql()` call. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
 

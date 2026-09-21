@@ -1,8 +1,10 @@
 """Static claims for `Model.query.sql()`.
 
 The template is a `Template` — a t-string and nothing else. A `str`, however
-it was written, is not one, and that is the whole injection story: there is no
-source-reading lint because the type is the rule.
+it was written, is not one, so the type is the rule and there is no
+source-reading lint. What the type buys is that no string reaches `sql()` by
+accident; hand-building a `Template` out of one is still possible, and is the
+thing never to do with text from outside the program.
 
 `{Model:*}` hands back the model; `result_type=` hands back the dataclass; a
 `result_type` that isn't a dataclass is a type error, not just a runtime one.
