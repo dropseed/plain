@@ -1,5 +1,19 @@
 # plain-jobs changelog
 
+## [0.58.0](https://github.com/dropseed/plain/releases/plain-jobs@0.58.0) (2026-09-21)
+
+### What's changed
+
+- The worker's per-queue gauges — the count of ready and running jobs and the age of the oldest ready request — are written queries (`sql(t"...")`), with the ready-to-run queryset embedded as the subquery it already is. The SQL and parameters they run are identical to before; this is the first written query in a shipped package ([ca91eec03c](https://github.com/dropseed/plain/commit/ca91eec03c)) ([5bcf431297](https://github.com/dropseed/plain/commit/5bcf431297))
+- The job and worker admin views declare their search fields and the trend card's fields as field references, which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.57.5](https://github.com/dropseed/plain/releases/plain-jobs@0.57.5) (2026-09-21)
 
 ### What's changed
