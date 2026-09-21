@@ -5,28 +5,39 @@ QuerySet API does — or *written*: known in full when you type it, however
 complex. `Model.query.sql()` is the written side. The two meet at one seam: a
 built query drops into a written one as a subquery.
 
-Everything in a template that isn't SQL is a `{}` reference, and what the
-reference names decides what it renders as:
+The statement is a t-string (PEP 750), so Python does the interpolation and
+hands this module the literal text and each interpolated *object* separately.
+What the object is decides what it renders as:
 
     {Model}              the table, quoted
+    {Model:*}            every column of the model; rows become model instances
     {Model.field}        the qualified column, "table"."column"
     {Model.field:name}   just the column, for an INSERT list or an UPDATE SET
-    {Model.*}            every column of the model; rows become model instances
-    {name}               a value, dispatched on its type (see `_render_value`)
+    {queryset}           the built query, embedded as a subquery
+    {statement}          another sql() statement, embedded the same way
+    {template}           another t-string, rendered inline
+    {value}              anything else, bound as a parameter
 
-Values are never formatted into the SQL — they bind as parameters — so there is
-never an f-string here. `plain preflight` enforces that: templates and fragments
-have to be literals (`postgres.sql_template_not_literal`).
+What that guarantees, exactly: the literal halves of a t-string are SQL the
+author wrote in the source, and every interpolated object is dispatched on
+its type, where a value always binds as a parameter. `sql()` takes a
+`Template`, so a `str` can't be passed at all — the type checker refuses a
+literal, an f-string and a runtime-built string alike.
+
+The one way to put runtime text into a statement is to build a `Template`
+from a string yourself (`Template(text)`, or concatenating one onto a
+t-string). That is a deliberate escape hatch, and it is exactly what must
+never be done with anything that came from outside the program.
 """
 
 from __future__ import annotations
 
+import ast
 import copy
 import dataclasses
 import datetime
 import decimal
 import json
-import string
 import types
 import typing
 import uuid
@@ -34,15 +45,23 @@ import weakref
 import zoneinfo
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from string.templatelib import Interpolation, Template
 from typing import TYPE_CHECKING, Any, Self
 
 import psycopg
 from plain.postgres import transaction
+from plain.postgres.base import Model
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import adapt_json_value, quote_name
-from plain.postgres.exceptions import FieldDoesNotExist
+from plain.postgres.fields import Field
 from plain.postgres.fields.encrypted import _ENCRYPTED_PREFIX
 from plain.postgres.fields.json import JSONField
+from plain.postgres.fields.related_descriptors import (
+    ForwardForeignKeyDescriptor,
+    ForwardManyToManyDescriptor,
+)
+from plain.postgres.fields.related_managers import BaseRelatedManager
+from plain.postgres.fields.reverse_descriptors import BaseReverseDescriptor
 from plain.postgres.fields.timezones import TimeZoneField
 from plain.postgres.otel import db_span, suppress_db_tracing
 from plain.postgres.query import QuerySet, prefetch_objects
@@ -53,34 +72,10 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from plain.exceptions import ValidationError
-    from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.fields import Field
     from plain.postgres.query import Prefetch
 
-__all__ = ["Fragment", "Written"]
-
-
-class Fragment:
-    """SQL text inlined into a written query instead of bound as a parameter.
-
-    This is the only way to put text into a statement that the template doesn't
-    spell out, so it is deliberately narrow: the text is a literal, checked by
-    `plain preflight` the same way a template is. Anything that reaches a
-    fragment from input is an injection.
-
-        ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
-    """
-
-    __slots__ = ("text",)
-
-    def __init__(self, text: str) -> None:
-        if not isinstance(text, str):
-            raise TypeError(f"Fragment() takes a string literal, got {type(text)}.")
-        self.text = text
-
-    def __repr__(self) -> str:
-        return f"Fragment({self.text!r})"
+__all__ = ["Written"]
 
 
 # --------------------------------------------------------------------------
@@ -90,7 +85,7 @@ class Fragment:
 
 @dataclasses.dataclass(frozen=True)
 class _StarExpansion:
-    """What one `{Model.*}` put into the select list.
+    """What one `{Model:*}` put into the select list.
 
     The fields are in declared order and the column names are theirs, which is
     how the result columns are found again — the expansion decides which
@@ -138,135 +133,18 @@ def _qualified(table: str, column: str) -> str:
     return f"{quote_name(table)}.{quote_name(column)}"
 
 
-def _models_named(name: str) -> list[type[Model]]:
-    """Every registered model class with this name."""
-    return [model for model in models_registry.get_models() if model.__name__ == name]
-
-
-def _model_by_name(name: str, reference: str) -> type[Model]:
-    """The one registered model this reference names."""
-    matches = _models_named(name)
-    if not matches:
-        raise ValueError(
-            f"{{{reference}}} names no registered model. "
-            f"There is no model class called {name!r}."
-        )
-    if len(matches) > 1:
-        paths = ", ".join(f"{m.__module__}.{m.__name__}" for m in matches)
-        raise ValueError(
-            f"{{{reference}}} is ambiguous — {len(matches)} registered models "
-            f"are called {name!r} ({paths}). Rename one, or write the table "
-            "out by hand."
-        )
-    return matches[0]
-
-
-def _model_field(model: type[Model], field_name: str, reference: str) -> Field:
-    try:
-        return model._model_meta.get_forward_field(field_name)
-    except FieldDoesNotExist:
-        available = ", ".join(field.name for field in model._model_meta.fields)
-        raise ValueError(
-            f"{{{reference}}} names no field on {model.__name__}. "
-            f"Its fields are: {available}."
-        )
-
-
-def _render(template: str, values: dict[str, Any]) -> _Rendered:
-    """Turn a template into one SQL statement and its positional parameters.
+def _render(template: Template) -> _Rendered:
+    """Turn a t-string into one SQL statement and its positional parameters.
 
     Everything binds positionally: psycopg refuses a statement that mixes `%s`
     with `%(name)s`, and an embedded queryset always brings `%s`. A value
-    referenced twice binds twice.
+    interpolated twice binds twice.
     """
     sql = _Sql()
     params: list[Any] = []
     stars: list[_StarExpansion] = []
 
-    for literal, reference, format_spec, conversion in _parse(template):
-        sql.author(literal)
-
-        if reference is None:
-            continue
-
-        if conversion:
-            raise ValueError(
-                f"{{{reference}!{conversion}}} uses a conversion. A written "
-                "query interpolates references and binds values — there is "
-                "nothing to convert."
-            )
-
-        if "." in reference:
-            model_name, _, attribute = reference.partition(".")
-            model = _model_by_name(model_name, reference)
-            table = model.model_options.db_table
-
-            if attribute == "*":
-                if format_spec:
-                    raise ValueError(
-                        f"{{{reference}:{format_spec}}} — `{{Model.*}}` takes no "
-                        "format spec; it always expands to every column."
-                    )
-                fields = tuple(model._model_meta.fields)
-                stars.append(
-                    _StarExpansion(
-                        model=model,
-                        fields=fields,
-                        columns=tuple(field.column for field in fields),
-                    )
-                )
-                sql.rendered(
-                    ", ".join(_qualified(table, field.column) for field in fields)
-                )
-                continue
-
-            field = _model_field(model, attribute, reference)
-            if format_spec == "name":
-                # The bare column: an INSERT column list and an UPDATE SET
-                # target can't take a qualified name.
-                sql.rendered(quote_name(field.column))
-            elif format_spec:
-                raise ValueError(
-                    f"{{{reference}:{format_spec}}} — the only format spec a "
-                    "column takes is `:name`, which renders the column on its "
-                    "own for an INSERT list or an UPDATE SET target."
-                )
-            else:
-                sql.rendered(_qualified(table, field.column))
-            continue
-
-        if format_spec:
-            raise ValueError(
-                f"{{{reference}:{format_spec}}} — a value takes no format spec. "
-                "It binds as a parameter; formatting it would put it in the SQL."
-            )
-
-        if _models_named(reference):
-            if reference in values:
-                raise ValueError(
-                    f"{{{reference}}} is both a registered model and a value "
-                    "passed to sql(). Rename the value."
-                )
-            model = _model_by_name(reference, reference)
-            sql.rendered(quote_name(model.model_options.db_table))
-            continue
-
-        if reference not in values:
-            if not reference.isidentifier():
-                raise ValueError(
-                    f"{{{reference}}} isn't a reference — nothing is named "
-                    f"{reference!r}. A literal `"
-                    "{"
-                    "` in SQL — a regex quantifier like `\\d{2}`, an array "
-                    "or jsonb literal — is written `{{`, and `}` is written `}}`."
-                )
-            given = ", ".join(sorted(values)) or "nothing"
-            raise ValueError(
-                f"{{{reference}}} has no value and names no model. "
-                f"sql() was given: {given}."
-            )
-
-        _render_value(values[reference], sql, params)
+    _render_template(template, sql, params, stars)
 
     binds_parameters = bool(params)
     return _Rendered(
@@ -279,29 +157,232 @@ def _render(template: str, values: dict[str, Any]) -> _Rendered:
     )
 
 
-def _parse(template: str) -> list[tuple[str, str | None, str | None, str | None]]:
-    """Split the template into literal text and `{}` references.
+def _render_template(
+    template: Template,
+    sql: _Sql,
+    params: list[Any],
+    stars: list[_StarExpansion],
+) -> None:
+    """Render one t-string into the statement being built.
 
-    `string.Formatter` does the splitting; this only improves the error when
-    what's inside the braces isn't a reference at all — a regex quantifier or
-    a JSON literal, where the fix is to double the brace.
+    A `Template` alternates literal text and interpolations, starting and
+    ending with text — `strings` always has exactly one more entry than
+    `interpolations`.
+    """
+    for literal, interpolation in zip(template.strings, template.interpolations):
+        sql.author(literal)
+        _render_interpolation(interpolation, sql, params, stars)
+    sql.author(template.strings[-1])
+
+
+# The relation accessors a model class carries. A forward foreign key is not
+# one of them: it has a column of its own, and `_field_of` renders it.
+_RELATIONS = (
+    ForwardManyToManyDescriptor,
+    BaseReverseDescriptor,
+    BaseRelatedManager,
+)
+
+
+def _brace_lookalike_error(expression: str) -> str | None:
+    """The message for braces that were meant to stay braces, if these were.
+
+    `'^\\d{2}$'` is a regex whose braces weren't doubled, and Python read
+    `{2}` as an interpolation of the int 2. Nothing downstream can tell that
+    from a parameter, so the source text between the braces answers it — but
+    only for the two shapes a forgotten brace actually makes: a bare integer
+    (a quantifier) and a comma-separated run of literals (an array literal,
+    a regex range). Every other literal is left alone to bind, because
+    `{None}`, `{"active"}` and `{True}` are values someone meant.
     """
     try:
-        return list(string.Formatter().parse(template))
-    except ValueError as exc:
+        node = ast.parse(expression, mode="eval").body
+    except SyntaxError:
+        return None
+
+    doubled = f"{{{{{expression}}}}}"
+
+    # `type(...) is int` rather than isinstance: True is an int, and a bool
+    # is a value to bind.
+    if isinstance(node, ast.Constant) and type(node.value) is int:
+        return (
+            f"{{{expression}}} interpolates the number {node.value} as a bound "
+            "parameter. Write the number into the SQL, or — if this was meant "
+            "to be a literal brace, a regex quantifier like \\d{2} or an array "
+            f"literal — write {doubled}."
+        )
+
+    # `'{1,2,3}'` parses as a tuple. A set can only come from braces the
+    # author typed on purpose, but psycopg can't adapt one either way.
+    if isinstance(node, ast.Tuple | ast.Set) and all(
+        isinstance(element, ast.Constant) for element in node.elts
+    ):
+        kind = type(node).__name__.lower()
+        return (
+            f"{{{expression}}} interpolates a {kind} of literals as a bound "
+            "parameter. Write them into the SQL, or — if this was meant to be "
+            "a literal brace, an array literal or a regex range — write "
+            f"{doubled}."
+        )
+
+    return None
+
+
+def _render_interpolation(
+    interpolation: Interpolation,
+    sql: _Sql,
+    params: list[Any],
+    stars: list[_StarExpansion],
+) -> None:
+    """Render one `{...}` on what its value *is*. The value type decides.
+
+    Errors quote `interpolation.expression` — the source text between the
+    braces — so a message names what the author wrote.
+    """
+    written = interpolation.expression
+    value = interpolation.value
+    format_spec = interpolation.format_spec
+
+    if (lookalike := _brace_lookalike_error(written)) is not None:
+        raise ValueError(lookalike)
+
+    if interpolation.conversion:
         raise ValueError(
-            f"This template isn't parseable ({exc}). A literal `{{` in SQL — a "
-            "regex quantifier like `\\d{2}`, an array or jsonb literal — is "
-            "written `{{`, and `}` is written `}}`."
-        ) from exc
+            f"{{{written}!{interpolation.conversion}}} uses a conversion. A "
+            "written query interpolates models and binds values — there is "
+            "nothing to convert."
+        )
+
+    if isinstance(value, type) and issubclass(value, Model):
+        _render_model(value, format_spec, written, sql, stars)
+        return
+
+    field = _field_of(value)
+    if field is not None:
+        _render_field(field, format_spec, written, sql)
+        return
+
+    if isinstance(value, Template):
+        if format_spec:
+            raise ValueError(
+                f"{{{written}:{format_spec}}} — a nested template takes no "
+                "format spec; it renders as the SQL it spells out."
+            )
+        _render_template(value, sql, params, stars)
+        return
+
+    if isinstance(value, Model):
+        # Caught here rather than at execute, where psycopg's "cannot adapt
+        # type" names the class and nothing else.
+        raise TypeError(
+            f"{{{written}}} is a {type(value).__name__} instance, not something "
+            f"a statement can hold. Interpolate a field of it "
+            f"({{{written}.id}}), or the value you meant."
+        )
+
+    if isinstance(value, _RELATIONS):
+        raise TypeError(
+            f"{{{written}}} is a relation, not a column. A written query has no "
+            "relations to follow — write the JOIN out and interpolate the "
+            "related model's own columns."
+        )
+
+    if format_spec:
+        raise ValueError(
+            f"{{{written}:{format_spec}}} — a value takes no format spec. It "
+            "binds as a parameter; formatting it would put it in the SQL. (If "
+            "you meant a literal brace in the SQL, double it: `{{` and `}}`.)"
+        )
+
+    _render_value(value, sql, params)
+
+
+def _field_of(value: Any) -> Field | None:
+    """The model field this interpolation names, if it names one.
+
+    `Widget.name` at class level *is* the `Field`. A foreign key is a
+    descriptor instead — that is what serves `Post.author.email` traversal —
+    and the field it wraps is the one that owns the `_id` column.
+    """
+    if isinstance(value, Field):
+        return value
+    if isinstance(value, ForwardForeignKeyDescriptor):
+        return value._field
+    return None
+
+
+def _render_model(
+    model: type[Model],
+    format_spec: str,
+    written: str,
+    sql: _Sql,
+    stars: list[_StarExpansion],
+) -> None:
+    """`{Model}` is the table; `{Model:*}` is every column of it."""
+    table = model.model_options.db_table
+
+    if not format_spec:
+        sql.rendered(quote_name(table))
+        return
+
+    if format_spec != "*":
+        raise ValueError(
+            f"{{{written}:{format_spec}}} — the only format spec a model takes "
+            "is `:*`, which expands to every column and makes each row an "
+            "instance."
+        )
+
+    fields = tuple(model._model_meta.fields)
+    stars.append(
+        _StarExpansion(
+            model=model,
+            fields=fields,
+            columns=tuple(field.column for field in fields),
+        )
+    )
+    sql.rendered(", ".join(_qualified(table, field.column) for field in fields))
+
+
+def _render_field(field: Field, format_spec: str, written: str, sql: _Sql) -> None:
+    """`{Model.field}` is the qualified column; `{Model.field:name}` is bare."""
+    if field.is_lookup_reference:
+        # `WidgetTag.widget.name` is the traversal `where()` follows through a
+        # join it builds. A written statement builds nothing, and the field
+        # handed back doesn't even carry the table its column lives on.
+        raise ValueError(
+            f"{{{written}}} is a traversal, not a column of this statement. A "
+            "written query has no relations to follow — write the JOIN out and "
+            "interpolate the related model's own field."
+        )
+
+    if "model" not in field.__dict__:
+        raise ValueError(
+            f"{{{written}}} is a field that belongs to no model, so there is no "
+            "table to qualify its column with. Interpolate a model's own field."
+        )
+
+    if not format_spec:
+        sql.rendered(_qualified(field.model.model_options.db_table, field.column))
+        return
+
+    if format_spec != "name":
+        raise ValueError(
+            f"{{{written}:{format_spec}}} — the only format spec a column takes "
+            "is `:name`, which renders the column on its own for an INSERT list "
+            "or an UPDATE SET target."
+        )
+
+    # The bare column: an INSERT column list and an UPDATE SET target can't
+    # take a qualified name.
+    sql.rendered(quote_name(field.column))
 
 
 def _render_value(value: Any, sql: _Sql, params: list[Any]) -> None:
-    """Dispatch a `{name}` value on its type. The value type decides."""
-    if isinstance(value, Fragment):
-        sql.author(value.text)
-    elif isinstance(value, Written):
-        sql.rendered(f"({value._bind_sql})", f"({value.sql})")
+    """Render a value that names nothing in the models."""
+    if isinstance(value, Written):
+        # The newlines matter, the same way they do in `_wrap`: the embedded
+        # statement can end in a `-- comment`, and the `)` would be inside it.
+        sql.rendered(f"(\n{value._bind_sql}\n)", f"(\n{value.sql}\n)")
         params.extend(value.params)
     elif isinstance(value, QuerySet):
         # elide_empty=False so a queryset that can't match anything (an empty
@@ -332,16 +413,16 @@ def _one_statement(sql: str, *, binds_parameters: bool) -> str:
     both halves — so that case is refused here.
 
     The check is deliberately blunt: any `;` left after the trailing one comes
-    off is refused, quoted or not. A template is a literal the author wrote,
-    so the cost of being wrong is a rewrite, not a mystery.
+    off is refused, quoted or not. A template is the statement the author
+    wrote, so the cost of being wrong is a rewrite, not a mystery.
     """
     sql = sql.rstrip().removesuffix(";")
     if not binds_parameters and ";" in sql:
         raise ValueError(
             "A written query is a single statement, and this one contains a "
-            "';'. Split it into separate sql() calls. (A ';' inside a string "
-            "literal counts too: bind the string as {name} instead, or write "
-            "the `{` of a literal as `{{`.)"
+            "';'. Split it into separate sql() calls. (A ';' inside a SQL "
+            "string literal counts too: interpolate the string instead, so it "
+            "binds as a parameter.)"
         )
     return sql
 
@@ -664,7 +745,7 @@ def _build_plan(
         for _, name in extras:
             if name in star.columns:
                 raise TypeError(
-                    f"This statement selects {{{star.model.__name__}.*}} and "
+                    f"This statement selects {{{star.model.__name__}:*}} and "
                     f"another column called {name!r}, which would overwrite the "
                     "instance's own. Alias the extra column."
                 )
@@ -681,7 +762,7 @@ def _build_plan(
         )
 
     if result_type is None:
-        star = f"{{{model.__name__}.*}}"
+        star = f"{{{model.__name__}:*}}"
         raise TypeError(
             f"This statement returns columns ({', '.join(names)}) and nothing "
             f"says what a row is. Select {star} to get instances, or pass "
@@ -705,7 +786,7 @@ def _build_plan(
 def _star_start(
     names: tuple[str, ...], fields: list[Field | None], star: _StarExpansion
 ) -> int:
-    """Where `{Model.*}`'s columns start in the result.
+    """Where `{Model:*}`'s columns start in the result.
 
     The expansion emitted the model's columns, in declared order, as one run —
     so the run of result columns with those names *is* the instance. Reading it
@@ -725,10 +806,10 @@ def _star_start(
             f"This statement returns ({', '.join(names)}), which doesn't "
             f"contain {star.model.__name__}'s columns "
             f"({', '.join(star.columns)}) in order. If the "
-            f"{{{star.model.__name__}.*}} is inside a subquery, select the "
+            f"{{{star.model.__name__}:*}} is inside a subquery, select the "
             "columns you want in the outer statement and pass result_type= a "
             "dataclass; otherwise something renamed them, and a "
-            f"{{{star.model.__name__}.*}} row can't be aliased."
+            f"{{{star.model.__name__}:*}} row can't be aliased."
         )
     if len(candidates) > 1:
         # Two runs of columns have those names. Provenance breaks the tie when
@@ -1016,27 +1097,36 @@ class Written[R]:
     the way a queryset caches its result. Call `sql()` again to run it again —
     which matters for writes, where a second iteration must not insert twice.
 
-    It renders when it is constructed, so an unknown reference or a missing
-    value fails at the call site, and so it can be embedded in another
-    statement as `{name}` without running.
+    It renders when it is constructed, so a bad interpolation fails at the
+    call site, and so it can be interpolated into another statement without
+    running.
     """
 
     def __init__(
         self,
         *,
         model: type[Model],
-        template: str,
-        values: dict[str, Any],
+        template: Template,
         result_type: Any = None,
     ) -> None:
+        if not isinstance(template, Template):
+            # The type checker already says so; this is what an untyped call
+            # site gets, and it names the one thing that would be an
+            # injection if it were allowed through.
+            raise TypeError(
+                "sql() takes a t-string. A str -- a literal, an f-string, or "
+                f"one built at runtime -- is not one; got "
+                f"{type(template).__name__}."
+            )
+
         if result_type is not None and not (
             isinstance(result_type, type) and dataclasses.is_dataclass(result_type)
         ):
             raise TypeError("sql(result_type=...) requires a dataclass.")
 
-        rendered = _render(template, values)
+        rendered = _render(template)
 
-        # `result_type=` says what a row is, so any `{Model.*}` in the
+        # `result_type=` says what a row is, so any `{Model:*}` in the
         # template is just columns -- inside a subquery, most likely. What
         # comes back is checked against the dataclass either way.
         stars = () if result_type is not None else rendered.stars
@@ -1048,7 +1138,7 @@ class Written[R]:
         if len(star_models) > 1:
             names = ", ".join(model.__name__ for model in star_models)
             raise TypeError(
-                f"sql() expands {{Model.*}} for more than one model ({names}), "
+                f"sql() expands {{Model:*}} for more than one model ({names}), "
                 "so a row can't be one instance. Select the columns you need "
                 "and pass result_type= a dataclass."
             )
@@ -1093,7 +1183,7 @@ class Written[R]:
         if self._instance_model is None:
             raise TypeError(
                 "prefetch() attaches related objects to model instances, and "
-                "this statement returns rows. Select {Model.*}, or join the "
+                "this statement returns rows. Select {Model:*}, or join the "
                 "related table into the statement."
             )
         # The clone carries whatever this statement already ran -- a write
@@ -1335,7 +1425,7 @@ class Written[R]:
 
         This is the write without a RETURNING clause — the count is what an
         `UPDATE` or `DELETE` has to say. It runs the statement without shaping
-        any rows, so a statement with no `result_type` and no `{Model.*}` is
+        any rows, so a statement with no `result_type` and no `{Model:*}` is
         still runnable this way.
         """
         self._run()

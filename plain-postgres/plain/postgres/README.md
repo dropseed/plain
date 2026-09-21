@@ -502,7 +502,7 @@ redeclare `query` just to type it; the base provides `QuerySet[Self]`. Declare
 
 A query is either **built** or **written**. The ORM builds one when the code assembles it at runtime — `where()`, `order_by()`, a paginator, a filter that's only sometimes applied. You write one when the whole query is known as you type it, however complex: a grouped count, a three-table join, a CTE, an `UPDATE ... RETURNING`. **If you can write the query, write it; if the code has to build it, build it.**
 
-`Model.query.sql()` is the written half:
+`Model.query.sql()` is the written half. The statement is a **t-string** ([PEP 750](https://peps.python.org/pep-0750/)) — the `t` prefix, not `f` — so models, columns and values are interpolated directly:
 
 ```python
 from dataclasses import dataclass
@@ -516,8 +516,10 @@ class QueueStats:
     oldest: datetime | None
 
 
+queues = ["default", "high"]
+
 stats = JobRequest.query.sql(
-    """
+    t"""
     SELECT {JobRequest.queue} AS queue,
            count(*) AS "n!",
            min({JobRequest.created_at}) AS "oldest?"
@@ -525,7 +527,6 @@ stats = JobRequest.query.sql(
     WHERE {JobRequest.queue} = ANY({queues})
     GROUP BY 1
     """,
-    queues=["default", "high"],
     result_type=QueueStats,
 )
 
@@ -533,37 +534,44 @@ for row in stats:
     print(row.queue, row.n)
 ```
 
+A t-string is not a string. Python evaluates each `{...}` and hands `sql()` the literal text and the interpolated **objects**, separately — so `JobRequest.queue` arrives as the field it is and becomes a quoted column, while `queues` arrives as a list and binds as a parameter.
+
+That is the guarantee, stated exactly: **the SQL is the literal halves of the t-string, written in your source; every interpolated object is dispatched on its type, and a value always binds as a parameter**. A `str` can't be passed to `sql()` at all — a literal, an f-string and a runtime-built string are all refused by the type checker, because none of them is a `Template`.
+
+The one way to put runtime text into a statement is to build a `Template` out of a string yourself — `Template(text)`, or concatenating one onto a t-string. It type-checks and it runs, because a `Template` is what `sql()` asked for. It is the escape hatch, and **it is exactly what you must never do with anything that came from outside the program.**
+
 The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once**: its rows are cached, the way a queryset caches results, so iterating twice can't repeat a write. Call `sql()` again to run it again.
 
-`sql()` starts from `Model.query`. A queryset narrowed past that — `where()`, `order_by()`, a slice — raises, because a written statement can't carry the narrowing and quietly dropping it would drop whatever the filter was enforcing. Put the queryset into the statement as a subquery instead. A model whose _default_ queryset filters can still write SQL, but that scope is **not** applied either: write the predicate into the statement, or embed `Model.query` as `{rows}`.
+`sql()` starts from `Model.query`. A queryset narrowed past that — `where()`, `order_by()`, a slice — raises, because a written statement can't carry the narrowing and quietly dropping it would drop whatever the filter was enforcing. Interpolate the queryset into the statement as a subquery instead. A model whose _default_ queryset filters can still write SQL, but that scope is **not** applied either: write the predicate into the statement, or interpolate `Model.query`.
 
 #### Interpolation
 
-Everything in a template that isn't SQL is a `{}` reference, and what it names decides what it renders as. Values never go into the SQL text — they bind as parameters — so there is never an f-string.
+What an interpolation renders as is decided by **what the object is**, never by how it was spelled:
 
-| Reference                                             | Renders as                                                                      |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `{Model}`                                             | the table, quoted                                                               |
-| `{Model.field}`                                       | the qualified column, `"table"."column"` (a foreign key gives its `_id` column) |
-| `{Model.field:name}`                                  | just the column, for an `INSERT` column list or an `UPDATE SET` target          |
-| `{Model.*}`                                           | every column of the model; rows come back as **model instances**                |
-| `{name}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged           |
-| `{name}` where the value is another `sql()` statement | the same, rendered without running                                              |
-| `{name}` where the value is a `Fragment`              | inlined SQL text                                                                |
-| `{name}` otherwise                                    | a bound parameter, always                                                       |
+| Interpolation                                          | Renders as                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `{Model}`                                              | the table, quoted                                                               |
+| `{Model:*}`                                            | every column of the model; rows come back as **model instances**                |
+| `{Model.field}`                                        | the qualified column, `"table"."column"` (a foreign key gives its `_id` column) |
+| `{Model.field:name}`                                   | just the column, for an `INSERT` column list or an `UPDATE SET` target          |
+| `{value}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged           |
+| `{value}` where the value is another `sql()` statement | the same, rendered without running                                              |
+| `{value}` where the value is another t-string          | rendered inline, recursively, into the same statement                           |
+| `{value}` otherwise                                    | a bound parameter, always                                                       |
 
-A value referenced twice binds twice. **A list binds as an array, never as an `IN` list**, so membership is written `= ANY(...)`:
+A value interpolated twice binds twice. **A list binds as an array, never as an `IN` list**, so membership is written `= ANY(...)`:
 
 ```python
-Widget.query.sql(
-    "SELECT {Widget.*} FROM {Widget} WHERE {Widget.id} = ANY({ids})",
-    ids=[1, 2, 3],
-)
+ids = [1, 2, 3]
+
+Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = ANY({ids})")
 ```
 
 A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
 
-A `{` that isn't a reference — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any format string.
+A `{` that isn't an interpolation — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any f-string. Forget it and Python reads the braces as an interpolation, so `'^\d{2}$'` would quietly bind the number 2. `sql()` catches the shapes a forgotten brace makes — a bare number, and a comma-separated run of literals like `{1,2,3}` or `{2,5}` — and says to double them. (A jsonb literal trips the format-spec error instead, because `{"a": 1}` splits into an expression and a spec; that message says to double them too.) Any other literal is a value: `{None}` binds NULL, `{"active"}` and `{True}` bind as themselves.
+
+`!r` and `!s` are refused — there is nothing to convert — and the only format specs are the two in the table: `:*` on a model and `:name` on a column. Anything else raises, quoting what you wrote between the braces. So does a model **instance** or a relation accessor: `{job}` and `{Widget.tags}` are not columns, and the message says what to write instead.
 
 A queryset goes in as a subquery, which is the seam between the two halves — the built query decides the rows, the written one does what the ORM can't say:
 
@@ -571,44 +579,35 @@ A queryset goes in as a subquery, which is the seam between the two halves — t
 ready = JobRequest.query.ready_to_run()
 
 JobRequest.query.sql(
-    """
+    t"""
     SELECT ready.queue AS queue, count(*) AS "n!"
     FROM {ready} ready
     GROUP BY 1
     """,
-    ready=ready,
     result_type=QueueCount,
 )
 ```
 
-A [`Fragment`](./written.py#Fragment) is the only way to put text into a statement that the template doesn't spell out:
+A t-string interpolated into another t-string is rendered inline, which is how a predicate is shared — it is an ordinary value, so it can live at module level and be passed around:
 
 ```python
-from plain.postgres import Fragment
+ACTIVE = t"{Job.status} = 'active' AND {Job.deleted_at} IS NULL"
 
-ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
+Job.query.sql(t"SELECT {Job:*} FROM {Job} WHERE {ACTIVE} ORDER BY {Job.created_at}")
 ```
 
-**Templates and fragments are literals, written at the call site.** A template built at runtime — an f-string, a concatenation, a value passed in — puts the injection guarantee back in the caller's hands, and at runtime it is indistinguishable from a literal. So the rule is checked by reading the source: `plain preflight` walks the app and reports each one (`postgres.sql_template_not_literal`).
+Don't end a shared template with a `--` line comment. It is inlined mid-line, so the comment would swallow whatever the outer statement wrote after it — the `ORDER BY` above, for instance. (An embedded queryset or `sql()` statement is put on its own lines, so only a nested t-string has this edge.)
 
-A _name_ is never accepted, however it was bound — following one would mean tracking every way Python can rebind it, and missing one is a false pass on the thing the check exists for. To share a predicate, share a `Fragment`, which is checked where its text is written:
-
-```python
-ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")  # checked here
-```
-
-A whole template is written where it's used.
-
-An unknown model or field name, a `{name}` with no value, and a format spec on something that doesn't take one all raise where the `sql()` call is written, before anything runs. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
+An unknown model or field is a Python `NameError` or `AttributeError` where you wrote it, before `sql()` is called at all. A format spec on something that doesn't take one raises when the statement is rendered, which is still at the `sql()` call. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
 
 #### Results
 
-`{Model.*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. The instance is built from the columns that expansion put in the statement, so a self-join or a UNION can't shift its fields. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
+`{Model:*}` gives live model instances, with encrypted and JSON fields decrypted and parsed like any other read. The instance is built from the columns that expansion put in the statement, so a self-join or a UNION can't shift its fields. Any other column you select comes back as a plain attribute on the instance, the way `raw()` does:
 
 ```python
 widgets = Widget.query.sql(
-    """
-    SELECT {Widget.*}, count(wt.id) AS tag_count
+    t"""
+    SELECT {Widget:*}, count(wt.id) AS tag_count
     FROM {Widget}
     LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
     GROUP BY {Widget.id}
@@ -620,7 +619,7 @@ for widget in widgets:
 
 An extra column that shares a name with one of the model's own has to be aliased apart — otherwise it would overwrite the instance's value, and the statement says so. `prefetch()` works on an instance statement exactly as it does on a queryset.
 
-Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. It also _is_ the answer to what a row is, so a `{Model.*}` below it — inside a subquery, say — is just columns. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
+Otherwise `result_type=` is required, and it has to be a dataclass — no dicts, no bare tuples. It also _is_ the answer to what a row is, so a `{Model:*}` below it — inside a subquery, say — is just columns. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
 
 The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
 
@@ -629,19 +628,19 @@ The sqlx alias convention says in the statement what the SQL itself leaves ambig
 `INSERT`, `UPDATE` and `DELETE` are the same call. With a `RETURNING` clause the rows come back like any other result; without one, iterating yields nothing and `execute()` returns how many rows were affected:
 
 ```python
+size = "large"
+
 updated = Widget.query.sql(
-    """
+    t"""
     UPDATE {Widget} SET {Widget.size:name} = {size}
-    WHERE {Widget.id} = {id}
-    RETURNING {Widget.*}
-    """,
-    size="large",
-    id=widget.id,
+    WHERE {Widget.id} = {widget.id}
+    RETURNING {Widget:*}
+    """
 ).get()
 
-gone = Widget.query.sql(
-    "DELETE FROM {Widget} WHERE {Widget.size} = {size}", size="tiny"
-).execute()
+tiny = "tiny"
+
+gone = Widget.query.sql(t"DELETE FROM {Widget} WHERE {Widget.size} = {tiny}").execute()
 ```
 
 `execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way. A write runs exactly once however it's asked — `count()` and `first()` on one read what that single execution returned rather than running it again, and adding a `prefetch()` afterwards doesn't re-run it. Asking a write with no `RETURNING` clause how many rows it _returns_ raises: 0 would read like "the UPDATE matched nothing", and `execute()` is the question with an answer.
@@ -655,13 +654,13 @@ The first execution of each statement reads `cursor.description`, which carries 
 - **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. A text-shaped one is watched: any value that arrives still encrypted is refused rather than handed back as ciphertext, since nothing can decrypt it. (Checked on every row of every execution, so a plain column holding a string that looks encrypted is refused too — which is the safe way to be wrong.)
 - **Check `result_type`.** Every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
 
-The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same template with a different embedded queryset is checked again rather than hydrated from the wrong plan.
+The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same statement with a different embedded queryset is checked again rather than hydrated from the wrong plan.
 
 What it does **not** check: **nullability** — the annotation is the declaration, and `!`/`?` documents it. And the check runs at first execution, not before deploy, so a statement no test and no code path ever runs is unverified.
 
 ### Raw SQL
 
-For complex queries that can't be expressed with the ORM, you can use raw SQL. Reach for [`sql()`](#written-queries-with-sql) first — it resolves `{}` references against the models, binds every value as a parameter, and checks the results against what you declared. `raw()` is the unchecked version of the same idea.
+For complex queries that can't be expressed with the ORM, you can use raw SQL. Reach for [`sql()`](#written-queries-with-sql) first — it takes a t-string, interpolates models and columns, binds every value as a parameter, and checks the results against what you declared. `raw()` is the unchecked version of the same idea.
 
 Use `Model.query.raw()` to execute raw SQL and get model instances back:
 

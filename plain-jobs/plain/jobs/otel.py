@@ -267,15 +267,14 @@ class WorkerMetrics:
         queues = active.worker.queues
         # A grouped aggregate is a written query: the ready-to-run queryset
         # goes in as the subquery it already is.
+        ready = JobRequest.query.ready_to_run()
         rows = JobRequest.query.sql(
-            """
+            t"""
             SELECT ready.queue AS queue, min(ready.created_at) AS "oldest?"
             FROM {ready} ready
             WHERE ready.queue = ANY({queues})
             GROUP BY 1
             """,
-            ready=JobRequest.query.ready_to_run(),
-            queues=queues,
             result_type=_QueueOldest,
         )
         now = timezone.now()
@@ -349,14 +348,12 @@ def _count_per_queue(queryset: Any, queues: list[str]) -> list[Observation]:
     # alike -- so it goes into the written statement as the subquery it
     # already is, and the grouping is written out.
     rows = queryset.model.query.sql(
-        """
+        t"""
         SELECT rows.queue AS queue, count(*) AS "n!"
         FROM {queryset} rows
         WHERE rows.queue = ANY({queues})
         GROUP BY 1
         """,
-        queryset=queryset,
-        queues=queues,
         result_type=_QueueCount,
     )
     counts = {row.queue: row.n for row in rows}

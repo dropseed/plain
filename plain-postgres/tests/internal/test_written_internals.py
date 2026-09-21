@@ -1,9 +1,10 @@
 """What `sql()` learns on a statement's first execution, and keeps.
 
 The user-visible contract is in tests/public/test_written_sql.py. This pins the
-machinery underneath it: the plan cache keyed on the result columns, the
-batched catalog lookup that attaches converters, the row limits `first()` and
-`get()` push into the statement, and the query span.
+machinery underneath it: how a `Template` is walked into SQL and parameters,
+the plan cache keyed on the result columns, the batched catalog lookup that
+attaches converters, the row limits `first()` and `get()` push into the
+statement, and the query span.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from dataclasses import dataclass
 
 import pytest
 from app.examples.models.encrypted import SecretStore
-from app.examples.models.relationships import Widget
+from app.examples.models.relationships import Tag, Widget
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 from plain.postgres import written
@@ -47,11 +48,70 @@ def _catalog_queries(queries: list[dict]) -> list[str]:
     return [query["sql"] for query in queries if "pg_attribute" in query["sql"]]
 
 
+# ---------------------------------------------------------------------------
+# The template walk
+# ---------------------------------------------------------------------------
+
+
+def test_the_template_walk_alternates_text_and_interpolations(db):
+    """`strings` has one more entry than `interpolations`, and both land."""
+    size = "small"
+    rendered = written._render(
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}"
+    )
+    table = Widget.model_options.db_table
+    assert rendered.sql.startswith("SELECT ")
+    assert f'"{table}"."size" = %s' in rendered.sql
+    assert rendered.params == ("small",)
+
+
+def test_a_nested_template_renders_into_the_same_statement(db):
+    """A nested `Template` is inlined, and its parameters merge in order."""
+    first = "small"
+    second = "large"
+    inner = t"{Widget.size} = {first}"
+    rendered = written._render(
+        t"SELECT {Widget:*} FROM {Widget} WHERE {inner} OR {Widget.size} = {second}"
+    )
+    table = Widget.model_options.db_table
+    assert rendered.sql.count(f'"{table}"."size" = %s') == 2
+    assert rendered.params == ("small", "large")
+    # The nesting is flattened -- one statement, one star expansion.
+    assert len(rendered.stars) == 1
+
+
+def test_a_star_records_the_model_columns_in_declared_order(db):
+    rendered = written._render(t"SELECT {Widget:*} FROM {Widget}")
+    (star,) = rendered.stars
+    assert star.model is Widget
+    assert star.columns == tuple(field.column for field in Widget._model_meta.fields)
+
+
+def test_two_stars_are_two_expansions(db):
+    rendered = written._render(t"SELECT {Widget:*}, {Tag:*} FROM {Widget}, {Tag}")
+    assert [star.model for star in rendered.stars] == [Widget, Tag]
+
+
+def test_author_text_is_percent_doubled_only_for_binding(db):
+    """psycopg parses `%s` in the text it is handed; `.sql` shows it as written."""
+    pattern = "small"
+    rendered = written._render(
+        t"SELECT 1 FROM {Widget} WHERE {Widget.name} LIKE {pattern} || '%'"
+    )
+    assert rendered.sql.endswith("|| '%'")
+    assert rendered.bind_sql.endswith("|| '%%'")
+
+
+# ---------------------------------------------------------------------------
+# The plan
+# ---------------------------------------------------------------------------
+
+
 def test_the_plan_is_built_once_per_result_shape(db, capture_queries):
     def run() -> None:
+        size = "small"
         Widget.query.sql(
-            "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
-            size="small",
+            t"SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
             result_type=NameRow,
         ).all()
 
@@ -76,10 +136,10 @@ def test_a_different_result_shape_gets_its_own_plan(db):
         size: str
 
     Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+        t"SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
     Widget.query.sql(
-        "SELECT {Widget.size} AS size FROM {Widget}", result_type=SizeRow
+        t"SELECT {Widget.size} AS size FROM {Widget}", result_type=SizeRow
     ).all()
 
     assert len(_plans()) == 2
@@ -94,7 +154,7 @@ def test_a_per_call_result_type_does_not_grow_the_cache(db):
             name: str
 
         Widget.query.sql(
-            "SELECT {Widget.name} AS name FROM {Widget}", result_type=Row
+            t"SELECT {Widget.name} AS name FROM {Widget}", result_type=Row
         ).all()
 
     for _ in range(3):
@@ -115,7 +175,7 @@ def test_the_catalog_lookup_is_one_query_for_every_column(db, capture_queries):
 
     with capture_queries() as queries:
         SecretStore.query.sql(
-            """
+            t"""
             SELECT {SecretStore.name} AS name,
                    {SecretStore.api_key} AS api_key,
                    {SecretStore.notes} AS notes,
@@ -137,7 +197,7 @@ def test_converters_are_attached_to_the_columns_that_have_a_field(db):
         api_key: str
 
     SecretStore.query.sql(
-        """
+        t"""
         SELECT {SecretStore.name} AS name, {SecretStore.api_key} AS api_key
         FROM {SecretStore}
         """,
@@ -160,7 +220,7 @@ def test_an_expression_column_resolves_to_no_field(db):
         shouted: str
 
     Widget.query.sql(
-        "SELECT upper({Widget.name}) AS shouted FROM {Widget}",
+        t"SELECT upper({Widget.name}) AS shouted FROM {Widget}",
         result_type=UpperRow,
     ).all()
 
@@ -173,7 +233,7 @@ def test_first_and_get_push_a_limit_into_the_statement(db, capture_queries):
         Widget.query.create(name=f"w{index}", size="small")
 
     statement = Widget.query.sql(
-        "SELECT {Widget.*} FROM {Widget} ORDER BY {Widget.name}"
+        t"SELECT {Widget:*} FROM {Widget} ORDER BY {Widget.name}"
     )
     with capture_queries() as queries:
         assert statement.first() is not None
@@ -181,8 +241,9 @@ def test_first_and_get_push_a_limit_into_the_statement(db, capture_queries):
     limited = [query["sql"] for query in queries if "LIMIT 1" in query["sql"]]
     assert limited, "first() should have asked for one row"
 
+    name = "w0"
     one = Widget.query.sql(
-        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.name} = {name}", name="w0"
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = {name}"
     )
     with capture_queries() as queries:
         one.get()
@@ -191,7 +252,7 @@ def test_first_and_get_push_a_limit_into_the_statement(db, capture_queries):
 
 def test_count_and_exists_are_memoised(db, capture_queries):
     Widget.query.create(name="one", size="small")
-    statement = Widget.query.sql("SELECT {Widget.*} FROM {Widget}")
+    statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
 
     with capture_queries() as queries:
         assert statement.count() == 1
@@ -203,7 +264,7 @@ def test_count_and_exists_are_memoised(db, capture_queries):
     assert not [query["sql"] for query in queries if "EXISTS" in query["sql"]]
 
     # exists() on its own memoises too.
-    fresh = Widget.query.sql("SELECT {Widget.*} FROM {Widget}")
+    fresh = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
     with capture_queries() as queries:
         assert fresh.exists() is True
         assert fresh.exists() is True
@@ -211,14 +272,14 @@ def test_count_and_exists_are_memoised(db, capture_queries):
 
 
 def test_a_write_is_never_wrapped_for_counting(db, capture_queries):
+    name = "one"
+    size = "small"
     statement = Widget.query.sql(
-        """
+        t"""
         INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
         VALUES ({name}, {size})
-        RETURNING {Widget.*}
-        """,
-        name="one",
-        size="small",
+        RETURNING {Widget:*}
+        """
     )
     with capture_queries() as queries:
         assert statement.count() == 1
@@ -234,8 +295,9 @@ def test_a_statement_opens_a_client_span_with_the_sql_as_written(
     Widget.query.create(name="one", size="small")
     otel_spans.clear()
 
+    size = "small"
     statement = Widget.query.sql(
-        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {size}", size="small"
+        t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}"
     )
     statement.all()
 
@@ -255,7 +317,7 @@ def test_the_catalog_lookup_is_not_traced(db, otel_spans: InMemorySpanExporter):
     otel_spans.clear()
 
     Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+        t"SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
 
     traced = [
@@ -269,14 +331,14 @@ def test_the_catalog_lookup_is_not_traced(db, otel_spans: InMemorySpanExporter):
 
 def test_the_catalog_cache_is_per_connection(db):
     Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+        t"SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
     assert get_connection() in written._catalog_cache
 
 
 def test_the_plan_cache_hangs_off_the_connection(db):
     Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+        t"SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
     ).all()
     assert get_connection() in written._plans
 
@@ -296,9 +358,9 @@ def test_a_written_statement_is_never_prepared(db):
     connection.connection.prepare_threshold = 0
     try:
         for _ in range(3):
+            size = "small"
             Widget.query.sql(
-                "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
-                size="small",
+                t"SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
                 result_type=NameRow,
             ).all()
 
