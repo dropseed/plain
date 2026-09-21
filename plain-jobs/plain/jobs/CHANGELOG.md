@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.57.5](https://github.com/dropseed/plain/releases/plain-jobs@0.57.5) (2026-09-21)
+
+### What's changed
+
+- The worker, queryset, admin, chores, CLI and gauge queries use typed `where()` conditions; SQL is unchanged. `JobResultQuerySet.retryable()` compares `retry_attempt` against the `retries` column with the new typed column comparison. Job-process uuids are parsed with `uuid.UUID(...)` before the typed lookup ([d87b0e7580](https://github.com/dropseed/plain/commit/d87b0e7580)) ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
 ## [0.57.4](https://github.com/dropseed/plain/releases/plain-jobs@0.57.4) (2026-09-20)
 
 ### What's changed
