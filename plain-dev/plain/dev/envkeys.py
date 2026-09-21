@@ -68,7 +68,7 @@ def is_valid_env_key(env_key: str) -> bool:
 
     try:
         Fernet(env_key.encode("ascii"))
-    except (ValueError, UnicodeEncodeError):
+    except ValueError, UnicodeEncodeError:
         return False
     return True
 

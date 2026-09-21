@@ -220,7 +220,7 @@ class Response:
         else:
             try:
                 status_code = int(status_code)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 raise TypeError("HTTP status code must be an integer.")
             if not is_valid_status_code(status_code):
                 raise ValueError(

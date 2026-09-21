@@ -117,7 +117,7 @@ class WebSocketTestConnection:
         """Let asyncio finish closing both ends before the loop goes away."""
         try:
             await asyncio.wait_for(self._writer.wait_closed(), 1)
-        except (TimeoutError, OSError, AttributeError):
+        except TimeoutError, OSError, AttributeError:
             pass
         await asyncio.sleep(0)
 
@@ -185,7 +185,7 @@ class WebSocketTestConnection:
         try:
             self._step(self._writer.drain(), timeout)
             self._step(asyncio.shield(self._server_task), timeout)
-        except (TimeoutError, OSError):
+        except TimeoutError, OSError:
             # A view that never reads the socket does not see the CLOSE;
             # stop it the way a worker shutdown would.
             self._server_task.cancel()

@@ -122,7 +122,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             self.instance._prefetched_objects_cache.pop(
                 self.field.remote_field.get_cache_name()
             )
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             pass  # nothing to clear from cache
 
     def get_queryset(self) -> QS:
@@ -137,7 +137,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             return self.instance._prefetched_objects_cache[
                 self.field.remote_field.get_cache_name()
             ]
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 
@@ -393,13 +393,13 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
     def _remove_prefetched_objects(self) -> None:
         try:
             self.instance._prefetched_objects_cache.pop(self.prefetch_cache_name)
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             pass  # nothing to clear from cache
 
     def get_queryset(self) -> QS:
         try:
             return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 

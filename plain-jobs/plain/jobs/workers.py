@@ -294,7 +294,7 @@ class Worker:
                     partial(future_finished_callback, job_process_uuid)
                 )
                 future.add_done_callback(self._discard_inflight)
-            except (BrokenProcessPool, RuntimeError):
+            except BrokenProcessPool, RuntimeError:
                 # BrokenProcessPool: child OOM, segfault, or other crash.
                 # RuntimeError: executor already shut down (shutdown race).
                 # Either way, the job was already converted from JobRequest
@@ -546,7 +546,7 @@ class Worker:
 
         try:
             num_proccesses = len(self.executor._processes)
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             # Depending on shutdown timing and internal behavior, this might not work
             num_proccesses = 0
 

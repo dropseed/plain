@@ -272,7 +272,7 @@ class IntegerField(NumericField):
         # Strip trailing decimal and zeros.
         try:
             value = int(self.re_decimal.sub("", str(value)))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             raise ValidationError(self.error_messages["invalid"], code="invalid")
         return value
 
@@ -292,7 +292,7 @@ class FloatField(NumericField):
             return None
         try:
             value = float(value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             raise ValidationError(self.error_messages["invalid"], code="invalid")
         return value
 
@@ -429,7 +429,7 @@ class BaseTemporalField(Field):
         for format in self.input_formats:
             try:
                 return self.strptime(value, format)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 continue
         raise ValidationError(self.error_messages["invalid"], code="invalid")
 
@@ -1025,7 +1025,7 @@ class TypedChoiceField(ChoiceField):
             return self.empty_value
         try:
             value = self.coerce(value)
-        except (ValueError, TypeError, ValidationError):
+        except ValueError, TypeError, ValidationError:
             raise ValidationError(
                 self.error_messages["invalid_choice"],
                 code="invalid_choice",

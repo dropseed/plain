@@ -125,7 +125,7 @@ class MCPResource(ABC):
             cls._uri_pattern = _compile_uri_template(cls.uri_template)
             try:
                 cls._init_hints = get_type_hints(cls.__init__)
-            except (NameError, TypeError):
+            except NameError, TypeError:
                 # Unresolvable forward refs: skip coercion, pass raw strings.
                 cls._init_hints = {}
 

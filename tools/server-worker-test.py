@@ -89,7 +89,7 @@ def recv_close_response(s: socket.socket) -> bytes:
     try:
         while chunk := s.recv(4096):
             chunks.append(chunk)
-    except (TimeoutError, OSError):
+    except TimeoutError, OSError:
         pass
     return b"".join(chunks)
 
@@ -224,7 +224,7 @@ def test_thread_pool_exhaustion(
             fast.sendall(CLOSE_GET)
             resp = recv_close_response(fast)
             status = parse_status(resp)
-        except (TimeoutError, OSError):
+        except TimeoutError, OSError:
             status = 0
         finally:
             fast.close()
@@ -456,7 +456,7 @@ def test_slow_drip_body_408(addr: tuple[str, int]) -> bool | tuple[bool, str]:
         while time.time() < deadline:
             try:
                 s.send(b"x")
-            except (BlockingIOError, OSError):
+            except BlockingIOError, OSError:
                 pass
             time.sleep(0.4)
             try:
@@ -467,7 +467,7 @@ def test_slow_drip_body_408(addr: tuple[str, int]) -> bool | tuple[bool, str]:
                         break
                 else:
                     break
-            except (BlockingIOError, TimeoutError):
+            except BlockingIOError, TimeoutError:
                 continue
             except OSError:
                 break
@@ -575,7 +575,7 @@ def test_keepalive_timeout(
             if data == b"":
                 return True  # Server closed
             return False, f"Expected EOF, got {len(data)} bytes"
-        except (ConnectionResetError, BrokenPipeError):
+        except ConnectionResetError, BrokenPipeError:
             return True  # Server forcibly closed
         except TimeoutError:
             return False, "Connection still open after keepalive timeout"

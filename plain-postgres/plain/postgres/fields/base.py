@@ -1176,7 +1176,7 @@ class ChoicesField[T](DefaultableField[T]):
         for choices_group in self.choices:
             try:
                 group_name, group_choices = choices_group
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 # Containing non-pairs
                 break
             try:
@@ -1196,7 +1196,7 @@ class ChoicesField[T](DefaultableField[T]):
                             ),
                         ]
                     )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 # No groups, choices in the form [value, display]
                 value, human_name = group_name, group_choices
                 if not self._choices_is_value(value) or not self._choices_is_value(

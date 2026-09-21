@@ -28,7 +28,7 @@ def build_input_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     sig = inspect.signature(fn)
     try:
         hints = get_type_hints(fn)
-    except (NameError, TypeError):
+    except NameError, TypeError:
         # Unresolvable forward refs or un-inspectable signatures: fall back to
         # no hints so every param defaults to the permissive empty schema —
         # never a strict type we'd then wrongly reject valid arguments against.

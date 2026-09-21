@@ -30,7 +30,7 @@ def pluralize_filter(value: Any, singular: str = "", plural: str = "s") -> str:
     """
     try:
         count = int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return singular
 
     if count == 1:

@@ -212,7 +212,7 @@ def analyze_file(file_path: Path) -> FileStats | None:
         )
         return stats
 
-    except (SyntaxError, UnicodeDecodeError):
+    except SyntaxError, UnicodeDecodeError:
         return None
 
 

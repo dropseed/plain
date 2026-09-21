@@ -38,7 +38,7 @@ def make_model_tuple(model: Any) -> tuple[str, str]:
             )
         assert len(model_tuple) == 2
         return model_tuple
-    except (ValueError, AssertionError):
+    except ValueError, AssertionError:
         raise ValueError(
             f"Invalid model reference '{model}'. String model references "
             "must be of the form 'package_label.ModelName'."

@@ -245,14 +245,14 @@ class AdminModelListView(AdminListView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except (FieldDoesNotExist, ObjectDoesNotExist):
+                except FieldDoesNotExist, ObjectDoesNotExist:
                     # ObjectDoesNotExist: get_field_display can refresh a
                     # deferred field, racing a concurrent delete — fall back
                     # to the raw value.
                     pass
 
             return value
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return get_model_field(obj, field)
 
 
@@ -298,14 +298,14 @@ class AdminModelDetailView(AdminDetailView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except (FieldDoesNotExist, ObjectDoesNotExist):
+                except FieldDoesNotExist, ObjectDoesNotExist:
                     # ObjectDoesNotExist: get_field_display can refresh a
                     # deferred field, racing a concurrent delete — fall back
                     # to the raw value.
                     pass
 
             return value
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return get_model_field(obj, field)
 
     def get_object(self) -> postgres.Model:

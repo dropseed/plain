@@ -146,7 +146,7 @@ class BaseHandler:
                 span_attributes[server_attributes.SERVER_PORT] = int(
                     request.server_port
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
 
         if client_ip := request.client_ip:

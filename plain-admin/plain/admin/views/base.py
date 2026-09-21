@@ -242,7 +242,7 @@ class AdminView(AuthView, TemplateView):
             field_obj = obj._model_meta.get_field(field)
             field_type = type(field_obj).__name__
             templates.append(f"admin/values/{field_type}.html")
-        except (AttributeError, FieldDoesNotExist):
+        except AttributeError, FieldDoesNotExist:
             # Not a model instance, or not a database field on it.
             pass
 

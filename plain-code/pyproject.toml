@@ -5,7 +5,7 @@ description = "Preconfigured code formatting and linting."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "plain>=0.155.0,<1.0.0",
   # Bounded so every checkout and every app lints with the same rule set —

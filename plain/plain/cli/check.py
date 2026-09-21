@@ -70,7 +70,7 @@ def check_preflight() -> None:
             for issue in check["issues"]
             if issue["warning"]
         )
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError, KeyError:
         warning_count = 0
 
     if warning_count:

@@ -514,7 +514,7 @@ def _make_execute_code(*, writable: bool = False):
                         if json_output:
                             try:
                                 return_value = json.dumps(result)
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 return_value = repr(result)
                         else:
                             return_value = repr(result)

@@ -28,7 +28,7 @@ def _get_cgroup_dir() -> str:
                 ):
                     cgroup_dir = f"/sys/fs/cgroup{parts[2]}"
                     break
-    except (FileNotFoundError, IndexError, OSError):
+    except FileNotFoundError, IndexError, OSError:
         pass
     return cgroup_dir
 
@@ -44,7 +44,7 @@ def get_rss_bytes() -> int:
             with open("/proc/self/statm") as f:
                 resident_pages = int(f.read().split()[1])
             return resident_pages * os.sysconf("SC_PAGE_SIZE")
-        except (OSError, ValueError, IndexError):
+        except OSError, ValueError, IndexError:
             pass
 
     # macOS / fallback: ru_maxrss is peak, not current
@@ -76,7 +76,7 @@ def get_cpu_count() -> int:
                 period = int(parts[1])
                 cgroup_cpus = max(1, -(-quota // period))  # ceiling division
                 cpu_count = min(cpu_count, cgroup_cpus)
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError, ValueError, OSError:
         pass
 
     # Check cgroup v1 CPU quota (Heroku Cedar, older Docker, etc.)
@@ -88,7 +88,7 @@ def get_cpu_count() -> int:
                 period = int(f.read().strip())
             cgroup_cpus = max(1, -(-quota // period))
             cpu_count = min(cpu_count, cgroup_cpus)
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError, ValueError, OSError:
         pass
 
     return cpu_count
@@ -112,7 +112,7 @@ def get_memory_usage() -> tuple[int, int | None]:
             content = f.read().strip()
             limit = None if content == "max" else int(content)
         return (usage, limit)
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError, ValueError, OSError:
         pass
 
     # cgroup v1
@@ -125,7 +125,7 @@ def get_memory_usage() -> tuple[int, int | None]:
             if limit >= 2**62:
                 limit = None
         return (usage, limit)
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError, ValueError, OSError:
         pass
 
     # Fallback: process RSS (works on macOS and Linux)

@@ -77,7 +77,7 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
 
         try:
             user = User.query.get(data["id"])
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        except TypeError, ValueError, OverflowError, User.DoesNotExist:
             return None
 
         # If the password has changed since the token was generated, the token is invalid.

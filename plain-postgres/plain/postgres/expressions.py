@@ -765,11 +765,11 @@ class CombinedExpression(Expression):
         if not isinstance(self, TemporalSubtraction):
             try:
                 lhs_field = lhs.output_field
-            except (AttributeError, FieldError):
+            except AttributeError, FieldError:
                 lhs_field = None
             try:
                 rhs_field = rhs.output_field
-            except (AttributeError, FieldError):
+            except AttributeError, FieldError:
                 rhs_field = None
             is_temporal = isinstance(
                 lhs_field, fields.DateField | fields.DateTimeField | fields.TimeField

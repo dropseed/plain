@@ -393,7 +393,7 @@ class WebSocket:
             await self._fail(CLOSE_INVALID_PAYLOAD, "Invalid UTF-8")
         except ProtocolError as exc:
             await self._fail(CLOSE_PROTOCOL_ERROR, str(exc))
-        except (IncompleteFrame, OSError):
+        except IncompleteFrame, OSError:
             # The peer went away without a CLOSE — an abnormal close
             # (the default code) from our side, and a perfectly normal
             # ending for the view. The finally records it.

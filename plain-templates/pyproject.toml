@@ -5,7 +5,7 @@ description = "Render HTML templates using Jinja2."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = ["plain>=0.160.0,<1.0.0", "jinja2>=3.1.2"]
 
 [dependency-groups]

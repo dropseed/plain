@@ -23,7 +23,7 @@ for pkg_dir in plain-*/; do
 
   echo "Checking $pkg (as $mod)"
 
-  if ! uv run --isolated --no-project --quiet --python 3.13 \
+  if ! uv run --isolated --no-project --quiet --python 3.14 \
       --with-editable "./plain" --with-editable "./$pkg" \
       python -c "
 import importlib, importlib.util, sys

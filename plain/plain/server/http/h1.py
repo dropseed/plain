@@ -148,7 +148,7 @@ async def _linger_discard(worker: Worker, conn: Connection) -> None:
                 conn.recv(65536),
                 timeout=min(remaining, _recv_timeout(worker)),
             )
-        except (TimeoutError, OSError):
+        except TimeoutError, OSError:
             break
         if not data:
             break
@@ -778,7 +778,7 @@ async def handle_connection(worker: Worker, conn: Connection) -> None:
             # read deadline (see _recv_timeout).
             try:
                 header_data, body_start = await async_read_headers(worker, conn)
-            except (TimeoutError, OSError):
+            except TimeoutError, OSError:
                 break
             except LimitRequestHeaders as e:
                 await async_handle_error(worker, None, conn, e)

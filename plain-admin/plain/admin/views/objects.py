@@ -297,7 +297,7 @@ class AdminCreateView(AdminView, CreateView):
     template_name = None
     nav_section = None
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if list_url := self.get_list_url():
             return list_url
 
@@ -359,7 +359,7 @@ class AdminUpdateView(AdminView, UpdateView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if detail_url := self.get_detail_url(self.object):
             return detail_url
 
@@ -390,7 +390,7 @@ class AdminDeleteView(AdminView, DeleteView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if list_url := self.get_list_url():
             return list_url
 

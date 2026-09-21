@@ -100,7 +100,7 @@ def _sanitize_address(addr: str | tuple[str, str], encoding: str) -> str:
         addr = force_str(addr)
         try:
             token, rest = headerregistry_parser.get_mailbox(addr)
-        except (HeaderParseError, ValueError, IndexError):
+        except HeaderParseError, ValueError, IndexError:
             raise ValueError(f'Invalid address "{addr}"')
         else:
             if rest:

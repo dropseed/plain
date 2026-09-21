@@ -25,11 +25,10 @@ jobs:
     strategy:
       # Test the floor (16, the minimum we enforce) and the latest Postgres,
       # since our introspection/health checks lean heavily on system catalogs
-      # that drift across major versions.
+      # that drift across major versions. Python is pinned to our floor
+      # (3.14) for every combination.
       matrix:
         include:
-          - python-version: "3.13"
-            postgres-image: "postgres:16"
           - python-version: "3.14"
             postgres-image: "postgres:16"
           - python-version: "3.14"

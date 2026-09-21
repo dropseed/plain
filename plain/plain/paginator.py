@@ -54,7 +54,7 @@ class Paginator:
             if isinstance(number, float) and not number.is_integer():
                 raise ValueError
             number = int(number)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise PageNotAnInteger("That page number is not an integer")
         if number < 1:
             raise EmptyPage("That page number is less than 1")

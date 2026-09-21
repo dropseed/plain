@@ -95,7 +95,7 @@ Templates are Jinja:
 
 Python where you want it, JS where you need it.
 
-- **Python:** 3.13+
+- **Python:** 3.14+
 - **Database:** Postgres
 - **Templates:** Jinja2
 - **Frontend:** htmx, Tailwind CSS

@@ -156,7 +156,7 @@ def leaks(duration: int, pid: int | None) -> None:
         try:
             results.append(json.loads(output_path.read_text()))
             output_path.unlink()
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError, json.JSONDecodeError:
             pass
 
     if not results:
@@ -252,7 +252,7 @@ def _signal_arbiter(arbiter_pid: int) -> None:
     """Send SIGUSR1 to the arbiter, with a clean error if it's gone."""
     try:
         os.kill(arbiter_pid, signal.SIGUSR1)
-    except (ProcessLookupError, PermissionError):
+    except ProcessLookupError, PermissionError:
         click.secho(
             f"Server (pid {arbiter_pid}) is no longer running.",
             fg="red",
@@ -297,7 +297,7 @@ def _find_arbiter_pid() -> int | None:
             )
             return None
         return arbiters[0] if arbiters else None
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
 
 
@@ -328,5 +328,5 @@ def _get_worker_pids(arbiter_pid: int) -> list[int]:
             except OSError:
                 pass
         return pids
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return []
