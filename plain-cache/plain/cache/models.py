@@ -20,19 +20,18 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
         reads as absent. (Contrast `unexpired()`, which matches only rows with a
         *future* expiry.)
         """
-        return self.filter(
-            postgres.Q(expires_at__isnull=True)
-            | postgres.Q(expires_at__gte=timezone.now())
+        return self.where(
+            CachedItem.expires_at.is_null() | CachedItem.expires_at.gte(timezone.now())
         )
 
     def expired(self) -> Self:
-        return self.filter(expires_at__lt=timezone.now())
+        return self.where(CachedItem.expires_at.lt(timezone.now()))
 
     def unexpired(self) -> Self:
-        return self.filter(expires_at__gte=timezone.now())
+        return self.where(CachedItem.expires_at.gte(timezone.now()))
 
     def forever(self) -> Self:
-        return self.filter(expires_at=None)
+        return self.where(CachedItem.expires_at.is_null())
 
 
 @postgres.register_model

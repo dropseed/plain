@@ -64,9 +64,10 @@ class SessionStore(MutableMapping):
 
     def _get_new_session_key(self) -> str:
         "Return session key that isn't being used."
+        model = self._model
         while True:
             session_key = get_random_string(32, string.ascii_lowercase + string.digits)
-            if not self._model.query.filter(session_key=session_key).exists():
+            if not model.query.where(model.session_key.equals(session_key)).exists():
                 return session_key
 
     def _get_session_data(self, no_load: bool = False) -> dict:
@@ -89,9 +90,13 @@ class SessionStore(MutableMapping):
             return self._session_cache
 
         try:
-            session = self._model.query.get(
-                session_key=self.session_key, expires_at__gt=timezone.now()
-            )
+            # Condition order mirrors what `filter(**kwargs)` emitted: it sorts
+            # its kwargs, `where()` keeps the order written.
+            model = self._model
+            session = model.query.where(
+                model.expires_at.gt(timezone.now()),
+                model.session_key.equals(self.session_key),
+            ).get()
             self._session_instance = session
             self._session_cache = session.session_data
             return self._session_cache
@@ -143,7 +148,8 @@ class SessionStore(MutableMapping):
         self._session_cache = data
         if key:
             try:
-                self._model.query.get(session_key=key).delete()
+                model = self._model
+                model.query.where(model.session_key.equals(key)).get().delete()
             except self._model.DoesNotExist:
                 pass
 

@@ -76,7 +76,8 @@ class Cache:
 
     def get(self, key: str, default: Any = None) -> Any:
         """Return the value for `key`, or `default` if it's absent or expired."""
-        item = self._model.query.live().filter(key=key).first()
+        model = self._model
+        item = model.query.live().where(model.key.equals(key)).first()
         return item.value if item is not None else default
 
     def get_many(self, keys: Iterable[str]) -> dict[str, Any]:
@@ -84,7 +85,8 @@ class Cache:
 
         Missing/expired keys are omitted. One query regardless of how many keys.
         """
-        items = self._model.query.live().filter(key__in=list(keys))
+        model = self._model
+        items = model.query.live().where(model.key.is_in(list(keys)))
         return {item.key: item.value for item in items}
 
     # Writing -----------------------------------------------------------------
@@ -142,7 +144,8 @@ class Cache:
         invoked on a miss (so a callable can't be cached *as* the value). A
         stored `None` counts as a hit (it won't recompute).
         """
-        item = self._model.query.live().filter(key=key).first()
+        model = self._model
+        item = model.query.live().where(model.key.equals(key)).first()
         if item is not None:
             return item.value
 
@@ -243,9 +246,10 @@ class Cache:
         # so updated_at's update_now won't bump on its own -- stamp it by hand.
         # (set_many() relies on pre_save instead, since bulk_upsert does fire it.)
         now = timezone.now()
+        model = self._model
         updated = (
-            self._model.query.live()
-            .filter(key=key)
+            model.query.live()
+            .where(model.key.equals(key))
             .update(expires_at=_coerce_expiration(expiration, now=now), updated_at=now)
         )
         return updated > 0
@@ -254,11 +258,13 @@ class Cache:
 
     def delete(self, key: str) -> bool:
         """Delete `key`. Returns `True` if it existed, `False` otherwise."""
-        return self._model.query.filter(key=key).delete() > 0
+        model = self._model
+        return model.query.where(model.key.equals(key)).delete() > 0
 
     def delete_many(self, keys: Iterable[str]) -> int:
         """Delete every key in `keys`. Returns the number of rows deleted."""
-        return self._model.query.filter(key__in=list(keys)).delete()
+        model = self._model
+        return model.query.where(model.key.is_in(list(keys))).delete()
 
     def clear(self) -> int:
         """Delete every entry in the cache. Returns the number of rows deleted."""

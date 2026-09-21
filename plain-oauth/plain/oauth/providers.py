@@ -163,6 +163,9 @@ class OAuthProvider(ABC):
         # Scope to the requesting user so one user can't disconnect another
         # user's connection by supplying their provider_user_id.
         user = get_request_user(request)
+        # Stays on the string form: `user` is a string-ref FK
+        # (`ForeignKeyField("users.User")`), so it has no typed condition, and
+        # half-converting would leave a mixed where()/filter() chain.
         connection = OAuthConnection.query.get(
             user=user,
             provider_key=self.provider_key,
