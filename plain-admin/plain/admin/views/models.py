@@ -151,11 +151,7 @@ class AdminModelListView(AdminListView):
                 coerced = pk_field.to_python(raw_id)
             except ValidationError:
                 continue
-            # to_python is typed `int | None` but only returns None for a None
-            # input, which form data can't produce -- this narrows the type,
-            # it doesn't drop anything.
-            if coerced is not None:
-                valid_ids.append(coerced)
+            valid_ids.append(coerced)
         return objects.where(pk_field.is_in(valid_ids))
 
     def order_objects(
