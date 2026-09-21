@@ -2141,11 +2141,11 @@ class QuerySet[T: "Model"]:
             ):
                 raise TypeError("select(result_type=...) requires a dataclass.")
             dataclass_type = result_type
-            _check_result_type_matches(dataclass_type, items)
+            _check_result_type_matches(dataclass_type, items, self.model)
 
         for item in items:
             self._check_column_model(item)
-        columns = [_selectable_to_column(item) for item in items]
+        columns = [_selectable_to_column(item, self.model) for item in items]
 
         clone = self._values_list(tuple(columns), flat=flat)
         clone.__class__ = RowQuerySet
@@ -2729,11 +2729,16 @@ class QuerySet[T: "Model"]:
             )
 
 
-# Why traversal is out: a column reached through a relation comes back over a
-# join, so a nullable relation yields None where the traversed field's type says
-# it can't. `Post.author.id` has the same problem as `Post.author.profile.city`
-# — the FK column is NULL when the row has no author — so both are refused
-# until select() can express that, and values_list() remains the way to spell it.
+# Why deeper traversal is out: a column reached through a relation comes back
+# over a join, so a nullable relation yields None where the traversed field's
+# type says it can't. `Post.author.profile.city` is a string typed `str` that
+# arrives as None for an authorless post, and select() has no way to say so.
+#
+# A foreign key's own key column is the exception: `Post.author.id` is
+# `"post"."author_id"`, a local column of the table being selected, read with
+# no join at all. Its nullability is the foreign key's own `allow_null`, which
+# is the same promise every other local column makes. See
+# `_local_foreign_key()`.
 _NO_TRAVERSAL_IN_SELECT = (
     "a column reached through a relation is nullable in a way its type doesn't "
     "say, so select() refuses it for now. Use values_list() with the lookup "
@@ -2741,12 +2746,46 @@ _NO_TRAVERSAL_IN_SELECT = (
 )
 
 
-def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
+def _local_foreign_key(model: type[Model], item: Field[Any]) -> Field[Any] | None:
+    """The foreign key whose own key column `item` names, or None.
+
+    `Grant.process.id` traverses one hop and lands on the related model's
+    primary key -- exactly the value the foreign key stores locally, in
+    `"grant"."process_id"`. So it is read off the selecting table with no join,
+    and its nullability is the foreign key's own `allow_null`.
+
+    Everything else really does need the join and stays refused: a deeper path
+    (`Grant.process.owner.id`), a non-key column (`Grant.process.name`), or a
+    hop that isn't a forward foreign key (a many-to-many).
+    """
+    # Local import: fields.related imports this module at load time (circular).
+    from plain.postgres.fields.related import ForeignKeyField
+
+    if not item.is_lookup_reference:
+        return None
+    relation_name, _, leaf_name = item.name.partition(LOOKUP_SEP)
+    if not leaf_name or LOOKUP_SEP in leaf_name:
+        # No hop at all, or more than one.
+        return None
+    try:
+        relation = model._model_meta.get_forward_field(relation_name)
+    except FieldDoesNotExist:
+        return None
+    if not isinstance(relation, ForeignKeyField):
+        return None
+    if leaf_name != relation.target_field.name:
+        return None
+    return relation
+
+
+def _selectable_to_column(
+    item: Selectable[Any], model: type[Model]
+) -> str | ResolvableExpression:
     """Turn a select() argument into something the values_list plumbing accepts.
 
     A field becomes its column name; an expression is passed through (the
-    plumbing auto-aliases it). Strings and FK traversal get their own error so
-    the message points at the real fix.
+    plumbing auto-aliases it). Strings and relation traversal get their own
+    error so the message points at the real fix.
     """
     # Local import: these pull in fields.related, which imports this module at
     # load time (circular).
@@ -2758,12 +2797,21 @@ def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
             f"select() takes typed column references like User.email, not "
             f"strings. Got {item!r}."
         )
-    if isinstance(item, RelatedFieldRef | ForwardForeignKeyDescriptor):
-        # The relation itself (`Post.author`) or an intermediate hop. Its key
-        # column is `Post.author.id`, which is refused for the same reason.
+    if isinstance(item, ForwardForeignKeyDescriptor):
+        # The relation itself (`Post.author`). Its key column *is* selectable,
+        # so the message names that spelling.
+        relation = item._field
         raise TypeError(
-            "select() takes columns, not relations, and a relation's key "
-            "column is not selectable yet either — " + _NO_TRAVERSAL_IN_SELECT
+            f"select() takes columns, not relations. Select the key column "
+            f"instead -- {relation.model.__name__}.{relation.name}."
+            f"{relation.target_field.name}."
+        )
+    if isinstance(item, RelatedFieldRef):
+        # An intermediate hop (`Post.author.organization`). Its key column
+        # lives on the related table, so it only arrives over a join.
+        raise TypeError(
+            "select() takes columns, not relations, and this relation's key "
+            "column arrives over a join — " + _NO_TRAVERSAL_IN_SELECT
         )
     if isinstance(item, Field):
         if not item.name:
@@ -2776,6 +2824,11 @@ def _selectable_to_column(item: Selectable[Any]) -> str | ResolvableExpression:
                 f"name or column yet -- read it off the model that mixes it "
                 f"in instead."
             )
+        if relation := _local_foreign_key(model, item):
+            # The foreign key's own column. Naming the relation is what
+            # `values_list("author")` does, and it compiles to the same
+            # join-free `"post"."author_id"`.
+            return relation.name
         if item.is_lookup_reference:
             # A traversed leaf: `Field.with_lookup_prefix` hands back the
             # related model's field carrying the relation path as its name.
@@ -2820,13 +2873,19 @@ def _result_type_parameters(
 
 
 def _check_result_type_matches(
-    result_type: type[DataclassInstance], items: tuple[Selectable[Any], ...]
+    result_type: type[DataclassInstance],
+    items: tuple[Selectable[Any], ...],
+    model: type[Model],
 ) -> None:
     """Validate a dataclass result_type against the selected items.
 
     Arity must match the constructor, and each selected field's name must
     equal the parameter at the same position — expressions are anonymous and
     only need the position to line up.
+
+    A foreign key's own key column (`Grant.process.id`) is named by the column
+    it reads, `process_id`, which is both the database column and the name a
+    dataclass field for a raw key wants.
     """
     parameters = _result_type_parameters(result_type)
     if len(parameters) != len(items):
@@ -2836,10 +2895,16 @@ def _check_result_type_matches(
             f"columns were selected."
         )
     for item, parameter in zip(items, parameters, strict=True):
-        if isinstance(item, Field) and item.name != parameter.name:
+        if not isinstance(item, Field):
+            continue
+        if relation := _local_foreign_key(model, item):
+            expected = relation.column
+        else:
+            expected = item.name
+        if expected != parameter.name:
             raise TypeError(
                 f"select(result_type={result_type.__name__}) maps columns "
-                f"positionally: field {item.name!r} does not match dataclass "
+                f"positionally: field {expected!r} does not match dataclass "
                 f"field {parameter.name!r} at the same position."
             )
 

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Never, assert_type
 
 from app.examples.models.defaults import DefaultsExample as D
+from app.examples.models.delete import CircB, Grandchild
 from app.examples.models.relationships import WidgetTag
 from plain.postgres import Field, RowQuerySet, types
 from plain.postgres.expressions import F
@@ -198,6 +199,61 @@ def must_accept_or_keeping_the_row_type() -> None:
     """
     rows = D.query.select(D.name, D.priority)
     assert_type(rows | rows, RowQuerySet[tuple[str, int]])
+
+
+def must_accept_a_foreign_keys_own_key_column() -> None:
+    """One hop ending at the related model's primary key is the foreign key's
+    own column, so it selects like any other local column.
+
+    Runtime half:
+    tests/public/test_select.py::TestSelectForeignKeyColumn.
+    """
+    assert_type(
+        WidgetTag.query.select(WidgetTag.widget.id, flat=True), RowQuerySet[int]
+    )
+    assert_type(
+        WidgetTag.query.select(WidgetTag.widget.id, WidgetTag.tag.id),
+        RowQuerySet[tuple[int, int]],
+    )
+
+
+def must_accept_a_nullable_foreign_keys_key_column_as_plain_int() -> None:
+    """A nullable foreign key's key column types as `int`, not `int | None`.
+
+    This is the one place `select()` is less precise than the row it returns:
+    `CircB.partner` is nullable, so the column really does come back as
+    `None` for an unpartnered row, and the checker cannot say so. Class access
+    on a foreign key resolves to `type[CircA]` whether or not it is nullable
+    (relations_foreign_key.py pins both), because that is what makes traversal
+    work at all -- and from `type[CircA]`, `.id` is `CircA`'s own
+    `Field[int]`. Expressing the difference would need a per-model nullable
+    view of every field, which Python's type system has no way to build.
+
+    So this asserts what the checker *does* say, not what is true of the
+    values. Narrow with `if value is not None` when the foreign key is
+    nullable. Runtime half:
+    test_select.py::TestSelectForeignKeyColumn::test_nullable_key_column_comes_back_as_none.
+    """
+    assert_type(CircB.query.select(CircB.partner.id, flat=True), RowQuerySet[int])
+
+
+def must_accept_refused_traversals_because_the_checker_cannot_see_them() -> None:
+    """Everything past the key column is a runtime refusal, not a type error.
+
+    `WidgetTag.widget.name` is `Field[str]` and
+    `Grandchild.mid_parent.grandparent.id` is `Field[int]` -- the same types
+    a local column of either kind has, with nothing in them to say a join is
+    involved. These lines have to type-check clean; the refusal is
+    `select()`'s runtime check, and its half lives in
+    test_select.py::TestSelectForeignKeyColumn.
+    """
+    assert_type(
+        WidgetTag.query.select(WidgetTag.widget.name, flat=True), RowQuerySet[str]
+    )
+    assert_type(
+        Grandchild.query.select(Grandchild.mid_parent.grandparent.id, flat=True),
+        RowQuerySet[int],
+    )
 
 
 def must_accept_a_column_from_another_model_because_the_checker_cannot_see_it() -> None:
