@@ -1,5 +1,15 @@
 # plain-auth changelog
 
+## [0.29.10](https://github.com/dropseed/plain/releases/plain-auth@0.29.10) (2026-09-21)
+
+### What's changed
+
+- The session user lookup uses a typed `where()` condition; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.29.9](https://github.com/dropseed/plain/releases/plain-auth@0.29.9) (2026-09-20)
 
 ### What's changed
