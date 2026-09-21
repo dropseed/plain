@@ -243,10 +243,11 @@ User.query.where(~User.role.equals("guest"))
 User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
 ```
 
-A comparison can also take another column of the same value type, which is the typed spelling of `filter(retry_attempt__lt=F("retries"))`:
+A comparison can also take another column of the same value type, instead of a value:
 
 ```python
-JobResult.query.where(JobResult.retry_attempt.lt(JobResult.retries))
+# Q(updated_at__gt=F("created_at"))
+Post.query.where(Post.updated_at.gt(Post.created_at))
 ```
 
 `equals`, `not_equal`, `gt`, `gte`, `lt`, and `lte` all accept one. The column has to be the same value type — comparing an `int` column against a `str` one is a type error — and it has to belong to the same model, which `where()` checks on both sides. An `F()` expression works too.
