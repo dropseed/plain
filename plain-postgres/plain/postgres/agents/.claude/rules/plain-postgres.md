@@ -129,6 +129,7 @@ Run `uv run plain docs postgres` for full workflow details.
 Use `Model.query` to build querysets (e.g., `User.query.filter(is_active=True)`).
 
 - `where()` takes typed conditions built off fields (`User.query.where(User.role.equals("admin"))`) instead of `filter()`'s string kwargs, so a typo or wrong value type is caught at the call site.
+- **Lookup by key is `get(pk)`; lookup by condition is `get(Model.f.equals(x))`; `get()` on a built query asserts exactly one row.** `get_or_none()` takes the same three; `first()`/`last()` take conditions but no key. All of it is sugar for `where(...)` plus the terminal, same SQL.
 - `__isnull=False` converts to `is_null(False)` (`"x" IS NOT NULL`), not `~...is_null()` (`NOT ("x" IS NULL)`) — same rows, different SQL.
 - A condition **is** a `Q`, so it goes anywhere a `Q` goes — `When(...)` (including the ones inside a `Case(...)`), `Count("id", filter=...)` — not just `where()`. `Case(...)` itself takes only `When` objects, never a bare condition.
 - `where()` keeps conditions in the order written; `filter()` sorted its kwargs alphabetically. A converted multi-condition `filter()` can emit different WHERE text and parameter order (same rows; already-alphabetical kwargs convert unchanged) — matters for tests pinning SQL and for `pg_stat_statements`, which groups by predicate structure, not literal text.

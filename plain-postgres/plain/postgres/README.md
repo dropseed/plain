@@ -330,6 +330,26 @@ So the strictness lands on the caller. Code holding a string from a CLI argument
 
 **A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
 
+**The terminals take conditions too, and `get()` takes a key.** Looking a row up by its primary key is the most common query there is, and spelling it `where(Model.id.equals(5)).get()` is a long way round, so `get()` has three entry points:
+
+```python
+User.query.get(5)  # by key
+User.query.get(User.email.equals(x))  # by condition
+User.query.where(...).get()  # exactly one row of a built query
+```
+
+The contract never moves: exactly one row, or `DoesNotExist`/`MultipleObjectsReturned`. `get_or_none()` takes the same three entry points and returns `None` instead of raising when nothing matches. `first()` and `last()` take conditions but no key, since `first(5)` would read as "the first 5".
+
+Each one is sugar for `where(...)` plus the terminal, so the SQL is identical — `get(5)`, `where(User.id.equals(5)).get()` and `get(id=5)` all compile to the same statement. Multiple conditions AND together in the order written, exactly as `where()` does.
+
+The key is the key's own type, so a value from a URL segment, session, or CLI argument is parsed first:
+
+```python
+User.query.get(int(raw_id))  # get("5") is a type error, and raises at runtime
+```
+
+Mixing a key with conditions is refused, and so is the key form on a `select()` queryset — a row has no key of its own, and `rows[5]` already means the sixth row.
+
 [Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`. That holds on either side of a comparison: an encrypted column can't be the column another column is compared _against_ either, since that would match plaintext against ciphertext.
 
 ### Selecting columns with select()
@@ -393,7 +413,7 @@ Re-selecting replaces the **column list**, not the joins: an expression that rea
 
 Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfies the model-valued `__get__` overload and class access resolves as `type[Any]` rather than a field. That's the same reason the field-annotation guidance says never to annotate a field `Field[Any]` — use the concrete type, or `Field[object]` when the column really does hold arbitrary JSON, which `select()` types as `object`.
 
-**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows, and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows (`get()` still takes conditions; only its primary key form is refused), and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
 
 `select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
 
