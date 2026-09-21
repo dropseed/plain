@@ -8,48 +8,55 @@ built query drops into a written one as a subquery.
 Everything in a template that isn't SQL is a `{}` reference, and what the
 reference names decides what it renders as:
 
-    {Model}         the table, quoted
-    {Model.field}   the qualified column, "table"."column"
-    {Model.*}       every column of the model; rows become model instances
-    {name}          a value, dispatched on its type (see `_render_value`)
+    {Model}              the table, quoted
+    {Model.field}        the qualified column, "table"."column"
+    {Model.field:name}   just the column, for an INSERT list or an UPDATE SET
+    {Model.*}            every column of the model; rows become model instances
+    {name}               a value, dispatched on its type (see `_render_value`)
 
 Values are never formatted into the SQL — they bind as parameters — so there is
-never an f-string here.
+never an f-string here. `plain preflight` enforces that: templates and fragments
+have to be literals (`postgres.sql_template_not_literal`).
 """
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
 import decimal
-import dis
+import json
 import string
-import sys
 import types
 import typing
 import uuid
 import weakref
 import zoneinfo
-from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Self
 
 import psycopg
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.dialect import adapt_json_value, quote_name
 from plain.postgres.exceptions import FieldDoesNotExist
+from plain.postgres.fields.encrypted import _ENCRYPTED_PREFIX
 from plain.postgres.fields.json import JSONField
 from plain.postgres.fields.timezones import TimeZoneField
-from plain.postgres.otel import suppress_db_tracing
-from plain.postgres.query import QuerySet
+from plain.postgres.otel import db_span, suppress_db_tracing
+from plain.postgres.query import QuerySet, prefetch_objects
 from plain.postgres.registry import models_registry
 from plain.postgres.sql.compiler import apply_converters, get_converters
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from plain.exceptions import ValidationError
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
     from plain.postgres.fields import Field
+    from plain.postgres.query import Prefetch
 
 __all__ = ["Fragment", "Written"]
 
@@ -57,10 +64,10 @@ __all__ = ["Fragment", "Written"]
 class Fragment:
     """SQL text inlined into a written query instead of bound as a parameter.
 
-    This is the only way to put text into a statement that the template
-    doesn't spell out, so it is deliberately narrow: the text must be written
-    as a literal at the construction site. Anything that reaches a `Fragment`
-    from input is an injection, and a literal is the one shape that can't be.
+    This is the only way to put text into a statement that the template doesn't
+    spell out, so it is deliberately narrow: the text is a literal, checked by
+    `plain preflight` the same way a template is. Anything that reaches a
+    fragment from input is an injection.
 
         ACTIVE = Fragment("status = 'active' AND deleted_at IS NULL")
     """
@@ -70,41 +77,10 @@ class Fragment:
     def __init__(self, text: str) -> None:
         if not isinstance(text, str):
             raise TypeError(f"Fragment() takes a string literal, got {type(text)}.")
-        _require_literal_argument()
         self.text = text
 
     def __repr__(self) -> str:
         return f"Fragment({self.text!r})"
-
-
-def _require_literal_argument() -> None:
-    """Refuse a Fragment built from anything but a literal string.
-
-    Read off the construction site's bytecode: a literal argument is loaded
-    with LOAD_CONST, while an f-string, a name, or a concatenation is built by
-    some other instruction right before the call. This catches the mistake
-    where it is made; the lint over `sql()` templates is the systematic
-    version of the same rule.
-    """
-    try:
-        frame = sys._getframe(2)  # 0 = here, 1 = Fragment.__init__, 2 = the call
-    except ValueError:  # pragma: no cover - no caller frame available
-        return
-
-    previous = None
-    for instruction in dis.get_instructions(frame.f_code):
-        if instruction.offset >= frame.f_lasti:
-            break
-        previous = instruction
-
-    if previous is not None and previous.opname != "LOAD_CONST":
-        raise TypeError(
-            "Fragment() takes a string literal written at the call site — "
-            f"{frame.f_code.co_filename}:{frame.f_lineno} builds its argument "
-            "instead. A fragment is inlined into the SQL, so it can never "
-            "come from a variable or an f-string. Pass the value as a "
-            "parameter with {name} instead."
-        )
 
 
 # --------------------------------------------------------------------------
@@ -113,22 +89,49 @@ def _require_literal_argument() -> None:
 
 
 @dataclasses.dataclass(frozen=True)
+class _StarExpansion:
+    """What one `{Model.*}` put into the select list.
+
+    The fields are in declared order and the column names are theirs, which is
+    how the result columns are found again — the expansion decides which
+    positions are the instance, never the catalog.
+    """
+
+    model: type[Model]
+    fields: tuple[Field, ...]
+    columns: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class _Rendered:
     sql: str
+    bind_sql: str
     params: tuple[Any, ...]
-    star_models: tuple[type[Model], ...]
+    stars: tuple[_StarExpansion, ...]
 
 
-def _escape_percent(text: str) -> str:
-    """Double every `%` in author-written text.
+class _Sql:
+    """The statement being rendered, in the two forms it needs.
 
-    psycopg substitutes parameters client-side whenever parameters are passed,
-    so a literal percent (a `LIKE 'a%'`, a `format()` spec) has to arrive
-    doubled. Rendered SQL from an embedded queryset is already escaped by the
-    compiler that produced it, so only text from the template and from
-    fragments goes through here.
+    `bind` is what psycopg is handed: it parses `%s` placeholders whether it
+    binds client- or server-side, so a literal `%` in author text has to arrive
+    doubled. `display` is the same statement as written — what `.sql`, the
+    query span and the logs show.
     """
-    return text.replace("%", "%%")
+
+    def __init__(self) -> None:
+        self.bind: list[str] = []
+        self.display: list[str] = []
+
+    def author(self, text: str) -> None:
+        """Text the author wrote: template literals and fragments."""
+        self.bind.append(text.replace("%", "%%"))
+        self.display.append(text)
+
+    def rendered(self, sql: str, display: str | None = None) -> None:
+        """SQL this module produced: identifiers, placeholders, subqueries."""
+        self.bind.append(sql)
+        self.display.append(sql if display is None else display)
 
 
 def _qualified(table: str, column: str) -> str:
@@ -170,47 +173,73 @@ def _model_field(model: type[Model], field_name: str, reference: str) -> Field:
 
 
 def _render(template: str, values: dict[str, Any]) -> _Rendered:
-    """Turn a template into one SQL string and its positional parameters.
+    """Turn a template into one SQL statement and its positional parameters.
 
-    Everything binds positionally: psycopg refuses a statement that mixes
-    `%s` with `%(name)s`, and an embedded queryset always brings `%s`. A value
+    Everything binds positionally: psycopg refuses a statement that mixes `%s`
+    with `%(name)s`, and an embedded queryset always brings `%s`. A value
     referenced twice binds twice.
     """
-    parts: list[str] = []
+    sql = _Sql()
     params: list[Any] = []
-    star_models: list[type[Model]] = []
+    stars: list[_StarExpansion] = []
 
-    for literal, reference, format_spec, conversion in string.Formatter().parse(
-        template
-    ):
-        parts.append(_escape_percent(literal))
+    for literal, reference, format_spec, conversion in _parse(template):
+        sql.author(literal)
 
         if reference is None:
             continue
 
-        if conversion or format_spec:
+        if conversion:
             raise ValueError(
-                f"{{{reference}}} uses a format spec or conversion. A written "
+                f"{{{reference}!{conversion}}} uses a conversion. A written "
                 "query interpolates references and binds values — there is "
-                "nothing to format."
+                "nothing to convert."
             )
 
         if "." in reference:
             model_name, _, attribute = reference.partition(".")
-            referenced = _model_by_name(model_name, reference)
-            table = referenced.model_options.db_table
+            model = _model_by_name(model_name, reference)
+            table = model.model_options.db_table
+
             if attribute == "*":
-                star_models.append(referenced)
-                parts.append(
-                    ", ".join(
-                        _qualified(table, field.column)
-                        for field in referenced._model_meta.fields
+                if format_spec:
+                    raise ValueError(
+                        f"{{{reference}:{format_spec}}} — `{{Model.*}}` takes no "
+                        "format spec; it always expands to every column."
+                    )
+                fields = tuple(model._model_meta.fields)
+                stars.append(
+                    _StarExpansion(
+                        model=model,
+                        fields=fields,
+                        columns=tuple(field.column for field in fields),
                     )
                 )
+                sql.rendered(
+                    ", ".join(_qualified(table, field.column) for field in fields)
+                )
+                continue
+
+            field = _model_field(model, attribute, reference)
+            if format_spec == "name":
+                # The bare column: an INSERT column list and an UPDATE SET
+                # target can't take a qualified name.
+                sql.rendered(quote_name(field.column))
+            elif format_spec:
+                raise ValueError(
+                    f"{{{reference}:{format_spec}}} — the only format spec a "
+                    "column takes is `:name`, which renders the column on its "
+                    "own for an INSERT list or an UPDATE SET target."
+                )
             else:
-                field = _model_field(referenced, attribute, reference)
-                parts.append(_qualified(table, field.column))
+                sql.rendered(_qualified(table, field.column))
             continue
+
+        if format_spec:
+            raise ValueError(
+                f"{{{reference}:{format_spec}}} — a value takes no format spec. "
+                "It binds as a parameter; formatting it would put it in the SQL."
+            )
 
         if _models_named(reference):
             if reference in values:
@@ -218,107 +247,118 @@ def _render(template: str, values: dict[str, Any]) -> _Rendered:
                     f"{{{reference}}} is both a registered model and a value "
                     "passed to sql(). Rename the value."
                 )
-            named_model = _model_by_name(reference, reference)
-            parts.append(quote_name(named_model.model_options.db_table))
+            model = _model_by_name(reference, reference)
+            sql.rendered(quote_name(model.model_options.db_table))
             continue
 
         if reference not in values:
+            if not reference.isidentifier():
+                raise ValueError(
+                    f"{{{reference}}} isn't a reference — nothing is named "
+                    f"{reference!r}. A literal `"
+                    "{"
+                    "` in SQL — a regex quantifier like `\\d{2}`, an array "
+                    "or jsonb literal — is written `{{`, and `}` is written `}}`."
+                )
             given = ", ".join(sorted(values)) or "nothing"
             raise ValueError(
                 f"{{{reference}}} has no value and names no model. "
                 f"sql() was given: {given}."
             )
 
-        _render_value(values[reference], parts, params)
+        _render_value(values[reference], sql, params)
 
-    sql = "".join(parts)
-    _refuse_multiple_statements(sql)
-    return _Rendered(sql=sql, params=tuple(params), star_models=tuple(star_models))
+    return _Rendered(
+        sql="".join(sql.display),
+        bind_sql=_one_statement("".join(sql.bind)),
+        params=tuple(params),
+        stars=tuple(stars),
+    )
 
 
-def _render_value(value: Any, parts: list[str], params: list[Any]) -> None:
+def _parse(template: str) -> list[tuple[str, str | None, str | None, str | None]]:
+    """Split the template into literal text and `{}` references.
+
+    `string.Formatter` does the splitting; this only improves the error when
+    what's inside the braces isn't a reference at all — a regex quantifier or
+    a JSON literal, where the fix is to double the brace.
+    """
+    try:
+        return list(string.Formatter().parse(template))
+    except ValueError as exc:
+        raise ValueError(
+            f"This template isn't parseable ({exc}). A literal `{{` in SQL — a "
+            "regex quantifier like `\\d{2}`, an array or jsonb literal — is "
+            "written `{{`, and `}` is written `}}`."
+        ) from exc
+
+
+def _render_value(value: Any, sql: _Sql, params: list[Any]) -> None:
     """Dispatch a `{name}` value on its type. The value type decides."""
     if isinstance(value, Fragment):
-        parts.append(_escape_percent(value.text))
+        sql.author(value.text)
     elif isinstance(value, Written):
-        parts.append(f"({value.sql})")
+        sql.rendered(f"({value._bind_sql})", f"({value.sql})")
         params.extend(value.params)
     elif isinstance(value, QuerySet):
         # elide_empty=False so a queryset that can't match anything (an empty
         # `is_in`, a `none()`) still compiles to SQL that returns no rows,
         # instead of raising EmptyResultSet out of the middle of a render.
-        sql, queryset_params = value.sql_query.get_compiler(elide_empty=False).as_sql()
-        parts.append(f"({sql})")
+        compiled, queryset_params = value.sql_query.get_compiler(
+            elide_empty=False
+        ).as_sql()
+        sql.rendered(f"({compiled})")
         params.extend(queryset_params)
     elif isinstance(value, dict):
-        parts.append("%s")
+        sql.rendered("%s")
         params.append(adapt_json_value(value, None))
     else:
         # Lists included: psycopg binds one as an array, which is what
         # `= ANY({ids})` wants. Nothing is ever expanded into `IN (...)`.
-        parts.append("%s")
+        sql.rendered("%s")
         params.append(value)
 
 
-def _refuse_multiple_statements(sql: str) -> None:
-    """Refuse `...; ...` — one written query is one statement.
+def _one_statement(sql: str) -> str:
+    """Drop a trailing semicolon; Postgres refuses the rest.
 
-    Scans past the places a semicolon is ordinary text: quoted strings and
-    identifiers, dollar-quoted bodies, and comments.
+    A statement with parameters goes to the server through the extended query
+    protocol, which carries exactly one command — `SELECT 1; DROP TABLE x` is
+    refused by Postgres itself, with no scanner here to get wrong. A trailing
+    `;` is the one thing that refusal would catch that nobody means, so it
+    comes off.
     """
-    index = 0
-    length = len(sql)
-    while index < length:
-        char = sql[index]
-        if char == "'":
-            index = _skip_quoted(sql, index, "'")
-        elif char == '"':
-            index = _skip_quoted(sql, index, '"')
-        elif char == "$":
-            index = _skip_dollar_quoted(sql, index)
-        elif sql.startswith("--", index):
-            end = sql.find("\n", index)
-            index = length if end == -1 else end + 1
-        elif sql.startswith("/*", index):
-            end = sql.find("*/", index + 2)
-            index = length if end == -1 else end + 2
-        elif char == ";":
-            raise ValueError(
-                "A written query is a single statement, and this one contains "
-                "a ';'. Drop it (a trailing semicolon included) and make each "
-                "statement its own sql() call."
-            )
-        else:
-            index += 1
-
-
-def _skip_quoted(sql: str, index: int, quote: str) -> int:
-    """The index just past the string or identifier starting at `index`."""
-    index += 1
-    while index < len(sql):
-        if sql[index] == quote:
-            if sql[index + 1 : index + 2] == quote:  # '' or "" is an escape
-                index += 2
-                continue
-            return index + 1
-        index += 1
-    return index
-
-
-def _skip_dollar_quoted(sql: str, index: int) -> int:
-    """The index just past a `$tag$ ... $tag$` body, or past a lone `$`."""
-    end_of_tag = sql.find("$", index + 1)
-    if end_of_tag == -1:
-        return index + 1
-    tag = sql[index : end_of_tag + 1]
-    if not tag[1:-1].replace("_", "").isalnum() and tag != "$$":
-        return index + 1
-    closing = sql.find(tag, end_of_tag + 1)
-    return len(sql) if closing == -1 else closing + len(tag)
+    return sql.rstrip().removesuffix(";")
 
 
 # --------------------------------------------------------------------------
-# What the first execution learns from cursor.description
+# Executing
+# --------------------------------------------------------------------------
+
+
+@contextmanager
+def _written_cursor(connection: DatabaseConnection) -> Generator[Any]:
+    """A cursor that binds this statement's parameters server-side.
+
+    Plain's connections default to `ClientCursor` — client-side binding, no
+    server-side statement of any kind, which is what keeps them safe behind a
+    transaction-mode pooler like pgbouncer. A written statement uses psycopg's
+    ordinary `Cursor` instead, for one reason: the extended query protocol
+    carries exactly one command, so Postgres refuses a second statement
+    smuggled into a template. It stays pooler-safe because the statement is
+    UNNAMED and one-shot — `prepare=True` is the named kind that isn't.
+
+    Wrapped in Plain's own cursor wrapper so the statement is logged and
+    guarded like every other query.
+    """
+    connection.ensure_connection()
+    assert connection.connection is not None
+    with connection._prepare_cursor(psycopg.Cursor(connection.connection)) as cursor:
+        yield cursor
+
+
+# --------------------------------------------------------------------------
+# What the result columns are, and where they came from
 # --------------------------------------------------------------------------
 
 _CATALOG_SQL = """
@@ -333,24 +373,12 @@ _catalog_cache: weakref.WeakKeyDictionary[
     DatabaseConnection, dict[tuple[int, int], Field | None]
 ] = weakref.WeakKeyDictionary()
 
-# One plan per (model, template, result_type). The template text is what
-# decides the result columns, so a second render of the same template — with
-# different values, or a different embedded queryset — reuses what the first
-# execution learned.
-_plans: dict[tuple[Any, str, Any], _Plan] = {}
-
-
-def _strip_alias_marker(name: str) -> str:
-    """`n!` and `oldest?` map to `n` and `oldest`.
-
-    The markers are the sqlx convention for declaring in the statement what
-    the catalog can't know: `!` this is not null despite appearances, `?` this
-    can be null. Today they are documentation — nothing enforces them — but
-    they are stripped so the column still maps onto a field by name.
-    """
-    if name.endswith(("!", "?")):
-        return name[:-1]
-    return name
+# One plan per result-column signature — the names, types and sources the
+# statement actually came back with. Two renders of the same template that
+# return the same columns share a plan; anything that changes the columns
+# (a different embedded queryset, a schema change) builds a new one, and the
+# cache can only grow to the number of distinct result shapes.
+_plans: dict[_Signature, _Plan] = {}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -361,6 +389,16 @@ class _Column:
     type_oid: int
     table_oid: int
     table_column: int
+
+
+type _Signature = tuple[tuple[str, int, int, int], ...]
+
+
+def _signature(columns: list[_Column]) -> _Signature:
+    return tuple(
+        (column.name, column.type_oid, column.table_oid, column.table_column)
+        for column in columns
+    )
 
 
 def _describe_columns(cursor: Any) -> list[_Column]:
@@ -382,14 +420,29 @@ def _describe_columns(cursor: Any) -> list[_Column]:
     ]
 
 
+def _strip_alias_marker(name: str) -> str:
+    """`n!` and `oldest?` map to `n` and `oldest`.
+
+    The markers are the sqlx convention for declaring in the statement what
+    the catalog can't know: `!` this is not null despite appearances, `?` this
+    can be null. Today they are documentation — nothing enforces them — but
+    they are stripped so the column still maps onto a field by name.
+    """
+    if name.endswith(("!", "?")):
+        return name[:-1]
+    return name
+
+
 def _fields_for_columns(
     columns: list[_Column], connection: DatabaseConnection
 ) -> list[Field | None]:
     """The model field behind each result column, where there is one.
 
     A column that comes from a table — through aliases, joins, derived tables
-    and CTEs — carries its source in `table_oid`/`table_column`. An aggregate
-    or an expression carries no source, and gets no field.
+    and CTEs — carries its source in `table_oid`/`table_column`. An aggregate,
+    an expression, or a branch of a UNION carries no source, and gets no field:
+    provenance is what attaches converters, so a column without it is returned
+    exactly as Postgres sent it.
     """
     pairs = {
         (column.table_oid, column.table_column)
@@ -413,7 +466,6 @@ def _catalog_fields(
     missing = sorted(pair for pair in pairs if pair not in cache)
 
     if missing:
-        rows: list[tuple[int, int, str, str]] = []
         with suppress_db_tracing(), connection.cursor() as cursor:
             cursor.execute(
                 _CATALOG_SQL,
@@ -449,20 +501,26 @@ def _catalog_fields(
     return {pair: cache[pair] for pair in pairs}
 
 
+# --------------------------------------------------------------------------
+# The plan: how this statement's rows become results
+# --------------------------------------------------------------------------
+
+
 @dataclasses.dataclass(frozen=True)
 class _Plan:
     """How to turn this statement's raw rows into results.
 
-    Built once per template, from the first execution's `cursor.description`:
-    which field converter each column needs, and how the columns become
-    instances or `result_type` rows.
+    Built from the first execution's result columns and reused for as long as
+    a statement comes back with the same ones.
     """
 
+    signature: _Signature
     names: tuple[str, ...]
     converters: dict[int, tuple[list[Any], Any]]
-    instance_model: type[Model] | None
-    instance_fields: tuple[tuple[int, Field], ...]
+    star: _StarExpansion | None
+    star_start: int
     extras: tuple[tuple[int, str], ...]
+    stars: tuple[_StarExpansion, ...]
     result_type: Any
 
     def build(
@@ -472,7 +530,7 @@ class _Plan:
         if self.converters:
             converted = apply_converters(iter(rows), self.converters, connection)
 
-        if self.instance_model is not None:
+        if self.star is not None:
             return [self._instance(row) for row in converted]
 
         assert self.result_type is not None
@@ -481,11 +539,12 @@ class _Plan:
             for row in converted
         ]
 
-    def _instance(self, row: list[Any]) -> Model:
-        assert self.instance_model is not None
-        instance = self.instance_model.from_db(
-            [field.name for _, field in self.instance_fields],
-            [row[position] for position, _ in self.instance_fields],
+    def _instance(self, row: Sequence[Any]) -> Model:
+        assert self.star is not None
+        width = len(self.star.fields)
+        instance = self.star.model.from_db(
+            [field.name for field in self.star.fields],
+            list(row[self.star_start : self.star_start + width]),
         )
         for position, attribute in self.extras:
             setattr(instance, attribute, row[position])
@@ -495,46 +554,41 @@ class _Plan:
 def _build_plan(
     *,
     model: type[Model],
-    template: str,
-    instance_model: type[Model] | None,
+    stars: tuple[_StarExpansion, ...],
     result_type: Any,
     columns: list[_Column],
+    rows: list[tuple[Any, ...]],
     connection: DatabaseConnection,
 ) -> _Plan:
     names = tuple(_strip_alias_marker(column.name) for column in columns)
     fields = _fields_for_columns(columns, connection)
-    converters = get_converters(
-        [
-            None if field is None else field.get_col(field.model.model_options.db_table)
-            for field in fields
-        ],
-        connection,
-    )
+    _refuse_unconverted_ciphertext(names, fields, rows)
+    converters = _converters_for(columns, fields, connection)
 
-    if instance_model is not None:
-        instance_fields = tuple(
-            (position, field)
-            for position, field in enumerate(fields)
-            if field is not None and field.model is instance_model
-        )
-        taken = {position for position, _ in instance_fields}
+    if stars:
+        star = stars[0]
+        star_start = _star_start(names, fields, star)
+        taken = range(star_start, star_start + len(star.fields))
         extras = tuple(
             (position, name)
             for position, name in enumerate(names)
             if position not in taken
         )
-        selected = {field.name for _, field in instance_fields}
-        if "id" not in selected:
-            raise TypeError(
-                f"A statement that returns {instance_model.__name__} instances "
-                f"has to select the primary key. Use {{{instance_model.__name__}.*}}."
-            )
+        for _, name in extras:
+            if name in star.columns:
+                raise TypeError(
+                    f"This statement selects {{{star.model.__name__}.*}} and "
+                    f"another column called {name!r}, which would overwrite the "
+                    "instance's own. Alias the extra column."
+                )
         return _Plan(
+            signature=_signature(columns),
             names=names,
             converters=converters,
-            instance_model=instance_model,
-            instance_fields=instance_fields,
+            star=star,
+            star_start=star_start,
             extras=extras,
+            stars=stars,
             result_type=None,
         )
 
@@ -548,13 +602,121 @@ def _build_plan(
 
     _check_result_type(result_type, names, columns, fields, connection)
     return _Plan(
+        signature=_signature(columns),
         names=names,
         converters=converters,
-        instance_model=None,
-        instance_fields=(),
+        star=None,
+        star_start=0,
         extras=(),
+        stars=(),
         result_type=result_type,
     )
+
+
+def _star_start(
+    names: tuple[str, ...], fields: list[Field | None], star: _StarExpansion
+) -> int:
+    """Where `{Model.*}`'s columns start in the result.
+
+    The expansion emitted the model's columns, in declared order, as one run —
+    so the run of result columns with those names *is* the instance. Reading it
+    back this way means the instance's fields are the ones the template asked
+    for, not whichever columns the catalog happens to trace to this model: a
+    self-join, a UNION branch, or another table with the same column names
+    can't shift them.
+    """
+    width = len(star.columns)
+    candidates = [
+        start
+        for start in range(len(names) - width + 1)
+        if tuple(names[start : start + width]) == star.columns
+    ]
+    if not candidates:
+        raise TypeError(
+            f"This statement returns ({', '.join(names)}), which doesn't "
+            f"contain {star.model.__name__}'s columns "
+            f"({', '.join(star.columns)}) in order — something renamed them. "
+            f"Select {{{star.model.__name__}.*}} without aliasing its columns."
+        )
+    if len(candidates) > 1:
+        # Two runs of columns have those names. Provenance breaks the tie when
+        # it survived; when it didn't, the statement is genuinely ambiguous.
+        confirmed = [
+            start
+            for start in candidates
+            if all(
+                fields[start + offset] is star.fields[offset] for offset in range(width)
+            )
+        ]
+        if len(confirmed) != 1:
+            raise TypeError(
+                f"This statement returns {star.model.__name__}'s columns "
+                f"({', '.join(star.columns)}) more than once, so which run is "
+                "the instance is ambiguous. Alias the other one's columns."
+            )
+        return confirmed[0]
+    return candidates[0]
+
+
+def _converters_for(
+    columns: list[_Column],
+    fields: list[Field | None],
+    connection: DatabaseConnection,
+) -> dict[int, tuple[list[Any], Any]]:
+    """The converter each column needs before it becomes a value.
+
+    A column with a field gets that field's converters — decryption, JSON
+    parsing, a timezone. A `json`/`jsonb` column with no field gets parsed
+    anyway: Plain loads `jsonb` as text on purpose (a `JSONField`'s converter
+    is normally what parses it), and handing back the raw text because the
+    column came out of an expression would be a surprise, not a rule.
+    """
+    converters = get_converters(
+        [
+            None if field is None else field.get_col(field.model.model_options.db_table)
+            for field in fields
+        ],
+        connection,
+    )
+    for position, (column, field) in enumerate(zip(columns, fields, strict=True)):
+        if field is None and column.type_oid in _JSON_OIDS:
+            converters[position] = ([_parse_json], None)
+    return converters
+
+
+_JSON_OIDS = frozenset({114, 3802})  # json, jsonb
+
+
+def _parse_json(value: Any, expression: Any, connection: Any) -> Any:
+    """Parse a `json`/`jsonb` column that no field converter claimed."""
+    if isinstance(value, str | bytes):
+        return json.loads(value)
+    return value
+
+
+def _refuse_unconverted_ciphertext(
+    names: tuple[str, ...], fields: list[Field | None], rows: list[tuple[Any, ...]]
+) -> None:
+    """Refuse a column that lost its source and came back as ciphertext.
+
+    Provenance is what attaches the decrypting converter, and an expression, an
+    aggregate or a UNION drops it — so `coalesce({Secret.api_key}, '')` would
+    otherwise hand back the stored token as a perfectly well-typed `str`.
+    """
+    if not rows:
+        return
+    for position, value in enumerate(rows[0]):  # every row has the same shape
+        if (
+            fields[position] is None
+            and isinstance(value, str)
+            and value.startswith(_ENCRYPTED_PREFIX)
+        ):
+            raise TypeError(
+                f"Column {names[position]!r} holds an encrypted value but lost "
+                "track of the column it came from, so nothing can decrypt it — "
+                "an expression, an aggregate or a UNION does that. Select it "
+                "as {Model.field} on its own."
+            )
 
 
 # --------------------------------------------------------------------------
@@ -562,8 +724,7 @@ def _build_plan(
 # --------------------------------------------------------------------------
 
 # The Python type psycopg hands back for each type OID, read against the
-# adapters Plain installs -- notably jsonb, which Plain loads as text on
-# purpose and a JSONField's converter parses.
+# adapters Plain installs.
 _OID_TO_PYTHON: dict[int, type] = {
     16: bool,
     17: bytes,
@@ -571,7 +732,6 @@ _OID_TO_PYTHON: dict[int, type] = {
     21: int,
     23: int,
     25: str,
-    114: dict,
     700: float,
     701: float,
     869: str,  # inet, loaded as text by plain.postgres.adapters
@@ -583,7 +743,6 @@ _OID_TO_PYTHON: dict[int, type] = {
     1186: datetime.timedelta,
     1700: decimal.Decimal,
     2950: uuid.UUID,
-    3802: str,  # jsonb, likewise text
 }
 
 
@@ -596,10 +755,13 @@ def _python_type_for_column(
 ) -> Any:
     """The Python type a row will actually carry in this column.
 
-    The OID says what psycopg loads; a field converter then says what it turns
-    into — a JSONField parses the text psycopg loaded, a TimeZoneField builds
-    a ZoneInfo, an encrypted field decrypts to its own type.
+    The OID says what psycopg loads; a converter then says what it turns into —
+    JSON is parsed, a TimeZoneField builds a ZoneInfo, an encrypted field
+    decrypts to its own type.
     """
+    if column.type_oid in _JSON_OIDS:
+        return _AnyJson
+
     if field is not None and field.get_db_converters(connection):
         if isinstance(field, JSONField):
             return _AnyJson
@@ -626,8 +788,24 @@ def _annotation_base(annotation: Any) -> Any:
     return typing.get_origin(annotation) or annotation
 
 
+def _type_hints(result_type: Any) -> dict[str, Any]:
+    """`result_type`'s annotations, resolved.
+
+    They are resolved late — the dataclass may be defined anywhere — so a name
+    that doesn't resolve surfaces here, where the statement can say so.
+    """
+    try:
+        return typing.get_type_hints(result_type)
+    except NameError as exc:
+        raise TypeError(
+            f"sql(result_type={result_type.__name__}) can't read its "
+            f"annotations: {exc}. Every name they use has to be importable at "
+            f"runtime — move it out of `if TYPE_CHECKING` for this dataclass."
+        ) from exc
+
+
 def _describe_result_type(result_type: Any) -> str:
-    hints = typing.get_type_hints(result_type)
+    hints = _type_hints(result_type)
     lines = [
         f"    {field.name}: {_format_annotation(hints.get(field.name, Any))}"
         for field in dataclasses.fields(result_type)
@@ -638,6 +816,13 @@ def _describe_result_type(result_type: Any) -> str:
 
 def _format_annotation(annotation: Any) -> str:
     return getattr(annotation, "__name__", str(annotation)).replace("typing.", "")
+
+
+def _has_default(field: Any) -> bool:
+    return (
+        field.default is not dataclasses.MISSING
+        or field.default_factory is not dataclasses.MISSING
+    )
 
 
 def _check_result_type(
@@ -654,9 +839,15 @@ def _check_result_type(
             f"and {result_type.__name__} maps columns by name. Alias them apart."
         )
 
-    declared = [field.name for field in dataclasses.fields(result_type) if field.init]
-    missing = [name for name in declared if name not in names]
-    unexpected = [name for name in names if name not in declared]
+    declared = [field for field in dataclasses.fields(result_type) if field.init]
+    missing = [
+        field.name
+        for field in declared
+        if field.name not in names and not _has_default(field)
+    ]
+    unexpected = [
+        name for name in names if name not in {field.name for field in declared}
+    ]
     if missing or unexpected:
         problems = []
         if missing:
@@ -669,7 +860,7 @@ def _check_result_type(
             f"dataclass declares\n{_describe_result_type(result_type)}"
         )
 
-    hints = typing.get_type_hints(result_type)
+    hints = _type_hints(result_type)
     for position, name in enumerate(names):
         expected = _python_type_for_column(
             columns[position], fields[position], connection
@@ -689,36 +880,46 @@ def _check_result_type(
 
 
 # --------------------------------------------------------------------------
-# The statement
+# Constraint violations
 # --------------------------------------------------------------------------
 
 
 def _integrity_error_to_validation_error(
-    model: type[Model], exc: psycopg.IntegrityError
+    exc: psycopg.IntegrityError,
 ) -> ValidationError | None:
-    """The ValidationError a declared constraint describes for this violation.
+    """The ValidationError the violated constraint describes.
 
-    The same mapping `Model.create()`/`Model.update()` do, minus the parts
-    that need the row being written: a written statement has no instance, so
-    only constraints that can describe themselves — check and unique — map,
-    and anything else re-raises as the original IntegrityError.
+    The same mapping `Model.create()`/`Model.update()` do, found the same way —
+    by the constraint name Postgres reports — except that the name is looked up
+    across every registered model, because a written statement can write any
+    table, not just the one its queryset named.
     """
     constraint_name = exc.diag.constraint_name
     if not constraint_name:
         return None
-    constraint = model._model_meta.constraints_by_name.get(constraint_name)
-    if constraint is None:
-        return None
-    try:
-        instance = model()
-    except Exception:
-        return None
-    error = constraint._db_violation_error(instance, model)
-    if error is None:
-        return None
-    from plain.exceptions import ValidationError
 
-    return ValidationError(error.update_error_dict({}))
+    for model in models_registry.get_models():
+        meta = model._model_meta
+        constraint = meta.constraints_by_name.get(
+            constraint_name
+        ) or meta.foreign_keys_by_constraint_name.get(constraint_name)
+        if constraint is None:
+            continue
+        # No instance: a written statement has rows, not objects. The
+        # constraint describes itself without one.
+        error = constraint._db_violation_error(None, model)
+        if error is None:
+            return None
+        from plain.exceptions import ValidationError
+
+        return ValidationError(error.update_error_dict({}))
+
+    return None
+
+
+# --------------------------------------------------------------------------
+# The statement
+# --------------------------------------------------------------------------
 
 
 class Written[R]:
@@ -748,31 +949,37 @@ class Written[R]:
 
         rendered = _render(template, values)
 
-        star_models = dict.fromkeys(rendered.star_models)
-        if star_models and result_type is not None:
+        if rendered.stars and result_type is not None:
             raise TypeError(
                 "sql() takes {Model.*} or result_type=, not both — "
                 "{Model.*} already says a row is a model instance."
             )
+        # The same model's columns can be expanded more than once -- that is
+        # what each branch of a UNION needs -- but two models can't both be
+        # the row.
+        star_models = dict.fromkeys(star.model for star in rendered.stars)
         if len(star_models) > 1:
             names = ", ".join(model.__name__ for model in star_models)
             raise TypeError(
-                f"sql() selects every column of more than one model ({names}), "
+                f"sql() expands {{Model.*}} for more than one model ({names}), "
                 "so a row can't be one instance. Select the columns you need "
                 "and pass result_type= a dataclass."
             )
 
         self._model = model
-        self._template = template
         self._result_type = result_type
+        self._stars = rendered.stars
         self._instance_model = next(iter(star_models), None)
         self._sql = rendered.sql
+        self._bind_sql = rendered.bind_sql
         self._params = rendered.params
+        self._prefetch_lookups: tuple[str | Prefetch, ...] = ()
         self._executed = False
         self._row_count = 0
         self._raw_rows: list[tuple[Any, ...]] = []
         self._columns: list[_Column] | None = None
         self._result_cache: list[R] | None = None
+        self._count_cache: int | None = None
 
     # -- what it renders to -------------------------------------------------
 
@@ -789,23 +996,65 @@ class Written[R]:
     def __repr__(self) -> str:
         return f"<Written: {self._sql}>"
 
+    def prefetch(self, *lookups: str | Prefetch) -> Self:
+        """Load related objects for the instances this statement returns.
+
+        The same as `QuerySet.prefetch()`, and like it this returns a new
+        statement — the one it was called on is untouched and still unrun.
+        """
+        if self._instance_model is None:
+            raise TypeError(
+                "prefetch() attaches related objects to model instances, and "
+                "this statement returns rows. Select {Model.*}, or join the "
+                "related table into the statement."
+            )
+        clone = copy.copy(self)
+        clone._prefetch_lookups = self._prefetch_lookups + lookups
+        clone._executed = False
+        clone._raw_rows = []
+        clone._columns = None
+        clone._result_cache = None
+        clone._count_cache = None
+        return clone
+
     # -- running it ---------------------------------------------------------
+
+    @contextmanager
+    def _run_statement(self, sql: str, display: str) -> Generator[Any]:
+        """Run one statement on the ORM's connection, yielding its cursor.
+
+        The span carries the statement as written — the `%` doubling psycopg
+        needs is an artifact of binding, not something to read in a trace — so
+        the cursor wrapper's own span is suppressed and this one replaces it.
+        """
+        connection = get_connection()
+        params = list(self._params)
+        with _written_cursor(connection) as cursor:
+            try:
+                with (
+                    db_span(
+                        connection,
+                        display,
+                        params=params,
+                        row_count_provider=lambda: cursor.rowcount,
+                    ),
+                    transaction.mark_for_rollback_on_error(),
+                    suppress_db_tracing(),
+                ):
+                    cursor.execute(sql, params)
+            except psycopg.IntegrityError as exc:
+                error = _integrity_error_to_validation_error(exc)
+                if error is not None:
+                    raise error from exc
+                raise
+            yield cursor
 
     def _run(self) -> None:
         """Execute the statement, once, and keep its raw rows."""
         if self._executed:
             return
 
-        connection = get_connection()
-        with connection.cursor() as cursor:
-            try:
-                with transaction.mark_for_rollback_on_error():
-                    cursor.execute(self._sql, list(self._params))
-            except psycopg.IntegrityError as exc:
-                error = _integrity_error_to_validation_error(self._model, exc)
-                if error is not None:
-                    raise error from exc
-                raise
+        with self._run_statement(self._bind_sql, self._sql) as cursor:
             self._row_count = cursor.rowcount
             # `description` is None for a statement with no result at all —
             # a write with no RETURNING clause.
@@ -813,6 +1062,34 @@ class Written[R]:
                 self._columns = _describe_columns(cursor)
                 self._raw_rows = cursor.fetchall()
         self._executed = True
+
+    def _plan_for(self, columns: list[_Column], rows: list[tuple[Any, ...]]) -> _Plan:
+        """The plan for these result columns, built once per column signature.
+
+        A cached plan is only reused when the statement came back with exactly
+        the columns it was built from — same names, same types, same sources.
+        A different embedded queryset, or a changed schema, gets a new plan
+        instead of the wrong one.
+        """
+        signature = _signature(columns)
+        plan = _plans.get(signature)
+        if (
+            plan is not None
+            and plan.result_type is self._result_type
+            and plan.stars == self._stars
+        ):
+            return plan
+
+        plan = _build_plan(
+            model=self._model,
+            stars=self._stars,
+            result_type=self._result_type,
+            columns=columns,
+            rows=rows,
+            connection=get_connection(),
+        )
+        _plans[signature] = plan
+        return plan
 
     def _fetch(self) -> list[R]:
         """The rows, hydrated — instances or `result_type` rows."""
@@ -824,31 +1101,46 @@ class Written[R]:
             self._result_cache = []
             return self._result_cache
 
-        connection = get_connection()
-        key = (self._model, self._template, self._result_type)
-        plan = _plans.get(key)
-        if plan is None:
-            plan = _build_plan(
-                model=self._model,
-                template=self._template,
-                instance_model=self._instance_model,
-                result_type=self._result_type,
-                columns=self._columns,
-                connection=connection,
-            )
-            _plans[key] = plan
-
-        self._result_cache = plan.build(self._raw_rows, connection)
+        plan = self._plan_for(self._columns, self._raw_rows)
+        self._result_cache = plan.build(self._raw_rows, get_connection())
+        if self._prefetch_lookups:
+            prefetch_objects(self._result_cache, *self._prefetch_lookups)
         return self._result_cache
 
-    def _scalar(self, sql: str) -> Any:
-        connection = get_connection()
-        with connection.cursor() as cursor:
-            with transaction.mark_for_rollback_on_error():
-                cursor.execute(sql, list(self._params))
+    def _limited(self, limit: int) -> list[R]:
+        """The first `limit` rows, without spending the statement's one run.
+
+        Only a read takes this path — `first()` and `get()` on a write go
+        through the single execution, because running a write twice is not a
+        cheaper way to look at fewer rows.
+        """
+        if self._executed:
+            return self._fetch()[:limit]
+
+        sql = f'SELECT * FROM ({self._bind_sql}) "written" LIMIT {limit}'
+        display = f'SELECT * FROM ({self._sql}) "written" LIMIT {limit}'
+        with self._run_statement(sql, display) as cursor:
+            columns = _describe_columns(cursor)
+            rows = cursor.fetchall()
+
+        results = self._plan_for(columns, rows).build(rows, get_connection())
+        if self._prefetch_lookups:
+            prefetch_objects(results, *self._prefetch_lookups)
+        return results
+
+    def _scalar(self, sql: str, display: str) -> Any:
+        with self._run_statement(sql, display) as cursor:
             row = cursor.fetchone()
         assert row is not None
         return row[0]
+
+    def _reads_rows(self) -> bool:
+        """Whether this statement is a plain read, and so safe to run twice.
+
+        Only a leading SELECT counts. A `WITH` can hold a write, and a write
+        has to run exactly once, so both go through the single execution.
+        """
+        return self._sql.lstrip().upper().startswith("SELECT")
 
     def __iter__(self) -> Iterator[R]:
         return iter(self._fetch())
@@ -865,7 +1157,7 @@ class Written[R]:
 
     def first(self) -> R | None:
         """The first row, or None if the statement returned none."""
-        rows = self._fetch()
+        rows = self._limited(1) if self._reads_rows() else self._fetch()
         return rows[0] if rows else None
 
     def get(self) -> R:
@@ -876,7 +1168,7 @@ class Written[R]:
         A `result_type` statement has no model to raise for, so it raises
         `ValueError`.
         """
-        rows = self._fetch()
+        rows = self._limited(2) if self._reads_rows() else self._fetch()
         if len(rows) == 1:
             return rows[0]
         if self._instance_model is not None:
@@ -898,21 +1190,37 @@ class Written[R]:
         """How many rows the statement returns."""
         if self._executed:
             return len(self._raw_rows)
-        return self._scalar(f'SELECT count(*) FROM ({self._sql}) "written"')
+        if not self._reads_rows():
+            # A write counts the rows it returned, from its one execution —
+            # wrapping it in a count() would run the write to throw the rows
+            # away.
+            self._run()
+            return len(self._raw_rows)
+        if self._count_cache is None:
+            self._count_cache = self._scalar(
+                f'SELECT count(*) FROM ({self._bind_sql}) "written"',
+                f'SELECT count(*) FROM ({self._sql}) "written"',
+            )
+        return self._count_cache
 
     def exists(self) -> bool:
         """Whether the statement returns any row at all."""
-        if self._executed:
-            return bool(self._raw_rows)
-        return self._scalar(f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")')
+        if self._executed or not self._reads_rows():
+            return self.count() > 0
+        if self._count_cache is not None:
+            return self._count_cache > 0
+        return self._scalar(
+            f'SELECT EXISTS(SELECT 1 FROM ({self._bind_sql}) "written")',
+            f'SELECT EXISTS(SELECT 1 FROM ({self._sql}) "written")',
+        )
 
     def execute(self) -> int:
         """Run the statement and return how many rows it affected.
 
         This is the write without a RETURNING clause — the count is what an
-        `UPDATE` or `DELETE` has to say. It runs the statement without
-        shaping any rows, so a statement with no `result_type` and no
-        `{Model.*}` is still runnable this way.
+        `UPDATE` or `DELETE` has to say. It runs the statement without shaping
+        any rows, so a statement with no `result_type` and no `{Model.*}` is
+        still runnable this way.
         """
         self._run()
         return self._row_count

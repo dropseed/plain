@@ -1,15 +1,18 @@
 """`Model.query.sql()` — written queries.
 
 The contract: what a `{}` reference renders as, what a row comes back as, and
-what a statement refuses. The static half lives in tests/typing/written_sql.py.
+what a statement refuses. The static half lives in tests/typing/written_sql.py,
+and the literal-template rule is `plain preflight`'s
+(tests/internal/test_written_preflight.py).
 """
 
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
+import psycopg
 import pytest
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.mixins import MixinTestModel
@@ -37,14 +40,21 @@ class SizeCount:
     n: int
 
 
+@dataclass
+class NameRow:
+    name: str
+
+
 # ---------------------------------------------------------------------------
 # The interpolation table
 # ---------------------------------------------------------------------------
 
 
 def test_model_reference_renders_the_table(widgets):
-    rows = Widget.query.sql("SELECT count(*) AS n FROM {Widget}", result_type=SizeCount)
-    assert '"widget"' in rows.sql or Widget.model_options.db_table in rows.sql
+    statement = Widget.query.sql(
+        "SELECT count(*) AS n FROM {Widget}", result_type=SizeCount
+    )
+    assert f'"{Widget.model_options.db_table}"' in statement.sql
 
 
 def test_field_reference_renders_the_qualified_column(widgets):
@@ -63,6 +73,21 @@ def test_field_reference_renders_the_qualified_column(widgets):
         SizeCount(size="large", n=1),
         SizeCount(size="small", n=1),
     ]
+
+
+def test_bare_column_reference_renders_the_column_alone(widgets):
+    """`{Model.field:name}` is the spelling an INSERT list needs."""
+    statement = Widget.query.sql(
+        """
+        INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
+        VALUES ({name}, {size})
+        RETURNING {Widget.*}
+        """,
+        name="fresh",
+        size="tiny",
+    )
+    assert '("name", "size")' in statement.sql
+    assert statement.get().name == "fresh"
 
 
 def test_foreign_key_reference_renders_the_id_column(widgets):
@@ -134,7 +159,8 @@ def test_dict_binds_as_jsonb(db):
     ReturningEvent.query.create(label="churn", count=1, payload={"plan": "free"})
 
     statement = ReturningEvent.query.sql(
-        "SELECT {ReturningEvent.*} FROM {ReturningEvent} WHERE {ReturningEvent.payload} @> {match}",
+        "SELECT {ReturningEvent.*} FROM {ReturningEvent} "
+        "WHERE {ReturningEvent.payload} @> {match}",
         match={"plan": "pro"},
     )
     event = statement.get()
@@ -152,20 +178,13 @@ def test_fragment_inlines_its_text(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_fragment_refuses_a_non_literal():
-    text = "size = 'small'"
+def test_fragment_requires_a_string():
     with pytest.raises(TypeError, match="string literal"):
-        Fragment(text)
-    with pytest.raises(TypeError, match="string literal"):
-        Fragment(f"size = '{text}'")
+        Fragment(42)  # ty: ignore[invalid-argument-type]
 
 
 def test_embedded_queryset_becomes_a_subquery(widgets):
     small_widgets = Widget.query.where(Widget.size.equals("small"))
-
-    @dataclass
-    class NameRow:
-        name: str
 
     statement = Widget.query.sql(
         'SELECT sub."name" AS name FROM {small} sub ORDER BY 1',
@@ -179,10 +198,6 @@ def test_embedded_queryset_becomes_a_subquery(widgets):
 def test_embedded_queryset_with_no_rows_still_renders(widgets):
     nothing = Widget.query.where(Widget.name.is_in([]))
 
-    @dataclass
-    class NameRow:
-        name: str
-
     statement = Widget.query.sql(
         'SELECT sub."name" AS name FROM {nothing} sub',
         nothing=nothing,
@@ -192,10 +207,6 @@ def test_embedded_queryset_with_no_rows_still_renders(widgets):
 
 
 def test_written_embeds_in_another_written(widgets):
-    @dataclass
-    class NameRow:
-        name: str
-
     inner = Widget.query.sql(
         "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
         size="small",
@@ -210,16 +221,17 @@ def test_written_embeds_in_another_written(widgets):
     assert outer.all() == [NameRow(name="small-widget")]
 
 
-def test_a_literal_percent_survives(widgets):
-    @dataclass
-    class NameRow:
-        name: str
-
+def test_a_literal_percent_survives_and_stays_readable(widgets):
     statement = Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.name} LIKE {pattern} || '%'",
+        "SELECT {Widget.name} AS name FROM {Widget} "
+        "WHERE {Widget.name} LIKE {pattern} || '%'",
         pattern="small",
         result_type=NameRow,
     )
+    # `.sql` is the statement as written -- the doubling psycopg needs to bind
+    # parameters is not something to read.
+    assert "|| '%'" in statement.sql
+    assert "%%" not in statement.sql
     assert statement.all() == [NameRow(name="small-widget")]
 
 
@@ -232,9 +244,7 @@ def test_instances_decrypt_and_parse_their_fields(db):
     SecretStore.query.create(
         name="prod", api_key="sk-live-123", notes="top secret", config={"a": 1}
     )
-    statement = SecretStore.query.sql(
-        "SELECT {SecretStore.*} FROM {SecretStore}",
-    )
+    statement = SecretStore.query.sql("SELECT {SecretStore.*} FROM {SecretStore}")
     secret = statement.get()
     assert secret.api_key == "sk-live-123"
     assert secret.notes == "top secret"
@@ -256,6 +266,74 @@ def test_extra_columns_become_attributes(widgets):
         ("large-widget", 1),
         ("small-widget", 2),
     ]
+
+
+def test_a_repeated_column_is_kept_as_an_extra(widgets):
+    """`{Widget.*}` and `{Widget.name}` in one statement: both arrive."""
+    statement = Widget.query.sql(
+        """
+        SELECT {Widget.*}, upper({Widget.name}) AS display_name
+        FROM {Widget}
+        WHERE {Widget.size} = {size}
+        """,
+        size="small",
+    )
+    widget = statement.get()
+    assert widget.name == "small-widget"
+    assert getattr(widget, "display_name") == "SMALL-WIDGET"
+
+
+def test_a_self_join_hydrates_the_row_it_selected(widgets):
+    """The instance is `{Widget.*}`'s columns, not whatever traces to Widget.
+
+    Both sides of a self-join trace back to the same table, so picking the
+    instance's columns by provenance would mix the two rows together.
+    """
+    Widget.query.create(name="other-small", size="small")
+    small = Widget.query.get(name="small-widget")
+
+    statement = Widget.query.sql(
+        """
+        SELECT {Widget.*}, other."name" AS other_name
+        FROM {Widget}
+        JOIN {Widget} other
+          ON other."size" = {Widget.size} AND other."id" <> {Widget.id}
+        WHERE {Widget.name} = {name}
+        """,
+        name="small-widget",
+    )
+    widget = statement.get()
+    assert widget.id == small.id
+    assert widget.name == "small-widget"
+    assert getattr(widget, "other_name") == "other-small"
+
+
+def test_star_columns_work_through_a_union(widgets):
+    """A UNION drops every column's source; the expansion still says what a row is."""
+    statement = Widget.query.sql(
+        """
+        SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {small}
+        UNION ALL
+        SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {large}
+        """,
+        small="small",
+        large="large",
+    )
+    names = sorted(widget.name for widget in statement)
+    assert names == ["large-widget", "small-widget"]
+    assert all(isinstance(widget, Widget) for widget in statement)
+
+
+def test_an_unaliased_duplicate_column_is_refused(widgets):
+    statement = Widget.query.sql(
+        """
+        SELECT {Widget.*}, other."name"
+        FROM {Widget}
+        JOIN {Widget} other ON other."id" <> {Widget.id}
+        """,
+    )
+    with pytest.raises(TypeError, match="Alias the extra column"):
+        statement.all()
 
 
 def test_result_type_maps_columns_by_name(widgets):
@@ -324,6 +402,64 @@ def test_result_type_converters_run(db):
     )
 
 
+def test_json_is_parsed_even_without_a_field(db):
+    """`jsonb` is loaded as text and parsed by a converter — including here."""
+
+    @dataclass
+    class JsonRow:
+        payload: dict
+
+    statement = ReturningEvent.query.sql(
+        "SELECT jsonb_build_object('a', {value}::int) AS payload",
+        value=1,
+        result_type=JsonRow,
+    )
+    assert statement.get() == JsonRow(payload={"a": 1})
+
+
+def test_a_result_type_field_with_a_default_need_not_be_selected(widgets):
+    @dataclass
+    class PartialRow:
+        name: str
+        note: str = "unset"
+        tags: list[str] = field(default_factory=list)
+
+    statement = Widget.query.sql(
+        "SELECT {Widget.name} AS name FROM {Widget} ORDER BY 1",
+        result_type=PartialRow,
+    )
+    assert statement.first() == PartialRow(name="large-widget")
+
+
+def test_an_encrypted_column_that_lost_its_source_is_refused(db):
+    """Nothing can decrypt a column whose source an expression threw away."""
+    SecretStore.query.create(name="prod", api_key="sk-live-123")
+
+    @dataclass
+    class SecretRow:
+        api_key: str
+
+    statement = SecretStore.query.sql(
+        "SELECT coalesce({SecretStore.api_key}, '') AS api_key FROM {SecretStore}",
+        result_type=SecretRow,
+    )
+    with pytest.raises(TypeError, match="nothing can decrypt it"):
+        statement.all()
+
+
+def test_prefetch_loads_related_objects(widgets, capture_queries, executed_sql):
+    statement = Widget.query.sql(
+        "SELECT {Widget.*} FROM {Widget} ORDER BY {Widget.name}"
+    ).prefetch("tags")
+
+    with capture_queries() as queries:
+        rows = statement.all()
+        tags = [sorted(tag.name for tag in widget.tags.query) for widget in rows]
+
+    assert tags == [["red"], ["blue", "red"]]
+    assert len(queries) == 2  # the statement, and one prefetch
+
+
 # ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
@@ -384,7 +520,7 @@ def test_exists_is_false_on_no_rows(widgets):
 def test_write_with_returning_gives_instances(widgets):
     statement = Widget.query.sql(
         """
-        UPDATE {Widget} SET "size" = {size}
+        UPDATE {Widget} SET {Widget.size:name} = {size}
         WHERE {Widget.name} = {name}
         RETURNING {Widget.*}
         """,
@@ -399,7 +535,7 @@ def test_write_with_returning_gives_instances(widgets):
 
 def test_write_without_returning_gives_a_row_count(widgets):
     statement = Widget.query.sql(
-        'UPDATE {Widget} SET "size" = {size} WHERE {Widget.size} = {old}',
+        "UPDATE {Widget} SET {Widget.size:name} = {size} WHERE {Widget.size} = {old}",
         size="tiny",
         old="small",
     )
@@ -419,6 +555,23 @@ def test_execute_counts_rows_without_shaping_them(widgets):
     assert Widget.query.filter(size="small").count() == 0
 
 
+def test_a_write_runs_once_however_it_is_asked(widgets):
+    """count()/first()/get() never run a write a second time."""
+    statement = Widget.query.sql(
+        """
+        INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
+        VALUES ({name}, {size})
+        RETURNING {Widget.*}
+        """,
+        name="once",
+        size="small",
+    )
+    assert statement.count() == 1
+    assert statement.first() is not None
+    assert statement.all() == statement.all()
+    assert Widget.query.filter(name="once").count() == 1
+
+
 def test_insert_returning_a_result_type(db):
     @dataclass
     class NewWidget:
@@ -427,7 +580,8 @@ def test_insert_returning_a_result_type(db):
 
     statement = Widget.query.sql(
         """
-        INSERT INTO {Widget} ("name", "size") VALUES ({name}, {size})
+        INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
+        VALUES ({name}, {size})
         RETURNING {Widget.id} AS id, {Widget.name} AS name
         """,
         name="fresh",
@@ -439,28 +593,28 @@ def test_insert_returning_a_result_type(db):
     assert Widget.query.get(id=row.id).name == "fresh"
 
 
-def test_constraint_violation_maps_to_validation_error(widgets):
-    statement = Tag.query.sql(
-        'INSERT INTO {Tag} ("name") VALUES ({name})',
+def test_unique_violation_maps_to_validation_error(widgets):
+    """Any model's constraint maps, not just the queryset's own."""
+    statement = Widget.query.sql(
+        "INSERT INTO {Tag} ({Tag.name:name}) VALUES ({name})",
         name="red",  # unique_tag_name already holds "red"
     )
     with pytest.raises(ValidationError):
         statement.execute()
 
 
-def test_a_statement_runs_once(widgets):
-    statement = Widget.query.sql(
+def test_foreign_key_violation_maps_to_validation_error(widgets):
+    small, _ = widgets
+    statement = WidgetTag.query.sql(
         """
-        INSERT INTO {Widget} ("name", "size") VALUES ({name}, {size})
-        RETURNING {Widget.*}
+        INSERT INTO {WidgetTag} ({WidgetTag.widget:name}, {WidgetTag.tag:name})
+        VALUES ({widget_id}, {tag_id})
         """,
-        name="once",
-        size="small",
+        widget_id=small.id,
+        tag_id=999_999,
     )
-    first = statement.all()
-    second = statement.all()
-    assert first == second
-    assert Widget.query.filter(name="once").count() == 1
+    with pytest.raises(ValidationError):
+        statement.execute()
 
 
 # ---------------------------------------------------------------------------
@@ -483,20 +637,38 @@ def test_missing_value(db):
         Widget.query.sql("SELECT * FROM {Widget} WHERE size = {size}")
 
 
-def test_multiple_statements_are_refused(db):
-    with pytest.raises(ValueError, match="single statement"):
-        Widget.query.sql("SELECT 1; DROP TABLE {Widget}")
+def test_a_literal_brace_has_to_be_doubled(db):
+    with pytest.raises(ValueError, match=r"is written `\{\{`"):
+        Widget.query.sql("SELECT {Widget.*} FROM {Widget} WHERE name ~ '^a{2}'")
 
 
-def test_a_semicolon_inside_a_string_is_fine(widgets):
-    @dataclass
-    class NameRow:
-        name: str
-
+def test_a_trailing_semicolon_is_dropped(widgets):
     statement = Widget.query.sql(
-        "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.name} <> 'a;b'",
+        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.size} = {size};",
+        size="small",
     )
-    assert statement is not None
+    assert statement.get().name == "small-widget"
+
+
+def test_a_second_statement_is_refused(widgets):
+    statement = Widget.query.sql(
+        "SELECT {Widget.id} FROM {Widget} WHERE {Widget.size} = {size}; "
+        "DELETE FROM {Widget}",
+        size="small",
+    )
+    with pytest.raises(psycopg.errors.SyntaxError, match="multiple commands"):
+        statement.execute()
+
+
+def test_sql_needs_a_bare_queryset(db):
+    with pytest.raises(TypeError, match="where\\(\\)/filter\\(\\)"):
+        Widget.query.where(Widget.size.equals("small")).sql(
+            "SELECT {Widget.*} FROM {Widget}"
+        )
+    with pytest.raises(TypeError, match="order_by"):
+        Widget.query.order_by("name").sql("SELECT {Widget.*} FROM {Widget}")
+    with pytest.raises(TypeError, match="slicing"):
+        Widget.query.all()[:2].sql("SELECT {Widget.*} FROM {Widget}")
 
 
 def test_result_type_must_be_a_dataclass(db):
@@ -509,6 +681,13 @@ def test_result_type_must_be_a_dataclass(db):
 def test_star_and_result_type_together_are_refused(db):
     with pytest.raises(TypeError, match="not both"):
         Widget.query.sql("SELECT {Widget.*} FROM {Widget}", result_type=SizeCount)
+
+
+def test_two_models_starred_are_refused(db):
+    with pytest.raises(TypeError, match="more than one model"):
+        Widget.query.sql(
+            "SELECT {Widget.*}, {Tag.*} FROM {Widget}, {Tag}",
+        )
 
 
 def test_rows_with_no_result_type_are_refused(widgets):
@@ -542,3 +721,19 @@ def test_result_type_type_mismatch(widgets):
     )
     with pytest.raises(TypeError, match="comes back as str"):
         statement.all()
+
+
+def test_the_plan_follows_the_columns_not_the_template(widgets):
+    """The same template with a different subquery is a different statement."""
+    template = 'SELECT sub."name" AS name FROM {rows} sub ORDER BY 1'
+
+    names = Widget.query.sql(
+        template, rows=Widget.query.values("name"), result_type=NameRow
+    )
+    assert names.all() == [NameRow(name="large-widget"), NameRow(name="small-widget")]
+
+    sizes = Widget.query.sql(
+        template, rows=Widget.query.values("size"), result_type=NameRow
+    )
+    with pytest.raises(psycopg.errors.UndefinedColumn):
+        sizes.all()

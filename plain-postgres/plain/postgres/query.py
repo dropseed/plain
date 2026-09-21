@@ -1896,12 +1896,18 @@ class QuerySet[T: "Model"]:
         """Write the query out, with `{}` references resolved against the models.
 
         The written half of the query API: `where()`/`order_by()` build a query
-        the code assembles, `sql()` runs one you wrote. Only this queryset's
-        model is used -- anything already filtered onto it is not part of the
-        statement.
+        the code assembles, `sql()` runs one you wrote.
+
+        The statement is the whole query, so it starts from the bare model --
+        `Model.query.sql(...)`. A queryset that has been narrowed cannot carry
+        its narrowing into written SQL, and silently dropping it would drop
+        whatever that filter was there to enforce. Embed the queryset as a
+        subquery instead: `sql("... FROM {rows} r", rows=narrowed)`.
 
         See `plain.postgres.written` and the README for the reference table.
         """
+        self._reject_narrowed_for_sql()
+
         from plain.postgres.written import Written
 
         return Written(
@@ -1910,6 +1916,35 @@ class QuerySet[T: "Model"]:
             values=values,
             result_type=result_type,
         )
+
+    def _reject_narrowed_for_sql(self) -> None:
+        """Refuse sql() on anything but a bare `Model.query`."""
+        query = self.sql_query
+        narrowings = {
+            "where()/filter()": query.has_filters(),
+            "order_by()": bool(query.order_by),
+            "distinct()": query.distinct,
+            "slicing": bool(query.low_mark) or query.high_mark is not None,
+            "annotate()": bool(query.annotations),
+            "values()/values_list()/select()": self._fields is not None
+            or bool(query.values_select)
+            or bool(query.select),
+            "join()": bool(query.joined_relations),
+            "prefetch()": bool(self._prefetch_lookups),
+            "only()/defer()": bool(query.deferred_loading[0]),
+            "for_update()": query.lock_mode is not None,
+            "returning()": self._returning_fields is not None
+            or self._returning_instances,
+        }
+        applied = [name for name, is_set in narrowings.items() if is_set]
+        if applied:
+            raise TypeError(
+                f"sql() takes the whole query, so it starts from "
+                f"{self.model.__name__}.query — this one already has "
+                f"{', '.join(applied)} on it, which a written statement can't "
+                "carry. Put the queryset in the statement as a subquery "
+                'instead: sql("... FROM {rows} r", rows=queryset).'
+            )
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()

@@ -1,9 +1,9 @@
 """What `sql()` learns on a statement's first execution, and keeps.
 
-The user-visible contract is in tests/public/test_written_sql.py. This pins
-the machinery underneath it: the per-template plan cache, the batched catalog
-lookup that resolves result columns back to model fields, the converters that
-lookup attaches, and the query span.
+The user-visible contract is in tests/public/test_written_sql.py. This pins the
+machinery underneath it: the plan cache keyed on the result columns, the
+batched catalog lookup that attaches converters, the row limits `first()` and
+`get()` push into the statement, and the query span.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _catalog_queries(queries: list[dict]) -> list[str]:
     return [query["sql"] for query in queries if "pg_attribute" in query["sql"]]
 
 
-def test_the_plan_is_built_once_per_template(db, capture_queries):
+def test_the_plan_is_built_once_per_result_shape(db, capture_queries):
     def run() -> None:
         Widget.query.sql(
             "SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
@@ -53,9 +53,44 @@ def test_the_plan_is_built_once_per_template(db, capture_queries):
 
     with capture_queries() as second:
         run()
-    # A second statement from the same template reuses the plan, so nothing
-    # goes back to the catalog.
+    # The same columns came back, so the plan is reused and nothing goes back
+    # to the catalog.
     assert _catalog_queries(second) == []
+    assert len(written._plans) == 1
+
+
+def test_a_different_result_shape_gets_its_own_plan(db):
+    """Two statements that return different columns can't share a plan."""
+
+    @dataclass
+    class SizeRow:
+        size: str
+
+    Widget.query.sql(
+        "SELECT {Widget.name} AS name FROM {Widget}", result_type=NameRow
+    ).all()
+    Widget.query.sql(
+        "SELECT {Widget.size} AS size FROM {Widget}", result_type=SizeRow
+    ).all()
+
+    assert len(written._plans) == 2
+
+
+def test_a_per_call_result_type_does_not_grow_the_cache(db):
+    """The cache is keyed on the columns, so a local dataclass can't leak."""
+
+    def run() -> None:
+        @dataclass
+        class Row:
+            name: str
+
+        Widget.query.sql(
+            "SELECT {Widget.name} AS name FROM {Widget}", result_type=Row
+        ).all()
+
+    for _ in range(3):
+        run()
+
     assert len(written._plans) == 1
 
 
@@ -124,7 +159,62 @@ def test_an_expression_column_resolves_to_no_field(db):
     assert plan.converters == {}
 
 
-def test_a_statement_opens_a_client_span(db, otel_spans: InMemorySpanExporter):
+def test_first_and_get_push_a_limit_into_the_statement(db, capture_queries):
+    for index in range(5):
+        Widget.query.create(name=f"w{index}", size="small")
+
+    statement = Widget.query.sql(
+        "SELECT {Widget.*} FROM {Widget} ORDER BY {Widget.name}"
+    )
+    with capture_queries() as queries:
+        assert statement.first() is not None
+
+    limited = [query["sql"] for query in queries if "LIMIT 1" in query["sql"]]
+    assert limited, "first() should have asked for one row"
+
+    one = Widget.query.sql(
+        "SELECT {Widget.*} FROM {Widget} WHERE {Widget.name} = {name}", name="w0"
+    )
+    with capture_queries() as queries:
+        one.get()
+    assert [query["sql"] for query in queries if "LIMIT 2" in query["sql"]]
+
+
+def test_count_and_exists_are_memoised(db, capture_queries):
+    Widget.query.create(name="one", size="small")
+    statement = Widget.query.sql("SELECT {Widget.*} FROM {Widget}")
+
+    with capture_queries() as queries:
+        assert statement.count() == 1
+        assert statement.count() == 1
+        assert statement.exists() is True
+
+    counted = [query["sql"] for query in queries if "count(*)" in query["sql"]]
+    assert len(counted) == 1
+    assert not [query["sql"] for query in queries if "EXISTS" in query["sql"]]
+
+
+def test_a_write_is_never_wrapped_for_counting(db, capture_queries):
+    statement = Widget.query.sql(
+        """
+        INSERT INTO {Widget} ({Widget.name:name}, {Widget.size:name})
+        VALUES ({name}, {size})
+        RETURNING {Widget.*}
+        """,
+        name="one",
+        size="small",
+    )
+    with capture_queries() as queries:
+        assert statement.count() == 1
+        assert statement.exists() is True
+
+    assert not [query["sql"] for query in queries if "count(*)" in query["sql"]]
+    assert Widget.query.filter(name="one").count() == 1
+
+
+def test_a_statement_opens_a_client_span_with_the_sql_as_written(
+    db, otel_spans: InMemorySpanExporter
+):
     Widget.query.create(name="one", size="small")
     otel_spans.clear()
 
@@ -140,6 +230,9 @@ def test_a_statement_opens_a_client_span(db, otel_spans: InMemorySpanExporter):
     ]
     assert spans, "no span carrying the rendered statement"
     assert spans[-1].kind is SpanKind.CLIENT
+    # One span per statement -- the cursor wrapper's own is suppressed so the
+    # span can carry the SQL as written rather than the escaped form.
+    assert len(spans) == 1
 
 
 def test_the_catalog_lookup_is_not_traced(db, otel_spans: InMemorySpanExporter):
