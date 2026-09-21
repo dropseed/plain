@@ -21,9 +21,9 @@ class ImpersonateMiddleware(HttpMiddleware):
             and can_be_impersonator(user)
         ):
             try:
-                user_to_impersonate = User.query.get(
-                    id=session[_IMPERSONATE_SESSION_KEY]
-                )
+                user_to_impersonate = User.query.where(
+                    User.id.equals(session[_IMPERSONATE_SESSION_KEY])
+                ).get()
             except User.DoesNotExist:
                 user_to_impersonate = None
 
