@@ -5,7 +5,7 @@ description = "Test with pytest."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "plain>=0.137.0,<1.0.0",
   "click>=8.0.0",

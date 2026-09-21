@@ -5,7 +5,7 @@ description = "Connect your Plain app to Plain Cloud via OTLP export."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "plain>=0.131.3,<1.0.0",
   # <2: the log handler overrides a private SDK method (see config.py).

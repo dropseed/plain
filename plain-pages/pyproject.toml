@@ -5,7 +5,7 @@ description = "Serve static pages, markdown, and assets from templates/pages dir
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "plain>=0.143.0,<1.0.0",
   "plain.assets>=0.1.0,<1.0.0",

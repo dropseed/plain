@@ -5,7 +5,7 @@ description = "Remote Python shell and file transfer via encrypted tunnel."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = ["plain<1.0.0", "websockets>=14.0", "spake2>=0.9", "pynacl>=1.5"]
 
 [dependency-groups]
