@@ -233,14 +233,15 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        filters = {"job_class": job_class_name}
+        conditions = []
         if concurrency_key:
-            filters["concurrency_key"] = concurrency_key
+            conditions.append(JobRequest.concurrency_key.equals(concurrency_key))
+        conditions.append(JobRequest.job_class.equals(job_class_name))
 
-        qs = JobRequest.query.filter(**filters)
+        qs = JobRequest.query.where(*conditions)
 
         if not include_retries:
-            qs = qs.filter(retry_attempt=0)
+            qs = qs.where(JobRequest.retry_attempt.equals(0))
 
         return qs
 
@@ -268,17 +269,18 @@ class Job(metaclass=JobType):
             else:
                 concurrency_key = self.default_concurrency_key()
 
-        filters = {"job_class": job_class_name}
+        conditions = []
         if concurrency_key:
-            filters["concurrency_key"] = concurrency_key
+            conditions.append(JobProcess.concurrency_key.equals(concurrency_key))
+        conditions.append(JobProcess.job_class.equals(job_class_name))
 
-        qs = JobProcess.query.filter(**filters)
+        qs = JobProcess.query.where(*conditions)
 
         if not include_retries:
-            qs = qs.filter(retry_attempt=0)
+            qs = qs.where(JobProcess.retry_attempt.equals(0))
 
         if not include_self and self.job_process:
-            qs = qs.exclude(id=self.job_process.id)
+            qs = qs.where(~JobProcess.id.equals(self.job_process.id))
 
         return qs
 
