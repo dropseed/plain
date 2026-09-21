@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-email@0.21.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-email@0.20.2) (2026-08-12)
 
 ### What's changed
