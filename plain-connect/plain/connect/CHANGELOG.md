@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.10.0](https://github.com/dropseed/plain/releases/plain-connect@0.10.0) (2026-09-21)
+
+### What's changed
+
+- `CONNECT_PAGEVIEWS_TOKEN` is now `CONNECT_PAGEVIEWS_PUBLIC_TOKEN` (env var `PLAIN_CONNECT_PAGEVIEWS_PUBLIC_TOKEN`). The value is a public endpoint token that `{% connect_pageviews %}` renders into every page's HTML, and the old name read like a credential — which mattered once Plain started enforcing that credential-named settings are masked. The name now says what the value is ([e7e5e7b5d8](https://github.com/dropseed/plain/commit/e7e5e7b5d8))
+
+### Upgrade instructions
+
+- Rename the setting: `CONNECT_PAGEVIEWS_TOKEN` → `CONNECT_PAGEVIEWS_PUBLIC_TOKEN`, or the env var `PLAIN_CONNECT_PAGEVIEWS_TOKEN` → `PLAIN_CONNECT_PAGEVIEWS_PUBLIC_TOKEN`. Same value; pageviews stop reporting until it's renamed.
+
 ## [0.9.0](https://github.com/dropseed/plain/releases/plain-connect@0.9.0) (2026-09-21)
 
 ### What's changed
