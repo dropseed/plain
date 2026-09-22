@@ -1,5 +1,16 @@
 # plain-postgres changelog
 
+## [0.122.0](https://github.com/dropseed/plain/releases/plain-postgres@0.122.0) (2026-09-21)
+
+### What's changed
+
+- `sql()` no longer attaches extra columns to `{Model:*}` instances. A query has a shape, and the shape is a type: a model instance is always complete and carries only its columns, so a statement that selects more than the expansion declares a dataclass, and a field of that dataclass annotated with a model class takes the expansion — `widget: Widget` alongside `tag_count: int`. `Model | None` is the outer side of a `LEFT JOIN` and hydrates `None` when the row didn't match. `{Model:*}` alone still returns instances; an extra column with no `result_type` is now refused rather than set on the instance where no type checker could see it. An expansion fills a model field only when it is written in the outer select list, which the renderer determines by scanning the statement's own text the way Postgres reads it — strings and their escapes, `E'...'` strings, quoted identifiers, dollar quotes, line and nested block comments — and if that scan can't finish, no depth is trusted and the statement is refused rather than hydrated from the wrong columns ([38e6dd04a3](https://github.com/dropseed/plain/commit/38e6dd04a3))
+- Preflight reads model annotations without evaluating them. On Python 3.14 annotations are deferred, and the default `inspect.get_annotations()` format evaluates them, so a model whose annotation names a class imported only under `TYPE_CHECKING` — the spelling 0.119.0 documents for string-referenced foreign keys — crashed `plain preflight` with `NameError`. Both checks now read with `annotationlib.Format.FORWARDREF` and treat an unresolved name as the text it stands for ([8164bb503c](https://github.com/dropseed/plain/commit/8164bb503c))
+
+### Upgrade instructions
+
+- A written statement that selected `{Model:*}` plus extra columns and read those extras off the instance needs a `result_type` dataclass with a model-typed field: `@dataclass class Row: widget: Widget; tag_count: int`, then `row.widget.name` and `row.tag_count`. `sql()` says so with the dataclass it expected. Statements that select only `{Model:*}`, and those that already pass `result_type=`, are unchanged.
+
 ## [0.121.0](https://github.com/dropseed/plain/releases/plain-postgres@0.121.0) (2026-09-21)
 
 ### What's changed
