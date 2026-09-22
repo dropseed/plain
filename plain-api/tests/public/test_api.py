@@ -1,4 +1,5 @@
-from typing import Literal, TypedDict
+import typing
+from typing import Any, Literal, TypedDict
 
 import pytest
 from plain.api import openapi
@@ -460,6 +461,153 @@ def test_schema_from_type_resolves_forward_ref_annotations():
         "properties": {
             "items": {"type": "array", "items": {"type": "integer"}},
             "name": {"type": "string"},
+        },
+    }
+
+
+def test_schema_from_type_optional_field_emits_nullable():
+    """An `X | None` field is the non-None member's schema plus `nullable`."""
+
+    class Prefs(TypedDict):
+        nickname: str | None
+        age: int | None
+
+    assert schema_from_type(Prefs) == {
+        "type": "object",
+        "properties": {
+            "nickname": {"type": "string", "nullable": True},
+            "age": {"type": "integer", "nullable": True},
+        },
+    }
+
+
+def test_schema_from_type_legacy_optional_spellings_match_pep604():
+    """User code still writes `Optional[X]` and `Union[X, None]`.
+
+    They're separate objects from `X | None` (equal, not identical), so the
+    generator has to recognize them in their own right. The old spelling is
+    the whole point of the test, hence the noqa on each one.
+    """
+    legacy_optional = typing.Optional[int]  # noqa: UP045
+    legacy_union = typing.Union[str, None]  # noqa: UP007
+    legacy_wide_union = typing.Union[str, int, None]  # noqa: UP007
+
+    assert schema_from_type(legacy_optional) == {
+        "type": "integer",
+        "nullable": True,
+    }
+    assert schema_from_type(legacy_union) == {
+        "type": "string",
+        "nullable": True,
+    }
+    assert schema_from_type(legacy_wide_union) == {
+        "anyOf": [{"type": "string"}, {"type": "integer"}],
+        "nullable": True,
+    }
+
+
+def test_schema_from_type_union_of_named_types_emits_any_of():
+    """OpenAPI 3.0 has no sum type, so a union of named types becomes `anyOf`."""
+    assert schema_from_type(str | int) == {
+        "anyOf": [{"type": "string"}, {"type": "integer"}]
+    }
+
+
+def test_schema_from_type_union_with_none_emits_any_of_plus_nullable():
+    """A three-member union carries its `None` arm as `nullable`, which is 3.0's spelling for it."""
+    assert schema_from_type(str | int | None) == {
+        "anyOf": [{"type": "string"}, {"type": "integer"}],
+        "nullable": True,
+    }
+
+
+def test_schema_from_type_optional_inside_list_and_dict():
+    """A union nested in a container is translated where it sits."""
+    assert schema_from_type(list[str | None]) == {
+        "type": "array",
+        "items": {"type": "string", "nullable": True},
+    }
+    assert schema_from_type(dict[str, int | None]) == {
+        "type": "object",
+        "additionalProperties": {"type": "integer", "nullable": True},
+    }
+
+
+def test_schema_from_type_optional_typed_dict_is_a_nullable_ref():
+    """An optional nested TypedDict still registers as its own component."""
+
+    class Address(TypedDict):
+        city: str
+
+    class Person(TypedDict):
+        address: Address | None
+
+    components: dict[str, Any] = {}
+    assert schema_from_type(Person, components=components) == {
+        "$ref": "#/components/schemas/Person"
+    }
+    assert components["schemas"]["Person"]["properties"]["address"] == {
+        "$ref": "#/components/schemas/Address",
+        "nullable": True,
+    }
+
+
+def test_schema_from_type_unsupported_generic_still_raises():
+    """Unions are handled, but an unmodelled container is still a hard error."""
+    with pytest.raises(ValueError, match="Unknown type"):
+        schema_from_type(tuple[int, str])
+
+
+def test_openapi_document_with_optional_fields_generates_and_validates():
+    """The whole document must build and validate when a response has optional fields.
+
+    This is the level a user sees the bug at: a view whose response TypedDict
+    has an `X | None` field used to raise out of the generator, so serving
+    `openapi.json` returned a 500.
+    """
+
+    class Note(TypedDict):
+        id: int
+        title: str
+        archived_at: str | None
+        tags: list[str | None]
+        owner: str | int | None
+
+    class NoteView(APIView):
+        @openapi.response_typed_dict(200, Note)
+        def get(self) -> Note:
+            return {
+                "id": 1,
+                "title": "x",
+                "archived_at": None,
+                "tags": [],
+                "owner": None,
+            }
+
+    @openapi.schema(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Notes API", "version": "1.0.0"},
+        }
+    )
+    class LocalRouter(Router):
+        namespace = ""
+        urls = (path("notes", NoteView, name="notes"),)
+
+    schema = OpenAPISchemaGenerator(LocalRouter()).schema
+    validate_openapi_schema(schema)
+
+    assert schema["paths"]["/notes"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/Note"}
+    assert schema["components"]["schemas"]["Note"]["properties"] == {
+        "id": {"type": "integer"},
+        "title": {"type": "string"},
+        "archived_at": {"type": "string", "nullable": True},
+        "tags": {"type": "array", "items": {"type": "string", "nullable": True}},
+        "owner": {
+            "anyOf": [{"type": "string"}, {"type": "integer"}],
+            "nullable": True,
         },
     }
 
