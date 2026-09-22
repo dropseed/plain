@@ -1,5 +1,15 @@
 # plain-api changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-api@0.37.0) (2026-09-21)
+
+### What's changed
+
+- OpenAPI generation no longer fails on Python 3.14. `schema_from_type()` probed `__origin__` and raised on anything it didn't recognize before reaching the branch that handles `X | None`; 3.14 unified `types.UnionType` with `typing.Union`, so every union suddenly had an origin and every optional field in a response schema raised `ValueError: Unknown type`. Unions are now matched first, through `typing.get_origin`/`get_args` instead of dunder probing. `X | None` generates exactly what it did on 3.13 (the member's schema plus `nullable: true`), so no existing document changes. A union of several named members — `str | int` — now generates `anyOf` (plus `nullable` when `None` is among them) instead of failing the whole document; a subscripted generic the generator doesn't model still raises ([ae347ae811](https://github.com/dropseed/plain/commit/ae347ae811))
+
+### Upgrade instructions
+
+- If an app serves a generated OpenAPI document and has moved to Python 3.14, regenerate it — a document generated before this fix is missing, not merely stale.
+
 ## [0.36.0](https://github.com/dropseed/plain/releases/plain-api@0.36.0) (2026-09-21)
 
 ### What's changed
