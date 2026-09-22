@@ -1,5 +1,15 @@
 # plain-code changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-code@0.27.0) (2026-09-21)
+
+### What's changed
+
+- Requires ty 0.0.82. plain-code pinned ruff to a floor but ty only to `<1.0.0`, so an app's `uv lock` never moved the type checker when Plain was upgraded — four apps were found sitting on ty 0.0.11 through 0.0.69, versions that can't check the typed query API (nullable foreign-key traversal, `LiteralString`, t-string templates) and were silently checking almost nothing ([3d44ca7bb1](https://github.com/dropseed/plain/commit/3d44ca7bb1))
+
+### Upgrade instructions
+
+- Run `uv lock` after upgrading; ty moves with it. Expect the newer checker to report real errors an older one missed, particularly in code that traverses nullable foreign keys.
+
 ## [0.26.0](https://github.com/dropseed/plain/releases/plain-code@0.26.0) (2026-09-21)
 
 ### What's changed
