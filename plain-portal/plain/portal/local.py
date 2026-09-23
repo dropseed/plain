@@ -5,8 +5,6 @@ tunnel through the relay and listens on a Unix socket. Subsequent
 commands (exec, pull, push) talk to the connect process over the socket.
 """
 
-from __future__ import annotations
-
 import asyncio
 import fcntl
 import functools

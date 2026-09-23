@@ -5,8 +5,6 @@ Every returned object -- inserted or updated -- comes back with its DB-returned
 fields (primary key, DB defaults) populated from the row at its own position.
 """
 
-from __future__ import annotations
-
 import random
 from decimal import Decimal
 from zoneinfo import ZoneInfo

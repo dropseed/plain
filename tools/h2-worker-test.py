@@ -8,8 +8,6 @@ and connection lifecycle over TLS+h2. Run via ./tools/h2-worker-test or:
 The server must be running with TLS and ALPN h2 support.
 """
 
-from __future__ import annotations
-
 import argparse
 import socket
 import ssl

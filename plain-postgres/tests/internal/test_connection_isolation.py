@@ -10,8 +10,6 @@ These tests directly manipulate the internal ContextVar to avoid needing a real
 database — we're testing the storage/isolation mechanism, not DB connectivity.
 """
 
-from __future__ import annotations
-
 import asyncio
 import concurrent.futures
 import contextvars

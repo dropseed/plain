@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 from calendar import monthrange
 from collections.abc import Iterator

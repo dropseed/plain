@@ -8,8 +8,6 @@ sequence-reserved id -- see test_create_update / test_delete_behaviors). Loading
 real rows is exempt -- that path passes `_from_db=True`.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.querysets import DefaultQuerySetModel
 

@@ -7,8 +7,6 @@ be swallowed rather than reported. Each of those says so; the assertion is
 "this is what happens today", not "this is what should happen".
 """
 
-from __future__ import annotations
-
 from io import BytesIO
 
 import pytest

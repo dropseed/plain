@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.postgres import get_connection
 from plain.postgres.introspection import (
     ColumnState,

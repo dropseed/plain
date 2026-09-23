@@ -1,7 +1,5 @@
 """The `MCPTool` base class. Subclass, define `__init__` with your args, and implement `run()`."""
 
-from __future__ import annotations
-
 import inspect
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, ClassVar

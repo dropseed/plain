@@ -5,8 +5,6 @@ read_only() opens a single BEGIN READ ONLY transaction for the block,
 so writes raise and nested atomic() blocks become read-only savepoints.
 """
 
-from __future__ import annotations
-
 import psycopg.errors
 import pytest
 from app.examples.models.iteration import IterationExample

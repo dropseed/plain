@@ -5,8 +5,6 @@ without a listener, signals, or init_process(), and drive
 h1.handle_connection over a socketpair with H1Client/h1_connect.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import os

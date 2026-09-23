@@ -5,8 +5,6 @@ code, waits for the local side to connect, then executes commands as
 they arrive through the encrypted tunnel.
 """
 
-from __future__ import annotations
-
 import ast
 import asyncio
 import base64

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 import importlib.metadata
 from collections.abc import Callable, Iterable, Iterator

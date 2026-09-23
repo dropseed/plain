@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.postgres.expressions import Func
 from plain.postgres.fields import UUIDField
 

@@ -11,8 +11,6 @@ Converters still expose a `regex` attribute, which is used to validate
 the *value* within a single segment — not as a slice of the URL.
 """
 
-from __future__ import annotations
-
 import functools
 import re
 import string

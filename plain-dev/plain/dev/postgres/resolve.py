@@ -24,8 +24,6 @@ sync`, which inherits our `DATABASE_URL`, sees a URL already configured, and
 skips all of this. Only the outermost process does any real work.
 """
 
-from __future__ import annotations
-
 import os
 import sys
 from enum import Enum, auto

@@ -10,8 +10,6 @@ converts them to HTTP responses — not intended for user code):
 - `Resolver400` — request path was malformed (e.g. `..` below root).
 """
 
-from __future__ import annotations
-
 from plain.http import BadRequestError400, NotFoundError404
 
 

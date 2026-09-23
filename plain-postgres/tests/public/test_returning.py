@@ -5,8 +5,6 @@ With it, no-arg returning() hydrates full model instances and
 returning(*Model.field) returns a list of dicts holding just those columns.
 """
 
-from __future__ import annotations
-
 import copy
 import operator
 import re

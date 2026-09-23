@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.iteration import IterationExample
 from plain.postgres import F
 from plain.postgres.functions import Lower

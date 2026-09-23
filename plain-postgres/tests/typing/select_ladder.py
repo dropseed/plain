@@ -12,8 +12,6 @@ transposition inside any rung swaps two types in the asserted tuple, and the
 runtime, because pytest doesn't collect this directory.
 """
 
-from __future__ import annotations
-
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import assert_type

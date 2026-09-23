@@ -11,8 +11,6 @@ the runtime behavior (`ForwardForeignKeyDescriptor.__getattr__` raises), so
 the two agree. Runtime half: tests/public/test_typed_where_fk.py.
 """
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.delete import (

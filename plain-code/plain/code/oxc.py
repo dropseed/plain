@@ -5,8 +5,6 @@ Downloads and manages oxlint (linter) and oxfmt (formatter) binaries
 from the oxc-project/oxc GitHub releases.
 """
 
-from __future__ import annotations
-
 import io
 import os
 import platform

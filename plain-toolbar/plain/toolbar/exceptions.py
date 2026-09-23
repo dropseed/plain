@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import linecache
 import logging
 import reprlib

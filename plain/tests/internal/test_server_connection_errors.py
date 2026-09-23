@@ -8,8 +8,6 @@ Worker._serve_connection — covering ALPN/TLS setup and both protocol
 handlers; this pins that layer with an h1 bug as the trigger.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import socket

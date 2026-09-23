@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.postgres import Field, types
 
 from plain import postgres

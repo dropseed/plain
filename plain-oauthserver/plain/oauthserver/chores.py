@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.chores import Chore, register_chore
 from plain.utils import timezone
 

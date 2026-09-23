@@ -6,8 +6,6 @@ pytest fixture shipped by this package, which clears ``outbox`` around each
 test.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from .base import BaseEmailBackend

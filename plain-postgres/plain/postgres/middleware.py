@@ -1,7 +1,5 @@
 """HTTP middleware that manages the per-request database connection lifecycle."""
 
-from __future__ import annotations
-
 from functools import partial
 
 from plain.http import HttpMiddleware, Response

@@ -11,8 +11,6 @@ Postgres will happily run. The checker is the whole guard, which is why these
 claims have no runtime counterpart.
 """
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.defaults import DefaultsExample

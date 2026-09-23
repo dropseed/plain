@@ -11,8 +11,6 @@ or directly:
 The server must have a WebSocket echo endpoint at /websocket/echo.
 """
 
-from __future__ import annotations
-
 import argparse
 import base64
 import hashlib

@@ -12,8 +12,6 @@ The policy cap is independent of buffering strategy (SERVER_BODY_MAX_MEMORY_SIZE
 - h2 stream exceeding the cap mid-data: 413.
 """
 
-from __future__ import annotations
-
 import asyncio
 
 import h2.errors

@@ -5,8 +5,6 @@ sign-up, returning users, the account-takeover guard when an email is
 already registered, connect() idempotency, and token-expiry helpers.
 """
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 import pytest

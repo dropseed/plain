@@ -1,7 +1,5 @@
 """Tests for the admin date-range helpers used by cards and charts."""
 
-from __future__ import annotations
-
 import datetime
 
 import pytest

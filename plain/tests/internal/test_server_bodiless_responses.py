@@ -17,8 +17,6 @@ incident: after a bodiless response, the next bytes on the connection
 must be the next response's status line.
 """
 
-from __future__ import annotations
-
 import asyncio
 
 import h2.events

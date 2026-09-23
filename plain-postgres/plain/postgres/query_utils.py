@@ -6,8 +6,6 @@ large and/or so that they can be used by other modules without getting into
 circular import difficulties.
 """
 
-from __future__ import annotations
-
 import functools
 import inspect
 from collections.abc import Callable, Generator, Iterable

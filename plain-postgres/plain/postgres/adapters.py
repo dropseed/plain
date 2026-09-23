@@ -4,8 +4,6 @@ The `AdaptersMap` returned by `get_adapters_template()` is attached to every
 psycopg connection we open (via `build_connection_params` in `sources.py`).
 """
 
-from __future__ import annotations
-
 from functools import lru_cache
 from typing import Any
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import mimetypes
 from email import charset as Charset
 from email import encoders as Encoders

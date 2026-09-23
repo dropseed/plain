@@ -1,8 +1,6 @@
 """Framework default error renderer — maps exception to status code,
 returns a plain-text body. Logging via `log_exception` (idempotent)."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from plain.http import Response, status_for_exception, status_omits_body

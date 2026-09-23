@@ -5,8 +5,6 @@ result is persisted, and later lookups return that stored value. Unkeyed
 flags recompute every time. Disabled flags short-circuit.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled

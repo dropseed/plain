@@ -10,8 +10,6 @@ columns, adding a join, or dropping a clause, these fail and you decide
 whether it should have.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.users.models import User
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (

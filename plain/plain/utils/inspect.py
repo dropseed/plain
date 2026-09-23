@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import annotationlib
 import functools
 import inspect

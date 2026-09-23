@@ -4,8 +4,6 @@ Covers the `db.client.connection.*` pool metric family, pool-name attribute,
 response row recording, and server.* span attributes.
 """
 
-from __future__ import annotations
-
 import concurrent.futures
 import threading
 from typing import Any, ClassVar

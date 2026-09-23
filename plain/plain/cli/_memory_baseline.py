@@ -6,8 +6,6 @@ are accurate — no prior imports contaminate the numbers.
 Outputs a single JSON line to stdout.
 """
 
-from __future__ import annotations
-
 import json
 import resource
 import subprocess

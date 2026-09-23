@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import zoneinfo
 from collections.abc import Callable, Sequence
 from functools import cache

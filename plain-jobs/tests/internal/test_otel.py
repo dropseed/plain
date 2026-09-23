@@ -6,8 +6,6 @@ are deferred. These tests cover `Job.run_in_worker()`, which is the
 hottest user-facing path.
 """
 
-from __future__ import annotations
-
 import logging
 import threading
 import time

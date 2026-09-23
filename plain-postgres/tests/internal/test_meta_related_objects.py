@@ -6,8 +6,6 @@ pins the index itself, because a regression in it silently empties every
 reverse accessor at once.
 """
 
-from __future__ import annotations
-
 from app.examples.models.delete import DeleteParent
 from plain.postgres.fields.reverse_related import ForeignKeyRel
 

@@ -8,8 +8,6 @@ changes on existing columns are convergence-managed — the schema editor
 short-circuits on allow_null and default differences.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import fields as plain_fields

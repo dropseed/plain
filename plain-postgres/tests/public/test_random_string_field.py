@@ -1,7 +1,5 @@
 """Tests for RandomStringField and the RandomString expression it renders."""
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from plain.postgres import RandomStringField, get_connection

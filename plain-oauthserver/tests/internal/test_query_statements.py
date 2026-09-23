@@ -9,8 +9,6 @@ The `db` fixture already holds the test inside a transaction, so each view's
 those atomic blocks are the outermost ones.
 """
 
-from __future__ import annotations
-
 import threading
 from datetime import timedelta
 

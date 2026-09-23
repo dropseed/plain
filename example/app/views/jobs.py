@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.http import RedirectResponse, Response
 from plain.urls import reverse
 from plain.views import View

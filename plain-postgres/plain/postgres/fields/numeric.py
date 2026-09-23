@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import decimal
 from collections.abc import Callable, Sequence
 from functools import cached_property

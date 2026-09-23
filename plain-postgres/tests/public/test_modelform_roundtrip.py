@@ -7,8 +7,6 @@ field types so regressions in form-field selection or coercion surface
 immediately.
 """
 
-from __future__ import annotations
-
 import datetime
 import json
 import uuid

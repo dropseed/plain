@@ -20,8 +20,6 @@ the keepalive ping loop, and the size cap — plus the handshake pieces
 (upgrade detection, subprotocol selection, the accept response).
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 from collections.abc import Callable, Coroutine

@@ -22,8 +22,6 @@ check reads the *annotation*; how the field names its target is irrelevant to
 it, and a class argument resolves without a registry.
 """
 
-from __future__ import annotations
-
 import sys
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Optional, TypeAliasType

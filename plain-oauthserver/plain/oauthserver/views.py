@@ -10,8 +10,6 @@ connector) needs to authenticate an end user against a Plain app:
 - Token revocation (RFC 7009)
 """
 
-from __future__ import annotations
-
 from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode, urlparse, urlunparse

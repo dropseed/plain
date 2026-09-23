@@ -6,8 +6,6 @@ the concrete `TextField[T]` the stub returns -- so `Field[T]` is what the
 checker actually sees.
 """
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.defaults import DefaultsExample

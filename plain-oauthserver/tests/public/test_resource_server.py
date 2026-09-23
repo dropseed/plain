@@ -1,7 +1,5 @@
 """Tests for validate_access_token — the resource-server side."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from oauth_helpers import generate_pkce_pair, issue_token_pair

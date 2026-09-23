@@ -4,8 +4,6 @@ Kept separate from the authorization-server views so a resource server (e.g. a
 `plain.mcp` endpoint) can validate tokens without importing the view layer.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

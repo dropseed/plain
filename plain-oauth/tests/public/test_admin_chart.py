@@ -4,8 +4,6 @@ The card's query is written with `sql()`; this pins that it returns what the
 grouped aggregate it replaced returned.
 """
 
-from __future__ import annotations
-
 from app.users.models import User
 from plain.oauth.admin import ProvidersChartCard
 from plain.oauth.models import OAuthConnection

@@ -18,8 +18,6 @@ we invoke it directly here against the live test-app registry (every example
 fixture model). A fixture that mis-declares an accessor as a field fails here.
 """
 
-from __future__ import annotations
-
 from plain.postgres import Field, ModelMixin, types
 from plain.postgres.base import Model, ModelBase
 from plain.postgres.preflight.models import (

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings
 

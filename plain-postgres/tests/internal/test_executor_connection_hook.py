@@ -10,8 +10,6 @@ checked out forever, since `request_finished` fires on the handler thread
 and can't see the worker thread's ContextVar state.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor

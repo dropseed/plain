@@ -1,7 +1,5 @@
 """Preflight checks on model definitions."""
 
-from __future__ import annotations
-
 import annotationlib
 import inspect
 import sys

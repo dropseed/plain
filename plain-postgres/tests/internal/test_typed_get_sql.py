@@ -8,8 +8,6 @@ structure rather than literal text.
 The behavioral contract lives in `tests/public/test_typed_get.py`.
 """
 
-from __future__ import annotations
-
 from app.examples.models.defaults import DefaultsExample
 
 

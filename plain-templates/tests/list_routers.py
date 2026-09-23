@@ -1,7 +1,5 @@
 """Views and routers for test_list_view.py."""
 
-from __future__ import annotations
-
 from plain.templates.views import ListView
 from plain.urls import Router, path
 

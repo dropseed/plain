@@ -8,8 +8,6 @@ The static half of the contract -- which calls the type checker must reject,
 and what the descriptors must keep typing as -- lives in `tests/typing/`.
 """
 
-from __future__ import annotations
-
 import copy
 import pickle
 

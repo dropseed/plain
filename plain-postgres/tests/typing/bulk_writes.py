@@ -6,8 +6,6 @@ references for its conflict target and its update columns -- including a
 Field -- and `bulk_create()` no longer takes a conflict surface at all.
 """
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.upsert import UpsertItem, UpsertScoped, UpsertTenant

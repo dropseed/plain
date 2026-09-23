@@ -4,8 +4,6 @@
 constructor's signature decides what reaches the file.
 """
 
-from __future__ import annotations
-
 from plain.postgres.migrations import operations
 from plain.postgres.migrations.writer import OperationWriter
 

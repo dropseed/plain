@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 from itertools import islice
 from typing import Any

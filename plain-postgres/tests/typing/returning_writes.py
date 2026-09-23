@@ -5,8 +5,6 @@ instances; the field-reference overload hands back dicts of just those columns.
 The overload ladder is the whole promise, so it is asserted statically.
 """
 
-from __future__ import annotations
-
 from typing import Any, assert_type
 
 from app.examples.models.delete import ChildCascade, DeleteParent

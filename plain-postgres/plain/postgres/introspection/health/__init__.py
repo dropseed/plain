@@ -18,8 +18,6 @@ Internal layout (for maintainers):
 - runner.py            — ALL_CHECKS + cross-check caveats + run_all_checks
 """
 
-from __future__ import annotations
-
 from .ownership import build_table_owners
 from .runner import run_all_checks
 from .types import CheckItem, CheckResult, Informational, TableOwner

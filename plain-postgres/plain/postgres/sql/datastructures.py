@@ -3,8 +3,6 @@ Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import quote_name

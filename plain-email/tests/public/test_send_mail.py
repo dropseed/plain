@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.email import send_mail, send_mass_mail
 from plain.email.backends.base import BaseEmailBackend
 

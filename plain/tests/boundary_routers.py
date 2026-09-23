@@ -11,8 +11,6 @@ The interesting cases:
 - Nested include — `/admin/users/x` through chained includes
 """
 
-from __future__ import annotations
-
 from plain.http import Response
 from plain.urls import Router, include, path
 from plain.views import View

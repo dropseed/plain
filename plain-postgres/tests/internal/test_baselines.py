@@ -7,8 +7,6 @@ real test database, where `examples` has its full history recorded and
 `plaintemplates` has no migrations at all.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 

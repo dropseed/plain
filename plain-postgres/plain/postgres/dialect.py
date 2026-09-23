@@ -5,8 +5,6 @@ All functions in this module are stateless — they don't depend on connection s
 Higher-level SQL builders that need connections live in ddl.py.
 """
 
-from __future__ import annotations
-
 import datetime
 import ipaddress
 import json

@@ -11,8 +11,6 @@ rewrites a field's surface -- which is why a traversed field offers exactly
 what direct access offers, down to an encrypted field's blocks.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.constants import LOOKUP_SEP

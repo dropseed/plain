@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.storage_parameters import StorageParametersExample
 from conftest_convergence import execute
 from plain.postgres import get_connection

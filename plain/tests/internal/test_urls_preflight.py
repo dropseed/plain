@@ -22,8 +22,6 @@ Preflight (warning):
   namespace separator
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.exceptions import ImproperlyConfigured
 from plain.urls import Router, include, path

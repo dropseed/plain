@@ -10,8 +10,6 @@ swallows the body reports only "connection failed". The misrouting is
 fixed; these facts are what would have made it a one-trace diagnosis.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any
 

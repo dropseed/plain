@@ -5,8 +5,6 @@ against nobody's database, or against somebody else's — so they're pinned
 even though they're internal.
 """
 
-from __future__ import annotations
-
 import os
 
 import pytest

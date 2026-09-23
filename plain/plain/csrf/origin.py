@@ -1,7 +1,5 @@
 """The cross-origin decision shared by the CSRF middleware and WebSocket upgrades."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 

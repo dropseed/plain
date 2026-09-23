@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.test import Client
 from plain.views import View
 

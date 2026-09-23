@@ -8,8 +8,6 @@ loop. Both are exercised here in isolation, byte-split-adversarially,
 before any protocol wiring depends on them.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.server.http.errors import ChunkedFramingError, LimitRequestBody
 from plain.server.http.sink import (

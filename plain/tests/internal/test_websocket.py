@@ -4,8 +4,6 @@ The server-level behaviour (handshake, echo, shutdown, logging) is in
 test_server_websocket.py; this pins the message layer's edges directly.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager

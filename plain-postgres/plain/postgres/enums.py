@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import enum
 from types import DynamicClassAttribute
 from typing import Any

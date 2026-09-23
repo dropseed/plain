@@ -16,8 +16,6 @@ Sections:
     8. Query-count canary
 """
 
-from __future__ import annotations
-
 import psycopg
 import pytest
 from app.examples.models.delete import (

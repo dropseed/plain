@@ -7,8 +7,6 @@ The contract lives in `tests/public/test_typed_where.py` and
 under the hood and you get to decide whether it should have.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent

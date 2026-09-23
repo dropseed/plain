@@ -16,8 +16,6 @@ arguments available in tempfile.NamedTemporaryFile.
 2: https://bugs.python.org/issue14243
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 from collections.abc import Callable

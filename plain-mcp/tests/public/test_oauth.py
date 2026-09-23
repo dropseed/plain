@@ -5,8 +5,6 @@ Requests go through the shared `mcp_post` fixture (tests/conftest.py), which
 builds the `_meta` envelope and mirrored headers every request must carry.
 """
 
-from __future__ import annotations
-
 import json
 
 from plain.mcp.views import PROTOCOL_VERSION

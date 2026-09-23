@@ -10,8 +10,6 @@ The FlagResult statements that follow are a separate, unconverted
 get_or_create() path -- they are pinned here only so the counts stay honest.
 """
 
-from __future__ import annotations
-
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )

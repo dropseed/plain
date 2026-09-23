@@ -9,8 +9,6 @@ dispatching to the thread pool. Tests are split into:
    verify the response bytes.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import socket

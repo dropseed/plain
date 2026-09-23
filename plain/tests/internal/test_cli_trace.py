@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 from opentelemetry import trace
 from opentelemetry.semconv.attributes.code_attributes import (

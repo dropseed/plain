@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.delete import ChildCascade, ChildSetNull
 from app.examples.models.relationships import Widget, WidgetTag
 from app.examples.models.trees import TreeNode

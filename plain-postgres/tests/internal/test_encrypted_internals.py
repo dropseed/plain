@@ -6,8 +6,6 @@ through SECRET_KEY_FALLBACKS) is asserted through the model in
 `tests/public/test_encrypted_fields.py`. These pin the mechanism.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,

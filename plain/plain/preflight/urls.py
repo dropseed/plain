@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .checks import PreflightCheck
 from .registry import register_check
 from .results import PreflightResult

@@ -5,8 +5,6 @@ These managers provide the API for working with collections of related objects
 through foreign key and many-to-many relationships.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 

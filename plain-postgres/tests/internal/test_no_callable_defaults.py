@@ -1,7 +1,5 @@
 """Callable values are rejected as `default=` at model-definition time."""
 
-from __future__ import annotations
-
 import uuid
 
 import pytest

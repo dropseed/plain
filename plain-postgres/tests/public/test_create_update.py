@@ -5,8 +5,6 @@ Each refuses the wrong lifecycle state, and delete() resets the instance to
 "new" so it can be create()'d again.
 """
 
-from __future__ import annotations
-
 import psycopg
 import pytest
 from app.examples.models.constraints import ConstraintExample

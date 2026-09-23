@@ -1,7 +1,5 @@
 """Tests for heartbeat-based LOST detection and Job.on_aborted hook."""
 
-from __future__ import annotations
-
 import datetime
 import socket
 import uuid

@@ -6,8 +6,6 @@ future change to the foreign key implementation shows up as a diff to these
 tests.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.delete import ChildCascade, CircA, DeleteParent
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError

@@ -11,8 +11,6 @@ with a real client-side h2 state machine — no TLS, no worker process.
 The TLS/ALPN socket-level contract is covered by tools/h2-shutdown-test.
 """
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any
 

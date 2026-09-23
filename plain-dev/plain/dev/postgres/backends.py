@@ -14,8 +14,6 @@ If neither is available we return `None` and say why. Never start a Docker
 daemon, and never install Postgres.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import re

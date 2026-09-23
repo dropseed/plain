@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import email
 from email.message import Message
 from typing import Any

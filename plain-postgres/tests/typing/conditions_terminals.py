@@ -7,8 +7,6 @@ and `last()` take conditions only; a bare int there would read as a count.
 Runtime half: tests/public/test_typed_get.py.
 """
 
-from __future__ import annotations
-
 from typing import Never, assert_type
 
 from app.examples.models.defaults import DefaultsExample

@@ -7,8 +7,6 @@ counts time spent actively waiting for body bytes and 408s clients that
 stay under the rate once the grace period passes.
 """
 
-from __future__ import annotations
-
 import asyncio
 
 import pytest

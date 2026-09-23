@@ -5,8 +5,6 @@
 `default=`" -- that is the PEP 681 rule, and it is not nullable-specific.
 """
 
-from __future__ import annotations
-
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from plain.postgres import Field, types

@@ -14,8 +14,6 @@ Two things about how the statements are captured:
    In production the claim's atomic block is the outermost one.
 """
 
-from __future__ import annotations
-
 import datetime
 import threading
 

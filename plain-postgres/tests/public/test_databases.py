@@ -6,8 +6,6 @@ The role needs CREATEDB — which is the point of the module, and true of every
 development and CI Postgres.
 """
 
-from __future__ import annotations
-
 import secrets
 
 import psycopg

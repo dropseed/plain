@@ -1,7 +1,5 @@
 """Test fixtures for QuerySet.returning() on update()/delete()."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from plain.postgres import Field, types

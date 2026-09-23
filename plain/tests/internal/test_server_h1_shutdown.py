@@ -22,8 +22,6 @@ real Worker object — no listener, no signals. The socket-level contract
 (SIGTERM, drain, exit code) is covered by tools/shutdown-test.
 """
 
-from __future__ import annotations
-
 import asyncio
 import socket
 import time

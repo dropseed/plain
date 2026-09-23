@@ -1,7 +1,5 @@
 """Test middleware and view classes for test_middleware_pipeline.py."""
 
-from __future__ import annotations
-
 import asyncio
 from contextvars import ContextVar
 

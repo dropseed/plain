@@ -10,8 +10,6 @@ data") and escaped handle_connection unhandled (production incident:
 Sentry PULLAPPROVE5-7N).
 """
 
-from __future__ import annotations
-
 import asyncio
 
 import pytest

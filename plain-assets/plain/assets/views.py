@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import mimetypes
 import os
 from email.utils import parsedate

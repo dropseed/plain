@@ -6,8 +6,6 @@ immediately, and the message is the complete sequence to get the database's
 history back to ordinary records.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 

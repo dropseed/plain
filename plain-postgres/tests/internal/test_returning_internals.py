@@ -4,8 +4,6 @@ These poke private state directly: they pin the contracts between the
 queryset, the query and the compiler, not anything a user calls.
 """
 
-from __future__ import annotations
-
 import typing
 
 import pytest

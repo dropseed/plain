@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 class OnDelete:
     """Sentinel marking an on_delete action.
 

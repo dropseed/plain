@@ -9,8 +9,6 @@ The static half -- which of these calls the checker must reject -- lives in
 `tests/internal/test_typed_get_sql.py`.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import Tag

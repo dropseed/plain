@@ -5,8 +5,6 @@ proxied response is forwarded as an SSE stream or a buffered body), so these
 guard the internal behavior rather than a public contract.
 """
 
-from __future__ import annotations
-
 import httpx
 from plain.tunnel.client import TunnelClient
 

@@ -7,8 +7,6 @@ bearer-token auth, API versioning, full CRUD with `links`, and components
 in-memory dict store so the fixture runs with zero environment setup.
 """
 
-from __future__ import annotations
-
 import uuid
 from itertools import count
 from typing import Any, ClassVar

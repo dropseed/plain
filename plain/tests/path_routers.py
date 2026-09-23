@@ -6,8 +6,6 @@ resolver responds. Pinned so step #3 (pre-routing normalization) can
 flip the assertions in a visible diff.
 """
 
-from __future__ import annotations
-
 from plain.http import Response
 from plain.urls import Router, path
 from plain.views import View

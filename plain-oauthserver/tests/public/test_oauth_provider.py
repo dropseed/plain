@@ -1,7 +1,5 @@
 """Contract tests for the OAuth 2.1 authorization server endpoints."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from oauth_helpers import generate_pkce_pair, issue_token_pair

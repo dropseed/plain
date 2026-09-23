@@ -9,8 +9,6 @@ table's key column, these fail.
 The user-facing half lives in tests/public/test_select.py.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.relationships import Widget, WidgetTag
 from plain.postgres.exceptions import FieldError

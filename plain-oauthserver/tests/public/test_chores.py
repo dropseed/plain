@@ -1,7 +1,5 @@
 """The ClearExpiredOAuthTokens cleanup chore."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from oauth_helpers import issue_token_pair

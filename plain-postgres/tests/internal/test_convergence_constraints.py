@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 from app.examples.models.constraints import ConstraintExample
 from conftest_convergence import (

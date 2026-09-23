@@ -5,8 +5,6 @@ what a statement refuses. The static half — that the template has to be a
 t-string and nothing else — lives in tests/typing/written_sql.py.
 """
 
-from __future__ import annotations
-
 import datetime
 from dataclasses import dataclass, field
 from decimal import Decimal

@@ -16,8 +16,6 @@ Advisory locks are per-database, so parallel test databases and multi-tenant
 clusters don't contend.
 """
 
-from __future__ import annotations
-
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager

@@ -10,8 +10,6 @@ The loader (`plain.dev.dotenv`) and the `plain env` commands both come here to
 turn "what the files name" and "what the environment supplied" into one key.
 """
 
-from __future__ import annotations
-
 import hashlib
 import os
 import re

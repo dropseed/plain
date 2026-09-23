@@ -3,8 +3,6 @@
 The wrapper calls `source.acquire()` / `source.release()` / `source.config`
 and is otherwise source-agnostic."""
 
-from __future__ import annotations
-
 import threading
 import time
 from abc import ABC, abstractmethod

@@ -12,8 +12,6 @@ No background thread: the view runs on the test thread, inside a copy of
 the test's context, so the test database transaction is visible to it.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import contextvars

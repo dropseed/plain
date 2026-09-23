@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, ClassVar
 
 from plain.postgres import Field, types

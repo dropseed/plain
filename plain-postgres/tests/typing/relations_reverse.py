@@ -5,8 +5,6 @@ out of the synthesized constructor (see construction_unknown_kwargs.py) and
 makes them read-only on an instance.
 """
 
-from __future__ import annotations
-
 from typing import Any, assert_type
 
 from app.examples.models.delete import ChildCascade, DeleteParent

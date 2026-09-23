@@ -1,7 +1,5 @@
 """Test fixtures for delete / on_delete behavior."""
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from plain.postgres import Field, types

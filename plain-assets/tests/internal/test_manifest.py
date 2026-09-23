@@ -4,8 +4,6 @@ The user-visible contract (immutable survives compile → reload) lives in
 public/test_build_outputs.py; these pin the manifest method in isolation.
 """
 
-from __future__ import annotations
-
 from plain.assets.manifest import AssetsManifest
 
 

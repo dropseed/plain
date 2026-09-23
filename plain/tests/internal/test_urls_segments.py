@@ -6,8 +6,6 @@ Internal because the segment tuple shape isn't part of the public API —
 only the user-observable resolution behavior is.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.exceptions import ImproperlyConfigured
 from plain.urls.converters import INT, PATH, STR, UUID

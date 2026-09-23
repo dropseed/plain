@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import keyring
 import keyring.backend
 import pytest

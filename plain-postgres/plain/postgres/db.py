@@ -2,8 +2,6 @@
 and read-only helpers. Per-request lifecycle (clearing the query log,
 returning pooled connections) lives in `DatabaseConnectionMiddleware`."""
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar

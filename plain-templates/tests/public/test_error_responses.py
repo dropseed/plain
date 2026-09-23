@@ -9,8 +9,6 @@ default. For URL-resolution failures (no view ever runs), mount
 404 there too.
 """
 
-from __future__ import annotations
-
 
 class TestPlainViewFallsThroughToText:
     """A plain `View` re-raises; the framework default returns plain text."""

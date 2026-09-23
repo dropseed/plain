@@ -12,8 +12,6 @@ including the fields of it that are annotated with a model class; a
 The runtime half is in tests/public/test_written_sql.py.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import assert_type
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta

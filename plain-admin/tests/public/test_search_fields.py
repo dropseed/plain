@@ -7,8 +7,6 @@ query as the path it stands for. A reference to another model's field is
 refused when the class is defined.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.users.models import User
 from plain.admin.cards import TrendCard

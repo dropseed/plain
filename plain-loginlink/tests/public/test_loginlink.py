@@ -6,8 +6,6 @@ HTTP status, redirect targets, login state (probed via the login-gated
 ``/whoami`` view), rendered failure pages, and sent email.
 """
 
-from __future__ import annotations
-
 import re
 from urllib.parse import urlsplit
 

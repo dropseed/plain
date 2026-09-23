@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 from collections.abc import Callable, Sequence
 from functools import cached_property, partial

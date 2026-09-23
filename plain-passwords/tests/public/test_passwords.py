@@ -6,8 +6,6 @@ observes — HTTP status, redirect targets, login state (probed via the
 login-gated ``/whoami`` view), database rows, and sent email.
 """
 
-from __future__ import annotations
-
 import re
 
 from app.users.models import User

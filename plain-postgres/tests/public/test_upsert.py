@@ -5,8 +5,6 @@ Returns (obj, created): obj is hydrated from the post-write row -- no second
 query -- and created is True on insert, False on conflict-update.
 """
 
-from __future__ import annotations
-
 import concurrent.futures
 import threading
 from datetime import UTC

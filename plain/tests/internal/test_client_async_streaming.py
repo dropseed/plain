@@ -3,8 +3,6 @@ Response so tests can read `.content` — the rebuilt object must keep the
 original's identity (status, headers, exception, reason), because span
 finalization and test assertions read it afterwards."""
 
-from __future__ import annotations
-
 import pytest
 from plain.http import AsyncStreamingResponse
 from plain.test.client import ClientHandler

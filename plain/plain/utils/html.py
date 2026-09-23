@@ -1,7 +1,5 @@
 """HTML utilities suitable for global use."""
 
-from __future__ import annotations
-
 import html
 import json
 from html.parser import HTMLParser

@@ -8,8 +8,6 @@ middleware). The sentinel attribute makes it idempotent, so an exception
 caught at multiple layers is logged once.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import TYPE_CHECKING
 

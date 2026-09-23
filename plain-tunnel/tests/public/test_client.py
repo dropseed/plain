@@ -3,8 +3,6 @@ WebSocket URLs from the destination/subdomain/tunnel-host options a user
 passes on the command line.
 """
 
-from __future__ import annotations
-
 from plain.tunnel.client import PROTOCOL_VERSION, TunnelClient
 
 

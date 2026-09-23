@@ -12,8 +12,6 @@ remedies (`plain db fork`, `plain db use`, `plain db reset`) are one command
 away once you know what happened.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import click

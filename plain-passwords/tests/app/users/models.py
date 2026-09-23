@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.passwords.types import PasswordField
 from plain.postgres import Field, types
 

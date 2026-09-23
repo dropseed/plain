@@ -6,8 +6,6 @@ at HTTP 200. claude.ai's connector proxy still speaks this protocol, which is
 why the branch exists. Modern-path behavior is covered in test_http.py.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

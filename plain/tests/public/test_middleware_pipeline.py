@@ -6,8 +6,6 @@ including ordering, short-circuiting, exception handling, and
 the interaction between builtin and user-defined middleware.
 """
 
-from __future__ import annotations
-
 import pytest
 from middleware_helpers import call_log, fresh_client
 from plain.runtime import settings

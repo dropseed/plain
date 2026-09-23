@@ -14,8 +14,6 @@ for exactly when loading the app would fail: a fresh clone with no key, or a
 rotation to a new one. It loads the `.env` ladder itself, without decrypting.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import subprocess

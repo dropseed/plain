@@ -1777,8 +1777,6 @@ to the checker, so the annotation is where `Related` comes from; import it under
 `TYPE_CHECKING` when importing it for real would be the cycle you were avoiding:
 
 ```python
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from plain import postgres

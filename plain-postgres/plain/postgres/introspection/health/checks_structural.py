@@ -4,8 +4,6 @@ These fire the moment the condition exists; they don't depend on
 accumulated stats since the last reset. Each has an immediately
 actionable remediation in the user's code (or SQL for unmanaged tables)."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from .helpers import _index_suggestion

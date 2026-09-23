@@ -5,8 +5,6 @@ never from a registry. The only stored state is the pointer file, and it exists
 only when a checkout has been deliberately repointed with `plain db use`.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import subprocess

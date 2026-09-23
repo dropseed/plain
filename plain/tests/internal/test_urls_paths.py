@@ -17,8 +17,6 @@ segment resolver's path-parser layer. The trailing-slash and route
 matching contracts live in the public test files.
 """
 
-from __future__ import annotations
-
 
 def test_canonical_path_resolves(path_client):
     response = path_client.get("/target/")

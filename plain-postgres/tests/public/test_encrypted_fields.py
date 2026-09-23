@@ -6,8 +6,6 @@ survive it -- lives in `tests/typing/conditions_encrypted.py`. The
 encrypt/decrypt primitives are in `tests/internal/test_encrypted_internals.py`.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.encrypted import SecretStore
 from plain.postgres import F, Q, types

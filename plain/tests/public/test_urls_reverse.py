@@ -6,8 +6,6 @@ boundaries so subsequent routing changes don't silently shift what URLs
 get rendered into HTML.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.http import Response
 from plain.runtime import settings

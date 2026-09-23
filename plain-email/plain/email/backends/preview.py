@@ -6,8 +6,6 @@ installed) or by opening the .eml in Mail.app. Nothing is delivered to a real
 SMTP server.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from plain.runtime import PLAIN_TEMP_PATH

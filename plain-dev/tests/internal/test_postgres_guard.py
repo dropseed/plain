@@ -4,8 +4,6 @@ A planner refusal is divergence too: the code has moved past the database.
 The guard must fork rather than let the error disable it.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, cast
 

@@ -5,8 +5,6 @@ has to be an unknown argument, or the checker would bless a call the runtime
 raises on.
 """
 
-from __future__ import annotations
-
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import DeleteParent
 from app.examples.models.querysets import DefaultQuerySetModel

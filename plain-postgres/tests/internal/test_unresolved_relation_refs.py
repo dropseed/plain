@@ -3,8 +3,6 @@ the class. The code that runs before that point (preflight, migration state,
 the autodetector) must read the raw reference, and the resolved accessors
 must fail loudly rather than be silently skipped by getattr()/hasattr()."""
 
-from __future__ import annotations
-
 import pytest
 from plain.postgres import types
 from plain.postgres.deletion import CASCADE

@@ -2,8 +2,6 @@
 Timezone-related classes and functions.
 """
 
-from __future__ import annotations
-
 import functools
 import zoneinfo
 from contextlib import ContextDecorator

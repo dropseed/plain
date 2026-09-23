@@ -6,8 +6,6 @@ a string), parses it into segments, and returns a ResolverMatch object
 which provides access to all attributes of the resolved URL match.
 """
 
-from __future__ import annotations
-
 import functools
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote

@@ -1,7 +1,5 @@
 """Built-in admin views for core functionality."""
 
-from __future__ import annotations
-
 import datetime
 import json
 from typing import Any, ClassVar, Literal

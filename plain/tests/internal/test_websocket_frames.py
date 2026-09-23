@@ -7,8 +7,6 @@ the byte layout of a frame, what counts as a protocol violation, and the
 reader's promise that it survives a `recv` that hands back one byte at a time.
 """
 
-from __future__ import annotations
-
 import asyncio
 import struct
 

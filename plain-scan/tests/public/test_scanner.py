@@ -5,8 +5,6 @@ return the cached response without any network access. An ``http://`` URL is
 used so the TLS audit short-circuits instead of opening a socket.
 """
 
-from __future__ import annotations
-
 import httpx
 from plain.scan.scanner import Scanner
 

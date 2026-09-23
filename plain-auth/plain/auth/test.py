@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 

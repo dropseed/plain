@@ -6,8 +6,6 @@ and constraint/index types. Separated from dialect.py (which is low-level and
 imported everywhere) to avoid circular imports.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 import psycopg.sql

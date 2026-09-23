@@ -2,8 +2,6 @@
 Base file upload handler classes, and the built-in concrete subclasses
 """
 
-from __future__ import annotations
-
 import os
 from abc import ABC, abstractmethod
 from io import BytesIO

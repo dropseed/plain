@@ -1,7 +1,5 @@
 """Client-side WebSocket framing for tests that speak to the server directly."""
 
-from __future__ import annotations
-
 import asyncio
 
 from plain.http.websocket_frames import (

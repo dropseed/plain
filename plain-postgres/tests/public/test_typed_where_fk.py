@@ -5,8 +5,6 @@
 field, renamed to `parent__name`, so its condition methods build that path.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.delete import (
     ChildCascade,

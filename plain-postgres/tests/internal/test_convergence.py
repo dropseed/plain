@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.relationships import Widget, WidgetTag
 from conftest_convergence import constraint_exists, create_invalid_index, execute
 from plain.postgres import CheckConstraint, Index, Q, get_connection

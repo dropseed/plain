@@ -34,8 +34,6 @@ Reverse relations must be explicitly defined using ``ReverseForeignKey`` or
 ``ReverseManyToMany`` descriptors on the model class.
 """
 
-from __future__ import annotations
-
 from functools import cached_property
 from typing import Any
 

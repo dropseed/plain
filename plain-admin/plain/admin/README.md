@@ -849,8 +849,6 @@ To control access across all admin views (including package-shipped ones you don
 
 ```python
 # app/settings.py
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

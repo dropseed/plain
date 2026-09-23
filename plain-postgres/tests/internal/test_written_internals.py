@@ -7,8 +7,6 @@ attaches converters, the row limits `first()` and `get()` push into the
 statement, and the query span.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import pytest

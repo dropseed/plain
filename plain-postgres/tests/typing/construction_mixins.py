@@ -9,8 +9,6 @@ Runtime half: tests/internal/test_typed_construction_preflight.py, which runs
 `CheckTypedConstruction` over the live registry.
 """
 
-from __future__ import annotations
-
 from plain.postgres import Field, ModelMixin, types
 from plain.postgres.base import Model
 

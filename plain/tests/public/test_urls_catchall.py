@@ -7,8 +7,6 @@ The slash on the route string is irrelevant — `path("<path:_>/")` and
 `path("<path:_>")` produce the same catchall route.
 """
 
-from __future__ import annotations
-
 
 def test_catchall_matches_unslashed_request(catchall_client):
     response = catchall_client.get("/missing")

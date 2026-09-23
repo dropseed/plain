@@ -4,8 +4,6 @@ Wraps httpx with the bearer token from credentials and surfaces non-2xx
 responses as `APIError` with the server's message when available.
 """
 
-from __future__ import annotations
-
 from typing import Any, Self
 
 import click

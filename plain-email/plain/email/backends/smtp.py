@@ -1,7 +1,5 @@
 """SMTP email backend class."""
 
-from __future__ import annotations
-
 import smtplib
 import ssl
 import threading

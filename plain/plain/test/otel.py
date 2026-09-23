@@ -6,8 +6,6 @@ Plain projects using `plain.pytest` should reach for the `otel_spans` /
 `otel_metrics` fixtures instead.
 """
 
-from __future__ import annotations
-
 from opentelemetry import metrics, trace
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader

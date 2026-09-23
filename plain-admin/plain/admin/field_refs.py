@@ -25,8 +25,6 @@ reverse accessor or a many-to-many (`"memberships__team__name"`) has no field
 to reference.
 """
 
-from __future__ import annotations
-
 import inspect
 from typing import Any
 

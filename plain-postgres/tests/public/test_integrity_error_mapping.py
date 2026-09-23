@@ -2,8 +2,6 @@
 pre-check was bypassed or raced — surfaces as a ValidationError, the same
 error the pre-check would have raised, not a raw psycopg.IntegrityError."""
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.constraints import ConstraintExample
 from app.examples.models.delete import ChildCascade, DeleteParent

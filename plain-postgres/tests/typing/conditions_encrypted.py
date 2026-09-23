@@ -13,8 +13,6 @@ analyzed -- the marker on it would read as satisfied while proving nothing.
 Runtime half: tests/public/test_encrypted_fields.py.
 """
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.encrypted import SecretStore

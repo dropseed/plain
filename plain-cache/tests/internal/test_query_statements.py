@@ -8,8 +8,6 @@ These pin the statement list, the SET clause, and the deadlock-freedom the
 sorting buys.
 """
 
-from __future__ import annotations
-
 import concurrent.futures
 import threading
 

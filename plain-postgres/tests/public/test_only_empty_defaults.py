@@ -2,8 +2,6 @@
 default (enforced once in DefaultableField.__init__ via `only_empty_default`).
 The empty default exists so the field can be added to a populated table."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

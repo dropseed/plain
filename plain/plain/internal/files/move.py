@@ -5,8 +5,6 @@ Move a file in the safest way possible::
     >>> file_move_safe("/tmp/old_file", "/tmp/new_file")
 """
 
-from __future__ import annotations
-
 import os
 from shutil import copymode, copystat
 

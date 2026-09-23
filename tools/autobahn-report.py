@@ -9,8 +9,6 @@ count as passing — see the header comment in tools/autobahn-wstest for why
 NON-STRICT shows up on the 6.4.* cases.
 """
 
-from __future__ import annotations
-
 import json
 import sys
 from pathlib import Path

@@ -7,8 +7,6 @@ answer once there's a real request with real headers and a real status code.
 The `mcp_post` fixture (tests/conftest.py) builds the body and headers.
 """
 
-from __future__ import annotations
-
 import base64
 
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (

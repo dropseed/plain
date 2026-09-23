@@ -4,8 +4,6 @@ The lock lives on its own database session (separate from the working
 connection), so these tests observe it from the test connection via pg_locks.
 """
 
-from __future__ import annotations
-
 import psycopg
 import pytest
 from plain.postgres.db import get_connection

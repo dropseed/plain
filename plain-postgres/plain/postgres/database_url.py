@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 # Copyright (c) Kenneth Reitz & individual contributors
 # All rights reserved.
 # Redistribution and use in source and binary forms, with or without modification,

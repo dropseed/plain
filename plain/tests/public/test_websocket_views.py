@@ -7,8 +7,6 @@ cross-origin rule apply before the socket exists, and middleware still
 gets its say on the response.
 """
 
-from __future__ import annotations
-
 import pytest
 from middleware_helpers import fresh_client
 from plain.runtime import settings

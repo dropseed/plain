@@ -3,8 +3,6 @@ Row-level locking: for_update(), for_no_key_update(), for_share(), and
 for_key_share() emit the matching Postgres locking clause and options.
 """
 
-from __future__ import annotations
-
 import re
 
 import psycopg

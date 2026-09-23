@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 from collections import defaultdict
 from contextlib import contextmanager

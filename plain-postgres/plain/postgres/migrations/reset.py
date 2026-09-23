@@ -7,8 +7,6 @@ dependencies on them still resolve. `plan_reset` builds it and every check
 runs before a file is touched; the CLI writes and deletes.
 """
 
-from __future__ import annotations
-
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass

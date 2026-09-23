@@ -7,8 +7,6 @@ matches the runtime constructors is `tests/internal/test_stub_runtime_
 conformance.py`, because no type checker can see that far.
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import assert_type
 

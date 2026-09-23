@@ -9,8 +9,6 @@ Nothing in the SQL standard promises this, so it is pinned here rather than
 assumed. If this test ever fails, both call sites are wrong together.
 """
 
-from __future__ import annotations
-
 import random
 
 from app.examples.models.upsert import UpsertItem

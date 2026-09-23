@@ -15,8 +15,6 @@ the slashed routes in `boundary_routers.py` keep their canonical
 slashed form.
 """
 
-from __future__ import annotations
-
 
 def test_canonical_include_resolves(boundary_client):
     """`include("admin-canonical/", ...)` → child route resolves normally."""

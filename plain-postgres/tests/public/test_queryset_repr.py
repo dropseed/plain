@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.iteration import IterationExample
 
 

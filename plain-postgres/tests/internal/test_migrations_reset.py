@@ -6,8 +6,6 @@ real `examples` history into the temporary migrations root so a reset of it
 is the reset of the whole package, circular FK inside.
 """
 
-from __future__ import annotations
-
 import importlib
 import shutil
 import subprocess

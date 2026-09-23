@@ -10,8 +10,6 @@ then verifies the digest for each ingest shape:
 - chunked body spooled to disk
 """
 
-from __future__ import annotations
-
 import asyncio
 import hashlib
 import random

@@ -7,8 +7,6 @@ limited to what a browser observes — HTTP status, redirect targets, rendered
 page content, and database rows.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.users.models import User
 from plain.test import Client

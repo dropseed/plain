@@ -16,8 +16,6 @@ the original for forensics). Both observability sites pick up the new
 value automatically because they already share a source.
 """
 
-from __future__ import annotations
-
 import pytest
 from opentelemetry.semconv.attributes import url_attributes
 from plain.runtime import settings

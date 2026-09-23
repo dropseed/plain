@@ -5,8 +5,6 @@ Follows the wiring shown in the package README: the request-link form at
 mounted under ``/loginlink``.
 """
 
-from __future__ import annotations
-
 from plain.auth.views import AuthView
 from plain.http import Response
 from plain.loginlink.forms import LoginLinkForm

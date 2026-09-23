@@ -1,7 +1,5 @@
 """Preflight checks on the database connection and migration state."""
 
-from __future__ import annotations
-
 from plain.postgres.db import get_connection
 from plain.preflight import PreflightCheck, PreflightResult, register_check
 from plain.runtime import settings

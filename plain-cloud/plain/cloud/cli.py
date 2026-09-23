@@ -5,8 +5,6 @@ a Plain Cloud installation using a personal API key minted from the
 dashboard at /dashboard/api-keys/.
 """
 
-from __future__ import annotations
-
 import json
 import sys
 import webbrowser

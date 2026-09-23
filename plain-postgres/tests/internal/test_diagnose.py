@@ -10,8 +10,6 @@ indexes, and catalog tweaks all roll back at teardown. Scratch objects use a
 in the shared test database.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

@@ -6,8 +6,6 @@ refactor of the slicing math fails here rather than by silently changing an
 already-persisted DEFAULT and making convergence see drift forever.
 """
 
-from __future__ import annotations
-
 from plain.postgres.ddl import compile_database_default_sql
 from plain.postgres.functions.random import RandomString
 

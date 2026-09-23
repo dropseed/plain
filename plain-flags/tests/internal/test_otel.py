@@ -5,8 +5,6 @@ these tests guard against drift in the attribute names and `result.reason`
 values that downstream dashboards may filter on.
 """
 
-from __future__ import annotations
-
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,

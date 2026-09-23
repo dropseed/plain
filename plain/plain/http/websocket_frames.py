@@ -13,8 +13,6 @@ and RSV3) is always a protocol error here.
 Stdlib only, and no imports from anywhere else in Plain.
 """
 
-from __future__ import annotations
-
 import base64
 import hashlib
 import struct

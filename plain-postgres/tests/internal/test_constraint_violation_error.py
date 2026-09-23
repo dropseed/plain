@@ -2,8 +2,6 @@
 UniqueConstraint, plus the full_clean() / save() integration that surfaces
 constraint errors."""
 
-from __future__ import annotations
-
 from types import SimpleNamespace
 
 import pytest

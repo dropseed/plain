@@ -1,7 +1,5 @@
 """The `MCPResource` base class. Subclass, set `uri` (or `uri_template`), and implement `read()`."""
 
-from __future__ import annotations
-
 import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, get_type_hints

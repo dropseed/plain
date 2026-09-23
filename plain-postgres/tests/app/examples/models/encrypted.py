@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.postgres import EncryptedField, Field, types
 
 from plain import postgres

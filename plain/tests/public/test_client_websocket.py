@@ -1,7 +1,5 @@
 """`Client.websocket()`: driving a view's `websocket()` from a test."""
 
-from __future__ import annotations
-
 import pytest
 from plain.http import WebSocketClosed
 from plain.test import Client, WebSocketRejected

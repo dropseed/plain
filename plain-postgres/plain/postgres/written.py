@@ -35,8 +35,6 @@ t-string). That is a deliberate escape hatch, and it is exactly what must
 never be done with anything that came from outside the program.
 """
 
-from __future__ import annotations
-
 import ast
 import copy
 import dataclasses

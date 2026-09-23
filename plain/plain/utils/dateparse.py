@@ -1,7 +1,5 @@
 """Functions to parse datetime objects."""
 
-from __future__ import annotations
-
 # We're using regular expressions rather than time.strptime because:
 # - They provide both validation and parsing.
 # - They're more flexible for datetimes.

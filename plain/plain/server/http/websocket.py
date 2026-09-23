@@ -7,8 +7,6 @@ finish cleanly whichever way it ends — the view returning, the peer
 leaving, the view failing, or the worker shutting down.
 """
 
-from __future__ import annotations
-
 import asyncio
 import contextvars
 from collections.abc import Callable

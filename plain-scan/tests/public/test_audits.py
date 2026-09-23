@@ -5,8 +5,6 @@ Each audit reads an ``httpx.Response`` off the scanner and returns an
 is required.
 """
 
-from __future__ import annotations
-
 import httpx
 from plain.scan.audits import (
     ContentTypeOptionsAudit,

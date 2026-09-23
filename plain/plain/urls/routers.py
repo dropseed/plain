@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .patterns import URLPattern
 from .resolvers import URLResolver
 from .segments import _route_to_segments

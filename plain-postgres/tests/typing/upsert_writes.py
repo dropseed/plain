@@ -7,8 +7,6 @@ and the call resolves the descriptor at runtime. `returning()` is the
 opposite case and refuses it (see returning_writes.py).
 """
 
-from __future__ import annotations
-
 from app.examples.models.upsert import UpsertItem, UpsertScoped
 
 

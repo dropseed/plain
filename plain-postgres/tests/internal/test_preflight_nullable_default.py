@@ -12,8 +12,6 @@ to hit a database -- so they're fed to `nullable_fields_missing_default`
 directly, while the registered-model sweep goes through the check itself.
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 from uuid import UUID
 

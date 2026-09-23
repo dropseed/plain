@@ -5,8 +5,6 @@ existing TOAST pointer, so a large value is not re-written. Re-set()ing the same
 value *does* re-TOAST, which is exactly the cost touch() avoids.
 """
 
-from __future__ import annotations
-
 import base64
 import os
 from datetime import timedelta

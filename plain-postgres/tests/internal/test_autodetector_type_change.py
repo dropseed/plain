@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector

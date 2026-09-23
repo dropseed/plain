@@ -9,8 +9,6 @@ The --threads flag tells the test how many threads the server is running
 so the exhaustion test can saturate the pool. Defaults to 4 (the Plain default).
 """
 
-from __future__ import annotations
-
 import argparse
 import re
 import socket

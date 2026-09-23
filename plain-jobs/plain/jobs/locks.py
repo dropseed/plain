@@ -1,7 +1,5 @@
 """Lock implementations for job enqueueing."""
 
-from __future__ import annotations
-
 import hashlib
 from collections.abc import Iterator
 from contextlib import contextmanager

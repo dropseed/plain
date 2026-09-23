@@ -2,8 +2,6 @@
 Form classes
 """
 
-from __future__ import annotations
-
 import copy
 from functools import cached_property
 from typing import TYPE_CHECKING, Any

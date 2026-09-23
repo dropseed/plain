@@ -7,8 +7,6 @@ earlier writes and run commit hooks. This pins the mechanism -- the connection's
 `needs_rollback` flag -- the same guard the ORM write paths use.
 """
 
-from __future__ import annotations
-
 import psycopg
 import pytest
 from plain.cache import cache

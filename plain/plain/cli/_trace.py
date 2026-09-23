@@ -14,8 +14,6 @@ are analyzed separately and never merged: counting a once-per-request query
 across three hops would read as a 3x repeat that no one can fix.
 """
 
-from __future__ import annotations
-
 from contextlib import contextmanager
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView

@@ -7,8 +7,6 @@ this being populated correctly for both direct and nested patterns under a
 namespaced router.
 """
 
-from __future__ import annotations
-
 import pytest
 from plain.runtime import settings
 from plain.urls import get_resolver

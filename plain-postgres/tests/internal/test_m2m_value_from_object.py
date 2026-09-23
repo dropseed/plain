@@ -5,8 +5,6 @@ the user-visible behavior it supports (an UpdateView pre-selecting the related
 rows) is asserted in `tests/public/test_modelform_roundtrip.py`.
 """
 
-from __future__ import annotations
-
 from typing import cast
 
 from app.examples.models.relationships import Tag, Widget

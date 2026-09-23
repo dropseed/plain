@@ -6,8 +6,6 @@ the column to compare against, so each relation type (ForeignKeyField,
 ForeignKeyRel, ManyToManyField, ManyToManyRel) must expose ``target_field``.
 """
 
-from __future__ import annotations
-
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.relationships import Tag, Widget
 

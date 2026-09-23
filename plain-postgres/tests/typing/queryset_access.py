@@ -1,7 +1,5 @@
 """`query` is a ClassVar -- a manager reached off the class, not an instance."""
 
-from __future__ import annotations
-
 from typing import assert_type
 
 from app.examples.models.defaults import DefaultsExample

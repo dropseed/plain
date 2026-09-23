@@ -14,8 +14,6 @@ compiled assets, certificates. The difference is that an artifact read from the
 wrong place is confusing, while a *fact* read from the wrong place is wrong.
 """
 
-from __future__ import annotations
-
 import hashlib
 from pathlib import Path
 

@@ -11,8 +11,6 @@ ContextVar directly), these tests exercise the real DatabaseConnection against
 a real database.
 """
 
-from __future__ import annotations
-
 import asyncio
 import concurrent.futures
 from contextlib import contextmanager

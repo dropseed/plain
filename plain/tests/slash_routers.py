@@ -5,8 +5,6 @@ the no-slash form (regardless of the global setting) declare it with
 `force_trailing_slash=False`.
 """
 
-from __future__ import annotations
-
 from plain.http import Response
 from plain.urls import Router, path
 from plain.views import View

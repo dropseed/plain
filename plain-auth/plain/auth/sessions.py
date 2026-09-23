@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hmac
 from collections.abc import Generator
 from typing import TYPE_CHECKING

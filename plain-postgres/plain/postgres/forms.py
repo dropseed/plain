@@ -3,8 +3,6 @@ Helper functions for creating Form classes from Plain models
 and database field objects.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, cast

@@ -10,8 +10,6 @@ The SAVEPOINT / RELEASE SAVEPOINT statements come from save()'s own
 `transaction.atomic()` nesting inside the `db` fixture's outer transaction.
 """
 
-from __future__ import annotations
-
 import concurrent.futures
 import threading
 from datetime import timedelta

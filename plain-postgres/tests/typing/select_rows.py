@@ -11,8 +11,6 @@ Nothing here runs, so the calls that would issue a real query (iterating,
 first(), get()) are written out the same as any other claim.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any, Never, assert_type
 

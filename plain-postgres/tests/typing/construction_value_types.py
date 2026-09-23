@@ -1,7 +1,5 @@
 """The synthesized constructor is typed by each field's value type."""
 
-from __future__ import annotations
-
 from datetime import datetime
 
 from app.examples.models.defaults import DefaultsExample

@@ -29,8 +29,6 @@ key store, by the id the file names in `PLAIN_ENV_KEY_ID=<id>`. Decrypted
 plaintext is bound literally — no variable expansion.
 """
 
-from __future__ import annotations
-
 import os
 import re
 from collections.abc import Callable, Iterable

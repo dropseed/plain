@@ -6,8 +6,6 @@ the socket then runs over `Connection` with `run_websocket`. The client
 half speaks masked frames with the same codec.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from collections.abc import Iterator

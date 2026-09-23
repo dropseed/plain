@@ -6,8 +6,6 @@ ManyToManyField relations, allowing explicit declaration of reverse accessors
 without relying on automatic related_name generation.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from plain.postgres.exceptions import FieldDoesNotExist

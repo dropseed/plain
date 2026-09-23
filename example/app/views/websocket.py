@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.http import WebSocket
 from plain.templates.views import TemplateView
 from plain.views import View

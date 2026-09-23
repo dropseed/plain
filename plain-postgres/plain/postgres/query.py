@@ -2,8 +2,6 @@
 The main QuerySet implementation. This provides the public API for the ORM.
 """
 
-from __future__ import annotations
-
 import annotationlib
 import copy
 import dataclasses

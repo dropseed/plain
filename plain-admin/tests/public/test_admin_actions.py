@@ -7,8 +7,6 @@ objects as a queryset. Assertions are limited to what a user observes — the
 redirect back to the list and the resulting database rows.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.users.models import User
 from plain.test import Client

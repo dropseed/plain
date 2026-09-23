@@ -13,8 +13,6 @@ needs to own it. Run via ./tools/h2-shutdown-test:
     ./tools/h2-shutdown-test
 """
 
-from __future__ import annotations
-
 import argparse
 import os
 import signal

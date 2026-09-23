@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 #
 #
 # This file is part of gunicorn released under the MIT license.

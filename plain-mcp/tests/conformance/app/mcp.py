@@ -4,8 +4,6 @@ The conformance CLI exercises specific names with specific behaviors,
 so the names and docstrings here are load-bearing.
 """
 
-from __future__ import annotations
-
 import base64
 import json
 from typing import ClassVar

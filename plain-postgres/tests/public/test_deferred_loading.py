@@ -5,8 +5,6 @@ deferred, that they load the correct value on access, and how many queries
 that access costs -- so a future change shows up as a diff to these tests.
 """
 
-from __future__ import annotations
-
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 
 

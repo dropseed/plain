@@ -5,8 +5,6 @@ QuerySet.update() does not -- see core.py for why set_many stamps created_at and
 touch stamps updated_at. These pin the observable invariants those choices buy.
 """
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from plain.cache import cache

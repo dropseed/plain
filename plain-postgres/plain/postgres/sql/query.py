@@ -6,8 +6,6 @@ themselves do not have to. This module has to know all about the internals of
 models in order to get the information it needs.
 """
 
-from __future__ import annotations
-
 import copy
 import difflib
 import functools

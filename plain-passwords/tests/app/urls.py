@@ -5,8 +5,6 @@ redirect configuration an app is expected to supply (see the package
 README). No form behavior is overridden.
 """
 
-from __future__ import annotations
-
 from plain.auth.views import AuthView
 from plain.http import Response
 from plain.passwords.views import (

@@ -4,8 +4,6 @@ index instead of adding a new one when the FK sits at a non-leading
 position.
 """
 
-from __future__ import annotations
-
 from types import SimpleNamespace
 
 from plain.postgres import Q

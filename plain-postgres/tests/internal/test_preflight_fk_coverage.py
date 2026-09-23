@@ -8,8 +8,6 @@ must recognize bare `F("col")` leading expressions so a constraint like
 `team` attribute, not an expression.
 """
 
-from __future__ import annotations
-
 from types import SimpleNamespace
 
 from plain.postgres import Q

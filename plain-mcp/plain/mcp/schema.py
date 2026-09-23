@@ -1,7 +1,5 @@
 """Derive JSON Schema from a Tool's `__init__` signature + type hints."""
 
-from __future__ import annotations
-
 import annotationlib
 import inspect
 import types

@@ -13,8 +13,6 @@ ladder's per-column types are asserted in `tests/typing/select_rows.py`, which
 is what would catch a checker that can't.
 """
 
-from __future__ import annotations
-
 
 class Selectable[T]:
     pass

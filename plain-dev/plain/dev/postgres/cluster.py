@@ -5,8 +5,6 @@ is dev's opinion rather than Postgres' mechanism: what metadata a dev database
 carries, and how to fork one without disrupting whoever is using the source.
 """
 
-from __future__ import annotations
-
 import json
 import subprocess
 import time

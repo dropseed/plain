@@ -4,8 +4,6 @@
 out.
 """
 
-from __future__ import annotations
-
 import pytest
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import get_connection

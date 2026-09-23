@@ -1,7 +1,5 @@
 """Preflight checks for index coverage on app models."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from plain.packages import packages_registry

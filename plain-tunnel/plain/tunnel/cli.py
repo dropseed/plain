@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import getpass
 import random
 import string

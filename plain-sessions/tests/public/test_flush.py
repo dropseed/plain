@@ -5,8 +5,6 @@ and flush() must not go to the database at all. A store with a saved key
 deletes that row. Either way the store ends up empty with no key.
 """
 
-from __future__ import annotations
-
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )

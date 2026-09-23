@@ -1,7 +1,5 @@
 """Shared helpers for convergence tests."""
 
-from __future__ import annotations
-
 from plain.postgres import get_connection
 from plain.postgres.introspection import introspect_table
 

@@ -6,8 +6,6 @@ headers. test_http.py and test_oauth.py both need that envelope, so it's
 assembled once here.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

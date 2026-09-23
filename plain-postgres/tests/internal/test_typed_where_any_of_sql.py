@@ -11,8 +11,6 @@ The contract -- which rows come back -- lives in
 `tests/public/test_typed_where_is_in.py`.
 """
 
-from __future__ import annotations
-
 import datetime
 from decimal import Decimal
 from uuid import UUID

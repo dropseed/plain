@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from http import cookies
 
 from plain.runtime import settings

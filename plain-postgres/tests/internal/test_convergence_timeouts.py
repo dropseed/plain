@@ -11,8 +11,6 @@ Two layers:
    second connection and asserting ``LockNotAvailable`` is raised fast.
 """
 
-from __future__ import annotations
-
 import threading
 import time
 

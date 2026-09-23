@@ -1,7 +1,5 @@
 """Lazy regex compilation helper used outside of URL routing."""
 
-from __future__ import annotations
-
 import re
 
 from plain.utils.functional import SimpleLazyObject

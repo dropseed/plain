@@ -6,8 +6,6 @@ work instead of re-applying its stale plan (which would re-run DDL that
 already exists and crash).
 """
 
-from __future__ import annotations
-
 from contextlib import contextmanager
 
 from plain.postgres.cli.migrations import apply

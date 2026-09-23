@@ -11,8 +11,6 @@ This pins the emitted order rather than racing two sessions: the order is the
 whole guarantee, and asserting it directly can't flake.
 """
 
-from __future__ import annotations
-
 from app.examples.models.upsert import UpsertItem
 from plain.postgres.query import QuerySet
 

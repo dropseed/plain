@@ -16,8 +16,6 @@ Both failure modes below have actually happened:
   no `contains` lookup.
 """
 
-from __future__ import annotations
-
 import annotationlib
 import ast
 import inspect

@@ -9,8 +9,6 @@ They also act as reverse fields for the purposes of the Meta API because
 they're the closest concept currently available.
 """
 
-from __future__ import annotations
-
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 

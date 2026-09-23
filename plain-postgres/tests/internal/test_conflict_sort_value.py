@@ -9,8 +9,6 @@ Unit-level because `conflict_sort_value` isn't public API; the behavior it buys
 is covered end-to-end in tests/public/test_bulk_upsert.py.
 """
 
-from __future__ import annotations
-
 import datetime
 from decimal import Decimal
 from enum import Enum, StrEnum

@@ -5,8 +5,6 @@ tokens — a token added to the Literal with no clause here type-checks fine and
 would only fail as a KeyError when someone calls the new lock method.
 """
 
-from __future__ import annotations
-
 from typing import get_args
 
 from plain.postgres.dialect import LOCK_MODE_SQL
