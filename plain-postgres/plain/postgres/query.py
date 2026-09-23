@@ -4,6 +4,7 @@ The main QuerySet implementation. This provides the public API for the ORM.
 
 from __future__ import annotations
 
+import annotationlib
 import copy
 import dataclasses
 import datetime
@@ -3074,7 +3075,11 @@ def _result_type_parameters(
     parameter that never appears in `fields()` at all. The signature is what
     `result_type(*row)` actually has to satisfy.
     """
-    parameters = tuple(inspect.signature(result_type).parameters.values())
+    parameters = tuple(
+        inspect.signature(
+            result_type, annotation_format=annotationlib.Format.FORWARDREF
+        ).parameters.values()
+    )
     for parameter in parameters:
         if parameter.kind in (
             inspect.Parameter.VAR_POSITIONAL,

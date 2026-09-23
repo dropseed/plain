@@ -18,6 +18,7 @@ Both failure modes below have actually happened:
 
 from __future__ import annotations
 
+import annotationlib
 import ast
 import inspect
 from pathlib import Path
@@ -93,7 +94,11 @@ def _declared_parameters(declarations: list[ast.FunctionDef]) -> set[str]:
 @pytest.mark.parametrize("name", sorted(SPECIFIERS))
 def test_stub_keyword_arguments_exist_on_the_runtime_constructor(name: str) -> None:
     declared = _declared_parameters(STUB_CONSTRUCTORS[name]) - PEP_681_PSEUDO_PARAMS
-    runtime = set(inspect.signature(SPECIFIERS[name]).parameters)
+    runtime = set(
+        inspect.signature(
+            SPECIFIERS[name], annotation_format=annotationlib.Format.FORWARDREF
+        ).parameters
+    )
 
     extras = sorted(declared - runtime)
     assert not extras, (

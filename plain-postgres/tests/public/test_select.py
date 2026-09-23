@@ -5,9 +5,8 @@ instances.
 The static-typing contract lives in tests/typing/select_rows.py.
 """
 
-from __future__ import annotations
-
 from dataclasses import InitVar, dataclass, field, fields
+from typing import TYPE_CHECKING
 
 import pytest
 from app.examples.models.alias_collisions import AliasCollisionExample
@@ -19,6 +18,10 @@ from plain.postgres import RowQuerySet
 from plain.postgres.aggregates import Count
 from plain.postgres.expressions import F, Value
 from plain.postgres.functions import Lower, Upper
+
+if TYPE_CHECKING:
+    # Only ever an annotation here, so the name never exists at runtime.
+    from builtins import int as Priority
 
 
 @pytest.fixture
@@ -270,6 +273,31 @@ class TestSelectForeignKeyColumn:
             WidgetTag.query.select(
                 WidgetTag.widget.tags.id  # ty: ignore[unresolved-attribute]
             )
+
+
+@dataclass
+class TypeOnlyStat:
+    name: str
+    priority: Priority
+
+
+def test_select_result_type_with_type_only_annotation(rows):
+    """A field annotated with a `TYPE_CHECKING`-only name doesn't stop `select()`.
+
+    Mapping columns onto the dataclass needs its parameters, not its types.
+    """
+    result = (
+        DefaultsExample.query.order_by("priority")
+        .select(
+            DefaultsExample.name, DefaultsExample.priority, result_type=TypeOnlyStat
+        )
+        .all()
+    )
+    assert list(result) == [
+        TypeOnlyStat(name="beta", priority=1),
+        TypeOnlyStat(name="gamma", priority=2),
+        TypeOnlyStat(name="alpha", priority=3),
+    ]
 
 
 def test_select_result_type_must_be_dataclass(db):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import annotationlib
 import copy
 import datetime
 import functools
@@ -527,7 +528,9 @@ class Expression(BaseExpression, Combinable):
 
     @cached_property
     def identity(self) -> tuple[Any, ...]:
-        constructor_signature = inspect.signature(self.__init__)
+        constructor_signature = inspect.signature(
+            self.__init__, annotation_format=annotationlib.Format.FORWARDREF
+        )
         args, kwargs = self._constructor_args
         signature = constructor_signature.bind_partial(*args, **kwargs)
         signature.apply_defaults()

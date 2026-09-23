@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import enum
 import json
-from typing import Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from plain.mcp import MCPResource, MCPTool, MCPToolError, MCPView
 from plain.mcp.views import (
@@ -14,15 +12,16 @@ from plain.mcp.views import (
 )
 from plain.test import RequestFactory
 
+if TYPE_CHECKING:
+    # Only ever an annotation here, so the name never exists at runtime.
+    from decimal import Decimal
+
 # Dispatch and result shapes live here; the transport around them — headers,
 # `_meta` validation, HTTP status codes — is tested in test_http.py, where a
 # real request exists to carry them.
 
 
 class _Mode(enum.StrEnum):
-    # Module-level so `get_type_hints` can resolve it under
-    # `from __future__ import annotations` (a local class inside a test would
-    # fail to resolve and silently fall back to a permissive schema).
     FAST = "fast"
     SLOW = "slow"
 
@@ -1053,6 +1052,31 @@ class TestToolMetadata:
         tools = _call(mcp, "tools/list")["result"]["tools"]
         assert tools[0]["name"] == "say_hello"
         assert tools[0]["description"] == "Greet a user by name."
+
+    def test_type_only_annotation_falls_back_to_permissive_schema(self) -> None:
+        """A parameter annotated with a `TYPE_CHECKING`-only name still lists.
+
+        Its hint can't resolve at runtime, so the schema is permissive — but
+        the tool is listed, instead of `tools/list` raising `NameError`.
+        """
+
+        class Charge(MCPTool):
+            """Charge an amount."""
+
+            def __init__(self, amount: Decimal, note: str):
+                self.amount = amount
+                self.note = note
+
+            def run(self) -> str:
+                return "charged"
+
+        class MyMCP(MCPView):
+            name = "test"
+            tools = (Charge,)
+
+        mcp = _instantiate(MyMCP)
+        tools = _call(mcp, "tools/list")["result"]["tools"]
+        assert set(tools[0]["inputSchema"]["properties"]) == {"amount", "note"}
 
     def test_tool_without_init_has_empty_schema(self) -> None:
         class WhoAmI(MCPTool):

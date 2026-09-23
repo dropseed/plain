@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import annotationlib
 import inspect
 import types
 import typing
@@ -25,7 +26,7 @@ def build_input_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     `Literal[...]`, and falls back to a permissive empty schema (accepts any
     JSON value) for anything else.
     """
-    sig = inspect.signature(fn)
+    sig = inspect.signature(fn, annotation_format=annotationlib.Format.FORWARDREF)
     try:
         hints = get_type_hints(fn)
     except NameError, TypeError:
