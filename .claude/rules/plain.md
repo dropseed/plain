@@ -23,7 +23,7 @@ Settings live in `app/settings.py` and are accessed via `plain.runtime.settings`
 
 - Type-annotated settings can be set via `PLAIN_`-prefixed environment variables (e.g., `PLAIN_SECRET_KEY`, `PLAIN_DEBUG=true`). Env vars take highest precedence — they override `settings.py` values. When suggesting how to configure a setting, mention the env var option.
 - `uv run plain settings list` — list all settings with current values and sources
-- `uv run plain settings get <SETTING_NAME>` — get a specific setting's value
+- `uv run plain settings get <SETTING_NAME>` — get a specific setting's value (secrets print masked; `--reveal` prints the real value, so only pass it when the task needs the plaintext)
 
 - Never use `getattr(settings, "X", default)` — all known settings have defaults registered by their packages, so `settings.X` always works. Using `getattr` masks typos and missing package installs.
 

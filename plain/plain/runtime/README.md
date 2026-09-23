@@ -168,6 +168,8 @@ DATABASE_PASSWORD: Secret[str]
 
 At runtime, the value is still a plain string. The `Secret` type is purely a marker that tells Plain to mask the value when displaying settings.
 
+`plain settings list` and `plain settings get` mask secrets too. To print one's real value, ask for it explicitly with `plain settings get SECRET_KEY --reveal`.
+
 ## Using Plain outside of an app
 
 If you need to use Plain in a standalone script, call `plain.runtime.setup()` first:
