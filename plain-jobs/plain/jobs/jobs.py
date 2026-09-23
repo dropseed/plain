@@ -46,7 +46,7 @@ class JobType(ABCMeta):
     when we schedule the job.
     """
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Job:
+    def __call__[J: Job](cls: type[J], *args: Any, **kwargs: Any) -> J:
         instance = super().__call__(*args, **kwargs)
         instance._init_args = args
         instance._init_kwargs = kwargs
