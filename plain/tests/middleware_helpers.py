@@ -4,7 +4,12 @@ import asyncio
 from contextvars import ContextVar
 
 from opentelemetry import trace
-from plain.http import HttpMiddleware, Response
+from plain.http import (
+    AsyncStreamingResponse,
+    HttpMiddleware,
+    Response,
+    StreamingResponse,
+)
 from plain.test import Client
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
@@ -78,6 +83,77 @@ class AsyncSpanEmittingView(View):
 class AsyncSpanRouter(Router):
     namespace = ""
     urls = (path("", AsyncSpanEmittingView, name="index"),)
+
+
+class SyncStreamSpanView(View):
+    """Sync streaming view whose body emits a child span per chunk."""
+
+    def get(self) -> Response:
+        tracer = trace.get_tracer("plain.tests")
+
+        def body():
+            for _ in range(2):
+                with tracer.start_as_current_span("body-child-span"):
+                    yield b"chunk"
+
+        return StreamingResponse(body())
+
+
+class SyncStreamSpanRouter(Router):
+    namespace = ""
+    urls = (path("", SyncStreamSpanView, name="index"),)
+
+
+class AsyncStreamSpanView(View):
+    """Async streaming view whose body emits a child span per chunk."""
+
+    def get(self) -> Response:
+        tracer = trace.get_tracer("plain.tests")
+
+        async def body():
+            for _ in range(2):
+                with tracer.start_as_current_span("body-child-span"):
+                    await asyncio.sleep(0)
+                yield b"chunk"
+
+        return AsyncStreamingResponse(body())
+
+
+class AsyncStreamSpanRouter(Router):
+    namespace = ""
+    urls = (path("", AsyncStreamSpanView, name="index"),)
+
+
+class StreamFailsView(View):
+    """Streams one chunk, then raises — a body that fails after the status."""
+
+    def get(self) -> Response:
+        def body():
+            yield b"chunk"
+            raise ValueError("export failed")
+
+        return StreamingResponse(body())
+
+
+class StreamFailsRouter(Router):
+    namespace = ""
+    urls = (path("", StreamFailsView, name="index"),)
+
+
+class StreamFailsFirstView(View):
+    """Streams nothing — the body raises before its first chunk."""
+
+    def get(self) -> Response:
+        def body():
+            raise ValueError("query failed")
+            yield b"never"
+
+        return StreamingResponse(body())
+
+
+class StreamFailsFirstRouter(Router):
+    namespace = ""
+    urls = (path("", StreamFailsFirstView, name="index"),)
 
 
 class TrackingMiddleware(HttpMiddleware):

@@ -27,6 +27,7 @@ from server_stubs import (
     h2_connect,
     length_request,
     make_worker,
+    stub_lifecycle,
 )
 
 # ---------------------------------------------------------------------------
@@ -136,7 +137,9 @@ def test_h1_chunked_body_over_cap_rejected_even_when_app_never_reads():
     # an unread body. Deliberate semantic flip.)
     class NoReadHandler:
         async def handle(self, request, executor):
-            return Response(b"ignored body", content_type="text/plain")
+            return stub_lifecycle(
+                request, Response(b"ignored body", content_type="text/plain"), executor
+            )
 
     async def scenario() -> None:
         worker = make_worker(handler=NoReadHandler())

@@ -1,6 +1,5 @@
 import asyncio
 import concurrent.futures
-import contextlib
 import contextvars
 import dataclasses
 import inspect
@@ -8,21 +7,18 @@ import time
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from opentelemetry import context, metrics, trace
+from opentelemetry import context, trace
 from opentelemetry.semconv._incubating.attributes.http_attributes import (
     HTTP_REQUEST_BODY_SIZE,
-    HTTP_RESPONSE_BODY_SIZE,
 )
 from opentelemetry.semconv.attributes import (
     client_attributes,
     error_attributes,
     http_attributes,
-    network_attributes,
     server_attributes,
     url_attributes,
     user_agent_attributes,
 )
-from opentelemetry.semconv.metrics.http_metrics import HTTP_SERVER_REQUEST_DURATION
 from plain.http import RedirectResponse
 from plain.runtime import settings
 from plain.urls import get_resolver
@@ -33,6 +29,7 @@ from plain.utils.module_loading import import_string
 from plain.utils.otel import format_exception_type
 
 from .exception import response_for_exception
+from .response_lifecycle import ResponseLifecycle, otel_http_method
 
 if TYPE_CHECKING:
     from plain.http import Request, Response
@@ -50,20 +47,14 @@ BUILTIN_BEFORE_MIDDLEWARE = [
 ]
 
 
-# RFC 9110 standard methods + PATCH (RFC 5789).
-# Unknown methods get normalized to _OTHER per OTel HTTP semconv.
-_KNOWN_HTTP_METHODS = frozenset(
-    {"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"}
-)
-
 tracer = trace.get_tracer("plain")
 
-meter = metrics.get_meter("plain")
-request_duration_histogram = meter.create_histogram(
-    name=HTTP_SERVER_REQUEST_DURATION,
-    unit="s",
-    description="Duration of HTTP server requests.",
-)
+
+def _span_name_method(method: str | None) -> str:
+    """The method as a request span's name shows it — an unknown one reads
+    as "HTTP"."""
+    semconv_method = otel_http_method(method)
+    return "HTTP" if semconv_method == "_OTHER" else semconv_method
 
 
 @dataclasses.dataclass
@@ -114,15 +105,14 @@ class BaseHandler:
         # as a flag for initialization being complete.
         self._middleware_chain = chain
 
-    def _start_request_span(
-        self, request: Request
-    ) -> contextlib.AbstractContextManager[trace.Span]:
-        """Start an OpenTelemetry span for a request and set it as current."""
-        method = request.method or ""
-        if method not in _KNOWN_HTTP_METHODS:
-            span_method = "_OTHER"
-        else:
-            span_method = method
+    def _start_request_span(self, request: Request) -> trace.Span:
+        """Start the request's OpenTelemetry SERVER span.
+
+        It isn't made current here: the pipeline makes it current inside
+        the request context, and the `ResponseLifecycle` the handler returns
+        ends it once the response is closed.
+        """
+        span_method = otel_http_method(request.method)
 
         span_attributes: dict[str, Any] = {
             "plain.request.id": request.unique_id,
@@ -131,8 +121,10 @@ class BaseHandler:
             url_attributes.URL_SCHEME: request.scheme,
         }
 
-        if span_method == "_OTHER" and method:
-            span_attributes[http_attributes.HTTP_REQUEST_METHOD_ORIGINAL] = method
+        if span_method == "_OTHER" and request.method:
+            span_attributes[http_attributes.HTTP_REQUEST_METHOD_ORIGINAL] = (
+                request.method
+            )
 
         if request.query_string:
             span_attributes[url_attributes.URL_QUERY] = request.query_string
@@ -165,33 +157,48 @@ class BaseHandler:
         # Start with just the method; updated to "{method} {route}" after
         # URL resolution in _resolve_request. Avoids high-cardinality span
         # names from raw paths when resolution fails (404, middleware errors).
-        span_name = "HTTP" if span_method == "_OTHER" else span_method
+        span_name = _span_name_method(request.method)
 
-        return tracer.start_as_current_span(
+        return tracer.start_span(
             span_name,
             attributes=span_attributes,
             kind=trace.SpanKind.SERVER,
         )
 
-    def _finalize_span(self, span: trace.Span, response: Response) -> None:
-        """Set span status and record exceptions from the response."""
-        span.set_attribute(
-            http_attributes.HTTP_RESPONSE_STATUS_CODE, response.status_code
+    def _response_lifecycle(
+        self,
+        response: Response,
+        *,
+        request: Request,
+        request_context: contextvars.Context,
+        span: trace.Span,
+        started: float,
+        executor: concurrent.futures.Executor | None,
+    ) -> ResponseLifecycle:
+        """Hand on the pipeline's response: closing it closes the request,
+        and the `ResponseLifecycle` sends it, closes it, and ends the span."""
+        response._resource_closers.append(request.close)
+        return ResponseLifecycle(
+            response,
+            request=request,
+            context=request_context,
+            span=span,
+            started=started,
+            executor=executor,
         )
-        if not response.streaming:
-            span.set_attribute(HTTP_RESPONSE_BODY_SIZE, len(response.content))
-        if response.status_code >= 500:
-            span.set_status(trace.StatusCode.ERROR)
-            if response.exception:
-                span.record_exception(response.exception)
-                span.set_attribute(
-                    error_attributes.ERROR_TYPE,
-                    format_exception_type(response.exception),
-                )
-            else:
-                span.set_attribute(
-                    error_attributes.ERROR_TYPE, str(response.status_code)
-                )
+
+    def _fail_request_span(self, span: trace.Span, exc: BaseException) -> None:
+        """End the span of a pipeline that raised instead of returning.
+
+        The pipeline turns app errors into responses, so this is a framework
+        failure or a cancellation — record it and end the span rather than
+        leak it.
+        """
+        if isinstance(exc, Exception):
+            span.record_exception(exc)
+            span.set_status(trace.StatusCode.ERROR, str(exc))
+            span.set_attribute(error_attributes.ERROR_TYPE, format_exception_type(exc))
+        span.end()
 
     async def _run_in_executor(
         self,
@@ -220,11 +227,14 @@ class BaseHandler:
         self,
         request: Request,
         executor: concurrent.futures.Executor,
-    ) -> Response:
+    ) -> ResponseLifecycle:
         """Single entry point for handling a request.
 
-        Creates OTel span and runs the full pipeline: before middleware →
-        resolve/dispatch view → after middleware.
+        Starts the request's OTel span and runs the full pipeline: before
+        middleware → resolve/dispatch view → after middleware. Returns the
+        response as a `ResponseLifecycle`, which the server sends — the request
+        isn't over until the body is sent and the response closed, and the
+        span ends then.
 
         A fresh, empty `contextvars.Context` is built per request and
         shared by every phase of the pipeline — both executor hops run
@@ -233,38 +243,37 @@ class BaseHandler:
         context=request_ctx)`. That keeps middleware state (e.g.
         `DatabaseConnectionMiddleware`'s connection wrapper) request-
         scoped, so `after_response` sees ContextVars that `before_request`
-        or the view set regardless of which worker thread it lands on.
+        or the view set regardless of which worker thread it lands on. The
+        `ResponseLifecycle` runs the body and the close in the same context.
 
         Starting from an empty `Context()` rather than `copy_context()`
-        is deliberate: the server task's ambient ContextVar state may
-        carry stale values from a previous keep-alive request's
-        streaming body, and inheriting that would contaminate this
-        request's view of per-request state. The OTel server span is
-        attached explicitly below so executor hops and the async task
-        still see it.
+        keeps whatever the server's connection task holds out of the
+        request. The OTel server span is attached explicitly below so
+        executor hops and the async task still see it.
         """
         assert self._middleware_chain is not None, (
             "load_middleware() must be called before handle()"
         )
 
-        with self._start_request_span(request) as span:
-            request_ctx = contextvars.Context()
-            # LOAD-BEARING: carry the OTel context (with the SERVER span
-            # active) into the empty `request_ctx` so it is visible across
-            # every hop the pipeline takes — the `ctx.run` calls in
-            # `_run_in_executor` (sync hop on a worker thread) and the
-            # `asyncio.create_task(coro, context=request_ctx)` below (async
-            # view's task).
-            #
-            # Without this line every child span emitted by the view, by a
-            # template render, by middleware, etc. silently becomes a root
-            # span instead of nesting under the server span. There is no
-            # fallback; OTel's context is contextvar-based and an empty
-            # context means no parent. Tests covering this live in
-            # `plain/tests/test_otel_spans.py` (`*_child_span_is_parented_*`).
-            request_ctx.run(context.attach, context.get_current())
-            start = time.perf_counter()
+        span = self._start_request_span(request)
+        started = time.perf_counter()
+        request_ctx = contextvars.Context()
+        # LOAD-BEARING: make the SERVER span current inside the empty
+        # `request_ctx` so it is visible across every hop the pipeline
+        # takes — the `ctx.run` calls in `_run_in_executor` (sync hop on a
+        # worker thread), the `asyncio.create_task(coro,
+        # context=request_ctx)` below (async view's task), and the body the
+        # `ResponseLifecycle` sends.
+        #
+        # Without this line every child span emitted by the view, by a
+        # template render, by middleware, etc. silently becomes a root
+        # span instead of nesting under the server span. There is no
+        # fallback; OTel's context is contextvar-based and an empty
+        # context means no parent. Tests covering this live in
+        # `plain/tests/test_otel_spans.py` (`*_child_span_is_parented_*`).
+        request_ctx.run(context.attach, trace.set_span_in_context(span))
 
+        try:
             result = await self._run_in_executor(
                 executor, request_ctx, self._run_sync_pipeline, request
             )
@@ -293,30 +302,18 @@ class BaseHandler:
                 )
             else:
                 response = result
+        except BaseException as exc:
+            self._fail_request_span(span, exc)
+            raise
 
-            response._resource_closers.append(request.close)
-            response.request_context = request_ctx
-            self._finalize_span(span, response)
-
-            duration_s = time.perf_counter() - start
-            method = request.method or ""
-            if method not in _KNOWN_HTTP_METHODS:
-                method = "_OTHER"
-            duration_attrs: dict[str, str | int] = {
-                http_attributes.HTTP_REQUEST_METHOD: method,
-                http_attributes.HTTP_RESPONSE_STATUS_CODE: response.status_code,
-                url_attributes.URL_SCHEME: request.scheme,
-                network_attributes.NETWORK_PROTOCOL_NAME: "http",
-            }
-            if request.resolver_match and request.resolver_match.route is not None:
-                duration_attrs[http_attributes.HTTP_ROUTE] = (
-                    f"/{request.resolver_match.route}"
-                )
-            if response.status_code >= 500:
-                duration_attrs[error_attributes.ERROR_TYPE] = str(response.status_code)
-            request_duration_histogram.record(duration_s, duration_attrs)
-
-            return response
+        return self._response_lifecycle(
+            response,
+            request=request,
+            request_context=request_ctx,
+            span=span,
+            started=started,
+            executor=executor,
+        )
 
     def _run_sync_pipeline(self, request: Request) -> Response | _AsyncViewPending:
         """Run the entire sync request pipeline on a single thread.
@@ -387,9 +384,7 @@ class BaseHandler:
         if resolver_match.route is not None:
             route_with_slash = f"/{resolver_match.route}"
             span.set_attribute(http_attributes.HTTP_ROUTE, route_with_slash)
-            method = request.method or ""
-            span_method = method if method in _KNOWN_HTTP_METHODS else "HTTP"
-            span.update_name(f"{span_method} {route_with_slash}")
+            span.update_name(f"{_span_name_method(request.method)} {route_with_slash}")
 
         return resolver_match
 

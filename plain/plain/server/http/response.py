@@ -10,7 +10,6 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from plain.http import (
-    FileResponse,
     content_length_forbidden,
     response_omits_body,
 )
@@ -20,6 +19,8 @@ from .errors import InvalidHeader, InvalidHeaderName
 from .message import TOKEN_RE
 
 if TYPE_CHECKING:
+    from plain.internal.handlers.response_lifecycle import ResponseLifecycle
+
     from .message import Request as ServerRequest
 
 # RFC9110 5.5: field-vchar = VCHAR / obs-text
@@ -27,20 +28,6 @@ if TYPE_CHECKING:
 HEADER_VALUE_RE = re.compile(r"[ \t\x21-\x7e\x80-\xff]*")
 
 log = logging.getLogger(__name__)
-
-
-class FileWrapper:
-    def __init__(self, filelike: Any, blksize: int = 8192) -> None:
-        self.filelike = filelike
-        self.blksize = blksize
-        if hasattr(filelike, "close"):
-            self.close = filelike.close
-
-    def __getitem__(self, key: int) -> bytes:
-        data = self.filelike.read(self.blksize)
-        if data:
-            return data
-        raise IndexError
 
 
 class Response:
@@ -63,6 +50,9 @@ class Response:
         self.framed_close: bool | None = None
         self.headers: list[tuple[str, str]] = []
         self.headers_sent = False
+        # Set when a write to an open-ended (async) stream failed: the
+        # client left, so the connection can't be kept alive.
+        self.client_disconnected = False
         self.response_length: int | None = None
         self.sent = 0
         self.status_code: int | None = None
@@ -231,10 +221,20 @@ class Response:
         else:
             await self._async_send(arg)
 
-    async def async_write_response(self, http_response: Any) -> None:
+    async def async_write_response(self, lifecycle: ResponseLifecycle) -> None:
         """Write a plain.http.Response using async I/O."""
-        self.prepare_response(http_response)
+        self.prepare_response(lifecycle.response)
+        try:
+            await self._write_body(lifecycle)
+        except OSError:
+            if not lifecycle.headers_first:
+                raise
+            # An open-ended stream (SSE, etc.): a failed write is the client
+            # leaving, not an error. A chunk that raises arrives as a
+            # ResponseBodyError, so this only catches the socket.
+            self.client_disconnected = True
 
+    async def _write_body(self, lifecycle: ResponseLifecycle) -> None:
         if self.omits_body:
             # Headers only (HEAD keeps its Content-Length) — the body is
             # never read or written. A status/body contradiction is
@@ -243,29 +243,11 @@ class Response:
             await self.async_close()
             return
 
-        if (
-            isinstance(http_response, FileResponse)
-            and http_response.file_to_stream is not None
-        ):
-            file_wrapper = FileWrapper(
-                http_response.file_to_stream, http_response.block_size
-            )
-            http_response.file_to_stream.close = http_response.close
-            # Read file chunks in the default executor (not the app thread pool)
-            # to avoid blocking the event loop. File reads are fast and shouldn't
-            # contend with app threads.
-            loop = asyncio.get_running_loop()
-            while True:
-                chunk = await loop.run_in_executor(
-                    None, file_wrapper.filelike.read, file_wrapper.blksize
-                )
-                if not chunk:
-                    break
-                await self.async_write(chunk)
-        else:
-            for chunk in http_response:
-                await self.async_write(chunk)
-
+        if lifecycle.headers_first:
+            await self.async_send_headers()
+        # Otherwise the headers go out with the first chunk.
+        async for chunk in lifecycle:
+            await self.async_write(chunk)
         await self.async_close()
 
     async def async_close(self) -> None:

@@ -61,32 +61,39 @@ def test_plain_urls_list_renders_both_modes():
         _get_cached_resolver.cache_clear()
 
 
-def test_plain_request_streaming_response_does_not_crash():
-    """`plain request` against a streaming/file response (e.g. an asset) must
-    not crash. Streaming responses have no readable `.content` — accessing it
-    raises AttributeError — so the command summarizes from headers instead of
-    dumping the body.
+def test_plain_request_streaming_response_is_summarized():
+    """`plain request` against a streaming/file response (e.g. an asset)
+    summarizes the body — type and size — instead of dumping what may be a
+    large or binary download.
     """
     runner = CliRunner()
     result = runner.invoke(cli, ["request", "/stream"], prog_name="plain")
     assert result.exit_code == 0, result.output
     assert "Status: 200" in result.output
-    # Body is summarized, not dumped or crashed on.
-    assert "streaming response" in result.output
-    assert "text/plain" in result.output
+    assert "streaming response: text/plain" in result.output
+    assert "14 bytes" in result.output
     assert "streamed-bytes" not in result.output
 
 
-def test_plain_request_streaming_body_assertion_is_flagged_unverifiable():
-    """A body `--contains` assertion can't be checked on a streaming response
-    (the body isn't readable), so it must fail loudly rather than silently pass.
-    """
+def test_plain_request_checks_body_assertions_on_a_streaming_response():
+    """The streamed body is read, so `--contains` checks it for real — a
+    match passes and a miss fails."""
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["request", "/stream", "--contains", "streamed"], prog_name="plain"
+
+    found = runner.invoke(
+        cli,
+        ["request", "/stream-generator", "--contains", "line 2"],
+        prog_name="plain",
     )
-    assert result.exit_code == 1, result.output
-    assert "Cannot check body assertions on a streaming response" in result.output
+    assert found.exit_code == 0, found.output
+
+    missing = runner.invoke(
+        cli,
+        ["request", "/stream-generator", "--contains", "line 3"],
+        prog_name="plain",
+    )
+    assert missing.exit_code == 1, missing.output
+    assert "Response body does not contain: line 3" in missing.output
 
 
 def test_plain_request_trace_flag_shows_the_span_tree():

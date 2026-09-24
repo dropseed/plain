@@ -30,9 +30,16 @@ from typing import Any
 
 import pytest
 from plain.http import Response
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.connection import Connection
 from plain.server.http import h1
-from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
+from server_stubs import (
+    BodyLengthHandler,
+    StubApp,
+    h1_connect,
+    make_worker,
+    stub_lifecycle,
+)
 
 
 class _Handler:
@@ -42,13 +49,13 @@ class _Handler:
         self.on_handle: Callable[[], None] | None = None
         self.response_headers: dict[str, str] = {}
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         if self.on_handle is not None:
             self.on_handle()
         response = Response(b"ok", content_type="text/plain")
         for name, value in self.response_headers.items():
             response.headers[name] = value
-        return response
+        return stub_lifecycle(request, response, executor)
 
 
 _REQUEST = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"

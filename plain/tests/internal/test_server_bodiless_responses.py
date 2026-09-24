@@ -286,7 +286,7 @@ def test_h1_head_healthcheck_has_no_body() -> None:
 def test_h1_head_on_sse_never_consumes_stream() -> None:
     # HEAD to an SSE view: headers only, and the (never-terminating)
     # generator must not be consumed — before the omits_body guard in
-    # stream_async_response this iterated forever.
+    # the H1 writer this iterated forever.
     consumed = []
 
     async def events():

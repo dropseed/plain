@@ -1,22 +1,23 @@
 import asyncio
+import contextvars
 import json
+import time
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
+from opentelemetry import context as otel_context
+from opentelemetry import trace
 from plain.http import (
-    AsyncStreamingResponse,
     QueryDict,
     Request,
-    StreamingResponse,
     WebSocketResponse,
     content_length_forbidden,
-    response_omits_body,
 )
-from plain.http import Response as HttpResponse
 from plain.internal.handlers.base import BaseHandler
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
 from plain.utils.encoding import force_bytes
@@ -58,10 +59,14 @@ class ClientResponse:
     def __init__(
         self,
         response: Response,
+        content: bytes,
         client: Client,
+        status_code: int,
     ):
         # Store wrapped response in __dict__ directly to avoid __setattr__ recursion
         object.__setattr__(self, "_response", response)
+        object.__setattr__(self, "_content", content)
+        object.__setattr__(self, "_status_code", status_code)
         object.__setattr__(self, "_json_cache", None)
         # Test-specific attributes
         self.client = client
@@ -82,11 +87,23 @@ class ClientResponse:
                     f'Content-Type header is "{content_type}", not "application/json"'
                 )
             _json_cache = json.loads(
-                response.content.decode(response.charset),
+                self.content.decode(response.charset),
                 **extra,
             )
             object.__setattr__(self, "_json_cache", _json_cache)
         return _json_cache
+
+    @property
+    def content(self) -> bytes:
+        """The body the response sent — for a streaming response too, read to
+        the end the way a server sends it (empty for HEAD, 204, 304)."""
+        return object.__getattribute__(self, "_content")
+
+    @property
+    def status_code(self) -> int:
+        """The status that went out — the view's, unless its streaming body
+        failed before producing anything, which a server answers with 500."""
+        return object.__getattribute__(self, "_status_code")
 
     @property
     def url(self) -> str:
@@ -105,6 +122,13 @@ class ClientResponse:
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the wrapped response."""
+        if name == "streaming_content":
+            # The client already read it — the wrapped response's iterator
+            # is spent, so delegating would quietly return nothing.
+            raise AttributeError(
+                "The test client reads a streaming body the way a server"
+                " sends it — use `response.content`."
+            )
         return getattr(object.__getattribute__(self, "_response"), name)
 
     # Attributes the wrapper owns; everything else belongs to the
@@ -182,66 +206,43 @@ class FakePayload(IOBase):
         self.__len += len(content)
 
 
-def _conditional_content_removal(request: Request, response: Response) -> Response:
-    """
-    Simulate the behavior of most web servers by removing the content of
-    responses for HEAD requests, 1xx, 204, and 304 responses. Ensure
-    compliance with RFC 9112 Section 6.3.
-    """
-    if response_omits_body(method=request.method, status_code=response.status_code):
-        # Only HEAD needs its body cleared — a bodiless *status* can't
-        # carry one in the first place (immutable, validated status).
-        if request.method == "HEAD":
-            if isinstance(response, StreamingResponse):
-                response.streaming_content = iter([])
-            elif not response.streaming:
-                response.content = b""
-        if content_length_forbidden(response.status_code):
-            # The server writers strip it too (kept on HEAD/304).
-            del response.headers["Content-Length"]
-    return response
+def _strip_forbidden_content_length(response: Response) -> None:
+    """A status that can't carry Content-Length (1xx, 204) loses it, as the
+    server writers strip it too. HEAD and 304 keep theirs — it describes the
+    body a GET would have had."""
+    if content_length_forbidden(response.status_code):
+        del response.headers["Content-Length"]
 
 
 class ClientHandler(BaseHandler):
     """
     An HTTP Handler that can be used for testing purposes. Takes a Request
-    object directly and returns the raw Response with the originating
-    Request attached to its ``request`` attribute.
+    object directly and returns the raw Response, with the originating
+    Request attached to its ``request`` attribute, and the body it sent.
     """
 
-    def __call__(self, request: Request) -> Response:
-        response = self.run_pipeline(request)
+    def __call__(self, request: Request) -> tuple[ResponseLifecycle, bytes]:
+        lifecycle = self.run_pipeline(request)
 
-        # Collect async streaming content so tests can use response.content.
-        # Bodiless responses (HEAD, 204/304) never consume the stream —
-        # mirroring the server writers, since an SSE generator may
-        # never terminate.
-        if isinstance(response, AsyncStreamingResponse):
-            response = self._collect_async_streaming(
-                response,
-                consume=not response_omits_body(
-                    method=request.method, status_code=response.status_code
-                ),
-            )
+        # Read the body and close, the way a server sends a response — the
+        # same ResponseLifecycle the server drives, read on this thread.
+        # Bodiless responses (HEAD, 204/304) never read their body.
+        content = lifecycle.read()
 
-        # Simulate behaviors of most web servers.
-        _conditional_content_removal(request, response)
+        response = lifecycle.response
+        _strip_forbidden_content_length(response)
 
         # Attach the originating request to the response so that it could be
         # later retrieved.
         setattr(response, "request", request)
+        return lifecycle, content
 
-        # Emulate a server by calling the close method on completion.
-        response.close()
+    def run_pipeline(self, request: Request) -> ResponseLifecycle:
+        """Run the request through middleware and the view.
 
-        return response
-
-    def run_pipeline(self, request: Request) -> Response:
-        """Run the request through middleware and the view; return the raw response.
-
-        What `__call__` does before it materializes streams and closes the
-        response — also the handshake half of `Client.websocket()`, whose
-        response must stay open for the socket that follows.
+        Returns what `handle()` returns to the server: the response as a
+        `ResponseLifecycle`, not yet read or closed. `__call__` reads it;
+        `Client.websocket()` runs the socket from it.
         """
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
@@ -250,7 +251,10 @@ class ClientHandler(BaseHandler):
 
         from plain.internal.handlers.base import _AsyncViewPending
 
-        with self._start_request_span(request) as span:
+        span = self._start_request_span(request)
+        started = time.perf_counter()
+        token = otel_context.attach(trace.set_span_in_context(span))
+        try:
             # Call the sync pipeline directly — no event loop needed for sync
             # views. This keeps the test client usable from both sync tests and
             # async tests (where asyncio.run() would raise).
@@ -261,28 +265,25 @@ class ClientHandler(BaseHandler):
             else:
                 response = result
 
-            self._finalize_span(span, response)
+            # The context the body is read in — copied from the ambient
+            # context the pipeline ran in (so the body sees the test's
+            # database transaction), with the request span current so the
+            # body's queries land in the request's trace.
+            request_context = contextvars.copy_context()
+        except BaseException as exc:
+            self._fail_request_span(span, exc)
+            raise
+        finally:
+            otel_context.detach(token)
 
-        response._resource_closers.append(request.close)
-        return response
-
-    def _collect_async_streaming(
-        self, response: AsyncStreamingResponse, *, consume: bool
-    ) -> Response:
-        """Collect async streaming content into a regular Response for tests."""
-
-        async def _collect(resp: AsyncStreamingResponse) -> HttpResponse:
-            chunks = []
-            if consume:
-                async for chunk in resp:
-                    chunks.append(chunk)
-            collected = b"".join(chunks)
-
-            sync_response = resp._to_buffered_response(collected)
-            await resp.aclose()
-            return sync_response
-
-        return asyncio.run(_collect(response))
+        return self._response_lifecycle(
+            response,
+            request=request,
+            request_context=request_context,
+            span=span,
+            started=started,
+            executor=None,
+        )
 
     def _handle_async_view(self, request: Request, pending: Any) -> Response:
         """Await an async view coroutine and run after-middleware."""
@@ -608,12 +609,18 @@ class Client:
         Send a Request through the handler and return a ClientResponse.
         """
         # Make the request
-        response = self.handler(http_request)
+        lifecycle, content = self.handler(http_request)
+        # read() always settles a status (None is for a server whose client
+        # left before anything went out).
+        status_code = lifecycle.sent_status_code
+        assert status_code is not None
 
         # Wrap the response in ClientResponse for test-specific attributes
         client_response = ClientResponse(
-            response=response,
+            response=lifecycle.response,
+            content=content,
             client=self,
+            status_code=status_code,
         )
 
         # Re-raise the exception if configured to do so
@@ -698,13 +705,14 @@ class Client:
             handshake.update(headers)
 
         request = self._request_factory.get(path, secure=secure, headers=handshake)
-        response = self.handler.run_pipeline(request)
+        lifecycle = self.handler.run_pipeline(request)
+        response = lifecycle.response
         if response.cookies:
             self.cookies.update(response.cookies)
         if not isinstance(response, WebSocketResponse):
-            response.close()
+            lifecycle.read()
             raise WebSocketRejected(response)
-        return WebSocketTestConnection(response, timeout=timeout)
+        return WebSocketTestConnection(lifecycle, timeout=timeout)
 
     def post(
         self,

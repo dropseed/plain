@@ -1,54 +1,67 @@
-"""The test client collects an AsyncStreamingResponse into a plain
-Response so tests can read `.content` — the rebuilt object must keep the
-original's identity (status, headers, exception, reason), because span
-finalization and test assertions read it afterwards."""
+"""The test client reads an AsyncStreamingResponse body with the same
+`ResponseLifecycle` the server sends it through — the response itself is never
+replaced, so its identity (status, headers, exception, reason) is what
+span finalization and test assertions read afterwards."""
+
+import contextvars
+import time
+from collections.abc import AsyncIterator
 
 import pytest
+from opentelemetry import trace
 from plain.http import AsyncStreamingResponse
-from plain.test.client import ClientHandler
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
+from plain.test import RequestFactory
 
 
-async def _stream():
+async def _stream() -> AsyncIterator[bytes]:
     yield b"data: 1\n\n"
 
 
-def _collect(response: AsyncStreamingResponse, *, consume: bool):
-    handler = ClientHandler.__new__(ClientHandler)
-    return handler._collect_async_streaming(response, consume=consume)
+def _read(response: AsyncStreamingResponse, *, method: str = "GET") -> bytes:
+    request = RequestFactory().generic(method, "/")
+    lifecycle = ResponseLifecycle(
+        response,
+        request=request,
+        context=contextvars.copy_context(),
+        span=trace.INVALID_SPAN,
+        started=time.perf_counter(),
+        executor=None,
+    )
+    return lifecycle.read()
 
 
-def test_collect_preserves_response_identity() -> None:
+def test_read_keeps_the_response_itself() -> None:
     response = AsyncStreamingResponse(
         _stream(), content_type="text/event-stream", status_code=500
     )
     exc = RuntimeError("boom")
     response.exception = exc
-    response.log_access = False
     response._reason_phrase = "Custom Reason"
 
-    collected = _collect(response, consume=True)
+    content = _read(response)
 
-    assert collected.content == b"data: 1\n\n"
-    assert collected.status_code == 500
-    assert collected.headers["Content-Type"] == "text/event-stream"
-    assert collected.exception is exc
-    assert collected.log_access is False
-    assert collected.reason_phrase == "Custom Reason"
-
-
-class _MultiStatusStream(AsyncStreamingResponse):
-    # Class-level declaration, no constructor argument — the effective
-    # status must still survive collection.
-    status_code = 207
+    assert content == b"data: 1\n\n"
+    assert response.status_code == 500
+    assert response.headers["Content-Type"] == "text/event-stream"
+    assert response.exception is exc
+    assert response.reason_phrase == "Custom Reason"
+    assert response.closed
 
 
-def test_collect_preserves_class_declared_status() -> None:
-    response = _MultiStatusStream(_stream(), content_type="text/event-stream")
+def test_head_never_reads_the_stream() -> None:
+    consumed: list[bool] = []
 
-    collected = _collect(response, consume=True)
+    async def endless() -> AsyncIterator[bytes]:
+        consumed.append(True)
+        while True:
+            yield b"data: tick\n\n"
 
-    assert collected.status_code == 207
-    assert collected.content == b"data: 1\n\n"
+    response = AsyncStreamingResponse(endless(), content_type="text/event-stream")
+
+    assert _read(response, method="HEAD") == b""
+    assert consumed == []
+    assert response.closed
 
 
 def test_client_response_wrapper_mirrors_readonly_status() -> None:
@@ -57,9 +70,11 @@ def test_client_response_wrapper_mirrors_readonly_status() -> None:
     from plain.test.client import Client, ClientResponse
 
     response = AsyncStreamingResponse(_stream(), content_type="text/event-stream")
-    wrapped = ClientResponse(response, Client())
+    wrapped = ClientResponse(
+        response=response, content=b"", client=Client(), status_code=200
+    )
     with pytest.raises(AttributeError):
-        wrapped.status_code = 204
+        wrapped.status_code = 204  # ty: ignore[invalid-assignment]
     # Test-only attributes still land on the wrapper.
     wrapped.redirect_chain = []
     assert wrapped.redirect_chain == []

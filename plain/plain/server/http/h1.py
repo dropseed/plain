@@ -5,6 +5,10 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from plain.internal.handlers.response_lifecycle import (
+    ResponseBodyError,
+    ResponseLifecycle,
+)
 from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
@@ -433,8 +437,14 @@ async def async_handle_error(
     req: Request | None,
     conn: Connection,
     exc: BaseException,
-) -> None:
-    """Handle request errors, sending an appropriate HTTP error response."""
+    *,
+    logs_access: bool = True,
+) -> int:
+    """Handle request errors, sending an appropriate HTTP error response.
+
+    `logs_access` is the failed response's own `log_access`, when there was
+    one. Returns the status it answered with.
+    """
     request_start = datetime.now(UTC)
     addr = conn.client or ("", -1)  # unix socket case
     if isinstance(exc, UpgradeRefused):
@@ -507,6 +517,12 @@ async def async_handle_error(
             status_int = 403
 
         worker.log.warning("Invalid request", extra={"ip": addr[0], "error": str(exc)})
+    elif isinstance(exc, ResponseBodyError):
+        # The body failed before its headers went out — already logged, in
+        # its request's context.
+        status_int = 500
+        reason = "Internal Server Error"
+        mesg = ""
     else:
         if hasattr(req, "uri"):
             worker.log.exception("Error handling request", extra={"uri": req.uri})
@@ -516,7 +532,7 @@ async def async_handle_error(
         reason = "Internal Server Error"
         mesg = ""
 
-    if req is not None:
+    if req is not None and logs_access:
         request_time = datetime.now(UTC) - request_start
         resp = Response(req, conn.writer, is_ssl=conn.is_ssl)
         resp.status = f"{status_int} {reason}"
@@ -527,25 +543,47 @@ async def async_handle_error(
         await conn.write_error(status_int, reason, mesg)
     except Exception:
         worker.log.debug("Failed to send error message.")
+    return status_int
 
 
 async def async_finish_request(
+    worker: Worker,
+    *,
     req: Any,
+    conn: Connection,
     resp: Response,
-    http_response: Any,
+    lifecycle: ResponseLifecycle,
     request_start: datetime,
 ) -> bool:
     """Write response using async I/O, log access, and determine keepalive."""
-    try:
-        await resp.async_write_response(http_response)
-    finally:
-        request_time = datetime.now(UTC) - request_start
-        if http_response.log_access:
-            log_access(resp, req, request_time)
-        if hasattr(http_response, "close"):
-            http_response.close()
+    answered_with_error = False
 
-    if resp.should_close():
+    async def write() -> None:
+        nonlocal answered_with_error
+        try:
+            await resp.async_write_response(lifecycle)
+        except Exception as exc:
+            if resp.headers_sent:
+                # Mid-body: dispatch's error path drops the connection.
+                raise
+            if isinstance(exc, OSError) and not isinstance(exc, TimeoutError):
+                # The client left before anything went out.
+                lifecycle.sent_status_code = None
+                raise
+            # Nothing went out yet: answer here, before the close ends the
+            # request's span, so the span records the status that did.
+            lifecycle.sent_status_code = await async_handle_error(
+                worker, req, conn, exc, logs_access=lifecycle.response.log_access
+            )
+            answered_with_error = True
+        finally:
+            # The error answer logs its own line.
+            if lifecycle.response.log_access and not answered_with_error:
+                log_access(resp, req, datetime.now(UTC) - request_start)
+
+    await lifecycle.send(write)
+
+    if answered_with_error or resp.client_disconnected or resp.should_close():
         log.debug("Closing connection.")
         return False
 
@@ -584,7 +622,9 @@ async def async_handle_dispatch_error(
         return False
 
     if resp.headers_sent:
-        worker.log.exception("Error handling request")
+        # A body that failed is already logged, in its request's context.
+        if not isinstance(exc, ResponseBodyError):
+            worker.log.exception("Error handling request")
         try:
             conn.close()
         except OSError:
@@ -607,7 +647,8 @@ async def dispatch(
 ) -> bool:
     """Dispatch a request through the handler and write the response."""
     try:
-        http_response = await worker.handler.handle(http_request, worker.tpool)
+        lifecycle = await worker.handler.handle(http_request, worker.tpool)
+        http_response = lifecycle.response
 
         # The single shutdown consultation: checked after the view ran and
         # before the response is framed, so a response that goes out
@@ -616,7 +657,7 @@ async def dispatch(
         if not worker.alive:
             resp.force_close()
 
-        from plain.http import AsyncStreamingResponse, WebSocketResponse
+        from plain.http import WebSocketResponse
 
         if isinstance(http_response, WebSocketResponse):
             # Two refusals, checked directly rather than through
@@ -626,27 +667,31 @@ async def dispatch(
             # graceful window, and bytes behind the handshake are not
             # frames — nothing speaks before the 101.
             if not worker.alive or pipelined:
-                http_response.close()
                 why = (
                     "worker is shutting down"
                     if not worker.alive
                     else "bytes received before the upgrade completed"
                 )
-                await async_handle_error(worker, req, conn, UpgradeRefused(why))
+                lifecycle.sent_status_code = await async_handle_error(
+                    worker, req, conn, UpgradeRefused(why)
+                )
+                await lifecycle.close()
                 # The client may still be sending frames; closing under
                 # them would RST-clobber the 503 (see LINGER_CLOSE_TIMEOUT).
                 await _linger_discard(worker, conn)
                 return False
             return await serve_websocket(
-                worker, req, conn, resp, http_response, request_start, shutdown_wait
+                worker, req, conn, resp, lifecycle, request_start, shutdown_wait
             )
 
-        # Check for async streaming response (SSE, etc.)
-        if isinstance(http_response, AsyncStreamingResponse):
-            return await stream_async_response(req, resp, http_response, request_start)
-
-        # Write response using async I/O (no thread pool needed)
-        return await async_finish_request(req, resp, http_response, request_start)
+        return await async_finish_request(
+            worker,
+            req=req,
+            conn=conn,
+            resp=resp,
+            lifecycle=lifecycle,
+            request_start=request_start,
+        )
     except Exception as exc:
         return await async_handle_dispatch_error(worker, req, resp, conn, exc)
 
@@ -656,7 +701,7 @@ async def serve_websocket(
     req: Any,
     conn: Connection,
     resp: Response,
-    http_response: Any,
+    lifecycle: ResponseLifecycle,
     request_start: datetime,
     shutdown_wait: asyncio.Task[bool],
 ) -> bool:
@@ -668,21 +713,31 @@ async def serve_websocket(
     access-log line is written when the socket closes, status 101, with
     the socket's lifetime as its duration.
     """
+    http_response = lifecycle.response
     try:
         resp.prepare_response(http_response)
         await resp.async_send_headers()
     except OSError:
-        http_response.close()
+        # The client left before the 101 went out — nothing was sent.
+        lifecycle.sent_status_code = None
+        await lifecycle.close()
         return False
-    except Exception:
-        # A middleware header the writer refuses: the view's closers still
-        # run, and dispatch's error path answers the request.
-        http_response.close()
+    except Exception as exc:
+        # A middleware header the writer refuses: answer it here, then run
+        # the view's closers.
+        lifecycle.sent_status_code = await async_handle_error(worker, req, conn, exc)
+        await lifecycle.close()
+        return False
+    except BaseException:
+        # Cancelled while the header write waited on a slow client: nothing
+        # went out, and the view's closers still run.
+        lifecycle.sent_status_code = None
+        await lifecycle.close()
         raise
 
     try:
         await run_websocket(
-            http_response,
+            lifecycle,
             conn,
             shutdown_wait=shutdown_wait,
             close_timeout=lambda: _recv_timeout(worker, WEBSOCKET_CLOSE_TIMEOUT),
@@ -691,57 +746,6 @@ async def serve_websocket(
         if http_response.log_access:
             log_access(resp, req, datetime.now(UTC) - request_start)
     return False
-
-
-async def stream_async_response(
-    req: Any,
-    resp: Response,
-    http_response: Any,
-    request_start: datetime,
-) -> bool:
-    """Stream an async response (SSE, etc.) chunk by chunk.
-
-    Headers and chunks are written using async I/O. This keeps the
-    event loop free between chunks and doesn't consume thread pool slots.
-    """
-    client_disconnected = False
-    try:
-        resp.prepare_response(http_response)
-
-        # A bodiless response (e.g. HEAD on an SSE view) never consumes
-        # the stream — it may not terminate. The finally sends the
-        # headers via async_close().
-        if not resp.omits_body:
-            await resp.async_send_headers()
-
-            async for chunk in http_response:
-                try:
-                    await resp.async_write(chunk)
-                except OSError:
-                    client_disconnected = True
-                    break
-    finally:
-        try:
-            if hasattr(http_response, "aclose"):
-                await http_response.aclose()
-        except Exception:
-            log.debug("Error in aclose()")
-
-        try:
-            if not client_disconnected:
-                await resp.async_close()
-        except OSError:
-            # The client vanished during the header/terminator write —
-            # classify it so the connection isn't framed keep-alive.
-            client_disconnected = True
-        finally:
-            request_time = datetime.now(UTC) - request_start
-            if http_response.log_access:
-                log_access(resp, req, request_time)
-            if hasattr(http_response, "close"):
-                http_response.close()
-
-    return not (client_disconnected or resp.should_close())
 
 
 async def handle_connection(worker: Worker, conn: Connection) -> None:

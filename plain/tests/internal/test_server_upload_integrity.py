@@ -16,6 +16,7 @@ import random
 from typing import Any
 
 from plain.http import Response
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.workers.worker import Worker
 from server_stubs import (
     chunked_payload,
@@ -24,17 +25,19 @@ from server_stubs import (
     h1_roundtrip,
     length_request,
     make_worker,
+    stub_lifecycle,
 )
 
 
 class _DigestHandler:
     """Returns sha256(body) so tests can verify integrity end to end."""
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         loop = asyncio.get_running_loop()
         body = await loop.run_in_executor(executor, lambda: request.body)
         digest = hashlib.sha256(body).hexdigest()
-        return Response(f"{len(body)}:{digest}", content_type="text/plain")
+        response = Response(f"{len(body)}:{digest}", content_type="text/plain")
+        return stub_lifecycle(request, response, executor)
 
 
 async def _roundtrip(worker: Worker, request: bytes) -> bytes:
@@ -86,13 +89,14 @@ def test_spooled_chunked_body_integrity():
 class _FramingHandler:
     """Reports the framing headers and ingest stamp the app sees, post-ingest."""
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         cl = request.headers.get("Content-Length")
         te = request.headers.get("Transfer-Encoding")
         ingested = request._body_ingest_seconds is not None
-        return Response(
+        response = Response(
             f"cl={cl} te={te} ingested={ingested}", content_type="text/plain"
         )
+        return stub_lifecycle(request, response, executor)
 
 
 def test_chunked_request_is_dechunked_for_the_app():
@@ -119,12 +123,13 @@ def test_bodyless_request_has_no_ingest_stamp():
 class _FormFieldHandler:
     """Parses multipart form data and echoes one field."""
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         loop = asyncio.get_running_loop()
         value = await loop.run_in_executor(
             executor, lambda: request.form_data.get("name", "")
         )
-        return Response(f"name={value}", content_type="text/plain")
+        response = Response(f"name={value}", content_type="text/plain")
+        return stub_lifecycle(request, response, executor)
 
 
 def test_chunked_multipart_form_is_parsed():

@@ -14,6 +14,8 @@ from opentelemetry.semconv.attributes.db_attributes import (
     DB_QUERY_TEXT,
 )
 from plain.http import (
+    AsyncStreamingResponse,
+    FileResponse,
     ForbiddenError403,
     JsonResponse,
     Response,
@@ -44,6 +46,57 @@ class StreamView(View):
 
     def get(self):
         return StreamingResponse(BytesIO(b"streamed-bytes"), content_type="text/plain")
+
+
+class StreamGeneratorView(View):
+    """Streams its body from a generator, the way a lazy export would."""
+
+    def get(self):
+        def lines():
+            yield b"line 1\n"
+            yield b"line 2\n"
+
+        return StreamingResponse(lines(), content_type="text/plain")
+
+
+class FileView(View):
+    """Serves a file-backed response."""
+
+    def get(self):
+        return FileResponse(BytesIO(b"file bytes"), content_type="text/plain")
+
+
+class AsyncStreamFailsView(View):
+    """Streams one event, then raises — an async body that fails partway."""
+
+    def get(self):
+        async def events():
+            yield b"data: 1\n\n"
+            raise ValueError("feed failed")
+
+        return AsyncStreamingResponse(events(), content_type="text/event-stream")
+
+
+class StreamFailsFirstView(View):
+    """Streams nothing — the body raises before its first chunk."""
+
+    def get(self):
+        def lines():
+            raise ValueError("query failed")
+            yield b"never"
+
+        return StreamingResponse(lines(), content_type="text/plain")
+
+
+class StreamFailsView(View):
+    """Streams one line, then raises — a body that fails after the status."""
+
+    def get(self):
+        def lines():
+            yield b"line 1\n"
+            raise ValueError("export failed")
+
+        return StreamingResponse(lines(), content_type="text/plain")
 
 
 class UploadView(View):
@@ -214,6 +267,11 @@ class AppRouter(Router):
         path("websocket/closes", ClosingWebSocketView, name="websocket_closes"),
         path("websocket/forbidden", ForbiddenWebSocketView, name="websocket_forbidden"),
         path("stream", StreamView, name="stream"),
+        path("stream-generator", StreamGeneratorView, name="stream_generator"),
+        path("stream-fails", StreamFailsView, name="stream_fails"),
+        path("stream-fails-first", StreamFailsFirstView, name="stream_fails_first"),
+        path("file", FileView, name="file"),
+        path("async-stream-fails", AsyncStreamFailsView, name="async_stream_fails"),
         path("upload", UploadView, name="upload"),
         path("echo-body", EchoBodyView, name="echo_body"),
         path("multipart-echo", MultipartEchoView, name="multipart_echo"),

@@ -219,8 +219,8 @@ class View[HandlerResult = Response]:
         # 5xx responses from handle_exception represent a real failure that
         # the view chose to render itself. Stamp the response with the
         # exception and log centrally so subclasses don't each have to
-        # remember (and so the canonical OTel SERVER span can record it via
-        # `_finalize_span`).
+        # remember (and so the canonical OTel SERVER span can record it when
+        # the response's `ResponseLifecycle` ends the span).
         if response.status_code >= 500:
             log_exception(self.request, exc)
             response.exception = exc

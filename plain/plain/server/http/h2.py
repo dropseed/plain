@@ -11,21 +11,21 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
+from plain.http import Request as HttpRequest
 from plain.http import (
-    AsyncStreamingResponse,
-    FileResponse,
-    StreamingResponse,
     content_length_forbidden,
     response_omits_body,
 )
-from plain.http import Request as HttpRequest
+from plain.internal.handlers.response_lifecycle import (
+    ResponseBodyError,
+    ResponseLifecycle,
+)
 from plain.logs import get_framework_logger
 
 from ..accesslog import log_access
 from ..util import HEALTHCHECK_BODY, http_date
 from .errors import BodyBudgetExceeded, LimitRequestBody
 from .request import _merge_headers, _resolve_path, _resolve_remote_addr
-from .response import FileWrapper
 from .sink import BodyBudget, BodyRateFloor, BodySink
 
 if TYPE_CHECKING:
@@ -921,160 +921,140 @@ async def _async_handle_stream_inner(
         return
 
     try:
-        http_response = await state.handler.handle(http_request, state.executor)
+        lifecycle = await state.handler.handle(http_request, state.executor)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        # The handler itself failed — there's no response to send.
+        log.exception(
+            "Error handling HTTP/2 request", extra={"path": http_request.path}
+        )
+        if stream.stream_id not in state.reset_streams:
+            await _async_send_h2_error(state, stream, 500)
+        return
 
+    async def write() -> None:
         try:
             if stream.stream_id in state.reset_streams:
+                # The client reset the stream before anything went out.
+                lifecycle.sent_status_code = None
                 return
 
-            await _async_write_h2_response(state, stream, http_response, h2_resp)
+            await _async_write_h2_response(
+                state, stream, h2_resp=h2_resp, lifecycle=lifecycle
+            )
+        except Exception as exc:
+            if (
+                h2_resp.headers_sent
+                or stream.stream_id in state.reset_streams
+                or isinstance(exc, h2.exceptions.StreamClosedError)
+            ):
+                # Mid-body, or the stream is gone: the handler below resets
+                # it or lets it go.
+                raise
+            # Nothing went out yet: answer here, before the close ends the
+            # request's span, so the span records the status that did. A
+            # body that failed is already logged, in its request's context.
+            if not isinstance(exc, ResponseBodyError):
+                log.exception(
+                    "Error handling HTTP/2 request", extra={"path": http_request.path}
+                )
+            await _async_send_h2_error(state, stream, 500)
+            lifecycle.sent_status_code = 500
+            h2_resp.status = "500 Internal Server Error"
         finally:
-            request_time = datetime.now(UTC) - request_start
-            if http_response.log_access:
-                log_access(h2_resp, h2_req, request_time)
-            if isinstance(http_response, AsyncStreamingResponse):
-                await http_response.aclose()
-            if hasattr(http_response, "close"):
-                http_response.close()
+            if lifecycle.response.log_access:
+                log_access(h2_resp, h2_req, datetime.now(UTC) - request_start)
 
+    try:
+        await lifecycle.send(write)
     except asyncio.CancelledError:
         raise
     except h2.exceptions.StreamClosedError:
         pass
-    except Exception:
-        log.exception(
-            "Error handling HTTP/2 request",
-            extra={"path": http_request.path},
-        )
+    except Exception as exc:
+        # Failed mid-body (anything earlier was answered in write()). A body
+        # that failed is already logged, in its request's context.
+        if not isinstance(exc, ResponseBodyError):
+            log.exception(
+                "Error handling HTTP/2 request", extra={"path": http_request.path}
+            )
         if stream.stream_id not in state.reset_streams:
-            if h2_resp.headers_sent:
-                # Headers already sent — can't send a clean error
-                # response. Reset so the client doesn't hang, and with
-                # INTERNAL_ERROR: the default NO_ERROR would tell a
-                # spec-following client the truncated body was complete
-                # (RFC 9113 §8.1 treats NO_ERROR after a response as a
-                # clean end).
-                async with state.write_lock:
-                    try:
-                        state.conn.reset_stream(
-                            stream.stream_id,
-                            error_code=h2.errors.ErrorCodes.INTERNAL_ERROR,
-                        )
-                        await state.flush()
-                    except Exception:
-                        pass
-            else:
-                await _async_send_h2_error(state, stream, 500)
+            # Headers already sent — can't send a clean error response.
+            # Reset so the client doesn't hang, and with INTERNAL_ERROR: the
+            # default NO_ERROR would tell a spec-following client the
+            # truncated body was complete (RFC 9113 §8.1 treats NO_ERROR
+            # after a response as a clean end).
+            async with state.write_lock:
+                try:
+                    state.conn.reset_stream(
+                        stream.stream_id,
+                        error_code=h2.errors.ErrorCodes.INTERNAL_ERROR,
+                    )
+                    await state.flush()
+                except Exception:
+                    pass
 
 
 async def _async_write_h2_response(
     state: H2ConnectionState,
     stream: H2Stream,
-    http_response: Any,
+    *,
     h2_resp: H2Response,
+    lifecycle: ResponseLifecycle,
 ) -> None:
     """Write a plain.http response as HTTP/2 frames."""
-    loop = asyncio.get_running_loop()
+    http_response = lifecycle.response
     conn = state.conn
-    executor = state.executor
     stream_id = stream.stream_id
-    method = stream.method
     status_code = http_response.status_code
     h2_resp.status = f"{status_code} {http_response.reason_phrase}"
 
     response_headers = _build_h2_response_headers(http_response)
 
-    if response_omits_body(method=method, status_code=status_code):
+    async def send_headers(*, end_stream: bool) -> None:
+        async with state.write_lock:
+            conn.send_headers(stream_id, response_headers, end_stream=end_stream)
+            await state.flush()
+            h2_resp.headers_sent = True
+
+    async def send_chunk(chunk: bytes, *, end_stream: bool = False) -> None:
+        h2_resp.sent += len(chunk)
+        await _async_send_h2_data(state, stream_id, chunk, end_stream=end_stream)
+
+    if response_omits_body(method=stream.method, status_code=status_code):
         # Headers only, END_STREAM, no DATA frames — a 204/304-with-DATA
         # is malformed per RFC 9113 8.1.1. The body is never read.
-        async with state.write_lock:
-            conn.send_headers(stream_id, response_headers, end_stream=True)
-            await state.flush()
-            h2_resp.headers_sent = True
+        await send_headers(end_stream=True)
         return
 
-    # Async streaming (SSE, etc.) — iterate on event loop
-    if isinstance(http_response, AsyncStreamingResponse):
-        async with state.write_lock:
-            conn.send_headers(stream_id, response_headers)
-            await state.flush()
-            h2_resp.headers_sent = True
-
-        async for chunk in http_response:
+    if http_response.streaming:
+        # The headers go out with the first chunk, unless the stream is
+        # open-ended (see ResponseLifecycle.headers_first) — so a body that
+        # fails before producing one can still be answered with a 500.
+        first_chunk = None if lifecycle.headers_first else await anext(lifecycle, None)
+        await send_headers(end_stream=False)
+        if first_chunk:
+            await send_chunk(first_chunk)
+        async for chunk in lifecycle:
             if chunk:
-                h2_resp.sent += len(chunk)
-                await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
-
-        async with state.write_lock:
-            conn.send_data(stream_id, b"", end_stream=True)
-            await state.flush()
-        return
-
-    is_file = (
-        isinstance(http_response, FileResponse)
-        and http_response.file_to_stream is not None
-    )
-
-    # Stream response when it's a file, streaming response, or has a
-    # declared Content-Length. Only buffer via _collect_body when the
-    # response size is unknown (no Content-Length).
-    has_content_length = any(n == "content-length" for n, _ in response_headers)
-
-    if is_file or isinstance(http_response, StreamingResponse) or has_content_length:
-        if is_file:
-            file_wrapper = FileWrapper(
-                http_response.file_to_stream, http_response.block_size
-            )
-            response_iter = iter(file_wrapper)
-        else:
-            response_iter = iter(http_response)
-
-        async with state.write_lock:
-            conn.send_headers(stream_id, response_headers)
-            await state.flush()
-            h2_resp.headers_sent = True
-
-        while True:
-            chunk = await loop.run_in_executor(executor, next, response_iter, None)
-            if chunk is None:
-                break
-            if chunk:
-                h2_resp.sent += len(chunk)
-                await _async_send_h2_data(state, stream_id, chunk, end_stream=False)
+                await send_chunk(chunk)
 
         h2_resp.response_length = h2_resp.sent
-
         async with state.write_lock:
             conn.send_data(stream_id, b"", end_stream=True)
             await state.flush()
-    else:
+        return
 
-        def _collect_body() -> bytes:
-            parts: list[bytes] = []
-            for chunk in http_response:
-                if chunk:
-                    parts.append(chunk)
-            return b"".join(parts)
-
-        body = await loop.run_in_executor(executor, _collect_body)
-
-        if body:
-            response_headers.append(("content-length", str(len(body))))
-
-        h2_resp.sent = len(body)
-        h2_resp.response_length = len(body)
-
-        if body:
-            async with state.write_lock:
-                conn.send_headers(stream_id, response_headers)
-                await state.flush()
-                h2_resp.headers_sent = True
-            await _async_send_h2_data(state, stream_id, body, end_stream=True)
-        else:
-            async with state.write_lock:
-                conn.send_headers(stream_id, response_headers, end_stream=True)
-                await state.flush()
-                h2_resp.headers_sent = True
+    content = http_response.content
+    h2_resp.response_length = len(content)
+    if not content:
+        await send_headers(end_stream=True)
+        return
+    if not any(n == "content-length" for n, _ in response_headers):
+        response_headers.append(("content-length", str(len(content))))
+    await send_headers(end_stream=False)
+    await send_chunk(content, end_stream=True)
 
 
 async def _async_send_h2_data(

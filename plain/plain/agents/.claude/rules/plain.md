@@ -84,8 +84,8 @@ If the exception propagates out of the span context, the SDK auto-records and se
 
 **Already wired entry spans:**
 
-- HTTP requests — SERVER (`plain/internal/handlers/base.py`)
-- View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
+- HTTP requests — SERVER, started in `plain/internal/handlers/base.py` and ended by `ResponseLifecycle` (`plain/internal/handlers/response_lifecycle.py`) once the response is closed, so it covers sending the body; a body that raises partway is recorded on it
+- View 5xx attachment — `plain/views/base.py:_respond_to_exception` (stamps `response.exception`, which `ResponseLifecycle` records on the SERVER span)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
 - Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a one-off CONSUMER span in `plain-jobs/jobs/workers.py:process_job`'s catch-all for library errors outside `run()` (row lookup, middleware setup, errors escaping `run()`)
 - Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`), opened only on ticks where a maintenance task is due — fully idle ticks emit no spans at all
