@@ -86,6 +86,31 @@ class StreamingDBQueryView(View):
         return StreamingResponse(generate())
 
 
+# (view's wrapper, body's wrapper) for each StreamingLazyQueryView request.
+_lazy_query_wrappers: list[tuple[DatabaseConnection, DatabaseConnection]] = []
+
+
+class StreamingLazyQueryView(View):
+    """Queries only from its streaming body — the lazy-export shape.
+
+    The body runs after the view returns. Run anywhere but the request's
+    context, its `get_connection()` makes a wrapper of its own that the
+    request's cleanup never returns.
+    """
+
+    def get(self):
+        view_wrapper = get_connection()
+
+        def generate():
+            body_wrapper = get_connection()
+            _lazy_query_wrappers.append((view_wrapper, body_wrapper))
+            with body_wrapper.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            yield b"lazy-chunk"
+
+        return StreamingResponse(generate())
+
+
 class WebSocketDBQueryView(View):
     """Queries only inside the socket, from a thread — a copied context."""
 
@@ -116,6 +141,7 @@ class TestRouter(Router):
         path("async-db-query", AsyncDBQueryView, name="async_db_query"),
         path("sse-db-query", DBQuerySSEView, name="sse_db_query"),
         path("streaming-db-query", StreamingDBQueryView, name="streaming_db_query"),
+        path("streaming-lazy-query", StreamingLazyQueryView, name="streaming_lazy"),
         path("ws-db-query", WebSocketDBQueryView, name="ws_db_query"),
         path("ws-handshake-db", HandshakeDBWebSocketView, name="ws_handshake_db"),
     )
@@ -340,13 +366,12 @@ class TestStreamingResponseCleanup:
     @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection", "_test_router")
     def test_streaming_connection_returned_after_body_drains(self, setup_db):
         """
-        Drive `handler.handle()` directly so the per-request ContextVar
-        boundary actually fires. The view opens a DB connection
-        in-request, then returns a StreamingResponse. Middleware must
-        capture the wrapper at `after_response` time (inside request_ctx)
-        and hand it to a closer — looking up `_db_conn.get()` lazily at
-        `response.close()` time would miss it because `close()` runs
-        outside request_ctx.
+        Drive `handler.handle()` directly, then send the body the way the
+        server does, so the per-request ContextVar boundary actually
+        fires. The view opens a DB connection in-request, then returns a
+        StreamingResponse. Middleware captures the wrapper at
+        `after_response` time (inside request_ctx) and hands it to a
+        closer, which runs once the body is sent.
 
         Asserts: the closer is called with the captured wrapper, and
         the wrapper's psycopg connection is released to the pool.
@@ -373,23 +398,31 @@ class TestStreamingResponseCleanup:
                 handler.load_middleware()
                 request = RequestFactory().get("/streaming-db-query")
 
-                async def run() -> Response:
+                async def run() -> bytes:
                     with concurrent.futures.ThreadPoolExecutor(
                         max_workers=2
                     ) as executor:
-                        return await handler.handle(request, executor)
+                        lifecycle = await handler.handle(request, executor)
+                        response = lifecycle.response
+                        assert response.status_code == 200
+                        assert isinstance(response, StreamingResponse)
 
-                response = asyncio.run(run())
-                assert response.status_code == 200
-                assert isinstance(response, StreamingResponse)
+                        # Streaming path: no close at after_response time.
+                        assert calls == []
 
-                # Streaming path: no close at after_response time.
-                assert calls == []
+                        chunks: list[bytes] = []
 
-                # Drain the body and close — that fires the resource closer.
-                body = b"".join(response)
+                        async def write() -> None:
+                            async for chunk in lifecycle:
+                                chunks.append(chunk)
+
+                        # Sending the body closes the response after it —
+                        # that fires the resource closer.
+                        await lifecycle.send(write)
+                        return b"".join(chunks)
+
+                body = asyncio.run(run())
                 assert body == b"streaming-chunk"
-                response.close()
 
                 # The closer ran exactly once and received the wrapper
                 # captured during after_response.
@@ -403,6 +436,38 @@ class TestStreamingResponseCleanup:
                 )
         finally:
             settings.MIDDLEWARE = original_middleware
+
+    @pytest.mark.usefixtures(
+        "_unblock_cursor", "_clean_connection", "_test_router", "_with_db_middleware"
+    )
+    def test_lazy_body_query_uses_the_views_connection(self, setup_db):
+        """A body that queries runs in the request's context, so it shares
+        the view's wrapper — the one the middleware returns at the end —
+        instead of checking out a connection nothing returns."""
+        _lazy_query_wrappers.clear()
+        handler = BaseHandler()
+        handler.load_middleware()
+        request = RequestFactory().get("/streaming-lazy-query")
+
+        async def run() -> bytes:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                lifecycle = await handler.handle(request, executor)
+                chunks: list[bytes] = []
+
+                async def write() -> None:
+                    async for chunk in lifecycle:
+                        chunks.append(chunk)
+
+                await lifecycle.send(write)
+                return b"".join(chunks)
+
+        assert asyncio.run(run()) == b"lazy-chunk"
+
+        [(view_wrapper, body_wrapper)] = _lazy_query_wrappers
+        assert body_wrapper is view_wrapper
+        assert view_wrapper.connection is None, (
+            "The connection the body queried on should be back in the pool"
+        )
 
 
 @pytest.mark.usefixtures(

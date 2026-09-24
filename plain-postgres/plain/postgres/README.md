@@ -149,7 +149,7 @@ MIDDLEWARE = [
 
 Place it near the top so downstream middleware can use the database inside `before_request` / `after_response` and still have the connection returned cleanly at the end.
 
-For `StreamingResponse` / `AsyncStreamingResponse`, the connection is returned after the body is fully drained (not when the view returns), so generators that lazily query the database — for example `Model.query.iterator()` or raw cursor loops — keep their cursor alive until the last chunk is sent.
+For `StreamingResponse` / `AsyncStreamingResponse`, the connection is returned after the body is fully drained (not when the view returns), so generators that lazily query the database — for example `Model.query.iterator()` or raw cursor loops — keep their cursor alive until the last chunk is sent. The server runs the body in the request's context, so the generator uses the same connection as the view.
 
 Without the middleware, connections keep living on their thread until something explicitly calls `plain.postgres.db.return_database_connection()` (or the process exits). That's fine for short-lived scripts but wastes a connection per thread in long-running servers.
 

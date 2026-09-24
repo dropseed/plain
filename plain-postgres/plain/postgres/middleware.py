@@ -17,10 +17,10 @@ class DatabaseConnectionMiddleware(HttpMiddleware):
     until first use, and returning an unused one is a no-op), and creating
     it now, on the request context, means every task or thread that later
     runs from a copy of that context shares the one wrapper the closer
-    knows about. The closer is handed the wrapper explicitly because
-    `response.close()` runs after `handle()` returns — outside the
-    per-request `contextvars.Context` — so a `_db_conn.get()` at close
-    time would miss it.
+    knows about. The response is closed inside the request context once
+    its body is sent, but the closer is still handed the wrapper
+    explicitly, so returning it doesn't depend on which context a close
+    runs in.
 
     A non-streaming response also returns the connection right now:
     the view is done with it. A streaming response keeps it until the

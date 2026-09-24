@@ -6,9 +6,11 @@ h1.handle_connection over a socketpair with H1Client/h1_connect.
 """
 
 import asyncio
+import contextvars
 import logging
 import os
 import socket
+import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -20,6 +22,7 @@ import h2.events
 import h2.exceptions
 from opentelemetry import trace
 from plain.http import ContentTooLargeError413, Response
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.runtime import settings
 from plain.server.connection import Connection
 from plain.server.http import h1
@@ -248,14 +251,48 @@ async def h1_roundtrip(worker: Worker, request: bytes) -> tuple[bytes, bytes]:
         client.teardown()
 
 
+def stub_lifecycle(
+    request: Any,
+    response: Response,
+    executor: Any,
+    *,
+    context: contextvars.Context | None = None,
+) -> ResponseLifecycle:
+    """What `BaseHandler.handle()` returns, around a response a stub built:
+    no middleware and no recorded span."""
+    return ResponseLifecycle(
+        response,
+        request=request,
+        context=context if context is not None else contextvars.copy_context(),
+        span=trace.INVALID_SPAN,
+        started=time.perf_counter(),
+        executor=executor,
+    )
+
+
 class ResponseHandler:
     """Handler stub that builds a fresh response per request."""
 
     def __init__(self, make_response: Callable[[], Response]) -> None:
         self.make_response = make_response
 
-    async def handle(self, request: Any, executor: Any) -> Response:
-        return self.make_response()
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
+        return stub_lifecycle(request, self.make_response(), executor)
+
+
+class ContextHandler:
+    """Handler stub that builds the response inside a fresh request context,
+    the way `BaseHandler.handle()` does — so the server reads the body in
+    it. ContextVars `make_response` sets are what the body sees.
+    """
+
+    def __init__(self, make_response: Callable[[], Response]) -> None:
+        self.make_response = make_response
+
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
+        context = contextvars.Context()
+        response = context.run(self.make_response)
+        return stub_lifecycle(request, response, executor, context=context)
 
 
 class BodyLengthHandler:
@@ -265,7 +302,7 @@ class BodyLengthHandler:
     the way the production handler maps any HTTPException.
     """
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         loop = asyncio.get_running_loop()
 
         def read_body() -> Response:
@@ -275,7 +312,8 @@ class BodyLengthHandler:
                 return Response(b"too large", status_code=413)
             return Response(str(len(body)).encode(), content_type="text/plain")
 
-        return await loop.run_in_executor(executor, read_body)
+        response = await loop.run_in_executor(executor, read_body)
+        return stub_lifecycle(request, response, executor)
 
 
 class H2Client:

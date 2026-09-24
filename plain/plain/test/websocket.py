@@ -14,7 +14,6 @@ the test's context, so the test database transaction is visible to it.
 
 import asyncio
 import base64
-import contextvars
 import os
 import socket
 from types import TracebackType
@@ -34,6 +33,7 @@ from plain.http.websocket_frames import (
     parse_close_payload,
     read_frame,
 )
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.connection import Connection
 from plain.server.http.websocket import run_websocket
 
@@ -80,8 +80,10 @@ class WebSocketTestConnection:
     """The client end of an accepted websocket, driven synchronously."""
 
     def __init__(
-        self, response: WebSocketResponse, *, timeout: float = DEFAULT_TIMEOUT
+        self, lifecycle: ResponseLifecycle, *, timeout: float = DEFAULT_TIMEOUT
     ) -> None:
+        response = lifecycle.response
+        assert isinstance(response, WebSocketResponse)
         self.response = response
         self.subprotocol = response.subprotocol
         self._timeout = timeout
@@ -97,14 +99,13 @@ class WebSocketTestConnection:
             self._loop.run_until_complete(self._settle_transports())
             self._loop.close()
             raise
-        # `ClientHandler` runs the pipeline in the ambient context rather
-        # than a per-request one, so copy it now, after the handshake ran
-        # on this thread: the view then sees what the test set up (the
-        # `db` fixture's transaction included).
-        response.request_context = contextvars.copy_context()
+        # `lifecycle.context` is the copy of the test's context that
+        # `ClientHandler.run_pipeline()` took after the handshake: the view
+        # sees what the test set up (the `db` fixture's transaction
+        # included), with the handshake's request span current.
         self._server_task = self._loop.create_task(
             run_websocket(
-                response,
+                lifecycle,
                 conn,
                 shutdown_wait=self._loop.create_future(),
                 close_timeout=lambda: 1.0,

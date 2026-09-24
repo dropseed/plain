@@ -273,6 +273,15 @@ def test_bytes_behind_the_handshake_refuse_the_upgrade(access_log: LogCapture) -
 
     asyncio.run(run())
     assert [r.__dict__.get("status") for r in access_log.records] == [503]
+    # The handshake's span records the 503 that went out, not a 101.
+    handshake_spans = [
+        s
+        for s in _span_exporter.get_finished_spans()
+        if s.kind == trace.SpanKind.SERVER and not s.name.startswith("WEBSOCKET")
+    ]
+    assert [
+        (s.attributes or {}).get("http.response.status_code") for s in handshake_spans
+    ] == [503]
 
 
 def test_draining_worker_refuses_the_upgrade() -> None:

@@ -1,4 +1,3 @@
-import contextvars
 import datetime
 import io
 import json
@@ -7,7 +6,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterable, Iterator
 from email.header import Header
 from http.client import responses
 from http.cookies import SimpleCookie
@@ -159,13 +158,6 @@ class Response:
 
     streaming = False
     _default_status_code = 200
-
-    # The per-request `contextvars.Context` the pipeline ran in, set by the
-    # handler on every response it returns. Read by responses whose work
-    # continues after the pipeline (a websocket's `websocket()` coroutine
-    # runs in it) so ContextVars middleware set — the database connection
-    # wrapper, the session — are what that later work sees too.
-    request_context: contextvars.Context | None = None
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
@@ -467,6 +459,56 @@ class Response:
         return iter(self._container)
 
 
+def _read_blocks(filelike: Any, *, block_size: int) -> Iterator[bytes | str]:
+    """Read a file to its end in blocks of `block_size` — a FileResponse.
+
+    A text file ends on "", a binary one on b"".
+    """
+    while block := filelike.read(block_size):
+        yield block
+
+
+def _read_as_available(filelike: Any, *, block_size: int) -> Iterator[bytes | str]:
+    """Read a file-like StreamingResponse body as its data arrives.
+
+    A text stream — anything with an `encoding`, like a text file, a
+    text-mode `SpooledTemporaryFile`, or `codecs.open` — is read in blocks
+    when it's a regular file, and a line at a time otherwise (a pipe), since
+    its `read(n)` waits for n characters. A binary stream is read with
+    `read1`, which returns whatever's buffered instead of waiting for a full
+    block, so a pipe or socket streams as it fills; one without a working
+    `read1` (unbuffered, or an `io.BufferedIOBase` that only implements
+    `read`) falls back to `read`.
+    """
+    if isinstance(filelike, io.TextIOBase) or getattr(filelike, "encoding", None):
+        if _is_seekable(filelike):
+            yield from _read_blocks(filelike, block_size=block_size)
+        else:
+            yield from filelike
+        return
+
+    read = filelike.read
+    if (read1 := getattr(filelike, "read1", None)) is not None:
+        try:
+            block = read1(block_size)
+        except io.UnsupportedOperation:
+            pass
+        else:
+            if not block:
+                return
+            yield block
+            read = read1
+    while block := read(block_size):
+        yield block
+
+
+def _is_seekable(filelike: Any) -> bool:
+    try:
+        return bool(filelike.seekable())
+    except AttributeError, OSError, ValueError:
+        return False
+
+
 class StreamingResponse(Response):
     """
     A streaming HTTP response class with an iterator as content.
@@ -477,6 +519,11 @@ class StreamingResponse(Response):
     """
 
     streaming = True
+
+    # The largest block a file-like body is read in. The server pulls each
+    # chunk with a trip to its thread pool, and iterating a file directly
+    # would make that one trip per line.
+    block_size = 65536
 
     def __init__(
         self,
@@ -512,14 +559,16 @@ class StreamingResponse(Response):
         return map(self.make_bytes, self._iterator)
 
     @streaming_content.setter
-    def streaming_content(self, value: Iterator[bytes | str]) -> None:
+    def streaming_content(self, value: Iterable[bytes | str]) -> None:
         self._set_streaming_content(value)
 
-    def _set_streaming_content(self, value: Iterator[bytes | str]) -> None:
-        # Ensure we can never iterate on "value" more than once.
-        self._iterator = iter(value)
+    def _set_streaming_content(self, value: Iterable[bytes | str]) -> None:
         if hasattr(value, "close"):
             self._resource_closers.append(value.close)
+        if hasattr(value, "read"):
+            value = _read_as_available(value, block_size=self.block_size)
+        # Ensure we can never iterate on "value" more than once.
+        self._iterator = iter(value)
 
     def __iter__(self) -> Iterator[bytes]:
         return iter(self.streaming_content)
@@ -563,26 +612,6 @@ class AsyncStreamingResponse(Response):
             "`streaming_content` instead."
         )
 
-    def _to_buffered_response(self, body: bytes) -> Response:
-        """Materialize the streamed body into a plain Response.
-
-        Used by the test client after collecting the stream. The body
-        routes through the constructor (and its validation), then the
-        rest of the instance state — including anything app code set on
-        the response — transfers wholesale, so tests assert against the
-        same object shape production sends. `closed` deliberately starts
-        fresh, and the resource closers move over.
-        """
-        response = Response(body, status_code=self.status_code)
-        state = {
-            k: v
-            for k, v in self.__dict__.items()
-            if k not in ("_async_iterator", "closed", "_container", "_status_code")
-        }
-        response.__dict__.update(state)
-        self._resource_closers = []
-        return response
-
     def __iter__(self) -> Iterator[bytes]:
         raise TypeError(
             f"{self.__class__.__name__} is async — use `async for` / `__aiter__` instead."
@@ -603,8 +632,6 @@ class FileResponse(StreamingResponse):
     """
     A streaming HTTP response class optimized for files.
     """
-
-    block_size = 4096
 
     def __init__(
         self,
@@ -648,7 +675,7 @@ class FileResponse(StreamingResponse):
         self.file_to_stream = filelike = value
         if hasattr(filelike, "close"):
             self._resource_closers.append(filelike.close)
-        value = iter(lambda: filelike.read(self.block_size), b"")
+        value = _read_blocks(filelike, block_size=self.block_size)
         self.set_headers(filelike)
         super()._set_streaming_content(value)
 

@@ -45,12 +45,11 @@ def return_database_connection(conn: DatabaseConnection | None = None) -> None:
     The wrapper itself stays referenced by the caller (typically a
     ContextVar) and will acquire a fresh connection on next use.
 
-    Pass `conn` explicitly when the caller is running outside the
-    context that owns the wrapper — e.g. a streaming response's resource
-    closer runs after `handle()` returns, so the request `ContextVar`
-    context is no longer active. Middleware captures the wrapper at
-    response time and hands it in. Without `conn`, falls back to
-    `_db_conn.get()` for callers that *are* still in-context.
+    Pass `conn` explicitly when the caller may run outside the context
+    that owns the wrapper. Middleware captures the wrapper at response time
+    and hands it in, so a response's closer returns the right connection
+    wherever it runs. Without `conn`, falls back to `_db_conn.get()` for
+    callers that *are* in-context.
 
     No-op when a transaction is in progress — returning mid-transaction
     would roll back the caller's work (tests wrap each case in `atomic()`,

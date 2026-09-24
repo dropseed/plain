@@ -23,6 +23,7 @@ from opentelemetry.semconv.attributes import (
 from plain.http import Request, WebSocket, WebSocketClosed, WebSocketResponse
 from plain.http.websocket import WebSocketTransport
 from plain.http.websocket_frames import CLOSE_GOING_AWAY, CLOSE_INTERNAL_ERROR
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.logs import log_exception
 from plain.utils.otel import format_exception_type
 
@@ -44,7 +45,7 @@ def is_normal_ending(exc: BaseException) -> bool:
 
 
 async def run_websocket(
-    ws_response: WebSocketResponse,
+    lifecycle: ResponseLifecycle,
     transport: WebSocketTransport,
     *,
     shutdown_wait: asyncio.Future[Any],
@@ -52,11 +53,11 @@ async def run_websocket(
 ) -> BaseException | None:
     """Serve one accepted websocket to completion.
 
-    `transport` is anything with `recv(n)`, `sendall(bytes)` and
-    `close()` — the server's `Connection`, or the test client's adapter.
-    Exactly one task, the view's coroutine, runs in the request's context
-    (`ws_response.request_context`, set by the handler; a copy of the
-    current context when nothing set it). `shutdown_wait` completes when the
+    `lifecycle` is what the handler returned for the upgrade (its response is
+    the `WebSocketResponse`). `transport` is anything with `recv(n)`,
+    `sendall(bytes)` and `close()` — the server's `Connection`, or the test
+    client's adapter. Exactly one task, the view's coroutine, runs in the
+    request's context (`lifecycle.context`). `shutdown_wait` completes when the
     worker begins draining, at which point the peer gets a 1001 and the
     view task is cancelled. `close_timeout` is read at close time because
     the drain deadline is published after the socket opened.
@@ -66,18 +67,27 @@ async def run_websocket(
     the return value (the log is the record); the test client re-raises it
     so a failing view fails the test.
     """
+    ws_response = lifecycle.response
+    assert isinstance(ws_response, WebSocketResponse)
     request = ws_response.request
-    context = ws_response.request_context or contextvars.copy_context()
-    ws = WebSocket(
-        transport,
-        subprotocol=ws_response.subprotocol,
-        max_message_size=ws_response.max_message_size,
-    )
-
-    span = _start_socket_span(request, context)
+    context = lifecycle.context
+    try:
+        ws = WebSocket(
+            transport,
+            subprotocol=ws_response.subprotocol,
+            max_message_size=ws_response.max_message_size,
+        )
+        span = _start_socket_span(request, context)
+    except BaseException:
+        # The socket never started: still close the response (its
+        # closers, then the handshake's span).
+        await lifecycle.close()
+        raise
+    # The handshake's span ends at the 101; the socket's span, linked to
+    # it, covers the socket's life.
+    lifecycle.end_span()
     # Make the socket span current inside the request context so spans the
-    # view emits nest under it (the handshake span in that context has
-    # already ended).
+    # view emits nest under it.
     context.run(otel_context.attach, trace.set_span_in_context(span))
 
     error: BaseException | None = None
@@ -142,7 +152,7 @@ async def run_websocket(
         # The resource closers registered on the accept — the request
         # body, the database connection — run now, as for any streaming
         # response once its body is done.
-        ws_response.close()
+        await lifecycle.close()
     return error
 
 

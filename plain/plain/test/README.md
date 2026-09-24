@@ -12,6 +12,7 @@
 - [Inspecting responses](#inspecting-responses)
     - [JSON responses](#json-responses)
     - [Response attributes](#response-attributes)
+    - [Streaming responses](#streaming-responses)
 - [Authentication](#authentication)
 - [Sessions](#sessions)
 - [RequestFactory](#requestfactory)
@@ -127,6 +128,19 @@ The [`ClientResponse`](./client.py#ClientResponse) wrapper provides access to:
 - `request` - The original request object
 - `resolver_match` - URL resolver match information
 - `redirect_chain` - List of redirects when using `follow=True`
+
+### Streaming responses
+
+The client reads a streaming body to the end before it returns, the way a server sends it, so `content` holds the body a `StreamingResponse`, `FileResponse`, or `AsyncStreamingResponse` sent:
+
+```python
+response = client.get("/export.csv")
+assert response.content.startswith(b"id,name")
+```
+
+The response itself stays what the view returned (a `FileResponse` is still one). Because the whole body is read, a stream that never ends (an endless event feed) makes the request never return — test those views' pieces directly instead. HEAD requests and bodiless statuses (204, 304) never read the body.
+
+If a body raises partway through, the error is re-raised from the request unless the client was created with `raise_request_exception=False`, in which case `response.exception` holds it and `content` has what came before.
 
 ## Authentication
 

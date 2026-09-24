@@ -50,7 +50,10 @@ def test_async_pipeline_shares_contextvars_across_threads():
 
         async def run() -> Response:
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                return await handler.handle(request, executor)
+                lifecycle = await handler.handle(request, executor)
+                # The request ends when the server closes the response.
+                await lifecycle.close()
+                return lifecycle.response
 
         response = asyncio.run(run())
 

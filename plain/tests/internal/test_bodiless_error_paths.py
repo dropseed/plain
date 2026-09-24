@@ -6,7 +6,7 @@ from plain.http import HTTPException, NotModifiedResponse, Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.internal.middleware.headers import DefaultHeadersMiddleware
 from plain.test import RequestFactory
-from plain.test.client import _conditional_content_removal
+from plain.test.client import _strip_forbidden_content_length
 
 
 class _NotModifiedError(HTTPException):
@@ -78,14 +78,12 @@ def test_default_headers_middleware_no_content_length_on_bodiless():
 def test_client_strips_content_length_on_204():
     # The test client mirrors the wire: the writers drop Content-Length
     # where forbidden (1xx/204) and keep it on HEAD/304.
-    request = RequestFactory().get("/")
-
     response = Response(status_code=204)
     response.headers["Content-Length"] = "0"
-    stripped = _conditional_content_removal(request, response)
-    assert "Content-Length" not in stripped.headers
+    _strip_forbidden_content_length(response)
+    assert "Content-Length" not in response.headers
 
     response = Response(status_code=304)
     response.headers["Content-Length"] = "11"
-    kept = _conditional_content_removal(request, response)
-    assert kept.headers["Content-Length"] == "11"
+    _strip_forbidden_content_length(response)
+    assert response.headers["Content-Length"] == "11"

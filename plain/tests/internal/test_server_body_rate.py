@@ -13,7 +13,13 @@ import pytest
 from plain.http import Response
 from plain.server.http import sink
 from plain.server.http.sink import BodyRateFloor
-from server_stubs import BodyLengthHandler, h1_connect, h2_connect, make_worker
+from server_stubs import (
+    BodyLengthHandler,
+    h1_connect,
+    h2_connect,
+    make_worker,
+    stub_lifecycle,
+)
 
 # ---------------------------------------------------------------------------
 # BodyRateFloor
@@ -240,7 +246,9 @@ def test_h2_stalled_upload_swept_while_other_stream_active(monkeypatch):
     class SlowHandler:
         async def handle(self, request, executor):
             await asyncio.sleep(3)
-            return Response("done", content_type="text/plain")
+            return stub_lifecycle(
+                request, Response("done", content_type="text/plain"), executor
+            )
 
     async def scenario() -> str:
         client, server_task, executor = await h2_connect(
