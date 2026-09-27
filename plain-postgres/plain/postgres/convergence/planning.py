@@ -40,7 +40,6 @@ from .corrections import (
     ReplaceForeignKeyCorrection,
     ResetStorageParameterCorrection,
     SetColumnDefaultCorrection,
-    SetConstraintNotDeferrableCorrection,
     SetNotNullCorrection,
     SetStorageParameterCorrection,
     ValidateConstraintCorrection,
@@ -126,8 +125,6 @@ def _plan_drift(drift: Drift) -> PlanItem:
             return PlanItem(drift, ValidateConstraintCorrection(t, n))
         case ForeignKeyNameDrift(kind=DriftKind.UNDECLARED, table=t, name=n):
             return PlanItem(drift, DropConstraintCorrection(t, n))
-        case ForeignKeyNameDrift(kind=DriftKind.DEFERRABLE, table=t, name=n):
-            return PlanItem(drift, SetConstraintNotDeferrableCorrection(t, n))
         case ForeignKeyRenameDrift(table=t, old_name=old, new_name=new):
             # Blocks sync, unlike other renames: the write path maps FK
             # violations back to the field by this name.
