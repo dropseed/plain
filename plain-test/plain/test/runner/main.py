@@ -69,14 +69,14 @@ def main(
     import plain.runtime
 
     from .collection import collect_tests
+    from .execution import run_tests
     from .layout import find_tests_directory
-    from .lifecycles import (
+    from .lifecycle_discovery import (
         AppLifecycleError,
         load_app_lifecycle,
         load_package_lifecycles,
     )
     from .reporting import Reporter
-    from .runner import run_tests
 
     # App mode: a resolvable Plain app gets the packages' lifecycles. Library
     # mode: no app, kernel only — collection, assertions, and runner still

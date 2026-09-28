@@ -2,7 +2,7 @@
 Declarative test decorators.
 
 Decorators declare static facts about a test — they never inject runtime
-values or alter control flow. The test runner (plain.testing) reads the
+values or alter control flow. The test runner (plain.test.runner) reads the
 attributes they attach.
 """
 

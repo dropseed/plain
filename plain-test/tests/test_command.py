@@ -32,9 +32,9 @@ def make_project(files: dict[str, str]) -> Path:
 
 
 def run_runner(directory: Path, *arguments: str) -> CommandResult:
-    """Run `python -m plain.testing` from a directory."""
+    """Run `python -m plain.test` from a directory."""
     completed = subprocess.run(
-        [sys.executable, "-m", "plain.testing", *arguments],
+        [sys.executable, "-m", "plain.test", *arguments],
         cwd=directory,
         capture_output=True,
         text=True,

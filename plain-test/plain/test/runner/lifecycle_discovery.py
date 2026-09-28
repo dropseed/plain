@@ -4,7 +4,7 @@ Lifecycle discovery.
 A lifecycle is what the runner does around every test without being asked:
 protection, not setup. There are two places one can come from, and no others.
 
-- Packages register a TestLifecycle subclass under the `plain.testing` entry
+- Packages register a TestLifecycle subclass under the `plain.test` entry
   point group.
 - The project declares its own in `tests/lifecycle.py`.
 
@@ -19,8 +19,7 @@ import sys
 from importlib.metadata import entry_points
 from pathlib import Path
 
-from plain.test.lifecycle import TestLifecycle
-
+from ..lifecycle import TestLifecycle
 from .layout import find_tests_directory
 
 __all__ = []
@@ -50,9 +49,7 @@ def load_package_lifecycles() -> list[TestLifecycle]:
     from plain.runtime import settings
 
     lifecycles = []
-    for entry_point in sorted(
-        entry_points(group="plain.testing"), key=lambda e: e.name
-    ):
+    for entry_point in sorted(entry_points(group="plain.test"), key=lambda e: e.name):
         lifecycle_class = entry_point.load()
         required = lifecycle_class.required_package
         if required is not None and required not in settings.INSTALLED_PACKAGES:

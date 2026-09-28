@@ -1,7 +1,7 @@
 """Bash-compatible `.env` file parsing and Plain dev/test dotenv loading.
 
 `plain.dev` owns all dotenv code so that production deployments (which don't
-install plain.dev) never load `.env` files. plain.testing opportunistically
+install plain.dev) never load `.env` files. plain.test opportunistically
 imports `load_dotenv_files` — if plain.dev is installed, `.env.test*` loads
 under the test runner; if not, it falls back to a minimal loader.
 

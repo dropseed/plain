@@ -1,10 +1,10 @@
 """
-The extension point for the test runner (plain.testing).
+The extension point for the test runner.
 
 Packages that participate in testing subclass TestLifecycle and register it
-under the `plain.testing` entry point group:
+under the `plain.test` entry point group:
 
-    [project.entry-points."plain.testing"]
+    [project.entry-points."plain.test"]
     postgres = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
 
 The runner discovers and drives lifecycles; packages never import the runner.

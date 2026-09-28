@@ -1,5 +1,5 @@
 """
-Email test lifecycle, registered under the `plain.testing` entry point.
+Email test lifecycle, registered under the `plain.test` entry point.
 
 Routes EMAIL_BACKEND to the in-memory backend for the whole run — tests
 never send real email — and clears the outbox before each test.

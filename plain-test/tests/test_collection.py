@@ -2,12 +2,12 @@ import tempfile
 from pathlib import Path
 
 from plain.test import raises
-from plain.testing.collection import (
+from plain.test.runner.collection import (
     ConftestNotSupported,
     TestDefinitionError,
     collect_tests,
 )
-from plain.testing.runner import run_tests
+from plain.test.runner.execution import run_tests
 
 
 def write_tests(files: dict[str, str]) -> Path:

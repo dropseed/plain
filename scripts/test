@@ -20,7 +20,7 @@ export PLAIN_CONNECT_EXPORT_ENABLED=false
 #   --python 3.14  Run with a specific Python version (sets UV_PYTHON)
 ALL_PACKAGES="$(cat <<EOF
 plain
-plain-testing
+plain-test
 plain-dev
 plain-postgres
 plain-assets
@@ -97,7 +97,7 @@ for package in $packages; do
     --isolated \
     --package "$package" \
     $WITH \
-    python -m plain.testing "$@"
+    python -m plain.test "$@"
   set +x
 
   cd ../..
@@ -107,7 +107,7 @@ done
 echo
 bold "Testing example"
 cd "example"
-uv run --isolated $WITH python -m plain.testing "$@"
+uv run --isolated $WITH python -m plain.test "$@"
 cd ..
 
 if [ "$run_server" = false ]; then

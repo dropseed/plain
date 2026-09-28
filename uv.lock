@@ -33,7 +33,7 @@ members = [
     "plain-start",
     "plain-tailwind",
     "plain-templates",
-    "plain-testing",
+    "plain-test",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",
@@ -223,7 +223,7 @@ dependencies = [
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -256,7 +256,7 @@ requires-dist = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },
@@ -675,7 +675,7 @@ dependencies = [
 dev = [
     { name = "opentelemetry-sdk" },
     { name = "plain-dev" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -691,7 +691,7 @@ requires-dist = [
 dev = [
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -710,7 +710,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -725,7 +725,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-api"
@@ -738,7 +738,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "openapi-spec-validator" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -747,7 +747,7 @@ requires-dist = [{ name = "plain", editable = "plain" }]
 [package.metadata.requires-dev]
 dev = [
     { name = "openapi-spec-validator", specifier = ">=0.7.1" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -760,14 +760,14 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-auth"
@@ -782,7 +782,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-dev" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -795,7 +795,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-dev", editable = "plain-dev" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -809,7 +809,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -819,7 +819,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-cloud"
@@ -833,7 +833,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -844,7 +844,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-code"
@@ -883,7 +883,7 @@ dev = [
     { name = "plain-assets" },
     { name = "plain-auth" },
     { name = "plain-templates" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
     { name = "plain-toolbar" },
 ]
 
@@ -900,7 +900,7 @@ dev = [
     { name = "plain-assets", editable = "plain-assets" },
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
 ]
 
@@ -913,7 +913,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "plain" },
     { name = "plain-assets" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
     { name = "rich" },
 ]
 
@@ -928,7 +928,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
     { name = "rich" },
 ]
 
@@ -946,7 +946,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -956,7 +956,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-email"
@@ -969,7 +969,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -979,7 +979,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-flags"
@@ -992,7 +992,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1002,7 +1002,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-htmx"
@@ -1015,7 +1015,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1025,7 +1025,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-jobs"
@@ -1039,7 +1039,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-postgres" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1051,7 +1051,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1068,7 +1068,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-auth" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1082,7 +1082,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-auth", editable = "plain-auth" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1095,14 +1095,14 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "plain", editable = "plain" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-oauth"
@@ -1120,7 +1120,7 @@ dependencies = [
 dev = [
     { name = "httpx" },
     { name = "plain-admin" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1136,7 +1136,7 @@ requires-dist = [
 dev = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "plain-admin", editable = "plain-admin" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1164,7 +1164,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-pages"
@@ -1181,7 +1181,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1195,7 +1195,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-passwords"
@@ -1211,7 +1211,7 @@ dependencies = [
 dev = [
     { name = "plain-auth" },
     { name = "plain-email" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1225,7 +1225,7 @@ requires-dist = [
 dev = [
     { name = "plain-auth", editable = "plain-auth" },
     { name = "plain-email", editable = "plain-email" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1241,7 +1241,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1253,7 +1253,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-postgres"
@@ -1270,7 +1270,7 @@ dev = [
     { name = "cryptography" },
     { name = "opentelemetry-sdk" },
     { name = "plain-templates" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1285,7 +1285,7 @@ dev = [
     { name = "cryptography" },
     { name = "opentelemetry-sdk", specifier = ">=1.34.1" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1299,7 +1299,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1309,7 +1309,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-sessions"
@@ -1323,7 +1323,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "plain-postgres" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1335,7 +1335,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
 ]
 
 [[package]]
@@ -1379,7 +1379,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1389,12 +1389,12 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
-name = "plain-testing"
+name = "plain-test"
 version = "0.1.0"
-source = { editable = "plain-testing" }
+source = { editable = "plain-test" }
 dependencies = [
     { name = "click" },
     { name = "opentelemetry-sdk" },
@@ -1437,7 +1437,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "plain-testing" },
+    { name = "plain-test" },
 ]
 
 [package.metadata]
@@ -1448,7 +1448,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-vendor"
@@ -1504,7 +1504,7 @@ dev = [
     { name = "plain-sessions" },
     { name = "plain-tailwind" },
     { name = "plain-templates" },
-    { name = "plain-testing" },
+    { name = "plain-test" },
     { name = "plain-toolbar" },
     { name = "plain-tunnel" },
     { name = "plain-vendor" },
@@ -1545,7 +1545,7 @@ dev = [
     { name = "plain-sessions", editable = "plain-sessions" },
     { name = "plain-tailwind", editable = "plain-tailwind" },
     { name = "plain-templates", editable = "plain-templates" },
-    { name = "plain-testing", editable = "plain-testing" },
+    { name = "plain-test", editable = "plain-test" },
     { name = "plain-toolbar", editable = "plain-toolbar" },
     { name = "plain-tunnel", editable = "plain-tunnel" },
     { name = "plain-vendor", editable = "plain-vendor" },

@@ -21,13 +21,12 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from plain.test.decorators import (
+from ..decorators import (
     TEST_CASES_ATTRIBUTE,
     TEST_SKIP_ATTRIBUTE,
     TEST_TAGS_ATTRIBUTE,
 )
-from plain.test.lifecycle import CollectedTest
-
+from ..lifecycle import CollectedTest
 from .assertions import rewrite_asserts
 
 __all__ = []

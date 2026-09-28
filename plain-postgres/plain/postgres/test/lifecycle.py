@@ -1,5 +1,5 @@
 """
-Database test lifecycle, registered under the `plain.testing` entry point.
+Database test lifecycle, registered under the `plain.test` entry point.
 
 Every test runs against a dedicated test database (created once per worker,
 migrated and converged) inside a transaction that rolls back afterward.

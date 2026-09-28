@@ -4,13 +4,13 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from plain.test import TestLifecycle, raises
-from plain.testing.collection import RunnableTest
-from plain.testing.lifecycles import (
+from plain.test.runner.collection import RunnableTest
+from plain.test.runner.execution import run_tests
+from plain.test.runner.lifecycle_discovery import (
     AppLifecycleError,
     app_lifecycle_path,
     load_app_lifecycle,
 )
-from plain.testing.runner import run_tests
 
 RECORDING_LIFECYCLE = (
     "from contextlib import contextmanager\n"
@@ -212,12 +212,11 @@ def test_nothing_in_the_engine_is_public_api():
     import importlib
     import pkgutil
 
-    import plain.testing
+    import plain.test.runner
 
-    modules = [plain.testing] + [
-        importlib.import_module(f"plain.testing.{module.name}")
-        for module in pkgutil.iter_modules(plain.testing.__path__)
-        if module.name != "__main__"
+    modules = [plain.test.runner] + [
+        importlib.import_module(f"plain.test.runner.{module.name}")
+        for module in pkgutil.iter_modules(plain.test.runner.__path__)
     ]
     assert len(modules) > 5
     for module in modules:

@@ -22,10 +22,10 @@ from typing import Any
 __all__ = []
 
 # Names injected into rewritten test modules. Unique and greppable.
-_FORMAT_COMPARE = "__plain_testing_format_compare__"
-_FORMAT_TRUTH = "__plain_testing_format_truth__"
-_LEFT = "__plain_testing_left__"
-_RIGHT = "__plain_testing_right__"
+_FORMAT_COMPARE = "__plain_test_format_compare__"
+_FORMAT_TRUTH = "__plain_test_format_truth__"
+_LEFT = "__plain_test_left__"
+_RIGHT = "__plain_test_right__"
 
 # The comparisons that get `left:` and `right:` values on failure.
 _COMPARISONS: tuple[type[ast.cmpop], ...] = (
@@ -188,7 +188,7 @@ def rewrite_asserts(tree: ast.Module, *, source: str) -> ast.Module:
             break
 
     formatter_import = ast.ImportFrom(
-        module="plain.testing.assertions",
+        module="plain.test.runner.assertions",
         names=[
             ast.alias(name="format_compare", asname=_FORMAT_COMPARE),
             ast.alias(name="format_truth", asname=_FORMAT_TRUTH),

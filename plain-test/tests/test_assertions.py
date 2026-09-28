@@ -1,7 +1,7 @@
 import ast
 
 from plain.test import raises
-from plain.testing.assertions import rewrite_asserts
+from plain.test.runner.assertions import rewrite_asserts
 
 
 def run_rewritten(source: str) -> None:

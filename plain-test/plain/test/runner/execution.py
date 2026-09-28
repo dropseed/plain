@@ -11,9 +11,8 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
 
-from plain.test.lifecycle import TestLifecycle
-from plain.test.skipping import TestSkipped
-
+from ..lifecycle import TestLifecycle
+from ..skipping import TestSkipped
 from .collection import RunnableTest
 
 __all__ = []

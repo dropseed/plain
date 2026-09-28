@@ -1,8 +1,8 @@
 from contextlib import contextmanager
 
 from plain.test import TestLifecycle, raises, skip, skip_test
-from plain.testing.collection import RunnableTest
-from plain.testing.runner import run_tests
+from plain.test.runner.collection import RunnableTest
+from plain.test.runner.execution import run_tests
 
 
 def make_test(func, id="test_x.py::test_x", tags=(), skip_reason=None):

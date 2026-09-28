@@ -119,7 +119,7 @@ def run_core_checks(*, skip_test: bool = False) -> None:
     else:
         click.secho("--> Skipping sync check", bold=True, fg="yellow")
 
-    if not skip_test and find_spec("plain.testing"):
+    if not skip_test and find_spec("plain.test"):
         print_event("plain test")
         result = subprocess.run(["plain", "test"], check=False)
         if result.returncode != 0:

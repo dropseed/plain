@@ -11,7 +11,7 @@ import textwrap
 import click
 
 from .collection import CollectionError
-from .runner import TestResult, TestRun
+from .execution import TestResult, TestRun
 
 __all__ = []
 
