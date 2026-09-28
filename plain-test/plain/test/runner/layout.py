@@ -3,9 +3,26 @@ Where a project keeps its tests.
 """
 
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 __all__ = []
+
+
+@dataclass(frozen=True, kw_only=True)
+class Layout:
+    """Where one run's tests and helper modules are."""
+
+    root: Path
+    helper_directory: Path
+    # The top-level name a test module may not import through (`tests`).
+    refused_import_name: str | None
+
+    def shown(self, path: Path) -> str:
+        """A path the way the run's output writes it: relative to the root."""
+        if path.is_relative_to(self.root):
+            return path.relative_to(self.root).as_posix()
+        return str(path)
 
 
 def find_tests_directory(root: Path) -> Path:

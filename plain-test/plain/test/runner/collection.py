@@ -8,14 +8,13 @@ when imported; helper modules do not.
 
 Helper modules are imported by their bare name from one directory, the
 helper directory. The caller puts it on `sys.path` before collecting. A test
-module can't reach them any other way: see `_import_problems`.
+module can't reach them any other way: see `loading.import_problems`.
 """
 
 import ast
 import functools
 import inspect
 import os
-import sys
 import types
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -28,7 +27,8 @@ from ..decorators import (
 )
 from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
-from .assertions import rewrite_asserts
+from .layout import Layout
+from .loading import load_test_module
 
 __all__ = []
 
@@ -56,22 +56,6 @@ _NO_FIXTURES_ADVICE = (
     "what it needs in its body, by calling a helper or entering a `with`\n"
     "block, and takes values only from @cases(...)."
 )
-
-
-@dataclass(frozen=True, kw_only=True)
-class _Layout:
-    """Where one run's tests and helper modules are."""
-
-    root: Path
-    helper_directory: Path
-    # The top-level name a test module may not import through (`tests`).
-    refused_import_name: str | None
-
-    def shown(self, path: Path) -> str:
-        """A path the way the run's output writes it: relative to the root."""
-        if path.is_relative_to(self.root):
-            return path.relative_to(self.root).as_posix()
-        return str(path)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -107,7 +91,7 @@ def collect_tests(
     unimportable file shouldn't stop every other file's tests from running.
     """
     root = (root or Path.cwd()).resolve()
-    layout = _Layout(
+    layout = Layout(
         root=root,
         helper_directory=(helper_directory or root).resolve(),
         refused_import_name=helper_directory.name if helper_directory else None,
@@ -210,7 +194,7 @@ def _conftest_files_above(test_file: Path, *, root: Path) -> list[Path]:
     ]
 
 
-def _conftest_message(path: Path, *, layout: _Layout) -> str:
+def _conftest_message(path: Path, *, layout: Layout) -> str:
     fixtures, autouse_fixtures = _fixture_names(path)
     helpers_file = layout.shown(layout.helper_directory / "helpers.py")
     lifecycle_file = layout.shown(layout.helper_directory / "lifecycle.py")
@@ -265,7 +249,7 @@ def _fixture_names(path: Path) -> tuple[list[str], list[str]]:
     return fixtures, autouse_fixtures
 
 
-def _collect_file(path: Path, *, layout: _Layout) -> list[RunnableTest]:
+def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:
     module = _import_test_module(path, layout=layout)
     relative = layout.shown(path)
 
@@ -414,97 +398,13 @@ def _expand(
     ]
 
 
-def _import_problems(tree: ast.Module, *, layout: _Layout) -> list[str]:
-    """
-    Imports in a test module that reach a helper module some way other than
-    its bare name.
-
-    A relative import can't work: a test module is loaded on its own, not as
-    part of a package. An import through the tests directory's own name
-    (`tests.helpers`) works only when the command runs from the directory
-    above it, and loads a second copy of a module that something else
-    imported as `helpers`.
-    """
-    problems = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            names = ", ".join(
-                f"{alias.name} as {alias.asname}" if alias.asname else alias.name
-                for alias in node.names
-            )
-            if node.level > 0:
-                written = f"from {'.' * node.level}{module} import {names}"
-                bare_module = module
-            elif module.split(".")[0] == layout.refused_import_name:
-                written = f"from {module} import {names}"
-                bare_module = module.partition(".")[2]
-            else:
-                continue
-            if bare_module:
-                corrected = f"from {bare_module} import {names}"
-            else:
-                corrected = f"import {names}"
-        elif isinstance(node, ast.Import):
-            through = [
-                alias.name
-                for alias in node.names
-                if "." in alias.name
-                and alias.name.split(".")[0] == layout.refused_import_name
-            ]
-            if not through:
-                continue
-            written = f"import {through[0]}"
-            corrected = f"import {through[0].partition('.')[2]}"
-        else:
-            continue
-        problems.append(f"line {node.lineno}: `{written}` should be `{corrected}`")
-    return problems
-
-
-def _import_test_module(path: Path, *, layout: _Layout) -> types.ModuleType:
-    root = layout.root
-    if path.is_relative_to(root):
-        relative = path.relative_to(root)
-        module_name = "plain_tests." + ".".join(relative.with_suffix("").parts)
-    else:
-        module_name = f"plain_tests.{path.stem}"
-
-    if module_name in sys.modules:
-        return sys.modules[module_name]
-
+def _import_test_module(path: Path, *, layout: Layout) -> types.ModuleType:
     try:
-        source = path.read_text()
-        tree = ast.parse(source, filename=str(path))
-        import_problems = _import_problems(tree, layout=layout)
-        if import_problems:
-            listed = "\n".join(f"  {problem}" for problem in import_problems)
-            helpers_file = layout.shown(layout.helper_directory / "helpers.py")
-            raise TestDefinitionError(
-                f"These imports can't be used in a test file:\n\n{listed}\n\n"
-                "A helper module is imported by its bare name, whichever\n"
-                "directory the test file is in and wherever the command runs\n"
-                f"from: {helpers_file} is `helpers`."
-            )
-        tree = rewrite_asserts(tree, source=source)
-        # dont_inherit: a test module is compiled with its own __future__
-        # statements and nothing else. Without it, compile() would also apply
-        # whatever compiler flags are in effect in this file — none today,
-        # but a test module's semantics shouldn't depend on that staying true.
-        code = compile(tree, str(path), "exec", dont_inherit=True)
-
-        module = types.ModuleType(module_name)
-        module.__file__ = str(path)
-        sys.modules[module_name] = module
-        exec(code, module.__dict__)  # noqa: S102 — running test files is the job
+        return load_test_module(path, layout=layout)
     except TestDefinitionError as e:
-        sys.modules.pop(module_name, None)
         raise CollectionError(path, _with_its_line(e, path=path)) from e
     except Exception as e:
-        sys.modules.pop(module_name, None)
         raise CollectionError(path, e) from e
-
-    return module
 
 
 def _with_its_line(error: TestDefinitionError, *, path: Path) -> TestDefinitionError:
