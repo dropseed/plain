@@ -130,6 +130,11 @@ class ForbiddenWebSocketView(EchoWebSocketView):
         raise ForbiddenError403("not for you")
 
 
+class RaisingHandshakeWebSocketView(EchoWebSocketView):
+    def before_request(self) -> None:
+        raise RuntimeError("websocket handshake boom")
+
+
 class AppRouter(Router):
     namespace = ""
     urls = (
@@ -140,6 +145,11 @@ class AppRouter(Router):
         path("websocket/talks", TalkingWebSocketView, name="websocket_talks"),
         path("websocket/closes", ClosingWebSocketView, name="websocket_closes"),
         path("websocket/forbidden", ForbiddenWebSocketView, name="websocket_forbidden"),
+        path(
+            "websocket/handshake-raises",
+            RaisingHandshakeWebSocketView,
+            name="websocket_handshake_raises",
+        ),
         path("stream", StreamView, name="stream"),
         path("stream-generator", StreamGeneratorView, name="stream_generator"),
         path("stream-fails", StreamFailsView, name="stream_fails"),

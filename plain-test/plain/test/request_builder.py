@@ -6,14 +6,13 @@ exactly as one a test builds by hand.
 """
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
 from plain.http import Request
 from plain.json import PlainJSONEncoder
-from plain.utils.http import urlencode
+from plain.utils.http import parse_header_parameters, urlencode
 
 from .encoding import encode_multipart
 
@@ -21,7 +20,6 @@ __all__ = ["build_request"]
 
 _BOUNDARY = "BoUnDaRyStRiNg"
 _MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
-_CHARSET_RE = re.compile(r".*; charset=([\w-]+);?")
 
 # Where a request goes when its path doesn't say: https://testserver.
 DEFAULT_SCHEME = "https"
@@ -62,23 +60,16 @@ def build_request(
         files=files,
         content_type=content_type,
     )
-    target = split_target(path)
     return build_encoded_request(
         method,
-        target.path,
-        scheme=target.scheme,
-        host=target.host,
-        port=target.port,
-        query_string=join_query_strings(
-            target.query_string, urlencode(query_params or {}, doseq=True)
-        ),
+        split_target(path, query_params=query_params),
         body=encoded_body,
         content_type=encoded_content_type,
         headers=headers,
     )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Target:
     """Where a request goes: the parts of the path or URL it was given."""
 
@@ -89,11 +80,12 @@ class Target:
     query_string: str
 
 
-def split_target(path: str) -> Target:
+def split_target(path: str, *, query_params: dict[str, Any] | None = None) -> Target:
     """Split a path, or a full http(s) URL, into where the request goes.
 
     A path goes to the default scheme and host. A URL names its own; its
-    port is the one it gives, or its scheme's.
+    port is the one it gives, or its scheme's. A query string the path
+    carries comes first, and `query_params` go after it.
     """
     parts = urlsplit(str(path))  # path can be lazy
 
@@ -106,30 +98,21 @@ def split_target(path: str) -> Target:
         host = DEFAULT_HOST
         port = DEFAULT_PORTS[scheme]
 
+    query_strings = [parts.query, urlencode(query_params or {}, doseq=True)]
+
     return Target(
         scheme=scheme,
         host=host,
         port=port,
         path=parts.path,
-        query_string=parts.query,
+        query_string="&".join(part for part in query_strings if part),
     )
-
-
-def join_query_strings(first: str, second: str) -> str:
-    """A URL can carry its own query string; `query_params` go after it."""
-    if first and second:
-        return f"{first}&{second}"
-    return first or second
 
 
 def build_encoded_request(
     method: str,
-    path: str,
+    target: Target,
     *,
-    scheme: str,
-    host: str,
-    port: str,
-    query_string: str,
     body: bytes,
     content_type: str,
     headers: dict[str, str] | None,
@@ -148,13 +131,13 @@ def build_encoded_request(
 
     return Request(
         method=method,
-        path=path,
+        path=target.path,
         headers=all_headers,
-        query_string=query_string,
+        query_string=target.query_string,
         body=body,
-        server_scheme=scheme,
-        server_name=host,
-        server_port=port,
+        server_scheme=target.scheme,
+        server_name=target.host,
+        server_port=target.port,
         remote_addr="127.0.0.1",
     )
 
@@ -210,11 +193,11 @@ def encode_request_body(
         resolved_content_type = content_type or "application/octet-stream"
         if isinstance(body, str):
             # Encode a string body with the charset the content type
-            # declares, so the payload bytes match what the request
-            # advertises. Bytes pass through untouched.
-            charset_match = _CHARSET_RE.match(resolved_content_type)
-            charset = charset_match[1] if charset_match else "utf-8"
-            body = body.encode(charset)
+            # declares, read the way `Request` reads it back, so the
+            # payload bytes match what the request advertises. Bytes pass
+            # through untouched.
+            _, content_params = parse_header_parameters(resolved_content_type)
+            body = body.encode(content_params.get("charset", "utf-8"))
         return (body, resolved_content_type)
 
     if files:

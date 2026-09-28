@@ -12,7 +12,6 @@ class RedirectCycleError(Exception):
     def __init__(self, message: str, last_response: ClientResponse) -> None:
         super().__init__(message)
         self.last_response = last_response
-        self.redirect_chain = last_response.redirect_chain
 
 
 class AppRequiredError(RuntimeError):

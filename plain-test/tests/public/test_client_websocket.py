@@ -45,6 +45,23 @@ def test_rejection_carries_the_response() -> None:
     assert response.request.path == "/websocket/forbidden"
 
 
+def test_a_handshake_that_raises_raises_from_the_client() -> None:
+    # As any other request the client makes does.
+    with raises(RuntimeError, match="websocket handshake boom"):
+        Client().websocket("/websocket/handshake-raises")
+
+
+def test_a_handshake_that_raises_is_a_rejection_when_not_raising() -> None:
+    client = Client(raise_exceptions=False)
+
+    with raises(WebSocketRejected) as caught:
+        client.websocket("/websocket/handshake-raises")
+
+    response = caught.exception.response
+    assert response.status_code == 500
+    assert isinstance(response.exception, RuntimeError)
+
+
 def test_subprotocol_is_negotiated() -> None:
     with Client().websocket("/websocket/echo", subprotocols=("rfb", "binary")) as ws:
         assert ws.subprotocol == "binary"

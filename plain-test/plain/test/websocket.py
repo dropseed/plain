@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
     from .client import ClientResponse
 
+# How long a call on the connection waits, unless the test says otherwise.
 DEFAULT_TIMEOUT = 5.0
 
 # Server-to-client frames are read without a size cap: the test wrote the
@@ -86,13 +87,10 @@ class WebSocketRejected(Exception):
 class WebSocketTestConnection:
     """The client end of an accepted websocket, driven synchronously."""
 
-    def __init__(
-        self,
-        handled: HandledRequest,
-        *,
-        timeout: float = DEFAULT_TIMEOUT,
-    ) -> None:
+    def __init__(self, handled: HandledRequest, *, timeout: float) -> None:
         response = handled.response
+        # For the type checker: `Client.websocket()` is the only caller, and
+        # it has already turned anything else into a `WebSocketRejected`.
         assert isinstance(response, WebSocketResponse)
         # The handshake: the request that asked for the socket, and the 101
         # that granted it.

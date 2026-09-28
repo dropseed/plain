@@ -7,7 +7,7 @@ content type it will see in production.
 
 from io import BytesIO
 
-from plain.test import build_request, raises
+from plain.test import build_request, case, cases, raises
 
 
 def test_form_data_is_urlencoded_without_files():
@@ -62,3 +62,24 @@ def test_raw_body_keeps_the_content_type_it_was_given():
 
     assert request.headers["Content-Type"] == "application/json"
     assert request.body == b"{}"
+
+
+@cases(
+    case("text/plain; charset=latin-1", id="with a space"),
+    case("text/plain;charset=latin-1", id="no space"),
+    case('text/plain; charset="latin-1"', id="quoted"),
+    case("text/plain; CHARSET=latin-1", id="uppercase"),
+)
+def test_a_string_body_is_encoded_with_the_charset_it_declares(content_type):
+    request = build_request("POST", "/x", body="café", content_type=content_type)
+
+    # The bytes are in the declared charset, which is what the request
+    # decodes them with.
+    assert request.body == "café".encode("latin-1")
+    assert request.encoding == "latin-1"
+
+
+def test_a_string_body_with_no_charset_is_utf8():
+    request = build_request("POST", "/x", body="café", content_type="text/plain")
+
+    assert request.body == "café".encode()

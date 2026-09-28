@@ -1,31 +1,32 @@
 import json
 import re
+from dataclasses import replace
+from functools import cached_property
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin
 
 from plain.http import Request, WebSocketResponse
-from plain.server.inprocess import InProcessServer, SentResponse
-from plain.urls import get_resolver
-from plain.utils.http import urlencode
+from plain.server.inprocess import HandledRequest, InProcessServer, SentResponse
 
 from .exceptions import RedirectCycleError, require_app
 from .request_builder import (
-    DEFAULT_PORTS,
     Target,
     build_encoded_request,
     encode_request_body,
-    join_query_strings,
     split_target,
+)
+from .websocket import (
+    DEFAULT_TIMEOUT,
+    WebSocketRejected,
+    WebSocketTestConnection,
+    handshake_headers,
 )
 
 if TYPE_CHECKING:
     from plain.http import Response
     from plain.http.response import ResponseHeaders
-    from plain.urls import ResolverMatch
-
-    from .websocket import WebSocketTestConnection
 
 __all__ = [
     "Client",
@@ -43,9 +44,6 @@ _REDIRECT_STATUS_CODES = (
     HTTPStatus.TEMPORARY_REDIRECT,
     HTTPStatus.PERMANENT_REDIRECT,
 )
-
-
-_UNSET: Any = object()
 
 
 class ClientResponse:
@@ -69,58 +67,49 @@ class ClientResponse:
         "redirect_chain",
         "request",
         "exception",
-        "streaming",
-        "resolver_match",
         "returned_response",
     )
 
     def __init__(self, sent: SentResponse):
-        self._returned_response = sent.response
-        self._request = sent.request
-        self._status_code = sent.status_code
-        self._body = sent.body
+        self._sent = sent
         self._redirect_chain: list[tuple[str, int]] = []
-        self._json_data: Any = _UNSET
-        self._resolver_match: ResolverMatch | None = _UNSET
 
     @property
     def status_code(self) -> int:
         """The status that went out — the view's, unless its streaming body
         failed before producing anything, which a server answers with 500."""
-        return self._status_code
+        return self._sent.status_code
 
     @property
     def headers(self) -> ResponseHeaders:
         """The response headers."""
-        return self._returned_response.headers
+        return self._sent.response.headers
 
     @property
     def cookies(self) -> SimpleCookie:
         """The cookies this response set."""
-        return self._returned_response.cookies
+        return self._sent.response.cookies
 
     @property
     def body(self) -> bytes:
         """The body the response sent — for a streaming response too, read to
         the end the way a server sends it (empty for HEAD, 204, 304)."""
-        return self._body
+        return self._sent.body
 
     @property
     def text(self) -> str:
         """The body the response sent, decoded as a string."""
-        return self._body.decode(self._returned_response.charset)
+        return self._sent.body.decode(self._sent.response.charset)
 
-    @property
+    @cached_property
     def json_data(self) -> Any:
         """The body the response sent, parsed as JSON (requires a JSON content type)."""
-        if self._json_data is _UNSET:
-            content_type = self.headers.get("Content-Type", "")
-            if not _JSON_CONTENT_TYPE_RE.match(content_type):
-                raise ValueError(
-                    f'Content-Type header is "{content_type}", not "application/json"'
-                )
-            self._json_data = json.loads(self.text)
-        return self._json_data
+        content_type = self.headers.get("Content-Type", "")
+        if not _JSON_CONTENT_TYPE_RE.match(content_type):
+            raise ValueError(
+                f'Content-Type header is "{content_type}", not "application/json"'
+            )
+        return json.loads(self.text)
 
     @property
     def redirect_to(self) -> str | None:
@@ -137,30 +126,15 @@ class ClientResponse:
 
     @property
     def request(self) -> Request:
-        """The request that produced this response."""
-        return self._request
+        """The request that produced this response. The route that handled
+        it is `request.resolver_match`."""
+        return self._sent.request
 
     @property
     def exception(self) -> Exception | None:
         """The exception behind a 5xx response, when
         `Client(raise_exceptions=False)` kept it from being raised."""
-        return self._returned_response.exception
-
-    @property
-    def streaming(self) -> bool:
-        """Whether the body was streamed rather than sent in one piece."""
-        return self._returned_response.streaming
-
-    @property
-    def resolver_match(self) -> ResolverMatch | None:
-        """The URL route the request's path resolves to. None for a path that
-        a middleware answered without a route (a healthcheck, a 404)."""
-        if self._resolver_match is _UNSET:
-            try:
-                self._resolver_match = get_resolver().resolve(self._request.path)
-            except Exception:
-                self._resolver_match = None
-        return self._resolver_match
+        return self._sent.response.exception
 
     @property
     def returned_response(self) -> Response:
@@ -171,7 +145,7 @@ class ClientResponse:
         has. Its own `content` and `status_code` can differ from what went
         out (a HEAD, a 204, a streaming body that failed).
         """
-        return self._returned_response
+        return self._sent.response
 
     def __getattr__(self, name: str) -> Any:
         # Only reached for a name that isn't defined above.
@@ -183,8 +157,8 @@ class ClientResponse:
 
     def __repr__(self) -> str:
         return (
-            f"<ClientResponse status_code={self._status_code}"
-            f" of {self._returned_response!r}>"
+            f"<ClientResponse status_code={self._sent.status_code}"
+            f" of {self._sent.response!r}>"
         )
 
 
@@ -248,14 +222,10 @@ class Client:
             files=files,
             content_type=content_type,
         )
-        target = split_target(path)
-        target.query_string = join_query_strings(
-            target.query_string, urlencode(query_params or {}, doseq=True)
-        )
         response = self._send(
             self._build_request(
                 method,
-                target,
+                split_target(path, query_params=query_params),
                 body=encoded_body,
                 content_type=encoded_content_type,
                 headers=headers,
@@ -296,27 +266,38 @@ class Client:
 
         return build_encoded_request(
             method,
-            target.path,
-            scheme=target.scheme,
-            host=target.host,
-            port=target.port,
-            query_string=target.query_string,
+            target,
             body=body,
             content_type=content_type,
             headers=all_headers,
         )
 
-    def _send(self, request: Request) -> ClientResponse:
-        """Run a Request through the app and wrap what came back."""
-        response = ClientResponse(self._server.handle(request).send())
+    def _handle(self, request: Request) -> HandledRequest:
+        """Run a request through the app, and keep the cookies it set.
 
-        # Only 5xx errors have an exception.
+        Every request this client makes comes through here, a websocket's
+        handshake included.
+        """
+        handled = self._server.handle(request)
+        if handled.response.cookies:
+            self._cookies.update(handled.response.cookies)
+        return handled
+
+    def _sent(self, handled: HandledRequest) -> ClientResponse:
+        """Send a handled request's response and wrap what went out.
+
+        An exception the app raised is raised from here, after the response
+        is sent and closed, unless `raise_exceptions` is off. Only a 5xx
+        has one.
+        """
+        response = ClientResponse(handled.send())
         if response.exception and self.raise_exceptions:
             raise response.exception
-
-        if response.cookies:
-            self._cookies.update(response.cookies)
         return response
+
+    def _send(self, request: Request) -> ClientResponse:
+        """Run a Request through the app and wrap what came back."""
+        return self._sent(self._handle(request))
 
     def get(
         self,
@@ -484,7 +465,7 @@ class Client:
         subprotocols: tuple[str, ...] = (),
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        timeout: float = 5.0,
+        timeout: float = DEFAULT_TIMEOUT,
     ) -> WebSocketTestConnection:
         """Open a websocket to `path` and drive the view's `websocket()` in-process.
 
@@ -494,31 +475,25 @@ class Client:
 
         The handshake runs through the normal pipeline with this client's
         cookies, so auth applies. A response other than the 101 raises
-        `WebSocketRejected` carrying it. Every call on the connection has
-        a timeout (default 5 s) and raises `TimeoutError` when it elapses.
+        `WebSocketRejected` carrying it, and a handshake the app raised from
+        raises that exception, as any other request does. Every call on the
+        connection has a timeout (default 5 s) and raises `TimeoutError`
+        when it elapses.
         """
-        from .websocket import (
-            WebSocketRejected,
-            WebSocketTestConnection,
-            handshake_headers,
-        )
-
         handshake = handshake_headers(subprotocols=subprotocols)
         if headers:
             handshake.update(headers)
 
-        target = split_target(path)
-        target.query_string = join_query_strings(
-            target.query_string, urlencode(query_params or {}, doseq=True)
+        handled = self._handle(
+            self._build_request(
+                "GET",
+                split_target(path, query_params=query_params),
+                headers=handshake,
+            )
         )
-        request = self._build_request("GET", target, headers=handshake)
-
-        handled = self._server.handle(request)
-        if handled.response.cookies:
-            self._cookies.update(handled.response.cookies)
-        if not isinstance(handled.response, WebSocketResponse):
-            raise WebSocketRejected(ClientResponse(handled.send()))
-        return WebSocketTestConnection(handled, timeout=timeout)
+        if isinstance(handled.response, WebSocketResponse):
+            return WebSocketTestConnection(handled, timeout=timeout)
+        raise WebSocketRejected(self._sent(handled))
 
     def _follow_redirects(
         self,
@@ -589,29 +564,12 @@ def _redirect_target(location: str, *, previous: Request) -> Target:
     previous request's. One that names a scheme or a host without a port
     goes to that scheme's port, not the previous request's.
     """
-    url = urlsplit(location)
-
-    scheme = url.scheme or previous.scheme
-    host = url.hostname or previous.server_name
-    if url.port:
-        port = str(url.port)
-    elif url.scheme or url.hostname:
-        port = DEFAULT_PORTS.get(scheme, previous.server_port)
-    else:
-        port = previous.server_port
-
-    path = url.path
-    # RFC 3986 Section 6.2.3: Empty path should be normalized to "/".
-    if not path and url.netloc:
-        path = "/"
-    # Prepend the request path to handle relative path redirects
-    if not path.startswith("/"):
-        path = urljoin(previous.path, path)
-
-    return Target(
-        scheme=scheme,
-        host=host,
-        port=port,
-        path=path,
-        query_string=url.query,
+    previous_url = (
+        f"{previous.scheme}://{previous.server_name}:{previous.server_port}"
+        f"{previous.path}"
     )
+    target = split_target(urljoin(previous_url, location))
+    if not target.path:
+        # RFC 3986 Section 6.2.3: Empty path should be normalized to "/".
+        return replace(target, path="/")
+    return target

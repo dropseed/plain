@@ -22,11 +22,6 @@ def test_file_like_body_is_readable() -> None:
     assert response.body == b"streamed-bytes"
 
 
-def test_streaming_response_says_it_streamed() -> None:
-    assert Client().get("/stream-generator").streaming
-    assert not Client().get("/").streaming
-
-
 def test_returned_response_is_the_object_the_view_returned() -> None:
     response = Client().get("/stream-generator")
 
@@ -75,7 +70,15 @@ def test_body_failing_before_its_first_chunk_is_a_500() -> None:
     assert isinstance(response.exception, ValueError)
 
 
-@cases("content", "streaming_content", "url", "reason_phrase", "charset")
+@cases(
+    "content",
+    "streaming_content",
+    "streaming",
+    "resolver_match",
+    "url",
+    "reason_phrase",
+    "charset",
+)
 def test_a_name_the_returned_response_has_is_not_forwarded(name: str) -> None:
     # Each of these is an attribute of the Response the view returned. The
     # client's response has its own fixed names and forwards none of them.
