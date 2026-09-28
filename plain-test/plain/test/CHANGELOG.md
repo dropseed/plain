@@ -126,7 +126,7 @@ The test client, where everything after the path is now keyword-only:
 
 Only the test client's response changes. `content` on a `Response` your own code builds or a view returns is unchanged.
 
-The client's response has a fixed set of names and no longer passes anything else through to the response the view returned: `status_code`, `headers`, `cookies`, `body`, `text`, `json_data`, `redirect_to`, `redirect_chain`, `request`, `exception`, `streaming`, `resolver_match`, and `returned_response`. Reading another name raises an `AttributeError` that lists them. `WebSocketRejected.response` is one of these too.
+The client's response has a fixed set of names and no longer passes anything else through to the response the view returned: `status_code`, `headers`, `cookies`, `body`, `text`, `json_data`, `redirect_to`, `redirect_chain`, `request`, `exception`, and `returned_response`. Reading another name raises an `AttributeError` that lists them. The route is `response.request.resolver_match`, and whether the body streamed is `response.returned_response.streaming`. `WebSocketRejected.response` is one of these too.
 
 Plugins with no replacement yet:
 

@@ -189,9 +189,9 @@ Responses are data, not assertion methods — bare `assert` is the assertion API
 | `redirect_chain`    | The `(url, status_code)` of each redirect that was followed; empty if none were |
 | `request`           | The request that produced this response, after middleware ran                   |
 | `exception`         | The exception behind a 5xx, when `raise_exceptions=False` kept it a response    |
-| `streaming`         | Whether the body was streamed                                                   |
-| `resolver_match`    | The URL route the path resolves to, `None` if it has none                       |
 | `returned_response` | The `Response` object the app returned                                          |
+
+The route that handled the request is `response.request.resolver_match`, which is `None` when a middleware answered it or nothing matched. Whether the body was streamed is `response.returned_response.streaming`.
 
 ```python
 response = client.get("/api/users/")
@@ -547,7 +547,7 @@ It takes `query_params=` and `headers=` like `get()`, plus `subprotocols=` and `
 - `ws.subprotocol` is the negotiated subprotocol. `ws.request` is the handshake request and `ws.response` is the 101 that answered it, for asserting on its headers and cookies.
 - Every call has a timeout (5 seconds by default, `receive(timeout=...)` per call) and raises `TimeoutError` when it elapses.
 - An exception raised by the view surfaces from `receive()` and again when the `with` block exits; a view that closes the socket makes `receive()` raise `WebSocketClosed` (from `plain.http`) with its code and reason.
-- A handshake that doesn't produce a socket — a 403, a redirect — raises `WebSocketRejected`. Its `.response` is the same kind of response `client.get()` returns.
+- A handshake that doesn't produce a socket — a 403, a redirect — raises `WebSocketRejected`. Its `.response` is the same kind of response `client.get()` returns. A handshake the app raised from raises that exception, as `client.get()` would, unless the client was created with `raise_exceptions=False`.
 
 The view runs on the test's own thread, inside a copy of the test's context, so the test database transaction is visible to it. Because the connection steps its own event loop, `Client.websocket()` is for synchronous tests, not `async def` ones.
 
