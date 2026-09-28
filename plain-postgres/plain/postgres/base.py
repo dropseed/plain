@@ -501,9 +501,9 @@ class Model(metaclass=ModelBase):
             )
         deferred_fields = self.get_deferred_fields()
         if fields is not None:
+            fields = frozenset(fields)
             if not fields:
                 return self  # explicit "update nothing" -- no-op
-            fields = frozenset(fields)
             field_names = self._model_meta._non_pk_field_names
             non_model_fields = fields.difference(field_names)
             if non_model_fields:
