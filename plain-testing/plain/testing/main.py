@@ -4,16 +4,34 @@ from pathlib import Path
 
 import click
 
+__all__ = []
+
 
 @click.command()
 @click.argument("targets", nargs=-1)
-@click.option("-k", "keyword", default=None, help="Filter tests by id substring")
-@click.option("--tag", "tags", multiple=True, help="Run only tests with this tag")
 @click.option(
-    "--exclude-tag", "exclude_tags", multiple=True, help="Skip tests with this tag"
+    "-k",
+    "keyword",
+    metavar="TEXT",
+    default=None,
+    help="Run only tests whose id contains TEXT",
 )
-@click.option("-x", "--fail-fast", is_flag=True, help="Stop on first failure")
-@click.option("-v", "--verbose", is_flag=True, help="One line per test")
+@click.option(
+    "--tag",
+    "tags",
+    metavar="NAME",
+    multiple=True,
+    help="Run only tests tagged NAME (repeat for any of several)",
+)
+@click.option(
+    "--exclude-tag",
+    "exclude_tags",
+    metavar="NAME",
+    multiple=True,
+    help="Leave out tests tagged NAME (repeatable)",
+)
+@click.option("-x", "--fail-fast", is_flag=True, help="Stop at the first failure")
+@click.option("-v", "--verbose", is_flag=True, help="Print one line per test")
 def main(
     targets: tuple[str, ...],
     keyword: str | None,
@@ -22,7 +40,23 @@ def main(
     fail_fast: bool,
     verbose: bool,
 ) -> None:
-    """Run tests"""
+    """Run tests
+
+    With no TARGETS, runs every test in every `test_*.py` file under the
+    directory the command runs from. A target narrows that to a directory, a
+    file, or one test, and a path is relative to the same directory.
+
+    \b
+      tests/accounts                                a directory
+      tests/test_signup.py                          a file
+      tests/test_signup.py::test_welcome            a test
+      tests/test_signup.py::TestInvites             a class
+      tests/test_signup.py::TestInvites::test_sent  a test in a class
+      'tests/test_price.py::test_total[annual]'     one case of a test
+
+    Quote a target that names a case. A failure prints the command that
+    runs it again, already quoted.
+    """
     # Tests run with PLAIN_ENV=test so the dotenv ladder picks `.env.test*`
     # and skips `.env.local` for determinism.
     os.environ.setdefault("PLAIN_ENV", "test")
@@ -35,6 +69,7 @@ def main(
     import plain.runtime
 
     from .collection import collect_tests
+    from .layout import find_tests_directory
     from .lifecycles import (
         AppLifecycleError,
         load_app_lifecycle,
@@ -70,9 +105,15 @@ def main(
 
     reporter = Reporter(verbose=verbose)
 
+    # Helper modules are imported from the tests directory. A project with
+    # no tests directory keeps them beside its test files, at the root.
+    tests_directory = find_tests_directory(Path.cwd())
+
     try:
         tests, collection_errors = collect_tests(
-            list(targets), exclude_dirs=exclude_dirs
+            list(targets),
+            exclude_dirs=exclude_dirs,
+            helper_directory=tests_directory if tests_directory.is_dir() else None,
         )
     except FileNotFoundError as e:
         click.secho(str(e), fg="red", err=True)

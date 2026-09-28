@@ -78,7 +78,7 @@ def test_records_emitted_inside_a_span_carry_its_context():
     ):
         logging.getLogger("plain.jobs").error("Inside")
 
-    span = spans.find(name="work")
+    [span] = spans.filter(name="work")
     context = logs.span_context_for("Inside")
     assert context.is_valid
     assert context.trace_id == span.context.trace_id

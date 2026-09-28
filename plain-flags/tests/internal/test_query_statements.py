@@ -12,8 +12,7 @@ get_or_create() path -- they are pinned here only so the counts stay honest.
 
 from plain.flags import Flag
 from plain.flags.models import Flag as FlagModel
-from plain.postgres.test import span_sql_statements
-from plain.test import capture_spans
+from plain.postgres.test import capture_queries
 
 
 class _PinnedFlag(Flag):
@@ -25,10 +24,10 @@ class _PinnedFlag(Flag):
 
 
 def test_first_evaluation_creates_the_flag_in_one_statement() -> None:
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         assert _PinnedFlag().value is True
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 3
     assert sql[0].startswith('INSERT INTO "plainflags_flag"')
     assert 'ON CONFLICT("name") DO UPDATE SET' in sql[0]
@@ -43,10 +42,10 @@ def test_first_evaluation_creates_the_flag_in_one_statement() -> None:
 def test_second_evaluation_reuses_the_flag_in_one_statement() -> None:
     assert _PinnedFlag().value is True
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         assert _PinnedFlag().value is True
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 2
     assert sql[0].startswith('INSERT INTO "plainflags_flag"')
     assert 'ON CONFLICT("name") DO UPDATE SET' in sql[0]
@@ -63,11 +62,11 @@ def test_conflict_refreshes_timestamps_and_leaves_the_rest_alone() -> None:
         enabled=False, description="still in use"
     )
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         # A disabled flag returns None, but it still claims its row.
         assert _PinnedFlag().value is None
 
-    insert = next(s for s in span_sql_statements(spans) if s.startswith("INSERT"))
+    insert = next(s for s in queries.sql_statements() if s.startswith("INSERT"))
     set_clause = insert.split("DO UPDATE SET")[1].split(" RETURNING ")[0]
     assert '"used_at" = EXCLUDED."used_at"' in set_clause
     assert '"updated_at" = EXCLUDED."updated_at"' in set_clause

@@ -14,16 +14,16 @@ from pathlib import Path
 from plain.test.lifecycle import TestLifecycle
 from plain.test.skipping import TestSkipped
 
-from .collection import CollectedTest
+from .collection import RunnableTest
 
-__all__ = ["TestResult", "TestRun", "run_tests"]
+__all__ = []
 
 _INTERNAL_DIR = str(Path(__file__).parent)
 
 
 @dataclass
 class TestResult:
-    test: CollectedTest
+    test: RunnableTest
     outcome: str  # "passed" | "failed" | "skipped"
     duration: float = 0.0
     error: BaseException | None = None
@@ -55,7 +55,7 @@ class TestRun:
 
 
 def run_tests(
-    tests: list[CollectedTest],
+    tests: list[RunnableTest],
     *,
     lifecycles: list[TestLifecycle],
     fail_fast: bool = False,
@@ -91,7 +91,7 @@ def run_tests(
     return TestRun(results=results, duration=time.monotonic() - run_start)
 
 
-def _run_one(test: CollectedTest, *, lifecycles: list[TestLifecycle]) -> TestResult:
+def _run_one(test: RunnableTest, *, lifecycles: list[TestLifecycle]) -> TestResult:
     if test.skip_reason is not None:
         return TestResult(test=test, outcome="skipped", skip_reason=test.skip_reason)
 

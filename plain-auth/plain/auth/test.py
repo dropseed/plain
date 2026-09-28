@@ -1,24 +1,29 @@
-from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 
 from plain.http.request import Request
 from plain.runtime import settings
 from plain.sessions import SessionStore
 from plain.sessions.requests import get_request_session, set_request_session
+from plain.sessions.test import get_client_session
 
 from .requests import set_request_user
 from .sessions import get_user, login, logout
 
 if TYPE_CHECKING:
-    from plain.test.client import Client
+    from plain.test import Client
+
+__all__ = ["login_client", "logout_client"]
 
 
 def login_client(client: Client, user: Any) -> None:
-    """Log a user into a test client."""
+    """Log a user into a test client, without going through a login view.
+
+    Writes the session cookie to `client.cookies`, so every request the
+    client makes afterwards is that user's.
+    """
     request = Request(method="GET", path="/")
-    if client.session:
-        session = client.session
-    else:
+    session = get_client_session(client)
+    if not session:
         session = SessionStore()
     set_request_session(request, session)
     login(request, user)
@@ -44,10 +49,10 @@ def login_client(client: Client, user: Any) -> None:
 
 
 def logout_client(client: Client) -> None:
-    """Log out a user from a test client."""
+    """Log a test client out: end its session and drop its cookies."""
     request = Request(method="GET", path="/")
-    if client.session:
-        session = client.session
+    session = get_client_session(client)
+    if session:
         set_request_session(request, session)
         user = get_user(request)
         set_request_user(request, user)
@@ -55,4 +60,4 @@ def logout_client(client: Client) -> None:
         session = SessionStore()
         set_request_session(request, session)
     logout(request)
-    client.cookies = SimpleCookie()
+    client.cookies.clear()

@@ -2,7 +2,11 @@ import tempfile
 from pathlib import Path
 
 from plain.test import raises
-from plain.testing.collection import TestDefinitionError, collect_tests
+from plain.testing.collection import (
+    ConftestNotSupported,
+    TestDefinitionError,
+    collect_tests,
+)
 from plain.testing.runner import run_tests
 
 
@@ -280,3 +284,122 @@ def test_skip_test_skips_one_case_and_runs_the_others():
         ("test_field[encrypted]", "skipped"),
     ]
     assert run.results[1].skip_reason == "Encrypted fields have no conditions"
+
+
+def test_a_conftest_is_a_collection_error_wherever_it_is():
+    root = write_tests(
+        {
+            "conftest.py": "import pytest\n",
+            "accounts/conftest.py": "import pytest\n",
+            "accounts/test_users.py": "def test_user():\n    assert True\n",
+        }
+    )
+    tests, errors = collect_tests(["."], root=root)
+    assert [t.id for t in tests] == ["accounts/test_users.py::test_user"]
+    assert [error.path for error in errors] == [
+        root.resolve() / "conftest.py",
+        root.resolve() / "accounts" / "conftest.py",
+    ]
+    assert all(isinstance(error.error, ConftestNotSupported) for error in errors)
+
+
+def test_a_conftest_above_a_single_file_target_is_found():
+    root = write_tests(
+        {
+            "conftest.py": "import pytest\n",
+            "accounts/conftest.py": "import pytest\n",
+            "billing/conftest.py": "import pytest\n",
+            "accounts/test_users.py": "def test_user():\n    assert True\n",
+        }
+    )
+    tests, errors = collect_tests(["accounts/test_users.py"], root=root)
+    assert len(tests) == 1
+    # The ones pytest would have applied to that file, and not billing's.
+    assert [error.path for error in errors] == [
+        root.resolve() / "conftest.py",
+        root.resolve() / "accounts" / "conftest.py",
+    ]
+
+
+def test_a_conftest_is_reported_once_for_overlapping_targets():
+    root = write_tests(
+        {
+            "conftest.py": "import pytest\n",
+            "test_one.py": "def test_one():\n    assert True\n",
+        }
+    )
+    _, errors = collect_tests([".", "test_one.py"], root=root)
+    assert len(errors) == 1
+
+
+def test_a_conftest_names_its_fixtures_without_being_imported():
+    root = write_tests(
+        {
+            "conftest.py": (
+                "import pytest\n"
+                "import a_module_that_is_not_installed\n"
+                "\n"
+                "@pytest.fixture\n"
+                "def user(db):\n"
+                "    return object()\n"
+                "\n"
+                "@pytest.fixture(scope='session')\n"
+                "def server():\n"
+                "    yield\n"
+                "\n"
+                "@pytest.fixture(autouse=True)\n"
+                "def no_network(monkeypatch):\n"
+                "    pass\n"
+                "\n"
+                "def a_plain_function():\n"
+                "    pass\n"
+            ),
+        }
+    )
+    _, errors = collect_tests(["."], root=root)
+    message = str(errors[0].error)
+    assert "Fixtures in this file: user, server" in message
+    assert "Autouse fixtures in this file: no_network" in message
+    assert "a_plain_function" not in message
+
+
+def test_only_a_tests_directory_refuses_imports_through_its_name():
+    # Without a helper directory, the root's own name means nothing: a
+    # project directory can be called anything, `plain` included.
+    root = write_tests({})
+    project = root / "plain"
+    project.mkdir()
+    (project / "test_one.py").write_text(
+        "from plain.test import raises\n\ndef test_one():\n    assert raises\n"
+    )
+    tests, errors = collect_tests(["."], root=project)
+    assert errors == []
+    assert len(tests) == 1
+
+
+def test_every_import_problem_in_a_file_is_reported_together():
+    root = write_tests(
+        {
+            "tests/helpers.py": "value = 1\n",
+            "tests/test_one.py": (
+                "import tests.helpers\n"
+                "from tests import helpers\n"
+                "from . import helpers as mine\n"
+                "\n"
+                "def test_one():\n"
+                "    from ..helpers import value\n"
+            ),
+        }
+    )
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    assert len(errors) == 1
+    assert isinstance(errors[0].error, TestDefinitionError)
+    message = str(errors[0].error)
+    assert "line 1: `import tests.helpers` should be `import helpers`" in message
+    assert "line 2: `from tests import helpers` should be `import helpers`" in message
+    assert (
+        "line 3: `from . import helpers as mine` should be `import helpers as mine`"
+    ) in message
+    assert (
+        "line 6: `from ..helpers import value` should be `from helpers import value`"
+    ) in message

@@ -15,7 +15,7 @@ from plain.postgres.test import capture_queries
 def statement_for(build):
     with capture_queries() as queries:
         build()
-    return [q["sql"] for q in queries]
+    return [q.sql_with_params for q in queries]
 
 
 def test_primary_key_form_matches_the_long_form():
@@ -70,4 +70,6 @@ def test_no_argument_terminals_are_untouched():
     with capture_queries() as sliced_queries:
         list(ordered[:1])
 
-    assert [q["sql"] for q in first_queries] == [q["sql"] for q in sliced_queries]
+    assert [q.sql_with_params for q in first_queries] == [
+        q.sql_with_params for q in sliced_queries
+    ]

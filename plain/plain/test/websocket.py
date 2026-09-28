@@ -17,9 +17,9 @@ import base64
 import os
 import socket
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from plain.http import Response, WebSocketClosed, WebSocketResponse
+from plain.http import Request, WebSocketClosed, WebSocketResponse
 from plain.http.websocket_frames import (
     OP_BINARY,
     OP_CLOSE,
@@ -36,6 +36,9 @@ from plain.http.websocket_frames import (
 from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.connection import Connection
 from plain.server.http.websocket import run_websocket
+
+if TYPE_CHECKING:
+    from .client import ClientResponse
 
 DEFAULT_TIMEOUT = 5.0
 
@@ -69,9 +72,12 @@ def _client_frame(opcode: int, payload: bytes = b"") -> bytes:
 
 
 class WebSocketRejected(Exception):
-    """The upgrade did not produce a socket; `.response` says why (a 403, a redirect)."""
+    """The upgrade did not produce a socket; `.response` says why (a 403, a redirect).
 
-    def __init__(self, response: Response) -> None:
+    `.response` is the same kind of response any other client request returns.
+    """
+
+    def __init__(self, response: ClientResponse) -> None:
         self.response = response
         super().__init__(f"WebSocket upgrade rejected with {response.status_code}")
 
@@ -80,10 +86,17 @@ class WebSocketTestConnection:
     """The client end of an accepted websocket, driven synchronously."""
 
     def __init__(
-        self, lifecycle: ResponseLifecycle, *, timeout: float = DEFAULT_TIMEOUT
+        self,
+        lifecycle: ResponseLifecycle,
+        *,
+        request: Request,
+        timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         response = lifecycle.response
         assert isinstance(response, WebSocketResponse)
+        # The handshake: the request that asked for the socket, and the 101
+        # that granted it.
+        self.request = request
         self.response = response
         self.subprotocol = response.subprotocol
         self._timeout = timeout

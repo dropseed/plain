@@ -222,8 +222,6 @@ def setting_client(router_cls: type[Router], *, urls_trailing_slash: bool):
     _get_cached_resolver.cache_clear()
     try:
         client = Client(raise_request_exception=False)
-        client.handler._middleware_chain = None
-        client.handler.load_middleware()
         yield client
     finally:
         settings.URLS_ROUTER = original_router

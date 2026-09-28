@@ -72,6 +72,8 @@ plain test -v                                   # one line per test, with its du
 | `-x`, `--fail-fast`  | Stop at the first failure                             |
 | `-v`, `--verbose`    | Print one line per test                               |
 
+`plain test --help` prints the same list, and the forms a target can take.
+
 Tests run in the same order every time. Within a file, that's the order they're written in.
 
 ### Selecting tests
@@ -87,7 +89,7 @@ A target is a path, optionally followed by `::` and a name. You can pass several
 | `tests/test_views.py::TestCart::test_add`  | That method                          |
 | `'tests/test_email.py::test_valid[empty]'` | That one case                        |
 
-Paths are relative to the directory you run from. Quote a target that names a case, since the shell reads `[` and spaces itself.
+Paths are relative to the directory you run from. Quote a target that names a case, since the shell reads `[` and spaces itself. The [re-run command](#failures) a failure prints is already quoted.
 
 `-k` matches against the whole id, which starts with the file's path. So `-k checkout` keeps every test in `tests/checkout/` as well as any test with "checkout" in its name.
 
@@ -95,12 +97,12 @@ Targets, `-k` and the tag flags combine: a test runs when it's inside a target a
 
 ### Exit codes
 
-| Code | Meaning                                                                                                |
-| ---- | ------------------------------------------------------------------------------------------------------ |
-| `0`  | Every test that ran passed. Skipped tests don't change this                                            |
-| `1`  | A test failed, or a file couldn't be collected                                                         |
-| `2`  | The run couldn't start: a target doesn't exist, or [`tests/lifecycle.py`](#project-lifecycle) is wrong |
-| `5`  | No tests matched                                                                                       |
+| Code | Meaning                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------- |
+| `0`  | Every test that ran passed. Skipped tests don't change this                                             |
+| `1`  | A test failed, or a file couldn't be collected                                                          |
+| `2`  | The run couldn't start: a target doesn't exist, or the [project lifecycle](#project-lifecycle) is wrong |
+| `5`  | No tests matched                                                                                        |
 
 ### Environment
 
@@ -153,19 +155,24 @@ def create_user(*, email="test@example.com"):
 ```
 
 ```python
-# tests/test_dashboard.py
+# tests/accounts/test_profile.py
+from helpers import create_user
 from plain.test import Client
 
-from tests.helpers import create_user
 
-
-def test_dashboard_requires_login():
-    client = Client()
-    client.force_login(create_user())
-    assert client.get("/dashboard/").status_code == 200
+def test_profile_shows_the_email():
+    user = create_user(email="ada@example.com")
+    response = Client().get(f"/users/{user.id}/")
+    assert "ada@example.com" in response.text
 ```
 
-The directory you run from is on the import path, so `tests/helpers.py` is `tests.helpers`. There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it.
+`tests/` is on the import path, so `tests/helpers.py` is `helpers`. That's true for a test file in any subdirectory, whichever directory you run from, and whatever target you pass.
+
+It's the only way to import one. `from tests.helpers import ...` and a relative `from .helpers import ...` are [collection errors](#collection-errors) that say what to write instead. A module imported under two names is loaded twice, and the two copies don't share their state.
+
+`tests/` comes first on the import path, so a helper module named like an installed package takes its place. Give a helper module a name nothing else has.
+
+There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it. A `conftest.py` anywhere under the tests is a collection error.
 
 Only files named `test_*.py` have their [assertions](#assertions) rewritten. An `assert` in a helper module fails as a bare `AssertionError`.
 
@@ -205,6 +212,12 @@ Re-run: plain test tests/test_signup.py::test_signup_redirects
 
 The traceback starts at your test. The runner's own frames are left out.
 
+The command is quoted wherever a shell would read the id for itself, so you can paste it as it is:
+
+```
+Re-run: plain test 'tests/test_price.py::test_total[annual plan]'
+```
+
 ### Skipped tests
 
 A skipped test is listed with its reason, whether it came from `@skip` or from [`skip_test`](../../../plain/plain/test/README.md#skipping-from-inside-a-test), and it's counted in the summary:
@@ -239,11 +252,40 @@ Every test in the file with a problem is named at once. Here is what each messag
 | `TypeError: test_x already has @cases.`                            | Use one `@cases`. For every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))` |
 | `TypeError: @skip requires a reason`                               | Write `@skip("why")`, not a bare `@skip`                                                                |
 | `TypeError: @tag requires at least one name`                       | Write `@tag("slow")`, not a bare `@tag`                                                                 |
+| `from tests.helpers import x should be from helpers import x`      | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
+| `ConftestNotSupported: conftest.py is a pytest file, ...`          | Move what the file holds, then delete it. See below                                                     |
 | Anything else, such as `ModuleNotFoundError: No module named 'x'`  | The file raised while it was being imported. Fix the import or the module-level code                    |
+
+A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name:
+
+```
+COLLECTION ERROR /project/tests/conftest.py
+
+  ConftestNotSupported: conftest.py is a pytest file, and nothing reads it here. There are no
+  fixtures: nothing in this file runs, and nothing is passed to a test
+  by name. Move what it holds, then delete the file.
+
+  - A fixture that tests ask for becomes a function in a helper module,
+    such as tests/helpers.py. A test imports it
+    (`from helpers import create_user`) and calls it in its body. A
+    fixture that cleans up after itself becomes a `@contextmanager`
+    that the test enters with `with`.
+  - A fixture that protected every test without being asked for
+    (`autouse=True`) becomes a TestLifecycle's `around_test()`, in
+    tests/lifecycle.py.
+  - Hooks (`pytest_configure`, `pytest_collection_modifyitems`, ...)
+    have no equivalent.
+
+  Fixtures in this file: user, organization
+
+  Autouse fixtures in this file: no_payments
+```
+
+The tests that needed nothing from it still run. The ones that asked for a fixture are collection errors of their own.
 
 ## Assertions
 
-Use bare `assert`. When a comparison fails, the runner shows the expression and the value on each side:
+Use bare `assert`. When a comparison fails, the runner shows the expression as you wrote it, parentheses and line breaks included, and the value on each side:
 
 ```
 AssertionError: assert response.status_code == 302
@@ -312,7 +354,9 @@ The runner finds the file by its path. There is nothing to register and no other
 - **It runs closest to the test.** Package lifecycles enter first, in the order of their entry point names, and the project's enters last. So the database transaction is already open when yours starts, and yours exits before the transaction is rolled back.
 - **It's for protection, not setup.** A user, an organization, a logged-in client: a test that reads one builds it in its body, by calling a helper. If a test would be wrong without the thing but never mentions it, that's the lifecycle's job.
 
-The file has to be named `lifecycle.py`. A file under any other name is an ordinary module that nothing loads.
+The file has to be `tests/lifecycle.py`. A lifecycle written somewhere the runner doesn't read would protect nothing, so the places one ends up by mistake are checked: `tests/lifecycles.py`, `tests/life_cycle.py`, `tests/lifecycle/__init__.py`, and `lifecycle.py` or `lifecycles.py` beside `tests/`. If one of those is there and mentions `TestLifecycle`, the run stops and says where the file belongs. A `lifecycle.py` deeper inside `tests/` isn't checked, and isn't loaded.
+
+`tests/lifecycle.py` imports [helper modules](#shared-helpers) the way a test file does, by their bare names.
 
 `tests/` is the directory beside `app/`. If you run `plain test` from inside a directory named `tests`, the file is that directory's `lifecycle.py`.
 
@@ -334,9 +378,9 @@ One run is one app. In a repository with several apps, run `plain test` once in 
 
 Testing is split across three places, and the split is what keeps a dev-only package out of production code.
 
-**`plain.test` ships with Plain.** It's what a test file imports: `Client`, `raises`, the decorators, the `with` helpers, and the `TestLifecycle` class. None of it needs the runner. It has to live in core because core uses it too: `plain request` is built on `Client`.
+**`plain.test` ships with Plain.** It's what a test file imports: `Client`, `raises`, the decorators, the `with` helpers, the `TestLifecycle` class, and the `CollectedTest` a lifecycle is handed. None of it needs the runner. It has to live in core because core uses it too: `plain request` is built on `Client`.
 
-**`plain.testing` is this package, a dev dependency.** It's the `plain test` command: finding tests, rewriting assertions, running them and reporting. Nothing in your application imports it. It imports you.
+**`plain.testing` is this package, a dev dependency.** It's the `plain test` command: finding tests, rewriting assertions, running them and reporting. Nothing imports it, your tests included. It imports you. What it offers is the command and the two ways to extend it below, and none of its modules is an API.
 
 **Each package owns its own testing.** Its helpers are in `plain.<package>.test`, and what it does around every test is a [`TestLifecycle`](../../../plain/plain/test/README.md#test-lifecycles) it registers under the `plain.testing` entry point group:
 

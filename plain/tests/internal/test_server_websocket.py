@@ -22,8 +22,7 @@ from plain.http.websocket_frames import (
     encode_frame,
 )
 from plain.internal.handlers.base import BaseHandler
-from plain.test import case, cases, override_settings
-from plain.test.otel import install_test_tracer
+from plain.test import CapturedSpans, capture_spans, case, cases, override_settings
 from server_stubs import H1Client, capture_logger, h1_connect, make_worker
 from websocket_helpers import (
     UPGRADE_ACCEPT,
@@ -34,16 +33,13 @@ from websocket_helpers import (
     upgrade_request,
 )
 
-_span_exporter = install_test_tracer()
-
 
 @contextmanager
-def _socket_test() -> Iterator[None]:
-    """Every test here starts with no finished spans, and runs over plain
-    HTTP — the socketpair is plain HTTP; keep the HTTPS redirect out of the way."""
-    _span_exporter.clear()
-    with override_settings(HTTPS_REDIRECT_ENABLED=False):
-        yield
+def _socket_test() -> Iterator[CapturedSpans]:
+    """Every test here runs over plain HTTP — the socketpair is plain HTTP;
+    keep the HTTPS redirect out of the way. Yields the spans the test emits."""
+    with override_settings(HTTPS_REDIRECT_ENABLED=False), capture_spans() as spans:
+        yield spans
 
 
 def _worker() -> Any:
@@ -201,7 +197,7 @@ def test_view_exception_closes_1011_and_is_logged_on_a_span() -> None:
         finally:
             client.teardown()
 
-    with _socket_test(), capture_logger("plain.request") as request_log:
+    with _socket_test() as spans, capture_logger("plain.request") as request_log:
         asyncio.run(run())
 
     errors = [r for r in request_log.records if r.levelno >= logging.ERROR]
@@ -209,9 +205,7 @@ def test_view_exception_closes_1011_and_is_logged_on_a_span() -> None:
     assert errors[0].exc_info is not None
     assert "websocket view boom" in str(errors[0].exc_info[1])
 
-    socket_spans = [
-        s for s in _span_exporter.get_finished_spans() if s.name.startswith("WEBSOCKET")
-    ]
+    socket_spans = [s for s in spans if s.name.startswith("WEBSOCKET")]
     assert len(socket_spans) == 1
     span = socket_spans[0]
     assert span.kind == trace.SpanKind.SERVER
@@ -256,13 +250,16 @@ def test_bytes_behind_the_handshake_refuse_the_upgrade() -> None:
         finally:
             client.teardown()
 
-    with _socket_test(), capture_logger("plain.server.access") as access_log:
+    with (
+        _socket_test() as spans,
+        capture_logger("plain.server.access") as access_log,
+    ):
         asyncio.run(run())
     assert [r.__dict__.get("status") for r in access_log.records] == [503]
     # The handshake's span records the 503 that went out, not a 101.
     handshake_spans = [
         s
-        for s in _span_exporter.get_finished_spans()
+        for s in spans
         if s.kind == trace.SpanKind.SERVER and not s.name.startswith("WEBSOCKET")
     ]
     assert [

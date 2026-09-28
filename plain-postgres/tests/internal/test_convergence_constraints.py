@@ -1327,7 +1327,7 @@ class TestProbeTableReuse:
         try:
             with capture_queries() as queries, conn.cursor() as cursor:
                 analyze_model(conn, cursor, ConstraintExample)
-            sqls = [q["sql"] for q in queries]
+            sqls = [q.sql_with_params for q in queries]
         finally:
             ConstraintExample.model_options.constraints = original
             execute(

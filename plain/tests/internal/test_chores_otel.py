@@ -2,9 +2,7 @@ from click.testing import CliRunner
 from opentelemetry import trace
 from plain.chores import Chore, register_chore
 from plain.cli.chores import chores
-from plain.test.otel import install_test_tracer
-
-_span_exporter = install_test_tracer()
+from plain.test import CapturedSpans, capture_spans
 
 
 @register_chore
@@ -27,22 +25,22 @@ def _qualname(cls: type) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def _chore_span(name: str):
-    spans = [s for s in _span_exporter.get_finished_spans() if s.name == name]
-    assert spans, f"expected a span named {name!r}"
-    return spans[-1]
+def _chore_span(spans: CapturedSpans, name: str):
+    matching = spans.filter(name=name)
+    assert matching, f"expected a span named {name!r}"
+    return matching[-1]
 
 
 def test_chore_emits_consumer_span_on_success() -> None:
     """Each chore execution gets a `chore {name}` CONSUMER span — the chore
     is the unit of work being consumed. CONSUMER puts it in the canonical
     error-attribution set (SERVER/CONSUMER/PRODUCER) alongside jobs."""
-    _span_exporter.clear()
     name = _qualname(_SuccessChore)
-    result = CliRunner().invoke(chores, ["run", "--name", name])
+    with capture_spans() as spans:
+        result = CliRunner().invoke(chores, ["run", "--name", name])
     assert result.exit_code == 0
 
-    span = _chore_span(f"chore {name}")
+    span = _chore_span(spans, f"chore {name}")
     assert span.kind == trace.SpanKind.CONSUMER
     assert span.status.status_code == trace.StatusCode.UNSET
 
@@ -51,13 +49,13 @@ def test_chore_records_error_on_failure() -> None:
     """A failing chore stamps the canonical failure signal (status=ERROR plus
     error.type) on its span. The chore catch-and-log keeps the runner alive
     so an exception in one chore doesn't skip the rest."""
-    _span_exporter.clear()
     name = _qualname(_BoomChore)
-    result = CliRunner().invoke(chores, ["run", "--name", name])
+    with capture_spans() as spans:
+        result = CliRunner().invoke(chores, ["run", "--name", name])
     # `run_chores` calls sys.exit(1) when any chore fails.
     assert result.exit_code == 1
 
-    span = _chore_span(f"chore {name}")
+    span = _chore_span(spans, f"chore {name}")
     assert span.status.status_code == trace.StatusCode.ERROR
     assert span.attributes is not None
     assert span.attributes["error.type"] == "RuntimeError"

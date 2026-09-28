@@ -12,12 +12,28 @@ The runner discovers and drives lifecycles; packages never import the runner.
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
 
-if TYPE_CHECKING:
-    from plain.testing.collection import CollectedTest
+__all__ = ["CollectedTest", "TestLifecycle"]
 
-__all__ = ["TestLifecycle"]
+
+@dataclass(frozen=True, kw_only=True)
+class CollectedTest:
+    """
+    One test the runner is about to run, as `around_test(test)` receives it.
+    """
+
+    # Where the test is and what it is called, as the runner prints it:
+    # "tests/test_signup.py::test_welcome", "...::TestInvites::test_expired",
+    # or "...::test_price[annual]" for one case of a test with `@cases`.
+    id: str
+    # The names given to `@tag(...)`, the class's before the test's own.
+    tags: tuple[str, ...] = ()
+
+    @property
+    def name(self) -> str:
+        """The test's name within its file (e.g. "TestInvites::test_expired")."""
+        return self.id.partition("::")[2]
 
 
 class TestLifecycle:

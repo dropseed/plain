@@ -6,7 +6,7 @@ from plain.testing.assertions import rewrite_asserts
 
 def run_rewritten(source: str) -> None:
     tree = ast.parse(source)
-    tree = rewrite_asserts(tree)
+    tree = rewrite_asserts(tree, source=source)
     code = compile(tree, "<test>", "exec", dont_inherit=True)
     exec(code, {})  # noqa: S102 — the rewritten tree is the thing under test
 
@@ -57,3 +57,41 @@ def test_module_future_imports_still_apply():
         "    return x\n"
         "assert f(1) == 1\n"
     )
+
+
+def test_failure_shows_the_expression_as_the_test_wrote_it():
+    # Without its parentheses this is `"@" in email is valid`, which is a
+    # chained comparison and a different expression.
+    with raises(AssertionError) as caught:
+        run_rewritten(
+            'email = "a@example.com"\nvalid = False\nassert ("@" in email) is valid\n'
+        )
+    message = str(caught.exception)
+    assert message.splitlines()[0] == 'assert ("@" in email) is valid'
+    assert "left:  True" in message
+    assert "right: False" in message
+
+
+def test_truthiness_failure_keeps_its_parentheses_and_quotes():
+    with raises(AssertionError) as caught:
+        run_rewritten('a = 1\nb = 1\nassert not (a and b) or (a == "one")\n')
+    assert str(caught.exception) == 'assert not (a and b) or (a == "one")'
+
+
+def test_an_expression_written_over_several_lines_keeps_its_shape():
+    with raises(AssertionError) as caught:
+        run_rewritten(
+            "def check():\n"
+            "    result = {'a': 1}\n"
+            "    assert result == {\n"
+            "        'a': 1,\n"
+            "        'b': 2,\n"
+            "    }\n"
+            "check()\n"
+        )
+    assert str(caught.exception).splitlines()[:4] == [
+        "assert result == {",
+        "    'a': 1,",
+        "    'b': 2,",
+        "}",
+    ]

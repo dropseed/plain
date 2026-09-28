@@ -122,7 +122,7 @@ def test_sentinel_recorded_adopts_with_one_record_and_no_ddl() -> None:
         assert result.exit_code == 0, result.output
         assert "examples.0019_baseline (baseline: recorded, not run)" in result.output
         assert "0019_baseline" in recorded("examples")
-        assert not any("CREATE TABLE" in q["sql"] for q in queries)
+        assert not any("CREATE TABLE" in q.sql_with_params for q in queries)
 
 
 def test_a_real_migration_after_a_pending_baseline_runs() -> None:

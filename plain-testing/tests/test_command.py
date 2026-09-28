@@ -3,11 +3,15 @@ The `plain test` command end to end: a project on disk, run in its own
 process, judged by what it prints and how it exits.
 """
 
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from plain.test import cases
 
 
 @dataclass
@@ -16,16 +20,50 @@ class CommandResult:
     output: str
 
 
-def run_in_project(files: dict[str, str], *arguments: str) -> CommandResult:
-    root = Path(tempfile.mkdtemp())
+def make_project(files: dict[str, str]) -> Path:
+    # resolve(): on macOS the temp directory is a symlink, and the runner
+    # prints the path it resolved.
+    root = Path(tempfile.mkdtemp()).resolve()
     for name, source in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(source)
+    return root
 
+
+def run_runner(directory: Path, *arguments: str) -> CommandResult:
+    """Run `python -m plain.testing` from a directory."""
     completed = subprocess.run(
         [sys.executable, "-m", "plain.testing", *arguments],
-        cwd=root,
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return CommandResult(
+        exit_code=completed.returncode,
+        output=completed.stdout + completed.stderr,
+    )
+
+
+def run_in_project(files: dict[str, str], *arguments: str) -> CommandResult:
+    return run_runner(make_project(files), *arguments)
+
+
+def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
+    """
+    Run a command line the way pasting it into a terminal would: a shell
+    reads it, and `plain` is whatever is on the PATH.
+    """
+    bin_directory = Path(tempfile.mkdtemp())
+    plain_command = bin_directory / "plain"
+    plain_command.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m plain "$@"\n')
+    plain_command.chmod(0o755)
+
+    completed = subprocess.run(
+        [shell, "-c", command],
+        cwd=directory,
+        env={**os.environ, "PATH": f"{bin_directory}{os.pathsep}{os.environ['PATH']}"},
         capture_output=True,
         text=True,
         check=False,
@@ -143,3 +181,212 @@ def test_verbose_skips_say_why_on_their_own_line():
     ) in lines
     # Said once, on the test's own line, not again in a list at the end.
     assert result.output.count("test_decides_for_itself") == 1
+
+
+def test_help_lists_the_flags_and_the_target_syntax():
+    root = make_project({"tests/test_one.py": "def test_one():\n    assert True\n"})
+    completed = subprocess.run(
+        [sys.executable, "-m", "plain", "test", "--help"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0
+    for flag in ("-k", "--tag", "--exclude-tag", "-x", "--fail-fast", "-v"):
+        assert flag in completed.stdout
+    assert "[TARGETS]..." in completed.stdout
+    assert "tests/test_signup.py::test_welcome" in completed.stdout
+    # The help is what was asked for. No test ran to produce it.
+    assert "Collected" not in completed.stdout
+
+
+CASES_WITH_AWKWARD_IDS = (
+    "from plain.test import case, cases\n"
+    "\n"
+    "@cases(\n"
+    "    case(1, id='annual plan'),\n"
+    "    case(2, id='annual'),\n"
+    '    case(3, id="it\'s $HOME"),\n'
+    "    case(4, id='a*b?'),\n"
+    "    case(5, id='x::y [z]'),\n"
+    "    case(6, id='say \"hi\" `now`; ls'),\n"
+    ")\n"
+    "def test_price(number):\n"
+    "    assert number == 0\n"
+    "\n"
+    "@cases(7, 8)\n"
+    "def test_numbered(number):\n"
+    "    assert number == 0\n"
+)
+
+
+def shells() -> list[str]:
+    # zsh refuses an unquoted `[0]` that matches no file, where sh passes it on.
+    found = [shutil.which(name) for name in ("sh", "zsh")]
+    return [shell for shell in found if shell is not None]
+
+
+@cases(*shells())
+def test_every_rerun_command_runs_its_own_test_when_pasted(shell):
+    root = make_project({"tests/test_price.py": CASES_WITH_AWKWARD_IDS})
+    failing_run = run_runner(root)
+    assert "8 failed" in failing_run.output
+
+    commands = [
+        line.removeprefix("Re-run: ")
+        for line in failing_run.output.splitlines()
+        if line.startswith("Re-run: ")
+    ]
+    assert len(commands) == 8
+
+    rerun_ids = []
+    for command in commands:
+        rerun = run_pasted(root, f"{command} -v", shell=shell)
+        assert "Collected 1 test\n" in rerun.output
+        failed_lines = [
+            line for line in rerun.output.splitlines() if line.startswith("FAILED ")
+        ]
+        # Verbose prints the result line, then the failure block's heading.
+        assert len(failed_lines) == 2
+        rerun_ids.append(failed_lines[1].removeprefix("FAILED "))
+
+    assert rerun_ids == [
+        "tests/test_price.py::test_price[annual plan]",
+        "tests/test_price.py::test_price[annual]",
+        "tests/test_price.py::test_price[it's $HOME]",
+        "tests/test_price.py::test_price[a*b?]",
+        "tests/test_price.py::test_price[x::y [z]]",
+        'tests/test_price.py::test_price[say "hi" `now`; ls]',
+        "tests/test_price.py::test_numbered[0]",
+        "tests/test_price.py::test_numbered[1]",
+    ]
+
+
+def test_a_rerun_command_with_nothing_for_a_shell_to_read_is_left_bare():
+    result = run_in_project(
+        {"tests/test_one.py": "def test_one():\n    assert False\n"}
+    )
+    assert "Re-run: plain test tests/test_one.py::test_one\n" in result.output
+
+
+CONFTEST = (
+    "import pytest\n"
+    "\n"
+    "@pytest.fixture\n"
+    "def user(db):\n"
+    "    return object()\n"
+    "\n"
+    "@pytest.fixture(autouse=True)\n"
+    "def no_payments(monkeypatch):\n"
+    "    pass\n"
+)
+
+
+def test_a_conftest_is_refused_and_says_where_its_contents_go():
+    result = run_in_project(
+        {
+            "tests/conftest.py": CONFTEST,
+            "tests/test_one.py": "def test_one():\n    assert True\n",
+        }
+    )
+    assert result.exit_code == 1
+    assert "COLLECTION ERROR" in result.output
+    assert "tests/conftest.py" in result.output
+    assert "conftest.py is a pytest file, and nothing reads it here" in result.output
+    assert "such as tests/helpers.py" in result.output
+    assert "`around_test()`, in\n    tests/lifecycle.py" in result.output
+    assert "Fixtures in this file: user" in result.output
+    assert "Autouse fixtures in this file: no_payments" in result.output
+    # The tests that need nothing from it still run.
+    assert "1 passed, 1 collection errors" in result.output
+
+
+HELPERS = "def create_user():\n    return 'a user'\n"
+
+TEST_USING_A_HELPER = (
+    "from helpers import create_user\n"
+    "\n"
+    "def test_user():\n"
+    "    assert create_user() == 'a user'\n"
+)
+
+
+def test_a_helper_module_is_imported_by_its_bare_name_from_the_project_root():
+    root = make_project(
+        {
+            "tests/helpers.py": HELPERS,
+            "tests/accounts/test_users.py": TEST_USING_A_HELPER,
+        }
+    )
+    for arguments in ([], ["tests/accounts"], ["tests/accounts/test_users.py"]):
+        result = run_runner(root, *arguments)
+        assert "1 passed" in result.output
+        assert result.exit_code == 0
+
+
+def test_a_helper_module_is_imported_by_its_bare_name_from_inside_tests():
+    root = make_project(
+        {
+            "tests/helpers.py": HELPERS,
+            "tests/accounts/test_users.py": TEST_USING_A_HELPER,
+        }
+    )
+    for arguments in ([], ["accounts"], ["accounts/test_users.py"]):
+        result = run_runner(root / "tests", *arguments)
+        assert "1 passed" in result.output
+        assert result.exit_code == 0
+
+
+def test_an_import_through_the_tests_directory_says_what_to_write():
+    result = run_in_project(
+        {
+            "tests/helpers.py": HELPERS,
+            "tests/test_users.py": (
+                "from tests.helpers import create_user\n"
+                "\n"
+                "def test_user():\n"
+                "    assert create_user() == 'a user'\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert "COLLECTION ERROR" in result.output
+    assert (
+        "line 1: `from tests.helpers import create_user` should be "
+        "`from helpers import create_user`"
+    ) in result.output
+    assert "tests/helpers.py is `helpers`" in result.output
+
+
+def test_a_relative_import_says_what_to_write():
+    result = run_in_project(
+        {
+            "tests/helpers.py": HELPERS,
+            "tests/test_users.py": (
+                "from .helpers import create_user\n"
+                "\n"
+                "def test_user():\n"
+                "    assert create_user() == 'a user'\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert (
+        "line 1: `from .helpers import create_user` should be "
+        "`from helpers import create_user`"
+    ) in result.output
+    assert "plain_tests" not in result.output
+
+
+def test_a_lifecycle_under_the_wrong_name_stops_the_run():
+    result = run_in_project(
+        {
+            "tests/lifecycles.py": PRINTING_LIFECYCLE,
+            "tests/test_one.py": "def test_one():\n    print('test body')\n",
+        }
+    )
+    assert result.exit_code == 2
+    assert "tests/lifecycles.py mentions TestLifecycle" in result.output
+    assert "tests/lifecycle.py\n" in result.output
+    assert "test body" not in result.output

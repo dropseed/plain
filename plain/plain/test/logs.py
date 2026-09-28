@@ -8,9 +8,11 @@ down again on exit.
 """
 
 import logging
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING
+
+from .captured import Captured
 
 if TYPE_CHECKING:
     from opentelemetry.trace import SpanContext
@@ -52,44 +54,24 @@ class _RecordingHandler(logging.Handler):
         self.span_contexts.append(get_current_span().get_span_context())
 
 
-class CapturedLogs(Sequence[logging.LogRecord]):
+class CapturedLogs(Captured[logging.LogRecord]):
     """
-    The records captured by `capture_logs`, in emission order.
-
-    Behaves like a list of `logging.LogRecord`, so iteration, indexing and
-    `len()` all work directly.
+    The records logged during a `capture_logs` block, in the order they were
+    logged. Each one is a `logging.LogRecord`.
     """
 
-    def __init__(self, handler: _RecordingHandler) -> None:
-        self._handler = handler
-
-    @property
-    def records(self) -> list[logging.LogRecord]:
-        return self._handler.records
+    def __init__(self) -> None:
+        super().__init__(helper="capture_logs")
+        self._span_contexts: tuple[SpanContext, ...] = ()
 
     @property
     def messages(self) -> list[str]:
         """The formatted message of every captured record."""
-        return [record.getMessage() for record in self._handler.records]
-
-    def __len__(self) -> int:
-        return len(self._handler.records)
-
-    @overload
-    def __getitem__(self, index: int) -> logging.LogRecord: ...
-
-    @overload
-    def __getitem__(self, index: slice) -> Sequence[logging.LogRecord]: ...
-
-    def __getitem__(
-        self, index: int | slice
-    ) -> logging.LogRecord | Sequence[logging.LogRecord]:
-        return self._handler.records[index]
-
-    def __iter__(self) -> Iterator[logging.LogRecord]:
-        return iter(self._handler.records)
+        return [record.getMessage() for record in self]
 
     def __repr__(self) -> str:
+        if self._items is None:
+            return super().__repr__()
         return f"<CapturedLogs {self.messages!r}>"
 
     def span_context_for(self, message: str) -> SpanContext:
@@ -100,7 +82,7 @@ class CapturedLogs(Sequence[logging.LogRecord]):
             with capture_spans() as spans, capture_logs() as logs:
                 do_the_thing()
 
-            span = spans.find(name="claim job")
+            [span] = spans.filter(name="claim job")
             assert logs.span_context_for("Claim failed").trace_id == (
                 span.context.trace_id
             )
@@ -112,9 +94,7 @@ class CapturedLogs(Sequence[logging.LogRecord]):
         """
         matches = [
             context
-            for record, context in zip(
-                self._handler.records, self._handler.span_contexts, strict=True
-            )
+            for record, context in zip(self, self._span_contexts, strict=True)
             if record.getMessage() == message
         ]
         if not matches:
@@ -163,10 +143,13 @@ def capture_logs(
         logger.addHandler(handler)
         logger.setLevel(level)
     logging.root.manager.disable = 0
+    captured = CapturedLogs()
     try:
-        yield CapturedLogs(handler)
+        yield captured
     finally:
         logging.root.manager.disable = original_disable
         for logger, original_level in zip(loggers, original_levels, strict=True):
             logger.removeHandler(handler)
             logger.setLevel(original_level)
+        captured._span_contexts = tuple(handler.span_contexts)
+        captured._finish(handler.records)

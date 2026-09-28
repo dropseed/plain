@@ -7,14 +7,11 @@ never send real email — and clears the outbox before each test.
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from plain.test import TestLifecycle
+from plain.test import CollectedTest, TestLifecycle
 
 from ..backends.locmem import outbox
-
-if TYPE_CHECKING:
-    from plain.testing.collection import CollectedTest
 
 _LOCMEM_BACKEND = "plain.email.backends.locmem.EmailBackend"
 

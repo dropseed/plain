@@ -174,7 +174,7 @@ def test_save_skips_constraint_pre_check_select() -> None:
     save_base maps any violation."""
     with capture_queries() as queries:
         ConstraintExample(name="solo", description="row").create()
-    assert len(queries) == 1, [q["sql"] for q in queries]
+    assert len(queries) == 1, [q.sql_with_params for q in queries]
 
 
 def test_save_clean_and_validate_false_skips_validation() -> None:

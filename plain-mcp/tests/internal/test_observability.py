@@ -27,11 +27,7 @@ def _rejects(logs: CapturedLogs) -> list[dict[str, Any]]:
 
 def _request_span(spans, path: str = "/mcp"):
     """The most recent request SERVER span — not the inner `rpc <method>` one."""
-    found = [
-        s
-        for s in spans.get_finished_spans()
-        if s.kind == trace.SpanKind.SERVER and s.name == f"POST {path}"
-    ]
+    found = spans.filter(kind=trace.SpanKind.SERVER, name=f"POST {path}")
     assert found, f"no `POST {path}` SERVER span captured"
     return found[-1]
 

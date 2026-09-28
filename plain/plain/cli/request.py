@@ -7,6 +7,7 @@ import click
 from plain.preflight import set_check_counts
 from plain.runtime import settings
 from plain.test import Client
+from plain.test.client import ClientResponse
 
 from ._trace import (
     CapturedTrace,
@@ -59,15 +60,15 @@ _SQL_DISPLAY_WIDTH = 64
 
 def _dispatch_request(
     client: Client, method: str, path: str, kwargs: dict[str, Any]
-) -> Any:
-    """Call the test client method matching the HTTP method."""
+) -> ClientResponse:
+    """Send the request through the test client."""
     if method not in _HTTP_METHODS:
         click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
         raise SystemExit(1)
-    return getattr(client, method.lower())(path, **kwargs)
+    return client.request(method=method, path=path, **kwargs)
 
 
-def _get_request_user(response: Any) -> Any:
+def _get_request_user(response: ClientResponse) -> Any:
     """The authenticated user for the request, or None (plain.auth optional)."""
     try:
         from plain.auth.requests import get_request_user
@@ -391,7 +392,12 @@ def request(
                 click.secho(f"User not found: {user_id}", fg="red", err=True)
                 raise SystemExit(1)
 
-            client.force_login(user)
+            try:
+                from plain.auth.test import login_client
+            except ImportError:
+                raise click.UsageError("plain.auth is required to use --user")
+
+            login_client(client, user)
 
         # Parse additional headers (default Accept to text/html)
         header_dict = {"Accept": "text/html"}
@@ -484,7 +490,7 @@ def request(
             }
             request_user = _get_request_user(response)
             response_data["user"] = str(request_user) if request_user else None
-            redirects = getattr(response, "redirect_chain", None)
+            redirects = response.redirect_chain
             if redirects:
                 response_data["redirects"] = [
                     {"url": url, "status": status} for url, status in redirects
@@ -521,7 +527,7 @@ def request(
         click.echo(f"  Request ID: {response.request.unique_id}")
 
         # Surface followed redirects — a 200 may not be the path you asked for.
-        redirects = getattr(response, "redirect_chain", None)
+        redirects = response.redirect_chain
         if redirects:
             hops = " → ".join(
                 [path] + [f"{url} ({status})" for url, status in redirects]

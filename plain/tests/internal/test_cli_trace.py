@@ -31,10 +31,7 @@ from plain.cli.request import (
     _render_traces,
     _trace_note,
 )
-from plain.test import patch
-from plain.test.otel import install_test_tracer
-
-_span_exporter = install_test_tracer()
+from plain.test import CapturedSpans, capture_spans, patch
 
 
 def _query_attributes(sql: str) -> dict[str, str | int]:
@@ -46,28 +43,28 @@ def _query_attributes(sql: str) -> dict[str, str | int]:
     }
 
 
-def _only_analysis() -> TraceAnalysis:
+def _only_analysis(spans: CapturedSpans) -> TraceAnalysis:
     """The analysis of the single trace the test emitted."""
-    traces = analyze_traces(_span_exporter.get_finished_spans())
+    traces = analyze_traces(spans)
     assert len(traces) == 1
     return traces[0]["analysis"]
 
 
 def test_groups_repeated_statements_with_their_call_site() -> None:
-    _span_exporter.clear()
-    # Repeats are reported, not diagnosed: one entry carrying the count and
-    # where it ran, for the reader to judge.
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        for _ in range(3):
-            with tracer.start_as_current_span(
-                "SELECT users",
-                kind=trace.SpanKind.CLIENT,
-                attributes=_query_attributes("SELECT * FROM users"),
-            ):
-                pass
+    with capture_spans() as spans:
+        # Repeats are reported, not diagnosed: one entry carrying the count and
+        # where it ran, for the reader to judge.
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("GET /"):
+            for _ in range(3):
+                with tracer.start_as_current_span(
+                    "SELECT users",
+                    kind=trace.SpanKind.CLIENT,
+                    attributes=_query_attributes("SELECT * FROM users"),
+                ):
+                    pass
 
-    analysis = _only_analysis()
+    analysis = _only_analysis(spans)
 
     assert analysis["query_count"] == 3
     assert len(analysis["queries"]) == 1
@@ -76,45 +73,45 @@ def test_groups_repeated_statements_with_their_call_site() -> None:
 
 
 def test_distinct_statements_stay_separate_entries() -> None:
-    _span_exporter.clear()
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        for sql in ("SELECT * FROM users", "SELECT * FROM teams"):
-            with tracer.start_as_current_span(
-                "query",
-                kind=trace.SpanKind.CLIENT,
-                attributes=_query_attributes(sql),
-            ):
-                pass
+    with capture_spans() as spans:
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("GET /"):
+            for sql in ("SELECT * FROM users", "SELECT * FROM teams"):
+                with tracer.start_as_current_span(
+                    "query",
+                    kind=trace.SpanKind.CLIENT,
+                    attributes=_query_attributes(sql),
+                ):
+                    pass
 
-    analysis = _only_analysis()
+    analysis = _only_analysis(spans)
 
     assert analysis["query_count"] == 2
     assert [q["count"] for q in analysis["queries"]] == [1, 1]
 
 
 def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
-    _span_exporter.clear()
-    # --follow redirects produce one trace per hop. A query that runs once per
-    # request must stay a 1x query in each hop's analysis rather than merging
-    # into a 2x count that reads as a repeat nobody can fix.
-    tracer = trace.get_tracer("test")
-    for path in ("/old", "/new"):
-        with (
-            tracer.start_as_current_span(
-                "GET",
-                kind=trace.SpanKind.SERVER,
-                attributes={HTTP_REQUEST_METHOD: "GET", URL_PATH: path},
-            ),
-            tracer.start_as_current_span(
-                "SELECT users",
-                kind=trace.SpanKind.CLIENT,
-                attributes=_query_attributes("SELECT * FROM users"),
-            ),
-        ):
-            pass
+    with capture_spans() as spans:
+        # --follow redirects produce one trace per hop. A query that runs once per
+        # request must stay a 1x query in each hop's analysis rather than merging
+        # into a 2x count that reads as a repeat nobody can fix.
+        tracer = trace.get_tracer("test")
+        for path in ("/old", "/new"):
+            with (
+                tracer.start_as_current_span(
+                    "GET",
+                    kind=trace.SpanKind.SERVER,
+                    attributes={HTTP_REQUEST_METHOD: "GET", URL_PATH: path},
+                ),
+                tracer.start_as_current_span(
+                    "SELECT users",
+                    kind=trace.SpanKind.CLIENT,
+                    attributes=_query_attributes("SELECT * FROM users"),
+                ),
+            ):
+                pass
 
-    traces = analyze_traces(_span_exporter.get_finished_spans())
+    traces = analyze_traces(spans)
 
     # Named by method and path, so the hops are tellable apart even though
     # both root spans are called "GET".
@@ -124,23 +121,23 @@ def test_each_redirect_hop_is_analyzed_on_its_own() -> None:
 
 
 def test_query_sources_dedup_distinct_call_sites() -> None:
-    _span_exporter.clear()
-    # Each distinct call site is recorded once, as its raw location string —
-    # the path is the information, so no classification travels with it.
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        for path in (
-            "/my/project/app/views.py",
-            "/my/project/.venv/lib/site-packages/plain/sessions/core.py",
-        ):
-            with tracer.start_as_current_span(
-                "query",
-                kind=trace.SpanKind.CLIENT,
-                attributes={DB_QUERY_TEXT: "SELECT shared", CODE_FILE_PATH: path},
+    with capture_spans() as spans:
+        # Each distinct call site is recorded once, as its raw location string —
+        # the path is the information, so no classification travels with it.
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("GET /"):
+            for path in (
+                "/my/project/app/views.py",
+                "/my/project/.venv/lib/site-packages/plain/sessions/core.py",
             ):
-                pass
+                with tracer.start_as_current_span(
+                    "query",
+                    kind=trace.SpanKind.CLIENT,
+                    attributes={DB_QUERY_TEXT: "SELECT shared", CODE_FILE_PATH: path},
+                ):
+                    pass
 
-    analysis = _only_analysis()
+    analysis = _only_analysis(spans)
 
     assert analysis["queries"][0]["sources"] == [
         "/my/project/app/views.py",
@@ -149,27 +146,27 @@ def test_query_sources_dedup_distinct_call_sites() -> None:
 
 
 def test_transaction_statements_are_counted_apart_from_queries() -> None:
-    _span_exporter.clear()
-    # Savepoint names are unique, so they never group and would otherwise fill
-    # the query list on their own while telling you nothing to fix.
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span("GET /"):
-        for sql, operation in (
-            ("SELECT * FROM users", "SELECT"),
-            ('SAVEPOINT "s1"', "SAVEPOINT"),
-            ('RELEASE SAVEPOINT "s1"', "RELEASE"),
-            # No db.operation.name attribute — falls back to the SQL keyword.
-            ("COMMIT", None),
-        ):
-            attributes: dict[str, str] = {DB_QUERY_TEXT: sql}
-            if operation:
-                attributes[DB_OPERATION_NAME] = operation
-            with tracer.start_as_current_span(
-                "query", kind=trace.SpanKind.CLIENT, attributes=attributes
+    with capture_spans() as spans:
+        # Savepoint names are unique, so they never group and would otherwise fill
+        # the query list on their own while telling you nothing to fix.
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span("GET /"):
+            for sql, operation in (
+                ("SELECT * FROM users", "SELECT"),
+                ('SAVEPOINT "s1"', "SAVEPOINT"),
+                ('RELEASE SAVEPOINT "s1"', "RELEASE"),
+                # No db.operation.name attribute — falls back to the SQL keyword.
+                ("COMMIT", None),
             ):
-                pass
+                attributes: dict[str, str] = {DB_QUERY_TEXT: sql}
+                if operation:
+                    attributes[DB_OPERATION_NAME] = operation
+                with tracer.start_as_current_span(
+                    "query", kind=trace.SpanKind.CLIENT, attributes=attributes
+                ):
+                    pass
 
-    analysis = _only_analysis()
+    analysis = _only_analysis(spans)
 
     assert analysis["query_count"] == 1
     assert analysis["transaction_count"] == 3
@@ -177,15 +174,15 @@ def test_transaction_statements_are_counted_apart_from_queries() -> None:
 
 
 def test_emits_flat_raw_spans() -> None:
-    _span_exporter.clear()
-    tracer = trace.get_tracer("test")
-    with (
-        tracer.start_as_current_span("GET /"),
-        tracer.start_as_current_span("render template"),
-    ):
-        pass
+    with capture_spans() as spans:
+        tracer = trace.get_tracer("test")
+        with (
+            tracer.start_as_current_span("GET /"),
+            tracer.start_as_current_span("render template"),
+        ):
+            pass
 
-    spans = analyze_traces(_span_exporter.get_finished_spans())[0]["spans"]
+    spans = analyze_traces(spans)[0]["spans"]
 
     assert {s["name"] for s in spans} == {"GET /", "render template"}
     assert all(s["start_offset_ms"] >= 0 for s in spans)
@@ -197,20 +194,20 @@ def test_emits_flat_raw_spans() -> None:
 
 
 def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
-    _span_exporter.clear()
-    tracer = trace.get_tracer("test")
-    with tracer.start_as_current_span(
-        "query",
-        kind=trace.SpanKind.CLIENT,
-        attributes={
-            DB_QUERY_TEXT: "SELECT 1",
-            CODE_STACKTRACE: "... a huge debug stack ...",
-            "custom.attr": "kept",
-        },
-    ):
-        pass
+    with capture_spans() as spans:
+        tracer = trace.get_tracer("test")
+        with tracer.start_as_current_span(
+            "query",
+            kind=trace.SpanKind.CLIENT,
+            attributes={
+                DB_QUERY_TEXT: "SELECT 1",
+                CODE_STACKTRACE: "... a huge debug stack ...",
+                "custom.attr": "kept",
+            },
+        ):
+            pass
 
-    spans = analyze_traces(_span_exporter.get_finished_spans())[0]["spans"]
+    spans = analyze_traces(spans)[0]["spans"]
 
     attributes = spans[0]["attributes"]
     assert attributes[DB_QUERY_TEXT] == "SELECT 1"
@@ -219,30 +216,30 @@ def test_raw_span_passes_attributes_through_and_drops_stacktrace() -> None:
 
 
 def test_capture_trace_spans_isolates_other_processors() -> None:
-    _span_exporter.clear()
     # capture_trace_spans() detaches processors an installed package attached —
     # here, the test tracer's own exporter — so a captured span reaches
     # only the capture exporter, not the pre-existing one.
     with (
+        capture_spans() as spans,
         capture_trace_spans() as exporter,
         trace.get_tracer("test").start_as_current_span("inside"),
     ):
         pass
 
     assert "inside" in [s.name for s in exporter.get_finished_spans()]
-    assert "inside" not in [s.name for s in _span_exporter.get_finished_spans()]
+    assert "inside" not in [s.name for s in spans]
 
 
 def test_captures_exceptions() -> None:
-    _span_exporter.clear()
-    tracer = trace.get_tracer("test")
-    try:
-        with tracer.start_as_current_span("GET /boom"):
-            raise ValueError("boom")
-    except ValueError:
-        pass
+    with capture_spans() as spans:
+        tracer = trace.get_tracer("test")
+        try:
+            with tracer.start_as_current_span("GET /boom"):
+                raise ValueError("boom")
+        except ValueError:
+            pass
 
-    captured = analyze_traces(_span_exporter.get_finished_spans())[0]
+    captured = analyze_traces(spans)[0]
 
     exceptions = captured["analysis"]["exceptions"]
     assert len(exceptions) == 1

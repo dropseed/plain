@@ -216,6 +216,9 @@ class CursorDebugWrapper(CursorWrapper):
         many: bool = False,
     ) -> Generator[None]:
         start = time.monotonic()
+        # The statement as it's sent, placeholders in place. `sql` below
+        # becomes the one with the values filled in.
+        sql_as_sent = sql
         try:
             yield
         finally:
@@ -231,6 +234,7 @@ class CursorDebugWrapper(CursorWrapper):
             self.db.queries_log.append(
                 {
                     "sql": f"{times} times: {sql}" if many else sql,
+                    "sql_as_sent": sql_as_sent,
                     "time": f"{duration:.3f}",
                 }
             )

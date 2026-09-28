@@ -2409,16 +2409,7 @@ AssertionError: Expected at most 5 queries, 6 were executed:
 
 ### Reading the queries a block ran
 
-There are two helpers, and they show you different SQL.
-
-| Helper                                                         | The SQL you get                           | Looks like                 |
-| -------------------------------------------------------------- | ----------------------------------------- | -------------------------- |
-| [`capture_queries`](./test/helpers.py#capture_queries)         | What ran, with the values filled in       | `WHERE "email" = 'a@b.co'` |
-| [`span_sql_statements`](./test/helpers.py#span_sql_statements) | What was sent, with its `%s` placeholders | `WHERE "email" = %s`       |
-
-Reach for `capture_queries` to count queries or to check the values one ran with. Reach for `span_sql_statements` to pin the shape of a statement, where the values would only get in the way.
-
-`capture_queries` yields a list that's filled in when the block exits, so read it after the `with`:
+[`capture_queries`](./test/helpers.py#capture_queries) records what the database is asked to do during a block:
 
 ```python
 from plain.postgres.test import capture_queries
@@ -2429,27 +2420,36 @@ def test_lookup_is_one_query():
         list(User.query.filter(email="a@example.com"))
 
     assert len(queries) == 1
-    assert "a@example.com" in queries[0]["sql"]
+    assert queries[0].sql.endswith('WHERE "users_user"."email" = %s')
+    assert "'a@example.com'" in queries[0].sql_with_params
 ```
 
-`span_sql_statements` reads the spans from [`capture_spans`](../../../plain/plain/test/README.md#capturing-opentelemetry-signals), and returns the statements in the order they ran:
+`queries` is a [capture](../../../plain/plain/test/README.md#capturing-what-happened) like the ones `plain.test` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
+
+| Attribute         | The SQL you get                           | Looks like                 |
+| ----------------- | ----------------------------------------- | -------------------------- |
+| `sql`             | What was sent, with its `%s` placeholders | `WHERE "email" = %s`       |
+| `sql_with_params` | What ran, with the values filled in       | `WHERE "email" = 'a@b.co'` |
+
+Use `sql` to pin the shape of a statement, where the values would only get in the way. Use `sql_with_params` to check the values one ran with.
+
+To compare against statements written out in the test, `queries.sql_statements()` returns the `sql` of each one with runs of whitespace collapsed to single spaces, so a statement written across several lines compares as one:
 
 ```python
-from plain.postgres.test import span_sql_statements
-from plain.test import capture_spans
+def test_set_many_is_one_statement():
+    with capture_queries() as queries:
+        cache.set_many({"a": 1, "b": 2})
 
-
-def test_lookup_filters_on_email():
-    with capture_spans() as spans:
-        list(User.query.filter(email="a@example.com"))
-
-    statements = span_sql_statements(spans)
-    assert statements[0].endswith('WHERE "users_user"."email" = %s')
+    [statement] = queries.sql_statements()
+    assert statement.startswith('INSERT INTO "plaincache_cacheditem"')
 ```
 
-Runs of whitespace are collapsed to single spaces, so a statement written across several lines compares as one. Pass `table="users_user"` to keep only the statements that name that table. The name is matched as a quoted identifier, so `users_user` doesn't match `users_usertag`.
+Pass `table="users_user"` to keep only the statements that name that table. The name is matched as a quoted identifier, so `users_user` doesn't match `users_usertag`.
 
-Queries that run with tracing turned off, inside [`suppress_db_tracing()`](#tracing), have no span, so only `capture_queries` sees them.
+Two things to know about what's counted:
+
+- **Transactions.** Every test runs inside a transaction, so an `atomic()` block in the code under test is a savepoint. `SAVEPOINT` and `RELEASE SAVEPOINT` are statements, and they're in both `queries` and `sql_statements()`. In an [`@isolated_db`](#tests-that-cant-run-in-a-transaction) test the same block is a real `BEGIN` and `COMMIT`. The connection issues those itself, so they're in `queries` (with `is_statement` false) and left out of `sql_statements()`.
+- **Queries the framework runs for itself.** `capture_queries` records at the connection, so it sees every query, including ones that run with tracing turned off inside [`suppress_db_tracing()`](#tracing) and so never appear as spans.
 
 ## Settings
 

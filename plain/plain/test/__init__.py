@@ -1,6 +1,8 @@
-from .client import Client, RequestFactory
+from .captured import Captured
+from .client import Client, ClientResponse, RequestFactory
 from .decorators import case, cases, skip, tag
-from .lifecycle import TestLifecycle
+from .exceptions import AppRequiredError
+from .lifecycle import CollectedTest, TestLifecycle
 from .logs import CapturedLogs, capture_logs
 from .otel import CapturedMetrics, CapturedSpans, capture_metrics, capture_spans
 from .overrides import override_settings, patch
@@ -9,10 +11,14 @@ from .skipping import skip_test
 from .websocket import WebSocketRejected, WebSocketTestConnection
 
 __all__ = [
+    "AppRequiredError",
+    "Captured",
     "CapturedLogs",
     "CapturedMetrics",
     "CapturedSpans",
     "Client",
+    "ClientResponse",
+    "CollectedTest",
     "RequestFactory",
     "TestLifecycle",
     "WebSocketRejected",

@@ -17,7 +17,7 @@ from app.examples.models.upsert import UpsertTenant
 from opentelemetry.trace import SpanKind
 from plain.postgres import written
 from plain.postgres.db import get_connection
-from plain.postgres.test import capture_queries
+from plain.postgres.test import CapturedQueries, capture_queries
 from plain.test import capture_spans, raises
 
 
@@ -47,8 +47,12 @@ class NameRow:
     name: str
 
 
-def _catalog_queries(queries: list[dict]) -> list[str]:
-    return [query["sql"] for query in queries if "pg_attribute" in query["sql"]]
+def _catalog_queries(queries: CapturedQueries) -> list[str]:
+    return [
+        query.sql_with_params
+        for query in queries
+        if "pg_attribute" in query.sql_with_params
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +442,11 @@ def test_first_and_get_push_a_limit_into_the_statement():
         with capture_queries() as queries:
             assert statement.first() is not None
 
-        limited = [query["sql"] for query in queries if "LIMIT 1" in query["sql"]]
+        limited = [
+            query.sql_with_params
+            for query in queries
+            if "LIMIT 1" in query.sql_with_params
+        ]
         assert limited, "first() should have asked for one row"
 
         name = "w0"
@@ -447,7 +455,11 @@ def test_first_and_get_push_a_limit_into_the_statement():
         )
         with capture_queries() as queries:
             one.get()
-        assert [query["sql"] for query in queries if "LIMIT 2" in query["sql"]]
+        assert [
+            query.sql_with_params
+            for query in queries
+            if "LIMIT 2" in query.sql_with_params
+        ]
 
 
 def test_count_and_exists_are_memoised():
@@ -460,16 +472,27 @@ def test_count_and_exists_are_memoised():
             assert statement.count() == 1
             assert statement.exists() is True
 
-        counted = [query["sql"] for query in queries if "count(*)" in query["sql"]]
+        counted = [
+            query.sql_with_params
+            for query in queries
+            if "count(*)" in query.sql_with_params
+        ]
         assert len(counted) == 1
-        assert not [query["sql"] for query in queries if "EXISTS" in query["sql"]]
+        assert not [
+            query.sql_with_params
+            for query in queries
+            if "EXISTS" in query.sql_with_params
+        ]
 
         # exists() on its own memoises too.
         fresh = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
         with capture_queries() as queries:
             assert fresh.exists() is True
             assert fresh.exists() is True
-        assert len([q["sql"] for q in queries if "EXISTS" in q["sql"]]) == 1
+        assert (
+            len([q.sql_with_params for q in queries if "EXISTS" in q.sql_with_params])
+            == 1
+        )
 
 
 def test_a_write_is_never_wrapped_for_counting():
@@ -487,7 +510,11 @@ def test_a_write_is_never_wrapped_for_counting():
             assert statement.count() == 1
             assert statement.exists() is True
 
-        assert not [query["sql"] for query in queries if "count(*)" in query["sql"]]
+        assert not [
+            query.sql_with_params
+            for query in queries
+            if "count(*)" in query.sql_with_params
+        ]
         assert Widget.query.filter(name="one").count() == 1
 
 
@@ -504,7 +531,7 @@ def test_a_statement_opens_a_client_span_with_the_sql_as_written():
 
         spans = [
             span
-            for span in captured.get_finished_spans()
+            for span in captured
             if span.attributes and span.attributes.get("db.query.text") == statement.sql
         ]
         assert spans, "no span carrying the rendered statement"
@@ -523,7 +550,7 @@ def test_the_catalog_lookup_is_not_traced():
 
         traced = [
             span
-            for span in spans.get_finished_spans()
+            for span in spans
             if span.attributes
             and "pg_attribute" in str(span.attributes.get("db.query.text"))
         ]

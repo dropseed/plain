@@ -2,6 +2,7 @@ import datetime
 
 from app.users.models import User
 from plain.auth.requests import get_request_user
+from plain.auth.test import login_client
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.test import Client, override_settings, raises
@@ -69,20 +70,20 @@ def test_dummy_signup():
         # Login required for this view
         response = client.get("/")
         assert response.status_code == 302
-        assert response.url == "/login?next=/"
+        assert response.redirect_to == "/login?next=/"
 
         # User clicks the login link (form submit)
         response = client.post("/oauth/dummy/login")
         assert response.status_code == 302
         assert (
-            response.url
+            response.redirect_to
             == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
         )
 
         # Provider redirects to the callback url
         response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
         # Now logged in
         response = client.get("/")
@@ -146,20 +147,20 @@ def test_dummy_login_connection():
         # Login required for this view
         response = client.get("/")
         assert response.status_code == 302
-        assert response.url == "/login?next=/"
+        assert response.redirect_to == "/login?next=/"
 
         # User clicks the login link (form submit)
         response = client.post("/oauth/dummy/login")
         assert response.status_code == 302
         assert (
-            response.url
+            response.redirect_to
             == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
         )
 
         # Provider redirects to the callback url
         response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
         # Now logged in
         response = client.get("/")
@@ -210,13 +211,13 @@ def test_dummy_login_without_connection():
         # Login required for this view
         response = client.get("/")
         assert response.status_code == 302
-        assert response.url == "/login?next=/"
+        assert response.redirect_to == "/login?next=/"
 
         # User clicks the login link (form submit)
         response = client.post("/oauth/dummy/login")
         assert response.status_code == 302
         assert (
-            response.url
+            response.redirect_to
             == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
         )
 
@@ -239,19 +240,19 @@ def test_dummy_connect():
         assert User.query.count() == 1
         assert OAuthConnection.query.count() == 0
 
-        client.force_login(user)
+        login_client(client, user)
 
         response = client.post("/oauth/dummy/connect")
         assert response.status_code == 302
         assert (
-            response.url
+            response.redirect_to
             == "https://example.com/oauth/authorize?client_id=dummy_client_id&redirect_uri=https%3A%2F%2Ftestserver%2Foauth%2Fdummy%2Fcallback&response_type=code&scope=dummy_scope&state=dummy_state"
         )
 
         # Provider redirects to the callback url
         response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
         # Now logged in
         response = client.get("/")
@@ -299,7 +300,7 @@ def test_dummy_disconnect_removes_own_connection():
         _make_connection(user, provider_user_id="dummy_id2")
 
         client = Client()
-        client.force_login(user)
+        login_client(client, user)
 
         response = client.post(
             "/oauth/dummy/disconnect", form_data={"provider_user_id": "dummy_id"}
@@ -323,7 +324,7 @@ def test_dummy_disconnect_cannot_remove_another_users_connection():
         _make_connection(attacker, provider_user_id="attacker_provider_id")
 
         client = Client()
-        client.force_login(attacker)
+        login_client(client, attacker)
 
         # Attacker targets the victim's connection. The user-scoped lookup finds
         # nothing for the attacker, so the request errors instead of deleting.
@@ -350,7 +351,8 @@ def test_dummy_disconnect_requires_login():
         )
 
         assert response.status_code == 302
-        assert "/login" in response.url
+        assert response.redirect_to is not None
+        assert "/login" in response.redirect_to
         assert OAuthConnection.query.count() == 1
 
 

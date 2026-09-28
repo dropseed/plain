@@ -10,6 +10,7 @@ import re
 from urllib.parse import urlsplit
 
 from app.users.models import User
+from plain.auth.test import login_client
 from plain.email.test import outbox
 from plain.loginlink.links import generate_link_url
 from plain.test import Client, RequestFactory
@@ -43,7 +44,7 @@ class TestRequestLink:
         )
 
         assert response.status_code == 302
-        assert response.url == "/loginlink/sent"
+        assert response.redirect_to == "/loginlink/sent"
         assert len(outbox) == 1
         assert outbox[0].to == ["known@example.com"]
 
@@ -56,7 +57,7 @@ class TestRequestLink:
 
         # Identical 302 -> /loginlink/sent as the known case: no existence leak.
         assert response.status_code == 302
-        assert response.url == "/loginlink/sent"
+        assert response.redirect_to == "/loginlink/sent"
         assert len(outbox) == 0
 
 
@@ -80,41 +81,41 @@ class TestLinkExpiration:
 class TestAlreadyLoggedIn:
     def test_login_page_redirects_home(self):
         client = Client()
-        client.force_login(User.query.create(email="repeat@example.com"))
+        login_client(client, User.query.create(email="repeat@example.com"))
 
         response = client.get("/login")
 
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
     def test_login_page_redirects_to_next(self):
         client = Client()
-        client.force_login(User.query.create(email="repeat@example.com"))
+        login_client(client, User.query.create(email="repeat@example.com"))
 
         response = client.get("/login?next=/whoami")
 
         assert response.status_code == 302
-        assert response.url == "/whoami"
+        assert response.redirect_to == "/whoami"
 
     def test_empty_next_redirects_home(self):
         client = Client()
-        client.force_login(User.query.create(email="repeat@example.com"))
+        login_client(client, User.query.create(email="repeat@example.com"))
 
         response = client.get("/login?next=")
 
         # An empty Location header would redirect the browser back to
         # the login page in a loop.
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
     def test_external_next_redirects_home(self):
         client = Client()
-        client.force_login(User.query.create(email="repeat@example.com"))
+        login_client(client, User.query.create(email="repeat@example.com"))
 
         response = client.get("/login?next=https://evil.com")
 
         assert response.status_code == 302
-        assert response.url == "/"
+        assert response.redirect_to == "/"
 
 
 class TestFollowLink:

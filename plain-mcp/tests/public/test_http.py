@@ -344,9 +344,7 @@ class TestRPCMethodSpan:
             response = mcp_post("/mcp", "tools/list")
         assert response.status_code == 200
 
-        rpc_spans = [
-            s for s in spans.get_finished_spans() if s.name == "rpc tools/list"
-        ]
+        rpc_spans = spans.filter(name="rpc tools/list")
         assert len(rpc_spans) == 1
         span = rpc_spans[0]
         assert span.kind == SpanKind.SERVER
@@ -361,7 +359,7 @@ class TestRPCMethodSpan:
         body = response.json_data
         assert body["error"]["code"] == -32603
 
-        rpc_spans = [s for s in spans.get_finished_spans() if s.name == "rpc boom"]
+        rpc_spans = spans.filter(name="rpc boom")
         assert len(rpc_spans) == 1
         span = rpc_spans[0]
         assert span.status.status_code == StatusCode.ERROR

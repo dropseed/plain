@@ -12,9 +12,9 @@ transaction that never commits.
 import re
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from plain.test import TestLifecycle
+from plain.test import CollectedTest, TestLifecycle
 
 from .. import transaction
 from ..db import get_connection
@@ -22,9 +22,6 @@ from ..otel import suppress_db_tracing
 from ..sources import runtime_pool_source
 from .database import use_test_database
 from .decorators import ISOLATED_DB_TAG
-
-if TYPE_CHECKING:
-    from plain.testing.collection import CollectedTest
 
 
 class PostgresTestLifecycle(TestLifecycle):

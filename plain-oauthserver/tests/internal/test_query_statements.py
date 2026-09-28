@@ -20,22 +20,11 @@ from oauth_helpers import (
 )
 from plain.oauthserver.models import AuthorizationCode
 from plain.postgres.db import get_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.test import capture_queries, isolated_db
 from plain.test import Client
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"
-
-
-class StatementRecorder:
-    """Records every statement executed on a connection, in order."""
-
-    def __init__(self) -> None:
-        self.statements: list[str] = []
-
-    def __call__(self, execute, sql, params, many, context):
-        self.statements.append(" ".join(str(sql).split()))
-        return execute(sql, params, many, context)
 
 
 def make_auth_code(application, user, code_challenge):
@@ -51,10 +40,9 @@ def make_auth_code(application, user, code_challenge):
 
 def post_token(payload):
     """POST the token endpoint, returning (response, statements executed)."""
-    recorder = StatementRecorder()
-    with get_connection().execute_wrapper(recorder):
+    with capture_queries() as queries:
         response = Client().post("/oauth/token", form_data=payload)
-    return response, recorder.statements
+    return response, queries.sql_statements()
 
 
 # -- Authorization code grant --

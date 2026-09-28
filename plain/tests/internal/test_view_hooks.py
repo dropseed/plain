@@ -3,18 +3,11 @@ handle_exception logging semantics.
 """
 
 import logging
-from contextlib import contextmanager
 
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.test import CapturedLogs, RequestFactory, capture_logs, patch, raises
 from plain.views import View
-
-
-@contextmanager
-def request_log():
-    with capture_logs("plain.request") as logs:
-        yield logs
 
 
 def _has_server_error(logs: CapturedLogs) -> bool:
@@ -102,7 +95,7 @@ class TestHandleExceptionLogging:
     """
 
     def test_mapped_4xx_does_not_log_server_error(self):
-        with request_log() as log:
+        with capture_logs("plain.request") as log:
 
             class AppError(Exception):
                 pass
@@ -120,16 +113,16 @@ class TestHandleExceptionLogging:
 
             assert response.status_code == 400
             assert response.exception is None
-            assert not _has_server_error(log), (
-                "handle_exception mapping to 4xx must not emit a Server error log"
-            )
+        assert not _has_server_error(log), (
+            "handle_exception mapping to 4xx must not emit a Server error log"
+        )
 
     def test_mapped_5xx_logs_and_attaches_exception(self):
         """A subclass that maps to a 5xx response gets logging and exception
         attachment from the framework — no need to call log_exception or set
         response.exception in the override."""
 
-        with request_log() as log:
+        with capture_logs("plain.request") as log:
 
             class AppError(Exception):
                 pass
@@ -147,7 +140,7 @@ class TestHandleExceptionLogging:
 
             assert response.status_code == 500
             assert isinstance(response.exception, AppError)
-            assert _has_server_error(log)
+        assert _has_server_error(log)
 
     def test_reraise_from_handle_exception_propagates(self):
         """Default handle_exception re-raises — exception escapes get_response."""
@@ -163,7 +156,7 @@ class TestHandleExceptionLogging:
         """When handle_exception re-raises and the framework catches it,
         response_for_exception logs a Server error."""
 
-        with request_log() as log:
+        with capture_logs("plain.request") as log:
 
             class Boom(View):
                 def get(self):
@@ -183,8 +176,8 @@ class TestHandleExceptionLogging:
 
             log_exception(request, caught)
 
-            server_errors = [r for r in log.records if "Server error" in r.getMessage()]
-            assert len(server_errors) == 1
+        server_errors = [r for r in log if "Server error" in r.getMessage()]
+        assert len(server_errors) == 1
 
     def test_falls_back_to_plain_text_when_templates_not_registered(self):
         """`plain.templates` importable but not in INSTALLED_PACKAGES → plain text.
@@ -213,7 +206,7 @@ class TestHandleExceptionLogging:
         """If a view calls log_exception and the framework also tries,
         the sentinel keeps it to one record."""
 
-        with request_log() as log:
+        with capture_logs("plain.request") as log:
             from plain.logs import log_exception
 
             exc = RuntimeError("once")
@@ -223,8 +216,8 @@ class TestHandleExceptionLogging:
             log_exception(request, exc)
             response_for_exception(request, exc)
 
-            server_errors = [r for r in log.records if "Server error" in r.getMessage()]
-            assert len(server_errors) == 1
+        server_errors = [r for r in log if "Server error" in r.getMessage()]
+        assert len(server_errors) == 1
 
     def test_suspicious_operation_logs_at_warning_without_exc_info(self):
         """CSRF rejections and other SuspiciousOperationError400s are working-as-designed
@@ -249,7 +242,7 @@ class TestHandleExceptionLogging:
     def test_response_exception_short_circuits_without_logging(self):
         """ResponseException is the sanctioned 'I already have a response' path."""
 
-        with request_log() as log:
+        with capture_logs("plain.request") as log:
             from plain.views.exceptions import ResponseException
 
             class ViaResponseException(View):
@@ -261,4 +254,4 @@ class TestHandleExceptionLogging:
             ).get_response()
 
             assert response.status_code == 418
-            assert not log.records
+        assert not log

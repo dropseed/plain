@@ -63,17 +63,16 @@ def test_head_never_reads_the_stream() -> None:
     assert response.closed
 
 
-def test_client_response_wrapper_mirrors_readonly_status() -> None:
-    # ClientResponse delegates response-owned attribute assignment to the
-    # wrapped response, so the read-only status contract holds in tests.
-    from plain.test.client import Client, ClientResponse
+def test_client_response_status_is_read_only() -> None:
+    from plain.test.client import ClientResponse
 
-    response = AsyncStreamingResponse(_stream(), content_type="text/event-stream")
-    wrapped = ClientResponse(
-        response=response, content=b"", client=Client(), status_code=200
+    response = ClientResponse(
+        returned_response=AsyncStreamingResponse(
+            _stream(), content_type="text/event-stream"
+        ),
+        request=RequestFactory().get("/"),
+        status_code=200,
+        body=b"",
     )
     with raises(AttributeError):
-        wrapped.status_code = 204  # ty: ignore[invalid-assignment]
-    # Test-only attributes still land on the wrapper.
-    wrapped.redirect_chain = []
-    assert wrapped.redirect_chain == []
+        response.status_code = 204  # ty: ignore[invalid-assignment]

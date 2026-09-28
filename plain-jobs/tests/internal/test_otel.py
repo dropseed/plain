@@ -64,34 +64,34 @@ def test_error_consumer_span_is_current_for_the_paired_log() -> None:
             ambient_context = get_current_span().get_span_context()
 
         assert ambient_context.is_valid
-        [span] = otel_spans.get_finished_spans()
-        assert span.name == "claim job"
-        assert span.kind == SpanKind.CONSUMER
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        assert [e for e in span.events if e.name == "exception"]
-        assert span.context is not None
-        assert ambient_context.trace_id == span.context.trace_id
-        assert ambient_context.span_id == span.context.span_id
+    [span] = otel_spans
+    assert span.name == "claim job"
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
+    assert span.context is not None
+    assert ambient_context.trace_id == span.context.trace_id
+    assert ambient_context.span_id == span.context.span_id
 
 
 def test_enqueue_emits_send_span() -> None:
     with capture_spans() as otel_spans:
         _NoopJob().run_in_worker()
 
-        spans = [s for s in otel_spans.get_finished_spans() if s.name == "send default"]
-        assert spans, "expected a `send default` PRODUCER span"
-        span = spans[-1]
-        attrs = span.attributes
-        assert attrs is not None
-        assert span.kind == SpanKind.PRODUCER
-        assert attrs["messaging.system"] == "plain.jobs"
-        assert attrs["messaging.operation.type"] == "send"
-        assert attrs["messaging.operation.name"] == "send"
-        assert attrs["messaging.destination.name"] == "default"
-        assert "messaging.message.id" in attrs
-        assert "code.function.name" in attrs
+    spans = otel_spans.filter(name="send default")
+    assert spans, "expected a `send default` PRODUCER span"
+    span = spans[-1]
+    attrs = span.attributes
+    assert attrs is not None
+    assert span.kind == SpanKind.PRODUCER
+    assert attrs["messaging.system"] == "plain.jobs"
+    assert attrs["messaging.operation.type"] == "send"
+    assert attrs["messaging.operation.name"] == "send"
+    assert attrs["messaging.destination.name"] == "default"
+    assert "messaging.message.id" in attrs
+    assert "code.function.name" in attrs
 
 
 def test_enqueue_skipped_marks_span() -> None:
@@ -99,11 +99,9 @@ def test_enqueue_skipped_marks_span() -> None:
         result = _ExclusiveJob().run_in_worker(concurrency_key="busy")
 
         assert result is None
-        span = next(
-            s for s in otel_spans.get_finished_spans() if s.name == "send default"
-        )
-        assert span.attributes is not None
-        assert span.attributes["job.enqueue.skipped"] is True
+    span = otel_spans.filter(name="send default")[0]
+    assert span.attributes is not None
+    assert span.attributes["job.enqueue.skipped"] is True
 
 
 def test_failed_enqueue_marks_producer_span_as_errored() -> None:
@@ -116,22 +114,23 @@ def test_failed_enqueue_marks_producer_span_as_errored() -> None:
 
     from plain.jobs.models import JobRequest
 
-    with capture_spans() as otel_spans, patch(JobRequest, "create", _boom):
-        with raises(RuntimeError):
-            _NoopJob().run_in_worker()
+    with (
+        capture_spans() as otel_spans,
+        patch(JobRequest, "create", _boom),
+        raises(RuntimeError),
+    ):
+        _NoopJob().run_in_worker()
 
-        producer_spans = [
-            s for s in otel_spans.get_finished_spans() if s.kind == SpanKind.PRODUCER
-        ]
-        assert producer_spans, "expected PRODUCER span from run_in_worker()"
-        span = producer_spans[-1]
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        # Exactly one event — `record_exception=False` on start_as_current_span
-        # suppresses the SDK's auto-record so the manual call is the sole event.
-        exception_events = [e for e in span.events if e.name == "exception"]
-        assert len(exception_events) == 1
+    producer_spans = otel_spans.filter(kind=SpanKind.PRODUCER)
+    assert producer_spans, "expected PRODUCER span from run_in_worker()"
+    span = producer_spans[-1]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    # Exactly one event — `record_exception=False` on start_as_current_span
+    # suppresses the SDK's auto-record so the manual call is the sole event.
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert len(exception_events) == 1
 
 
 def test_failing_job_marks_consumer_span_as_errored() -> None:
@@ -145,16 +144,14 @@ def test_failing_job_marks_consumer_span_as_errored() -> None:
         process = request.convert_to_job_process(worker_id=uuid.uuid4())
         process.run()
 
-        consumer_spans = [
-            s for s in otel_spans.get_finished_spans() if s.kind == SpanKind.CONSUMER
-        ]
-        assert consumer_spans, "expected CONSUMER span from JobProcess.run()"
-        span = consumer_spans[-1]
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        exception_events = [e for e in span.events if e.name == "exception"]
-        assert exception_events
+    consumer_spans = otel_spans.filter(kind=SpanKind.CONSUMER)
+    assert consumer_spans, "expected CONSUMER span from JobProcess.run()"
+    span = consumer_spans[-1]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
 
 def test_enqueue_failure_records_error_type_on_metric() -> None:
@@ -170,18 +167,19 @@ def test_enqueue_failure_records_error_type_on_metric() -> None:
         capture_spans(),
         capture_metrics() as otel_metrics,
         patch(JobRequest, "create", _boom),
+        raises(RuntimeError),
     ):
-        with raises(RuntimeError):
-            _NoopJob().run_in_worker()
+        _NoopJob().run_in_worker()
 
-        sent_points = otel_metrics.points("messaging.client.sent.messages")
-        assert sent_points, "expected sent_messages counter point on failure"
-        assert all(
-            p.attributes.get("error.type") == "RuntimeError" for p in sent_points
-        )
-        assert all(
-            p.attributes.get("messaging.system") == "plain.jobs" for p in sent_points
-        )
+    sent_points = otel_metrics.number_points("messaging.client.sent.messages")
+    assert sent_points, "expected sent_messages counter point on failure"
+    assert all(
+        (p.attributes or {}).get("error.type") == "RuntimeError" for p in sent_points
+    )
+    assert all(
+        (p.attributes or {}).get("messaging.system") == "plain.jobs"
+        for p in sent_points
+    )
 
 
 # --- process_job lookup failure ---------------------------------------------
@@ -205,21 +203,21 @@ def test_process_job_emits_consumer_span_when_lookup_fails() -> None:
         # lookup-failure path without monkey-patching the DB.
         process_job(str(uuid.uuid4()))
 
-        spans = [s for s in otel_spans.get_finished_spans() if s.name == "process job"]
-        assert len(spans) == 1
-        span = spans[0]
-        assert span.kind == SpanKind.CONSUMER
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        # JobProcess.DoesNotExist via plain-postgres' base manager.
-        assert "DoesNotExist" in str(span.attributes["error.type"])
-        exception_events = [e for e in span.events if e.name == "exception"]
-        assert exception_events
+    spans = otel_spans.filter(name="process job")
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    # JobProcess.DoesNotExist via plain-postgres' base manager.
+    assert "DoesNotExist" in str(span.attributes["error.type"])
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
-        assert span.context is not None
-        log_context = jobs_logs.span_context_for("Job process errored")
-        assert log_context.trace_id == span.context.trace_id
-        assert log_context.span_id == span.context.span_id
+    assert span.context is not None
+    log_context = jobs_logs.span_context_for("Job process errored")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
 
 
 # --- Worker run-loop span -----------------------------------------------
@@ -272,13 +270,11 @@ def test_worker_loop_emits_consumer_span_when_maintenance_due() -> None:
     with capture_spans() as otel_spans:
         worker._run_loop()
 
-        loop_spans = [
-            s for s in otel_spans.get_finished_spans() if s.name == "worker loop"
-        ]
-        assert len(loop_spans) == 1
-        span = loop_spans[0]
-        assert span.kind == SpanKind.CONSUMER
-        assert span.status.status_code == StatusCode.UNSET
+    loop_spans = otel_spans.filter(name="worker loop")
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.UNSET
 
 
 def test_worker_loop_idle_tick_emits_no_spans() -> None:
@@ -297,7 +293,7 @@ def test_worker_loop_idle_tick_emits_no_spans() -> None:
     ):
         worker._run_loop()
 
-        assert otel_spans.get_finished_spans() == ()
+    assert list(otel_spans) == []
 
 
 def test_worker_loop_records_error_when_maintenance_fails() -> None:
@@ -317,16 +313,14 @@ def test_worker_loop_records_error_when_maintenance_fails() -> None:
         # Must NOT raise — the loop catches and continues, just like in production.
         worker._run_loop()
 
-        loop_spans = [
-            s for s in otel_spans.get_finished_spans() if s.name == "worker loop"
-        ]
-        assert len(loop_spans) == 1
-        span = loop_spans[0]
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        exception_events = [e for e in span.events if e.name == "exception"]
-        assert exception_events
+    loop_spans = otel_spans.filter(name="worker loop")
+    assert len(loop_spans) == 1
+    span = loop_spans[0]
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
 
 def test_worker_loop_claim_failure_emits_error_span_and_continues() -> None:
@@ -352,22 +346,20 @@ def test_worker_loop_claim_failure_emits_error_span_and_continues() -> None:
         # Must NOT raise — this used to propagate and crash the worker process.
         worker._run_loop()
 
-        claim_spans = [
-            s for s in otel_spans.get_finished_spans() if s.name == "claim job"
-        ]
-        assert len(claim_spans) == 1
-        span = claim_spans[0]
-        assert span.kind == SpanKind.CONSUMER
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        exception_events = [e for e in span.events if e.name == "exception"]
-        assert exception_events
+    claim_spans = otel_spans.filter(name="claim job")
+    assert len(claim_spans) == 1
+    span = claim_spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    exception_events = [e for e in span.events if e.name == "exception"]
+    assert exception_events
 
-        assert span.context is not None
-        log_context = jobs_logs.span_context_for("Failed to claim job")
-        assert log_context.trace_id == span.context.trace_id
-        assert log_context.span_id == span.context.span_id
+    assert span.context is not None
+    log_context = jobs_logs.span_context_for("Failed to claim job")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
 
 
 def test_heartbeat_failure_emits_error_span_with_correlated_log() -> None:
@@ -390,21 +382,19 @@ def test_heartbeat_failure_emits_error_span_with_correlated_log() -> None:
         worker.maybe_heartbeat()
 
         assert worker._heartbeat_registered is False
-        spans = [
-            s for s in otel_spans.get_finished_spans() if s.name == "worker heartbeat"
-        ]
-        assert len(spans) == 1
-        span = spans[0]
-        assert span.kind == SpanKind.CONSUMER
-        assert span.status.status_code == StatusCode.ERROR
-        assert span.attributes is not None
-        assert span.attributes["error.type"] == "RuntimeError"
-        assert [e for e in span.events if e.name == "exception"]
+    spans = otel_spans.filter(name="worker heartbeat")
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.kind == SpanKind.CONSUMER
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.attributes is not None
+    assert span.attributes["error.type"] == "RuntimeError"
+    assert [e for e in span.events if e.name == "exception"]
 
-        assert span.context is not None
-        log_context = jobs_logs.span_context_for("Worker heartbeat failed")
-        assert log_context.trace_id == span.context.trace_id
-        assert log_context.span_id == span.context.span_id
+    assert span.context is not None
+    log_context = jobs_logs.span_context_for("Worker heartbeat failed")
+    assert log_context.trace_id == span.context.trace_id
+    assert log_context.span_id == span.context.span_id
 
 
 def test_maintenance_due_covers_every_task() -> None:
@@ -447,7 +437,7 @@ def test_future_finished_callback_emits_no_spans() -> None:
         future.set_result(None)
         future_finished_callback(str(uuid.uuid4()), future)
 
-        assert otel_spans.get_finished_spans() == ()
+    assert list(otel_spans) == []
 
 
 @register_job
@@ -484,10 +474,10 @@ def test_on_aborted_hook_runs_outside_suppression() -> None:
     with capture_spans() as otel_spans:
         future_finished_callback(str(process.uuid), future)
 
-        span_names = [s.name for s in otel_spans.get_finished_spans()]
-        # Framework bookkeeping (row lookup, conversion) stays suppressed —
-        # the only exported spans are from the user hook's query.
-        assert span_names == ["SELECT plainjobs_jobresult"]
+    span_names = [s.name for s in otel_spans]
+    # Framework bookkeeping (row lookup, conversion) stays suppressed —
+    # the only exported spans are from the user hook's query.
+    assert span_names == ["SELECT plainjobs_jobresult"]
 
 
 # --- Worker-state observable gauges -------------------------------------
@@ -574,7 +564,7 @@ def test_gauge_callbacks_emit_no_spans() -> None:
         for callback in _DB_GAUGE_CALLBACKS:
             list(callback(CallbackOptions()))
 
-        assert otel_spans.get_finished_spans() == ()
+    assert list(otel_spans) == []
 
 
 def test_queue_depth_counts_ready_jobs_by_queue() -> None:
@@ -715,18 +705,19 @@ def test_consumed_counter_records_outcome_for_lost() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.LOST)
 
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        lost_points = [
-            p for p in points if p.attributes.get("plain.jobs.outcome") == "lost"
-        ]
-        assert lost_points, "expected a consumed counter point with outcome=lost"
-        assert all(
-            p.attributes.get("messaging.system") == "plain.jobs" for p in lost_points
-        )
-        assert all(
-            p.attributes.get("messaging.destination.name") == "default"
-            for p in lost_points
-        )
+    lost_points = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "lost"},
+    )
+    assert lost_points, "expected a consumed counter point with outcome=lost"
+    assert all(
+        (p.attributes or {}).get("messaging.system") == "plain.jobs"
+        for p in lost_points
+    )
+    assert all(
+        (p.attributes or {}).get("messaging.destination.name") == "default"
+        for p in lost_points
+    )
 
 
 def test_consumed_counter_records_outcome_for_cancelled() -> None:
@@ -735,11 +726,11 @@ def test_consumed_counter_records_outcome_for_cancelled() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.CANCELLED)
 
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        cancelled = [
-            p for p in points if p.attributes.get("plain.jobs.outcome") == "cancelled"
-        ]
-        assert cancelled, "expected a consumed counter point with outcome=cancelled"
+    cancelled = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "cancelled"},
+    )
+    assert cancelled, "expected a consumed counter point with outcome=cancelled"
 
 
 def test_consumed_counter_records_outcome_for_successful() -> None:
@@ -750,11 +741,11 @@ def test_consumed_counter_records_outcome_for_successful() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.SUCCESSFUL)
 
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        successful = [
-            p for p in points if p.attributes.get("plain.jobs.outcome") == "successful"
-        ]
-        assert successful, "expected a consumed counter point with outcome=successful"
+    successful = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "successful"},
+    )
+    assert successful, "expected a consumed counter point with outcome=successful"
 
 
 def test_consumed_counter_records_outcome_for_errored() -> None:
@@ -763,11 +754,11 @@ def test_consumed_counter_records_outcome_for_errored() -> None:
     with capture_metrics() as otel_metrics:
         _trigger_outcome(JobResultStatuses.ERRORED)
 
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        errored = [
-            p for p in points if p.attributes.get("plain.jobs.outcome") == "errored"
-        ]
-        assert errored, "expected a consumed counter point with outcome=errored"
+    errored = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "errored"},
+    )
+    assert errored, "expected a consumed counter point with outcome=errored"
 
 
 def test_consumed_counter_includes_error_type_when_job_raises() -> None:
@@ -780,20 +771,17 @@ def test_consumed_counter_includes_error_type_when_job_raises() -> None:
         process = request.convert_to_job_process(worker_id=uuid.uuid4())
         process.run()
 
-        # Counters are cumulative across tests in a process and the SDK
-        # splits by attribute set, so other tests may have produced errored
-        # points without `error.type`. Look for a point that carries both
-        # attributes.
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        matching = [
-            p
-            for p in points
-            if p.attributes.get("plain.jobs.outcome") == "errored"
-            and p.attributes.get("error.type") == "RuntimeError"
-        ]
-        assert matching, (
-            "expected a consumed counter point with outcome=errored and error.type=RuntimeError"
-        )
+    # Counters are cumulative across tests in a process and the SDK
+    # splits by attribute set, so other tests may have produced errored
+    # points without `error.type`. Look for a point that carries both
+    # attributes.
+    matching = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "errored", "error.type": "RuntimeError"},
+    )
+    assert matching, (
+        "expected a consumed counter point with outcome=errored and error.type=RuntimeError"
+    )
 
 
 def test_consumed_counter_records_outcome_for_deferred() -> None:
@@ -807,11 +795,11 @@ def test_consumed_counter_records_outcome_for_deferred() -> None:
         process = request.convert_to_job_process(worker_id=uuid.uuid4())
         process.defer(job=_NoopJob(), defer_exception=DeferJob(delay=60))
 
-        points = otel_metrics.points("messaging.client.consumed.messages")
-        deferred = [
-            p for p in points if p.attributes.get("plain.jobs.outcome") == "deferred"
-        ]
-        assert deferred, "expected a consumed counter point with outcome=deferred"
+    deferred = otel_metrics.number_points(
+        "messaging.client.consumed.messages",
+        attributes={"plain.jobs.outcome": "deferred"},
+    )
+    assert deferred, "expected a consumed counter point with outcome=deferred"
 
 
 def test_defer_skipped_when_reenqueue_blocked() -> None:

@@ -1,4 +1,5 @@
 from app.users.models import User
+from plain.auth.test import login_client
 from plain.test import Client
 
 
@@ -9,7 +10,7 @@ def test_admin_access():
     assert client.get("/admin").status_code == 302
 
     user = User.query.create(email="admin@example.com", password="strongpass1")
-    client.force_login(user)
+    login_client(client, user)
 
     # Not admin yet
     assert client.get("/admin").status_code == 404

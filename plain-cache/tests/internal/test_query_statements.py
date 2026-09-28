@@ -16,8 +16,7 @@ from plain.cache.models import CachedItem
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
-from plain.postgres.test import isolated_db, span_sql_statements
-from plain.test import capture_spans
+from plain.postgres.test import capture_queries, isolated_db
 
 
 def assert_is_the_set_many_statement(sql: str) -> None:
@@ -34,10 +33,10 @@ def assert_is_the_set_many_statement(sql: str) -> None:
 
 
 def test_all_new_keys_is_one_statement() -> None:
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         cache.set_many({"a": 1, "b": 2})
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
@@ -45,10 +44,10 @@ def test_all_new_keys_is_one_statement() -> None:
 def test_all_existing_keys_is_one_statement() -> None:
     cache.set_many({"a": 1, "b": 2})
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         cache.set_many({"a": 10, "b": 20}, expiration=60)
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
@@ -56,19 +55,19 @@ def test_all_existing_keys_is_one_statement() -> None:
 def test_mixed_new_and_existing_keys_is_one_statement() -> None:
     cache.set_many({"a": 1})
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         cache.set_many({"a": 100, "c": 3})
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
 
 def test_empty_mapping_runs_no_statements() -> None:
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         cache.set_many({})
 
-    assert span_sql_statements(spans) == []
+    assert queries.sql_statements() == []
 
 
 @isolated_db

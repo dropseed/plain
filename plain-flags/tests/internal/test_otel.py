@@ -30,17 +30,15 @@ def test_first_eval_with_key_emits_targeting_match_reason() -> None:
         flag = _KeyedFlag()
         assert flag.value is True
 
-        span = next(
-            s for s in otel_spans.get_finished_spans() if s.name == "flag _KeyedFlag"
-        )
-        attrs = span.attributes
-        assert attrs is not None
-        assert attrs["feature_flag.provider.name"] == "plain.flags"
-        assert attrs["feature_flag.key"] == "user-123"
-        # `get_value()` ran dynamically with this key — semconv `targeting_match`,
-        # not `static` (which means "no dynamic evaluation").
-        assert attrs["feature_flag.result.reason"] == "targeting_match"
-        assert attrs["feature_flag.result.value"] == "True"
+    span = otel_spans.filter(name="flag _KeyedFlag")[0]
+    attrs = span.attributes
+    assert attrs is not None
+    assert attrs["feature_flag.provider.name"] == "plain.flags"
+    assert attrs["feature_flag.key"] == "user-123"
+    # `get_value()` ran dynamically with this key — semconv `targeting_match`,
+    # not `static` (which means "no dynamic evaluation").
+    assert attrs["feature_flag.result.reason"] == "targeting_match"
+    assert attrs["feature_flag.result.value"] == "True"
 
 
 def test_second_eval_with_key_emits_cached_reason() -> None:
@@ -51,13 +49,11 @@ def test_second_eval_with_key_emits_cached_reason() -> None:
     with capture_spans() as otel_spans:
         _KeyedFlag().retrieve_or_compute_value()
 
-        span = next(
-            s for s in otel_spans.get_finished_spans() if s.name == "flag _KeyedFlag"
-        )
-        attrs = span.attributes
-        assert attrs is not None
-        assert attrs["feature_flag.result.reason"] == "cached"
-        assert attrs["feature_flag.key"] == "user-123"
+    span = otel_spans.filter(name="flag _KeyedFlag")[0]
+    attrs = span.attributes
+    assert attrs is not None
+    assert attrs["feature_flag.result.reason"] == "cached"
+    assert attrs["feature_flag.key"] == "user-123"
 
 
 def test_unkeyed_flag_emits_targeting_match_reason() -> None:
@@ -65,14 +61,12 @@ def test_unkeyed_flag_emits_targeting_match_reason() -> None:
         flag = _UnkeyedFlag()
         assert flag.value == "feature-on"
 
-        span = next(
-            s for s in otel_spans.get_finished_spans() if s.name == "flag _UnkeyedFlag"
-        )
-        attrs = span.attributes
-        assert attrs is not None
-        assert attrs["feature_flag.result.reason"] == "targeting_match"
-        assert attrs["feature_flag.result.value"] == "feature-on"
-        assert "feature_flag.key" not in attrs
+    span = otel_spans.filter(name="flag _UnkeyedFlag")[0]
+    attrs = span.attributes
+    assert attrs is not None
+    assert attrs["feature_flag.result.reason"] == "targeting_match"
+    assert attrs["feature_flag.result.value"] == "feature-on"
+    assert "feature_flag.key" not in attrs
 
 
 def test_disabled_flag_emits_disabled_reason_with_key() -> None:
@@ -89,12 +83,10 @@ def test_disabled_flag_emits_disabled_reason_with_key() -> None:
     ):
         assert _KeyedFlag().value is None
 
-        span = next(
-            s for s in otel_spans.get_finished_spans() if s.name == "flag _KeyedFlag"
-        )
-        attrs = span.attributes
-        assert attrs is not None
-        assert attrs["feature_flag.result.reason"] == "disabled"
-        # The key is resolved before the disabled check, so dashboards filtering
-        # disabled events by user/tenant key still see the evaluation.
-        assert attrs["feature_flag.key"] == "user-123"
+    span = otel_spans.filter(name="flag _KeyedFlag")[0]
+    attrs = span.attributes
+    assert attrs is not None
+    assert attrs["feature_flag.result.reason"] == "disabled"
+    # The key is resolved before the disabled check, so dashboards filtering
+    # disabled events by user/tenant key still see the evaluation.
+    assert attrs["feature_flag.key"] == "user-123"

@@ -1,11 +1,12 @@
 from .database import use_test_database
 from .decorators import isolated_db
-from .helpers import capture_queries, max_queries, span_sql_statements
+from .helpers import CapturedQueries, CapturedQuery, capture_queries, max_queries
 
 __all__ = [
+    "CapturedQueries",
+    "CapturedQuery",
     "capture_queries",
     "isolated_db",
     "max_queries",
-    "span_sql_statements",
     "use_test_database",
 ]

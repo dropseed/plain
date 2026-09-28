@@ -4,6 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from plain.postgres.db import _db_conn
+from plain.postgres.test import CapturedQueries
 
 
 @contextmanager
@@ -23,7 +24,7 @@ def clean_connection() -> Generator[None]:
         _db_conn.reset(token)
 
 
-def executed_sql(queries: list[dict]) -> str:
+def executed_sql(queries: CapturedQueries) -> str:
     """Join the statements recorded by ``capture_queries`` into one string.
 
         with capture_queries() as queries:
@@ -36,5 +37,7 @@ def executed_sql(queries: list[dict]) -> str:
     """
     control = ("BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE")
     return " ".join(
-        query["sql"] for query in queries if not query["sql"].startswith(control)
+        query.sql_with_params
+        for query in queries
+        if not query.sql_with_params.startswith(control)
     )

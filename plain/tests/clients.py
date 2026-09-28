@@ -23,10 +23,6 @@ def _swap_router(
         ):
             _get_cached_resolver.cache_clear()
             client = Client(raise_request_exception=False)
-            # Middleware chain was built on init with the old router; rebuild it
-            # after the settings swap.
-            client.handler._middleware_chain = None
-            client.handler.load_middleware()
             yield client
     finally:
         # Settings are restored by override_settings; clear the resolver

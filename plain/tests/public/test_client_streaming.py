@@ -5,7 +5,8 @@ generator body before the test could read it — so a test of a streamed
 download saw an empty (or closed-file) body.
 """
 
-from plain.test import Client, raises
+from plain.http import FileResponse, StreamingResponse
+from plain.test import Client, cases, raises
 
 
 def test_generator_body_is_readable() -> None:
@@ -21,10 +22,15 @@ def test_file_like_body_is_readable() -> None:
     assert response.body == b"streamed-bytes"
 
 
-def test_streaming_response_keeps_its_type() -> None:
+def test_streaming_response_says_it_streamed() -> None:
+    assert Client().get("/stream-generator").streaming
+    assert not Client().get("/").streaming
+
+
+def test_returned_response_is_the_object_the_view_returned() -> None:
     response = Client().get("/stream-generator")
 
-    assert response.streaming
+    assert isinstance(response.returned_response, StreamingResponse)
 
 
 def test_head_does_not_read_the_body() -> None:
@@ -56,7 +62,7 @@ def test_file_response_stays_a_file_response() -> None:
     response = Client().get("/file")
 
     assert response.body == b"file bytes"
-    assert response.file_to_stream is not None
+    assert isinstance(response.returned_response, FileResponse)
 
 
 def test_body_failing_before_its_first_chunk_is_a_500() -> None:
@@ -69,11 +75,19 @@ def test_body_failing_before_its_first_chunk_is_a_500() -> None:
     assert isinstance(response.exception, ValueError)
 
 
-def test_streaming_content_points_to_body() -> None:
+@cases("content", "streaming_content", "url", "reason_phrase", "charset")
+def test_a_name_the_returned_response_has_is_not_forwarded(name: str) -> None:
+    # Each of these is an attribute of the Response the view returned. The
+    # client's response has its own fixed names and forwards none of them.
     response = Client().get("/stream-generator")
 
-    with raises(AttributeError, match="response.body"):
-        _ = response.streaming_content
+    with raises(AttributeError) as caught:
+        getattr(response, name)
+
+    message = str(caught.exception)
+    assert f"has no `{name}`" in message
+    assert "status_code, headers, cookies, body, text, json_data" in message
+    assert "response.returned_response" in message
 
 
 def test_text_and_body_read_the_sent_body() -> None:
@@ -81,13 +95,6 @@ def test_text_and_body_read_the_sent_body() -> None:
 
     assert response.text == "line 1\nline 2\n"
     assert response.body == b"line 1\nline 2\n"
-
-
-def test_content_points_to_body() -> None:
-    response = Client().get("/stream-generator")
-
-    with raises(AttributeError, match="response.body"):
-        _ = response.content
 
 
 def test_head_of_a_buffered_response_has_no_body() -> None:

@@ -230,7 +230,7 @@ def test_update_returning_across_a_relation():
     # Filtering across the FK rewrites the UPDATE to `WHERE id IN (subquery)`;
     # RETURNING has to survive that rewrite, in one statement.
     assert len(queries) == 1
-    assert "RETURNING" in queries[0]["sql"]
+    assert "RETURNING" in queries[0].sql_with_params
     assert len(rows) == 2
     assert ChildCascade.query.filter(parent=keep).count() == 3
 
@@ -244,7 +244,7 @@ def test_delete_returning_across_a_relation():
         rows = ChildCascade.query.filter(parent__name="doomed").returning().delete()
 
     assert len(queries) == 1
-    assert "RETURNING" in queries[0]["sql"]
+    assert "RETURNING" in queries[0].sql_with_params
     assert len(rows) == 2
     assert all(row.parent.id == parent.id for row in rows)
 
@@ -373,7 +373,7 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update():
             .update(parent=parent)
         )
 
-    sql = " ".join(q["sql"] for q in queries)
+    sql = " ".join(q.sql_with_params for q in queries)
     assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED", sql)
     assert "RETURNING" in sql
     assert [row.id for row in rows] == [child.id]

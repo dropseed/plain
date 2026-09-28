@@ -1,9 +1,11 @@
 """
 Test output: answers "what do I do next", not just "what happened".
 
-Every failure block ends with the exact re-run command for that test.
+Every failure block ends with the exact re-run command for that test,
+quoted so that pasting it into a shell runs that test and no other.
 """
 
+import shlex
 import textwrap
 
 import click
@@ -11,7 +13,7 @@ import click
 from .collection import CollectionError
 from .runner import TestResult, TestRun
 
-__all__ = ["Reporter"]
+__all__ = []
 
 _STATUS_COLORS = {
     "passed": "green",
@@ -20,6 +22,15 @@ _STATUS_COLORS = {
 }
 
 _DOTS = {"passed": ".", "failed": "F", "skipped": "s"}
+
+
+def rerun_command(test_id: str) -> str:
+    """
+    The command that runs one test, safe to paste. A case id can hold
+    anything (`test_price[annual plan]`), and a shell reads spaces, brackets,
+    quotes and `$` for itself unless the id is quoted.
+    """
+    return f"plain test {shlex.quote(test_id)}"
 
 
 class Reporter:
@@ -58,7 +69,7 @@ class Reporter:
             click.echo()
             click.echo(textwrap.indent(result.traceback_text.rstrip(), "  "))
             click.echo()
-            click.secho(f"Re-run: plain test {result.test.id}", dim=True)
+            click.secho(f"Re-run: {rerun_command(result.test.id)}", dim=True)
 
     def skips(self, run: TestRun) -> None:
         # Verbose output already gave each skipped test its own line.

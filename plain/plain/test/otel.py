@@ -1,29 +1,50 @@
-"""In-memory OpenTelemetry providers for tests.
+"""
+Capture the OpenTelemetry spans and metrics emitted during a block.
 
-The global tracer/meter providers are install-once per process, so both
+The global tracer/meter providers are install-once per process, so the two
 install helpers are idempotent — repeated calls return the same
-exporter/reader. Tests should use the `capture_spans` / `capture_metrics`
-context managers.
+exporter/reader, and every capture reads from that one.
 
 The OpenTelemetry SDK imports are deferred into the install helpers so that
 importing `plain.test` (e.g. for `Client`) doesn't pay the SDK import cost.
 """
 
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
+
+from .captured import Captured
 
 if TYPE_CHECKING:
-    from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+    from opentelemetry.sdk.metrics.export import (
+        DataPointT,
+        HistogramDataPoint,
+        InMemoryMetricReader,
+        Metric,
+        NumberDataPoint,
+    )
+    from opentelemetry.sdk.trace import ReadableSpan
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
         InMemorySpanExporter,
     )
+    from opentelemetry.trace import SpanKind
+    from opentelemetry.util.types import AttributeValue
+
+__all__ = ["CapturedMetrics", "CapturedSpans", "capture_metrics", "capture_spans"]
 
 _span_exporter: InMemorySpanExporter | None = None
 _metric_reader: InMemoryMetricReader | None = None
 
+# Captures can be nested (a project lifecycle around every test, and the
+# test's own inside it), and they all read the one exporter and the one
+# reader. So an inner capture must not empty them: each capture remembers
+# where it started, and they're only emptied when nothing is capturing.
+_open_span_captures = 0
+_open_metric_captures = 0
+_collected_metrics: list[Metric] = []
 
-def install_test_tracer() -> InMemorySpanExporter:
+
+def _install_test_tracer() -> InMemorySpanExporter:
     global _span_exporter
     if _span_exporter is None:
         from opentelemetry import trace
@@ -51,7 +72,7 @@ def install_test_tracer() -> InMemorySpanExporter:
     return _span_exporter
 
 
-def install_test_meter() -> InMemoryMetricReader:
+def _install_test_meter() -> InMemoryMetricReader:
     global _metric_reader
     if _metric_reader is None:
         from opentelemetry import metrics
@@ -88,87 +109,183 @@ def install_test_meter() -> InMemoryMetricReader:
     return _metric_reader
 
 
-class CapturedSpans:
-    """Spans captured by `capture_spans`, with small lookup conveniences."""
-
-    def __init__(self, exporter: InMemorySpanExporter) -> None:
-        self._exporter = exporter
-
-    def get_finished_spans(self) -> tuple[Any, ...]:
-        return self._exporter.get_finished_spans()
-
-    def find(self, *, kind: Any = None, name: str | None = None) -> Any:
-        """Return the first finished span matching the given kind and/or name."""
-        for span in self.get_finished_spans():
-            if kind is not None and span.kind != kind:
-                continue
-            if name is not None and span.name != name:
-                continue
-            return span
-        raise LookupError(f"No span found matching kind={kind!r} name={name!r}")
-
-
-class CapturedMetrics:
+class CapturedSpans(Captured["ReadableSpan"]):
     """
-    Metrics captured by `capture_metrics`.
-
-    Synchronous instruments report with delta temporality, so each drain of
-    the reader only returns what happened since the last one — drains are
-    accumulated here so `points()` always reflects the whole block.
+    The spans that ended during a `capture_spans` block, in the order they
+    ended. Each one is OpenTelemetry's own `ReadableSpan`.
     """
 
-    def __init__(self, reader: InMemoryMetricReader) -> None:
-        self._reader = reader
-        self._collected: list[Any] = []
+    def __init__(self) -> None:
+        super().__init__(helper="capture_spans")
 
-    def _drain(self) -> None:
-        data = self._reader.get_metrics_data()
-        if data is not None:
-            self._collected.append(data)
+    def filter(
+        self, *, name: str | None = None, kind: SpanKind | None = None
+    ) -> list[ReadableSpan]:
+        """
+        The spans with this name, of this kind, or both.
 
-    def collect(self) -> None:
-        """Force a collection — triggers observable instrument callbacks."""
-        self._drain()
-
-    def clear(self) -> None:
-        """Forget the metrics captured so far in this block."""
-        self._drain()
-        self._collected.clear()
-
-    def points(self, name: str) -> list[Any]:
-        """Return all data points recorded for the named metric."""
-        self._drain()
+            [span] = spans.filter(name="claim job")
+            server_spans = spans.filter(kind=SpanKind.SERVER)
+        """
+        if name is None and kind is None:
+            raise TypeError("filter() needs a name=, a kind=, or both")
         return [
-            point
-            for data in self._collected
-            for resource_metrics in data.resource_metrics
-            for scope_metrics in resource_metrics.scope_metrics
-            for metric in scope_metrics.metrics
-            if metric.name == name
-            for point in metric.data.data_points
+            span
+            for span in self
+            if (name is None or span.name == name)
+            and (kind is None or span.kind == kind)
         ]
+
+
+class CapturedMetrics(Captured["Metric"]):
+    """
+    The metrics collected for a `capture_metrics` block, in the order they
+    were collected. Each one is OpenTelemetry's own `Metric`.
+
+    What a test usually wants are a metric's data points, and those come in
+    two kinds: `number_points(name)` for a counter or a gauge, and
+    `histogram_points(name)` for a histogram.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(helper="capture_metrics")
+
+    def number_points(
+        self, name: str, *, attributes: Mapping[str, AttributeValue] | None = None
+    ) -> list[NumberDataPoint]:
+        """
+        The data points of the counter, up-down counter or gauge with this
+        name. Each has a `value`.
+
+            points = metrics.number_points(
+                "messaging.client.consumed.messages",
+                attributes={"plain.jobs.outcome": "lost"},
+            )
+            assert sum(point.value for point in points) == 1
+
+        Pass `attributes` to keep only the points that carry all of them.
+        """
+        from opentelemetry.sdk.metrics.export import NumberDataPoint
+
+        points = self._points(name, attributes)
+        for point in points:
+            if not isinstance(point, NumberDataPoint):
+                raise TypeError(
+                    f"{name!r} is a histogram — read it with"
+                    f" `histogram_points({name!r})`."
+                )
+        return cast("list[NumberDataPoint]", points)
+
+    def histogram_points(
+        self, name: str, *, attributes: Mapping[str, AttributeValue] | None = None
+    ) -> list[HistogramDataPoint]:
+        """
+        The data points of the histogram with this name. Each has a `count`,
+        a `sum`, a `min` and a `max`.
+
+            points = metrics.histogram_points(
+                "db.client.response.returned_rows",
+                attributes={"db.operation.name": "SELECT"},
+            )
+            assert sum(point.sum for point in points) == 5
+
+        Pass `attributes` to keep only the points that carry all of them.
+        """
+        from opentelemetry.sdk.metrics.export import HistogramDataPoint
+
+        points = self._points(name, attributes)
+        for point in points:
+            if not isinstance(point, HistogramDataPoint):
+                raise TypeError(
+                    f"{name!r} is not a histogram — read it with"
+                    f" `number_points({name!r})`."
+                )
+        return cast("list[HistogramDataPoint]", points)
+
+    def _points(
+        self, name: str, attributes: Mapping[str, AttributeValue] | None
+    ) -> list[DataPointT]:
+        wanted = attributes or {}
+        points = []
+        for metric in self:
+            if metric.name != name:
+                continue
+            for point in metric.data.data_points:
+                carried = point.attributes or {}
+                if all(
+                    key in carried and carried[key] == value
+                    for key, value in wanted.items()
+                ):
+                    points.append(point)
+        return points
 
 
 @contextmanager
 def capture_spans() -> Generator[CapturedSpans]:
     """
-    The OpenTelemetry spans emitted during the block.
+    The OpenTelemetry spans that end during the block.
 
         with capture_spans() as spans:
             Client().get("/")
-        server_span = spans.find(kind=trace.SpanKind.SERVER)
+
+        [server_span] = spans.filter(kind=SpanKind.SERVER)
     """
-    exporter = install_test_tracer()
-    exporter.clear()
-    yield CapturedSpans(exporter)
+    global _open_span_captures
+
+    exporter = _install_test_tracer()
+    if _open_span_captures == 0:
+        exporter.clear()
+    start = len(exporter.get_finished_spans())
+
+    captured = CapturedSpans()
+    _open_span_captures += 1
+    try:
+        yield captured
+    finally:
+        _open_span_captures -= 1
+        captured._finish(exporter.get_finished_spans()[start:])
+
+
+def _collect_metrics(reader: InMemoryMetricReader) -> None:
+    """Collect what the reader holds — which also asks every observable
+    instrument for its current value — and keep it."""
+    data = reader.get_metrics_data()
+    if data is None:
+        return
+    for resource_metrics in data.resource_metrics:
+        for scope_metrics in resource_metrics.scope_metrics:
+            _collected_metrics.extend(scope_metrics.metrics)
 
 
 @contextmanager
 def capture_metrics() -> Generator[CapturedMetrics]:
     """
-    The OpenTelemetry metrics emitted during the block. Drains prior
-    observations on entry. Read with `.points(name)`.
+    The OpenTelemetry metrics recorded during the block.
+
+        with capture_metrics() as metrics:
+            Client().get("/")
+
+        assert metrics.histogram_points("http.server.request.duration")
+
+    Metrics are collected when the block ends, which is also when an
+    observable instrument (a gauge that reports a pool's size, say) is asked
+    for its value. So whatever it observes has to still be there: open the
+    capture inside the block that keeps it alive, not around it.
     """
-    reader = install_test_meter()
-    reader.get_metrics_data()  # drain anything recorded before the block
-    yield CapturedMetrics(reader)
+    global _open_metric_captures
+
+    reader = _install_test_meter()
+    # What was recorded before the block belongs to whatever came before.
+    _collect_metrics(reader)
+    if _open_metric_captures == 0:
+        _collected_metrics.clear()
+    start = len(_collected_metrics)
+
+    captured = CapturedMetrics()
+    _open_metric_captures += 1
+    try:
+        yield captured
+    finally:
+        _open_metric_captures -= 1
+        _collect_metrics(reader)
+        captured._finish(_collected_metrics[start:])

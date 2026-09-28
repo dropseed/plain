@@ -4,6 +4,7 @@ import re
 
 from app.users.models import User
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from plain.auth.test import login_client
 from plain.test import Client, override_settings
 
 TOKEN = "plain_pv_testtoken"
@@ -73,7 +74,7 @@ def test_signed_in_user_identity_is_encrypted_into_the_tag():
     ):
         user = User.query.create(username="dave")
         client = Client()
-        client.force_login(user)
+        login_client(client, user)
 
         response = client.get("/")
         assert response.status_code == 200

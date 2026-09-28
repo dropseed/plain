@@ -164,7 +164,9 @@ def test_upsert_conflict_defaults_set_order_matches_param_order():
             unique_fields=[UpsertItem.key],
         )
 
-    set_clause = queries[0]["sql"].split("DO UPDATE SET ")[1].split(" RETURNING")[0]
+    set_clause = (
+        queries[0].sql_with_params.split("DO UPDATE SET ")[1].split(" RETURNING")[0]
+    )
     # label precedes value in the model, so the literals must appear that way
     # round too -- the parameters are interpolated in the order they were sent.
     assert set_clause.index("'HELLO'") < set_clause.index("42")
@@ -378,7 +380,7 @@ def test_upsert_excluded_compiles_to_the_excluded_column():
         )
 
     assert len(queries) == 1
-    sql = queries[0]["sql"]
+    sql = queries[0].sql_with_params
     assert '"value" = ("examples_upsertitem"."value" + EXCLUDED."value")' in sql
 
 
@@ -507,7 +509,7 @@ def test_upsert_excluded_increments_survive_concurrent_writers():
             conflict_defaults={"value": F("value") + Excluded("value")},
             unique_fields=[UpsertItem.key],
         )
-    increment_sql = queries[0]["sql"]
+    increment_sql = queries[0].sql_with_params
     assert f'"value" = ("{table}"."value" + EXCLUDED."value")' in increment_sql
 
     params = build_connection_params(get_connection().settings_dict)
@@ -516,7 +518,8 @@ def test_upsert_excluded_increments_survive_concurrent_writers():
     def race(_: int) -> None:
         with psycopg.connect(**params, autocommit=True) as session:
             barrier.wait()
-            session.execute(increment_sql)
+            # The statement capture_queries recorded, replayed as it ran.
+            session.execute(increment_sql)  # ty: ignore[invalid-argument-type]
 
     # Start from the row that first upsert() inserted, then race the same
     # statement -- every session takes the conflict path.

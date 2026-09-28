@@ -17,10 +17,9 @@ from datetime import timedelta
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
-from plain.postgres.test import isolated_db, span_sql_statements
+from plain.postgres.test import capture_queries, isolated_db
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
-from plain.test import capture_spans
 from plain.utils import timezone
 
 
@@ -28,10 +27,10 @@ def test_new_session_save_is_one_insert_on_conflict() -> None:
     store = SessionStore()
     store["a"] = 1
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         store.save()
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 4
     assert sql[0].startswith("SAVEPOINT")
     # _get_new_session_key() checks the key it minted isn't already taken.
@@ -50,10 +49,10 @@ def test_resaving_a_session_is_one_insert_on_conflict() -> None:
     reopened = SessionStore(store.session_key)
     reopened["a"] = 2  # loads the row, before we start capturing
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         reopened.save()
 
-    sql = span_sql_statements(spans)
+    sql = queries.sql_statements()
     assert len(sql) == 3
     assert sql[0].startswith("SAVEPOINT")
     assert sql[1].startswith('INSERT INTO "plainsessions_session"')
@@ -73,10 +72,10 @@ def test_conflict_updates_the_session_but_not_created_at() -> None:
     reopened = SessionStore(store.session_key)
     reopened["a"] = 2
 
-    with capture_spans() as spans:
+    with capture_queries() as queries:
         reopened.save()
 
-    insert = next(s for s in span_sql_statements(spans) if s.startswith("INSERT"))
+    insert = next(s for s in queries.sql_statements() if s.startswith("INSERT"))
     set_clause = insert.split("DO UPDATE SET")[1].split(" RETURNING ")[0]
     assert '"expires_at" = EXCLUDED."expires_at"' in set_clause
     assert '"session_data" = EXCLUDED."session_data"' in set_clause

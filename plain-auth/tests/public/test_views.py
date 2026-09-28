@@ -1,4 +1,5 @@
 from app.users.models import User
+from plain.auth.test import login_client
 from plain.test import Client
 
 
@@ -6,7 +7,7 @@ def test_login_required_redirect():
     client = Client()
     response = client.get("/protected")
     assert response.status_code == 302
-    assert response.url == "/login?next=/protected"
+    assert response.redirect_to == "/login?next=/protected"
 
 
 def test_view_without_login_required():
@@ -23,7 +24,7 @@ def test_admin_required():
     assert client.get("/admin").status_code == 302
 
     user = User.query.create(username="user")
-    client.force_login(user)
+    login_client(client, user)
     # not admin -> 404
     assert client.get("/admin").status_code == 404
 

@@ -9,6 +9,7 @@ login-gated ``/whoami`` view), database rows, and sent email.
 import re
 
 from app.users.models import User
+from plain.auth.test import login_client
 from plain.email.test import outbox
 from plain.test import Client
 
@@ -51,7 +52,7 @@ class TestLogin:
         )
 
         assert response.status_code == 302
-        assert response.url == "/done"
+        assert response.redirect_to == "/done"
         assert is_logged_in(client)
 
     def test_wrong_password_is_rejected(self):
@@ -121,7 +122,7 @@ class TestForgotPassword:
         response = client.post("/forgot", form_data={"email": "known@example.com"})
 
         assert response.status_code == 302
-        assert response.url == "/done"
+        assert response.redirect_to == "/done"
         assert len(outbox) == 1
         assert outbox[0].to == ["known@example.com"]
 
@@ -132,7 +133,7 @@ class TestForgotPassword:
 
         # Identical 302 -> /done as the known-email case: no existence leak.
         assert response.status_code == 302
-        assert response.url == "/done"
+        assert response.redirect_to == "/done"
         assert len(outbox) == 0
 
 
@@ -169,7 +170,7 @@ class TestResetPassword:
 class TestChangePassword:
     def test_correct_old_password_changes_it(self):
         client = Client()
-        client.force_login(make_user(email="change-ok@example.com"))
+        login_client(client, make_user(email="change-ok@example.com"))
 
         response = client.post(
             "/change",
@@ -186,7 +187,7 @@ class TestChangePassword:
 
     def test_wrong_old_password_is_rejected(self):
         client = Client()
-        client.force_login(make_user(email="change-bad@example.com"))
+        login_client(client, make_user(email="change-bad@example.com"))
 
         response = client.post(
             "/change",
@@ -203,7 +204,7 @@ class TestChangePassword:
 
     def test_mismatched_new_passwords_are_rejected(self):
         client = Client()
-        client.force_login(make_user(email="change-mismatch@example.com"))
+        login_client(client, make_user(email="change-mismatch@example.com"))
 
         response = client.post(
             "/change",

@@ -11,17 +11,9 @@ from typing import Any, ClassVar
 from opentelemetry.trace import NoOpTracer
 from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
-from plain.postgres.otel import register_pool_observables
 from plain.postgres.sources import runtime_pool_source
 from plain.test import capture_metrics, capture_spans, override_settings, patch, raises
-from plain.test.otel import install_test_meter
 from psycopg_pool import PoolTimeout
-
-# Pool observables were registered against the proxy meter at package
-# `ready()`; ensure the real MeterProvider is installed and rebind so
-# observations land on it.
-install_test_meter()
-register_pool_observables(runtime_pool_source)
 
 
 class TestQuerySpanAttributes:
@@ -31,7 +23,7 @@ class TestQuerySpanAttributes:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
 
-        spans = [s for s in otel_spans.get_finished_spans() if s.name == "SELECT"]
+        spans = otel_spans.filter(name="SELECT")
         assert spans, "no SELECT span captured"
         attrs = spans[-1].attributes
         assert attrs is not None
@@ -52,7 +44,7 @@ class TestQuerySpanAttributes:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
 
-        spans = [s for s in otel_spans.get_finished_spans() if s.name == "SELECT"]
+        spans = otel_spans.filter(name="SELECT")
         assert spans, "no SELECT span captured"
         attrs = spans[-1].attributes
         assert attrs is not None
@@ -93,12 +85,13 @@ class TestReturnedRowsMetric:
                 cursor.execute("SELECT generate_series(1, 5)")
                 cursor.fetchall()
 
-            points = otel_metrics.points("db.client.response.returned_rows")
+        points = otel_metrics.histogram_points("db.client.response.returned_rows")
         # Histogram points aggregate over collection window; at least one
         # data point with our operation tag should be present.
-        select_points = [
-            p for p in points if p.attributes.get("db.operation.name") == "SELECT"
-        ]
+        select_points = otel_metrics.histogram_points(
+            "db.client.response.returned_rows",
+            attributes={"db.operation.name": "SELECT"},
+        )
         assert select_points, f"no SELECT returned_rows points; got {points}"
         # Sum across points should reflect the 5 rows we returned.
         assert sum(p.sum for p in select_points) >= 5
@@ -111,30 +104,30 @@ class TestReturnedRowsMetric:
             with conn.cursor() as cursor:
                 list(cursor.stream("SELECT generate_series(1, 7)"))
 
-            points = otel_metrics.points("db.client.response.returned_rows")
-        select_points = [
-            p for p in points if p.attributes.get("db.operation.name") == "SELECT"
-        ]
+        points = otel_metrics.histogram_points("db.client.response.returned_rows")
+        select_points = otel_metrics.histogram_points(
+            "db.client.response.returned_rows",
+            attributes={"db.operation.name": "SELECT"},
+        )
         assert select_points, f"no SELECT returned_rows points; got {points}"
         assert sum(p.sum for p in select_points) >= 7
 
     def test_non_select_does_not_record_returned_rows(self) -> None:
-        with capture_metrics() as otel_metrics:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                # Table doesn't matter — a BEGIN/COMMIT compiles to COMMIT op.
-                cursor.execute("SELECT 1")  # warm
-            otel_metrics.clear()  # forget the warm-up query's points
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # Table doesn't matter — a BEGIN/COMMIT compiles to COMMIT op.
+            cursor.execute("SELECT 1")  # warm
 
-            with conn.cursor() as cursor:
-                cursor.execute("CREATE TEMP TABLE _otel_tmp (v int)")
-                cursor.execute("INSERT INTO _otel_tmp (v) VALUES (1), (2), (3)")
-                cursor.execute("UPDATE _otel_tmp SET v = v + 1")
-                cursor.execute("DELETE FROM _otel_tmp")
+        # Opened after the warm-up query, so its points aren't captured.
+        with capture_metrics() as otel_metrics, conn.cursor() as cursor:
+            cursor.execute("CREATE TEMP TABLE _otel_tmp (v int)")
+            cursor.execute("INSERT INTO _otel_tmp (v) VALUES (1), (2), (3)")
+            cursor.execute("UPDATE _otel_tmp SET v = v + 1")
+            cursor.execute("DELETE FROM _otel_tmp")
 
-            points = otel_metrics.points("db.client.response.returned_rows")
+        points = otel_metrics.histogram_points("db.client.response.returned_rows")
         for p in points:
-            assert p.attributes.get("db.operation.name") == "SELECT", (
+            assert (p.attributes or {}).get("db.operation.name") == "SELECT", (
                 f"non-SELECT recorded returned_rows: {p.attributes}"
             )
 
@@ -143,46 +136,47 @@ class TestPoolObservables:
     def test_count_max_idle_pending_observed(self) -> None:
         # The per-test transaction runs on a connection that bypasses the
         # runtime pool, so exercise the pool directly.
-        with capture_metrics() as otel_metrics:
-            runtime_pool_source.close()
-            held = runtime_pool_source.acquire()
-            try:
+        runtime_pool_source.close()
+        held = runtime_pool_source.acquire()
+        try:
+            # The pool's gauges are read when the capture ends, so it ends
+            # while this connection is still held.
+            with capture_metrics() as otel_metrics:
                 pool = runtime_pool_source._pool
                 assert pool is not None
                 assert pool.get_stats().get("pool_size", 0) >= 1
+        finally:
+            runtime_pool_source.release(held)
+            runtime_pool_source.close()
 
-                otel_metrics.collect()
-                by_name: dict[str, list[dict[str, Any]]] = {
-                    name: [dict(p.attributes) for p in otel_metrics.points(name)]
-                    for name in (
-                        "db.client.connection.count",
-                        "db.client.connection.max",
-                        "db.client.connection.idle.min",
-                        "db.client.connection.idle.max",
-                        "db.client.connection.pending_requests",
-                    )
-                }
+        by_name: dict[str, list[dict[str, Any]]] = {
+            name: [dict(p.attributes or {}) for p in otel_metrics.number_points(name)]
+            for name in (
+                "db.client.connection.count",
+                "db.client.connection.max",
+                "db.client.connection.idle.min",
+                "db.client.connection.idle.max",
+                "db.client.connection.pending_requests",
+            )
+        }
 
-                count_attrs = by_name.get("db.client.connection.count", [])
-                states = {a.get("db.client.connection.state") for a in count_attrs}
-                assert "idle" in states, count_attrs
-                assert "used" in states, count_attrs
-                for a in count_attrs:
-                    assert a.get("db.client.connection.pool.name") == "runtime"
+        count_attrs = by_name.get("db.client.connection.count", [])
+        states = {a.get("db.client.connection.state") for a in count_attrs}
+        assert "idle" in states, count_attrs
+        assert "used" in states, count_attrs
+        for a in count_attrs:
+            assert a.get("db.client.connection.pool.name") == "runtime"
 
-                for name in (
-                    "db.client.connection.max",
-                    "db.client.connection.idle.min",
-                    "db.client.connection.idle.max",
-                    "db.client.connection.pending_requests",
-                ):
-                    attrs_list = by_name.get(name, [])
-                    assert attrs_list, f"no observations for {name}"
-                    for a in attrs_list:
-                        assert a.get("db.client.connection.pool.name") == "runtime"
-            finally:
-                runtime_pool_source.release(held)
-                runtime_pool_source.close()
+        for name in (
+            "db.client.connection.max",
+            "db.client.connection.idle.min",
+            "db.client.connection.idle.max",
+            "db.client.connection.pending_requests",
+        ):
+            attrs_list = by_name.get(name, [])
+            assert attrs_list, f"no observations for {name}"
+            for a in attrs_list:
+                assert a.get("db.client.connection.pool.name") == "runtime"
 
 
 class TestWaitTimeHistogram:
@@ -211,19 +205,17 @@ class TestWaitTimeHistogram:
                         runtime_pool_source.release(held)
                         release_event.set()
                         fut.result(timeout=3.0)
-
-                otel_metrics.collect()
-                points = otel_metrics.points("db.client.connection.wait_time")
-                relevant = [
-                    p
-                    for p in points
-                    if p.attributes.get("db.client.connection.pool.name") == "runtime"
-                ]
-                assert relevant, f"no wait_time observations; got {points}"
-                # Second acquire waited noticeably.
-                assert max(p.max for p in relevant) >= 0.1
             finally:
                 runtime_pool_source.close()
+
+        points = otel_metrics.histogram_points("db.client.connection.wait_time")
+        relevant = otel_metrics.histogram_points(
+            "db.client.connection.wait_time",
+            attributes={"db.client.connection.pool.name": "runtime"},
+        )
+        assert relevant, f"no wait_time observations; got {points}"
+        # Second acquire waited noticeably.
+        assert max(p.max for p in relevant) >= 0.1
 
 
 class TestTimeoutCounter:
@@ -242,15 +234,13 @@ class TestTimeoutCounter:
                             runtime_pool_source.acquire()
                     finally:
                         runtime_pool_source.release(held)
-
-                otel_metrics.collect()
-                points = otel_metrics.points("db.client.connection.timeouts")
-                relevant = [
-                    p
-                    for p in points
-                    if p.attributes.get("db.client.connection.pool.name") == "runtime"
-                ]
-                assert relevant, f"no timeouts observations; got {points}"
-                assert sum(p.value for p in relevant) >= 1
             finally:
                 runtime_pool_source.close()
+
+        points = otel_metrics.number_points("db.client.connection.timeouts")
+        relevant = otel_metrics.number_points(
+            "db.client.connection.timeouts",
+            attributes={"db.client.connection.pool.name": "runtime"},
+        )
+        assert relevant, f"no timeouts observations; got {points}"
+        assert sum(p.value for p in relevant) >= 1

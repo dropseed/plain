@@ -7,6 +7,10 @@ protection, not setup. There are two places one can come from, and no others.
 - Packages register a TestLifecycle subclass under the `plain.testing` entry
   point group.
 - The project declares its own in `tests/lifecycle.py`.
+
+A file that is there and wrong stops the run, and so does one that holds a
+lifecycle under a name the runner doesn't look for. Someone wrote it
+expecting it to protect their tests.
 """
 
 import importlib.util
@@ -17,11 +21,9 @@ from pathlib import Path
 
 from plain.test.lifecycle import TestLifecycle
 
-__all__ = [
-    "AppLifecycleError",
-    "load_app_lifecycle",
-    "load_package_lifecycles",
-]
+from .layout import find_tests_directory
+
+__all__ = []
 
 _APP_LIFECYCLE_MODULE_NAME = "plain_tests_app_lifecycle"
 
@@ -40,7 +42,7 @@ _APP_LIFECYCLE_EXAMPLE = (
 
 
 class AppLifecycleError(Exception):
-    """`tests/lifecycle.py` exists but doesn't declare a usable lifecycle."""
+    """The project's lifecycle file is wrong, or is somewhere it is never read."""
 
 
 def load_package_lifecycles() -> list[TestLifecycle]:
@@ -68,8 +70,43 @@ def app_lifecycle_path(root: Path) -> Path:
     `tests/app` runs from inside `tests/`, so there the root is that
     directory.
     """
-    tests_directory = root if root.name == "tests" else root / "tests"
-    return tests_directory / "lifecycle.py"
+    return find_tests_directory(root) / "lifecycle.py"
+
+
+def misplaced_app_lifecycle_paths(root: Path) -> list[Path]:
+    """
+    The places a project lifecycle gets written by mistake. The runner reads
+    none of them.
+    """
+    tests_directory = find_tests_directory(root)
+    paths = [
+        tests_directory / "lifecycles.py",
+        tests_directory / "life_cycle.py",
+        tests_directory / "lifecycle" / "__init__.py",
+    ]
+    if tests_directory != root:
+        # Beside `tests/` instead of inside it.
+        paths.append(root / "lifecycle.py")
+        paths.append(root / "lifecycles.py")
+    return paths
+
+
+def _check_for_a_misplaced_app_lifecycle(root: Path) -> None:
+    expected = app_lifecycle_path(root)
+    for path in misplaced_app_lifecycle_paths(root):
+        if not path.is_file():
+            continue
+        # A file with one of these names that never mentions TestLifecycle is
+        # something else, and none of the runner's business.
+        if "TestLifecycle" not in path.read_text(errors="replace"):
+            continue
+        raise AppLifecycleError(
+            f"{path} mentions TestLifecycle, but nothing reads it. A "
+            "project's lifecycle is found by its path, and the path is\n\n"
+            f"  {expected}\n\n"
+            "Move it there. If it isn't meant to be the project's lifecycle, "
+            "give the file another name."
+        )
 
 
 def load_app_lifecycle(root: Path) -> TestLifecycle | None:
@@ -81,14 +118,17 @@ def load_app_lifecycle(root: Path) -> TestLifecycle | None:
     subclass raises AppLifecycleError. It is never quietly ignored: someone
     wrote that file expecting it to protect their tests.
     """
+    _check_for_a_misplaced_app_lifecycle(root)
+
     path = app_lifecycle_path(root)
     if not path.exists():
         return None
 
-    # The file can import the project's test helpers, which are found from
-    # the root — the same root collection puts on sys.path.
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
+    # The file can import the project's helper modules by their bare names,
+    # from the same directory test files import them from.
+    helper_directory = str(find_tests_directory(root))
+    if helper_directory not in sys.path:
+        sys.path.insert(0, helper_directory)
 
     spec = importlib.util.spec_from_file_location(_APP_LIFECYCLE_MODULE_NAME, path)
     if spec is None or spec.loader is None:

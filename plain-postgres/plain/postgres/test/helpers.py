@@ -4,36 +4,98 @@ Database test helpers.
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 
-from opentelemetry.semconv.attributes.db_attributes import DB_QUERY_TEXT
-from plain.test import CapturedSpans
+from plain.test import Captured
 
 from ..db import get_connection
 
-__all__ = ["capture_queries", "max_queries", "span_sql_statements"]
+__all__ = ["CapturedQueries", "CapturedQuery", "capture_queries", "max_queries"]
+
+
+@dataclass(frozen=True)
+class CapturedQuery:
+    """One thing the database was asked to do during a `capture_queries` block."""
+
+    # The statement as it was sent: `%s` placeholders in place, values apart.
+    sql: str
+    # The same statement with the values filled in. An `executemany()` is one
+    # query here, prefixed with how many times it ran: "3 times: INSERT ...".
+    sql_with_params: str
+    # False for BEGIN, COMMIT and ROLLBACK, which the connection issues
+    # itself. A savepoint is a statement like any other.
+    is_statement: bool
+
+
+class CapturedQueries(Captured[CapturedQuery]):
+    """
+    What the database was asked to do during a `capture_queries` block, in
+    the order it was asked.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(helper="capture_queries")
+
+    def sql_statements(self, *, table: str | None = None) -> list[str]:
+        """
+        The statements as they were sent, with runs of whitespace collapsed
+        to single spaces — the form to compare against SQL written out in a
+        test.
+
+            with capture_queries() as queries:
+                cache.set_many({"a": 1, "b": 2})
+
+            [statement] = queries.sql_statements()
+            assert statement.startswith('INSERT INTO "plaincache_cacheditem"')
+
+        Savepoints are statements and are here. BEGIN, COMMIT and ROLLBACK
+        are not: the connection issues those itself.
+
+        Pass `table` to keep only the statements that name that table as a
+        quoted identifier: `table="users_user"` keeps the statements that
+        contain `"users_user"`.
+        """
+        statements = []
+        for query in self:
+            if not query.is_statement:
+                continue
+            statement = " ".join(query.sql.split())
+            if table is not None and f'"{table}"' not in statement:
+                continue
+            statements.append(statement)
+        return statements
 
 
 @contextmanager
-def capture_queries() -> Generator[list[dict]]:
+def capture_queries() -> Generator[CapturedQueries]:
     """
-    Record the SQL executed within the block.
+    What the database is asked to do within the block.
 
         with capture_queries() as queries:
-            list(qs)
-        assert len(queries) == 1
+            list(Article.query.all())
 
-    The yielded list is populated when the block exits with the executed
-    query dicts (each has a "sql" key), so inspect it after the `with`.
+        assert len(queries) == 1
+        assert queries[0].sql.startswith("SELECT")
+
+    It records at the connection, so it sees every query whether or not the
+    query is traced.
     """
     conn = get_connection()
     previous = conn.force_debug_cursor
     conn.force_debug_cursor = True
     conn.queries_log.clear()
-    captured: list[dict] = []
+    captured = CapturedQueries()
     try:
         yield captured
     finally:
-        captured.extend(conn.queries_log)
+        captured._finish(
+            CapturedQuery(
+                sql=entry.get("sql_as_sent", entry["sql"]),
+                sql_with_params=entry["sql"],
+                is_statement="sql_as_sent" in entry,
+            )
+            for entry in conn.queries_log
+        )
         conn.force_debug_cursor = previous
 
 
@@ -51,35 +113,7 @@ def max_queries(count: int) -> Generator[None]:
         yield
     executed = len(queries)
     if executed > count:
-        sql_lines = "\n".join(f"  {q['sql']}" for q in queries)
+        sql_lines = "\n".join(f"  {query.sql_with_params}" for query in queries)
         raise AssertionError(
             f"Expected at most {count} queries, {executed} were executed:\n{sql_lines}"
         )
-
-
-def span_sql_statements(spans: CapturedSpans, *, table: str | None = None) -> list[str]:
-    """
-    The SQL statements the captured database spans carry, in the order they ran.
-
-        with capture_spans() as spans:
-            store.save()
-        assert span_sql_statements(spans)[0].startswith("INSERT")
-
-    Each statement is the span's `db.query.text` -- the SQL as sent, with its
-    `%s` placeholders rather than interpolated values -- with runs of
-    whitespace collapsed to single spaces. Spans that carry no SQL (a request
-    span, say) are skipped.
-
-    Pass `table` to keep only the statements that mention that table, as the
-    quoted identifier: `table="users_user"` keeps statements containing
-    `"users_user"`.
-    """
-    statements = []
-    for span in spans.get_finished_spans():
-        if not span.attributes or DB_QUERY_TEXT not in span.attributes:
-            continue
-        statement = " ".join(str(span.attributes[DB_QUERY_TEXT]).split())
-        if table is not None and f'"{table}"' not in statement:
-            continue
-        statements.append(statement)
-    return statements

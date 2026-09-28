@@ -201,10 +201,8 @@ def _with_db_middleware():
 
 
 def _fresh_client():
-    """Create a Client with a fresh middleware chain."""
+    """A new Client, which builds its middleware chain at its first request."""
     client = Client(raise_request_exception=True)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
     return client
 
 

@@ -10,6 +10,7 @@ import secrets
 from datetime import timedelta
 from typing import Any
 
+from plain.auth.test import login_client
 from plain.test import Client
 from plain.utils import timezone
 
@@ -34,7 +35,7 @@ def make_public_app() -> Any:
 
 def login_as(user: Any) -> Client:
     client = Client()
-    client.force_login(user)
+    login_client(client, user)
     return client
 
 

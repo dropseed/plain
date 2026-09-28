@@ -8,7 +8,8 @@ Two things about how the statements are captured:
 
 1. `_claim_job()` runs inside `suppress_db_tracing()`, so `capture_spans()`
    sees nothing for it (pinned below). Statements are captured with
-   `connection.execute_wrapper()` instead, which suppression doesn't touch.
+   `capture_queries()`, which records at the connection and so isn't
+   affected by what is traced.
 2. Every test already runs inside a transaction, so the
    claim's `transaction.atomic()` opens a SAVEPOINT rather than a BEGIN.
    In production the claim's atomic block is the outermost one.
@@ -22,23 +23,12 @@ from contextlib import contextmanager
 from plain.jobs.models import JobRequest
 from plain.jobs.workers import Worker
 from plain.postgres.db import get_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.test import capture_queries, isolated_db
 from plain.test import capture_spans
 from plain.utils import timezone
 
 CLAIM_SELECT_TABLE = 'FROM "plainjobs_jobrequest"'
 CLAIM_LOCK_CLAUSE = "FOR UPDATE SKIP LOCKED"
-
-
-class StatementRecorder:
-    """Records every statement executed on a connection, in order."""
-
-    def __init__(self) -> None:
-        self.statements: list[str] = []
-
-    def __call__(self, execute, sql, params, many, context):
-        self.statements.append(" ".join(str(sql).split()))
-        return execute(sql, params, many, context)
 
 
 @contextmanager
@@ -65,18 +55,14 @@ def test_claim_statements_when_a_job_is_pending() -> None:
         created_at=now - datetime.timedelta(minutes=1),
     )
 
-    recorder = StatementRecorder()
-    with (
-        default_queue_worker() as worker,
-        get_connection().execute_wrapper(recorder),
-    ):
+    with default_queue_worker() as worker, capture_queries() as queries:
         job_process = worker._claim_job()
 
     # Highest priority first — the claim's ordering decides which job runs.
     assert job_process is not None
     assert job_process.job_class == "app.High"
 
-    statements = recorder.statements
+    statements = queries.sql_statements()
     assert len(statements) == 7
 
     assert statements[0].startswith("SAVEPOINT ")
@@ -102,16 +88,12 @@ def test_claim_statements_when_a_job_is_pending() -> None:
 
 
 def test_claim_statements_when_no_job_is_pending() -> None:
-    recorder = StatementRecorder()
-    with (
-        default_queue_worker() as worker,
-        get_connection().execute_wrapper(recorder),
-    ):
+    with default_queue_worker() as worker, capture_queries() as queries:
         job_process = worker._claim_job()
 
     assert job_process is None
 
-    statements = recorder.statements
+    statements = queries.sql_statements()
     assert len(statements) == 3
     assert statements[0].startswith("SAVEPOINT ")
     assert statements[1].startswith("SELECT ")
@@ -127,12 +109,12 @@ def test_claim_emits_no_database_spans() -> None:
     with default_queue_worker() as worker:
         with capture_spans() as create_spans:
             JobRequest.query.create(job_class="app.Any", queue="default")
-        assert create_spans.get_finished_spans(), "ordinary queries do emit spans"
+        assert create_spans, "ordinary queries do emit spans"
 
         with capture_spans() as claim_spans:
             assert worker._claim_job() is not None
 
-        assert claim_spans.get_finished_spans() == ()
+        assert list(claim_spans) == []
 
 
 @isolated_db

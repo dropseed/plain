@@ -1,6 +1,7 @@
 from app.users.models import User
 from plain.admin.views.base import AdminView
 from plain.admin.views.registry import registry
+from plain.auth.test import login_client
 from plain.test import Client, override_settings
 
 
@@ -11,7 +12,7 @@ def test_admin_login_required():
     assert client.get("/admin").status_code == 302
 
     user = User.query.create(username="test")
-    client.force_login(user)
+    login_client(client, user)
 
     # Not admin yet
     assert client.get("/admin").status_code == 404
@@ -22,7 +23,8 @@ def test_admin_login_required():
     # Now admin — redirected into the admin (to the first registered list view)
     resp = client.get("/admin")
     assert resp.status_code == 302
-    assert resp.url.startswith("/admin/p/")
+    assert resp.redirect_to is not None
+    assert resp.redirect_to.startswith("/admin/p/")
 
 
 def test_has_permission_on_view():
@@ -71,7 +73,7 @@ def test_ui_view_renders():
     """The UI catalog page renders for an admin user."""
     user = User.query.create(username="admin", is_admin=True)
     client = Client()
-    client.force_login(user)
+    login_client(client, user)
 
     resp = client.get("/admin/ui")
     assert resp.status_code == 200

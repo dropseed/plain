@@ -1,12 +1,12 @@
 from contextlib import contextmanager
 
 from plain.test import TestLifecycle, raises, skip, skip_test
-from plain.testing.collection import CollectedTest
+from plain.testing.collection import RunnableTest
 from plain.testing.runner import run_tests
 
 
 def make_test(func, id="test_x.py::test_x", tags=(), skip_reason=None):
-    return CollectedTest(id=id, func=func, tags=tags, skip_reason=skip_reason)
+    return RunnableTest(id=id, func=func, tags=tags, skip_reason=skip_reason)
 
 
 class RecordingLifecycle(TestLifecycle):

@@ -7,6 +7,7 @@ can't be impersonated, and stopping restores the original user.
 
 from app.users.models import User
 from plain.auth.requests import get_request_user
+from plain.auth.test import login_client
 from plain.test import Client
 
 
@@ -26,7 +27,7 @@ def test_admin_can_impersonate_regular_user():
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
 
     started = client.get(f"/admin/impersonate/start/{target.id}")
     assert started.status_code == 302
@@ -41,7 +42,7 @@ def test_stopping_impersonation_restores_original_user():
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
     client.get(f"/admin/impersonate/start/{target.id}")
     assert acting_user_id(client.get("/whoami")) == target.id
 
@@ -57,7 +58,7 @@ def test_non_admin_cannot_start_impersonation():
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(regular)
+    login_client(client, regular)
 
     started = client.get(f"/admin/impersonate/start/{target.id}")
     assert started.status_code == 403
@@ -71,7 +72,7 @@ def test_admin_users_cannot_be_impersonated():
     other_admin = User.query.create(username="other_admin", is_admin=True)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
 
     # The start view sets the session marker, but the middleware refuses to
     # swap to an admin target and clears it.

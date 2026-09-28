@@ -8,13 +8,18 @@ comparison instead of a bare AssertionError.
 The rewrite is deliberately narrow: single-operator comparisons get rich
 output; everything else falls back to showing the asserted expression source.
 Each operand is evaluated exactly once, preserving the original semantics.
+
+The expression is shown the way the test file wrote it, taken from the file's
+own text. Regenerating it from the syntax tree drops parentheses, and
+`("@" in email) is valid` without them is a different expression.
 """
 
 import ast
 import reprlib
+import textwrap
 from typing import Any
 
-__all__ = ["format_compare", "format_truth", "rewrite_asserts"]
+__all__ = []
 
 # Names injected into rewritten test modules. Unique and greppable.
 _FORMAT_COMPARE = "__plain_testing_format_compare__"
@@ -22,18 +27,19 @@ _FORMAT_TRUTH = "__plain_testing_format_truth__"
 _LEFT = "__plain_testing_left__"
 _RIGHT = "__plain_testing_right__"
 
-_OP_SYMBOLS: dict[type[ast.cmpop], str] = {
-    ast.Eq: "==",
-    ast.NotEq: "!=",
-    ast.Lt: "<",
-    ast.LtE: "<=",
-    ast.Gt: ">",
-    ast.GtE: ">=",
-    ast.Is: "is",
-    ast.IsNot: "is not",
-    ast.In: "in",
-    ast.NotIn: "not in",
-}
+# The comparisons that get `left:` and `right:` values on failure.
+_COMPARISONS: tuple[type[ast.cmpop], ...] = (
+    ast.Eq,
+    ast.NotEq,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.Is,
+    ast.IsNot,
+    ast.In,
+    ast.NotIn,
+)
 
 _repr = reprlib.Repr()
 _repr.maxstring = 400
@@ -42,18 +48,11 @@ _repr.maxlist = 20
 _repr.maxdict = 20
 
 
-def format_compare(
-    left_source: str,
-    op: str,
-    right_source: str,
-    left: Any,
-    right: Any,
-    msg: Any = None,
-) -> str:
+def format_compare(source: str, left: Any, right: Any, msg: Any = None) -> str:
     lines = []
     if msg is not None:
         lines.append(str(msg))
-    lines.append(f"assert {left_source} {op} {right_source}")
+    lines.append(f"assert {source}")
     lines.append(f"  left:  {_repr.repr(left)}")
     lines.append(f"  right: {_repr.repr(right)}")
     return "\n".join(lines)
@@ -66,6 +65,17 @@ def format_truth(source: str, msg: Any = None) -> str:
 
 
 class _AssertRewriter(ast.NodeTransformer):
+    def __init__(self, source: str) -> None:
+        self.source = source
+
+    def _source_as_written(self, node: ast.expr) -> str:
+        # padded: a continuation line keeps its indentation relative to the
+        # first, so an expression written over several lines keeps its shape.
+        written = ast.get_source_segment(self.source, node, padded=True)
+        if written is None:
+            return ast.unparse(node)
+        return textwrap.dedent(written).strip()
+
     def visit_Assert(self, node: ast.Assert) -> list[ast.stmt] | ast.stmt:
         test = node.test
         msg_expr = node.msg if node.msg is not None else ast.Constant(value=None)
@@ -73,7 +83,7 @@ class _AssertRewriter(ast.NodeTransformer):
         if (
             isinstance(test, ast.Compare)
             and len(test.ops) == 1
-            and type(test.ops[0]) in _OP_SYMBOLS
+            and isinstance(test.ops[0], _COMPARISONS)
         ):
             return self._rewrite_compare(node, test, msg_expr)
 
@@ -82,9 +92,7 @@ class _AssertRewriter(ast.NodeTransformer):
     def _rewrite_compare(
         self, node: ast.Assert, test: ast.Compare, msg_expr: ast.expr
     ) -> list[ast.stmt]:
-        op_symbol = _OP_SYMBOLS[type(test.ops[0])]
-        left_source = ast.unparse(test.left)
-        right_source = ast.unparse(test.comparators[0])
+        source = self._source_as_written(test)
 
         assign_left = ast.Assign(
             targets=[ast.Name(id=_LEFT, ctx=ast.Store())],
@@ -106,9 +114,7 @@ class _AssertRewriter(ast.NodeTransformer):
                     ast.Call(
                         func=ast.Name(id=_FORMAT_COMPARE, ctx=ast.Load()),
                         args=[
-                            ast.Constant(value=left_source),
-                            ast.Constant(value=op_symbol),
-                            ast.Constant(value=right_source),
+                            ast.Constant(value=source),
                             ast.Name(id=_LEFT, ctx=ast.Load()),
                             ast.Name(id=_RIGHT, ctx=ast.Load()),
                             msg_expr,
@@ -135,7 +141,7 @@ class _AssertRewriter(ast.NodeTransformer):
     def _rewrite_truth(
         self, node: ast.Assert, test: ast.expr, msg_expr: ast.expr
     ) -> ast.stmt:
-        source = ast.unparse(test)
+        source = self._source_as_written(test)
         raise_stmt = ast.Raise(
             exc=ast.Call(
                 func=ast.Name(id="AssertionError", ctx=ast.Load()),
@@ -160,9 +166,12 @@ class _AssertRewriter(ast.NodeTransformer):
         return check
 
 
-def rewrite_asserts(tree: ast.Module) -> ast.Module:
-    """Rewrite asserts in a parsed test module and inject the formatters."""
-    tree = _AssertRewriter().visit(tree)
+def rewrite_asserts(tree: ast.Module, *, source: str) -> ast.Module:
+    """
+    Rewrite asserts in a parsed test module and inject the formatters.
+    `source` is the text `tree` was parsed from.
+    """
+    tree = _AssertRewriter(source).visit(tree)
 
     # Inject the formatter imports after any docstring and __future__ imports.
     insert_at = 0

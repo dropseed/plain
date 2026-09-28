@@ -21,41 +21,38 @@ from contextlib import contextmanager
 from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
 from plain.runtime import settings
-from plain.test import Client, capture_logs
-from plain.test.otel import install_test_tracer
+from plain.test import CapturedSpans, Client, capture_logs, capture_spans
 from plain.urls.resolvers import _get_cached_resolver
-
-_span_exporter = install_test_tracer()
 
 
 @contextmanager
 def app_router():
-    """Stand up the default app router and drain spans before the test runs."""
+    """Stand up the default app router."""
     original = settings.URLS_ROUTER
     settings.URLS_ROUTER = "app.urls.AppRouter"
     _get_cached_resolver.cache_clear()
-    _span_exporter.clear()
     try:
-        yield _span_exporter
+        yield
     finally:
         settings.URLS_ROUTER = original
         _get_cached_resolver.cache_clear()
 
 
-def _request_span(spans):
+def _request_span(spans: CapturedSpans):
     """Return the SERVER span that carries `url.path`."""
-    for span in spans.get_finished_spans():
-        if url_attributes.URL_PATH in span.attributes:
+    for span in spans:
+        if url_attributes.URL_PATH in (span.attributes or {}):
             return span
     raise AssertionError("No span with url.path attribute found")
 
 
 def test_otel_url_path_records_request_path():
     """`GET /` → `url.path` span attribute is `/` (request.path)."""
-    with app_router() as spans:
+    with app_router(), capture_spans() as spans:
         Client().get("/")
-        span = _request_span(spans)
-        assert span.attributes[url_attributes.URL_PATH] == "/"
+
+    span = _request_span(spans)
+    assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
 def test_otel_url_path_is_unnormalized():
@@ -66,10 +63,11 @@ def test_otel_url_path_is_unnormalized():
     and the recorded value reflects that — same final value, different
     provenance.
     """
-    with app_router() as spans:
+    with app_router(), capture_spans() as spans:
         Client().get("///")
-        span = _request_span(spans)
-        assert span.attributes[url_attributes.URL_PATH] == "/"
+
+    span = _request_span(spans)
+    assert span.attributes[url_attributes.URL_PATH] == "/"
 
 
 def test_exception_log_records_request_path():

@@ -159,9 +159,15 @@ def test_cart_is_remembered():
     assert session["cart"] == ["A-1"]
 ```
 
-If the client has no session yet, one is created and its cookie is set on the client. To change the session, set the value and call `session.save()`.
+If the client has no session yet, one is created and its cookie is set on the client. To change the session, set the value and call `session.save()`:
 
-`client.session` on the [test client](../../../plain/plain/test/README.md#sessions) returns the same thing.
+```python
+session = get_client_session(client)
+session["theme"] = "dark"
+session.save()
+
+response = client.get("/")  # the view sees session["theme"]
+```
 
 ## FAQs
 

@@ -40,7 +40,9 @@ def test_close_against_a_view_that_never_reads_does_not_hang() -> None:
 def test_rejection_carries_the_response() -> None:
     with raises(WebSocketRejected) as caught:
         Client().websocket("/websocket/forbidden")
-    assert caught.exception.response.status_code == 403
+    response = caught.exception.response
+    assert response.status_code == 403
+    assert response.request.path == "/websocket/forbidden"
 
 
 def test_subprotocol_is_negotiated() -> None:
@@ -76,4 +78,4 @@ def test_view_closing_the_socket_raises_websocket_closed_on_receive() -> None:
 
 def test_query_params_reach_the_handshake_request() -> None:
     with Client().websocket("/websocket/echo", query_params={"room": "7"}) as ws:
-        assert ws.response.request.query_params["room"] == "7"
+        assert ws.request.query_params["room"] == "7"

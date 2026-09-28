@@ -10,6 +10,8 @@ from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from typing import Any
 
+from .exceptions import require_app
+
 __all__ = ["override_settings", "patch"]
 
 _MISSING = object()
@@ -25,6 +27,8 @@ def override_settings(**overrides: Any) -> Generator[Any]:
             ...
     """
     from plain.runtime import settings
+
+    require_app("override_settings")
 
     # Snapshot every original value before applying anything, so an unknown
     # setting name raises without leaving earlier overrides applied. The
