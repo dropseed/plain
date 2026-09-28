@@ -8,11 +8,11 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-import pytest
 from plain.http import WebSocket, WebSocketClosed
 from plain.http import websocket as websocket_module
 from plain.http.websocket import PING_INTERVAL, PING_TIMEOUT
 from plain.http.websocket_frames import OP_CLOSE, OP_PING, OP_PONG, OP_TEXT
+from plain.test import patch, raises
 from server_stubs import StubApp, socketpair_connection
 from websocket_helpers import client_close, client_frame, close_code, read_server_frame
 
@@ -103,9 +103,9 @@ def test_send_after_close_raises_with_the_close_code() -> None:
             async for _ in ws:
                 raise AssertionError("no messages were sent")
             assert (ws.close_code, ws.close_reason) == (4000, "bye")
-            with pytest.raises(WebSocketClosed) as excinfo:
+            with raises(WebSocketClosed) as caught:
                 await ws.send("too late")
-            assert (excinfo.value.code, excinfo.value.reason) == (4000, "bye")
+            assert (caught.exception.code, caught.exception.reason) == (4000, "bye")
 
     asyncio.run(run())
 
@@ -117,9 +117,9 @@ def test_peer_vanishing_ends_iteration_and_send_raises_1006() -> None:
             async for _ in ws:
                 raise AssertionError("no messages were sent")
             assert ws.closed
-            with pytest.raises(WebSocketClosed) as excinfo:
+            with raises(WebSocketClosed) as caught:
                 await ws.send("anyone?")
-            assert excinfo.value.code == 1006
+            assert caught.exception.code == 1006
 
     asyncio.run(run())
 
@@ -197,31 +197,24 @@ class _StuckTransport:
         self.aborted.set()
 
 
-def test_send_to_a_peer_that_stopped_reading_aborts_the_transport(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(websocket_module, "WRITE_TIMEOUT", 0.05)
-
+def test_send_to_a_peer_that_stopped_reading_aborts_the_transport() -> None:
     async def run() -> None:
         transport = _StuckTransport()
         ws = WebSocket(transport, max_message_size=1024, ping_interval=3600)
         async with ws:
-            with pytest.raises(WebSocketClosed) as excinfo:
+            with raises(WebSocketClosed) as caught:
                 await ws.send(b"x" * 10)
-            assert excinfo.value.code == 1006
+            assert caught.exception.code == 1006
             assert transport.aborted.is_set()
             assert ws.closed
 
-    asyncio.run(run())
+    with patch(websocket_module, "WRITE_TIMEOUT", 0.05):
+        asyncio.run(run())
 
 
-def test_ping_timeout_behind_a_stuck_send_still_ends_the_socket(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_ping_timeout_behind_a_stuck_send_still_ends_the_socket() -> None:
     """A view mid-`send` to a dead peer holds the write lock; the keepalive
     must end the socket anyway rather than queue behind it."""
-    monkeypatch.setattr(websocket_module, "WRITE_TIMEOUT", 10.0)
-    monkeypatch.setattr(websocket_module, "CLOSE_TIMEOUT", 0.05)
 
     async def run() -> None:
         transport = _StuckTransport()
@@ -232,10 +225,14 @@ def test_ping_timeout_behind_a_stuck_send_still_ends_the_socket(
             sender = asyncio.create_task(ws.send(b"stuck"))
             await asyncio.wait_for(ws.wait_closed(), 2)
             assert transport.aborted.is_set()
-            with pytest.raises(WebSocketClosed):
+            with raises(WebSocketClosed):
                 await sender
 
-    asyncio.run(run())
+    with (
+        patch(websocket_module, "WRITE_TIMEOUT", 10.0),
+        patch(websocket_module, "CLOSE_TIMEOUT", 0.05),
+    ):
+        asyncio.run(run())
 
 
 def test_full_receive_buffer_closes_with_1008_at_the_next_ping() -> None:
@@ -286,11 +283,11 @@ def test_a_send_cancelled_mid_frame_ends_the_socket() -> None:
             while transport.chunks < 2:
                 await asyncio.sleep(0)
             sending.cancel()
-            with pytest.raises(asyncio.CancelledError):
+            with raises(asyncio.CancelledError):
                 await sending
             assert ws.closed
             assert transport.aborted.is_set()
-            with pytest.raises(WebSocketClosed):
+            with raises(WebSocketClosed):
                 await ws.send("next")
 
     asyncio.run(run())

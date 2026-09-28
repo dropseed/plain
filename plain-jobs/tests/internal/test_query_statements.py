@@ -6,21 +6,24 @@ you decide whether it should have.
 
 Two things about how the statements are captured:
 
-1. `_claim_job()` runs inside `suppress_db_tracing()`, so the `otel_spans`
-   fixture sees nothing for it (pinned below). Statements are captured with
+1. `_claim_job()` runs inside `suppress_db_tracing()`, so `capture_spans()`
+   sees nothing for it (pinned below). Statements are captured with
    `connection.execute_wrapper()` instead, which suppression doesn't touch.
-2. The `db` fixture already holds the test inside a transaction, so the
+2. Every test already runs inside a transaction, so the
    claim's `transaction.atomic()` opens a SAVEPOINT rather than a BEGIN.
    In production the claim's atomic block is the outermost one.
 """
 
 import datetime
 import threading
+from collections.abc import Generator
+from contextlib import contextmanager
 
-import pytest
 from plain.jobs.models import JobRequest
 from plain.jobs.workers import Worker
 from plain.postgres.db import get_connection
+from plain.postgres.test import isolated_db
+from plain.test import capture_spans
 from plain.utils import timezone
 
 CLAIM_SELECT_TABLE = 'FROM "plainjobs_jobrequest"'
@@ -38,8 +41,8 @@ class StatementRecorder:
         return execute(sql, params, many, context)
 
 
-@pytest.fixture
-def worker():
+@contextmanager
+def default_queue_worker() -> Generator[Worker]:
     w = Worker(queues=["default"], max_processes=1)
     try:
         yield w
@@ -47,7 +50,7 @@ def worker():
         w.executor.shutdown(wait=False, cancel_futures=True)
 
 
-def test_claim_statements_when_a_job_is_pending(db, worker) -> None:
+def test_claim_statements_when_a_job_is_pending() -> None:
     now = timezone.now()
     JobRequest.query.create(
         job_class="app.Low", priority=1, queue="default", created_at=now
@@ -63,7 +66,10 @@ def test_claim_statements_when_a_job_is_pending(db, worker) -> None:
     )
 
     recorder = StatementRecorder()
-    with get_connection().execute_wrapper(recorder):
+    with (
+        default_queue_worker() as worker,
+        get_connection().execute_wrapper(recorder),
+    ):
         job_process = worker._claim_job()
 
     # Highest priority first — the claim's ordering decides which job runs.
@@ -95,9 +101,12 @@ def test_claim_statements_when_a_job_is_pending(db, worker) -> None:
     assert statements[6].startswith("RELEASE SAVEPOINT ")
 
 
-def test_claim_statements_when_no_job_is_pending(db, worker) -> None:
+def test_claim_statements_when_no_job_is_pending() -> None:
     recorder = StatementRecorder()
-    with get_connection().execute_wrapper(recorder):
+    with (
+        default_queue_worker() as worker,
+        get_connection().execute_wrapper(recorder),
+    ):
         job_process = worker._claim_job()
 
     assert job_process is None
@@ -111,20 +120,23 @@ def test_claim_statements_when_no_job_is_pending(db, worker) -> None:
     assert statements[2].startswith("RELEASE SAVEPOINT ")
 
 
-def test_claim_emits_no_database_spans(db, worker, otel_spans) -> None:
+def test_claim_emits_no_database_spans() -> None:
     """The claim polls every ~1s outside any entry span, so the worker
     suppresses its tracing. An ordinary query emits a CLIENT span; the
     claim emits none."""
-    JobRequest.query.create(job_class="app.Any", queue="default")
-    assert otel_spans.get_finished_spans(), "ordinary queries do emit spans"
+    with default_queue_worker() as worker:
+        with capture_spans() as create_spans:
+            JobRequest.query.create(job_class="app.Any", queue="default")
+        assert create_spans.get_finished_spans(), "ordinary queries do emit spans"
 
-    otel_spans.clear()
-    assert worker._claim_job() is not None
+        with capture_spans() as claim_spans:
+            assert worker._claim_job() is not None
 
-    assert otel_spans.get_finished_spans() == ()
+        assert claim_spans.get_finished_spans() == ()
 
 
-def test_two_workers_racing_for_one_job(isolated_db) -> None:
+@isolated_db
+def test_two_workers_racing_for_one_job() -> None:
     """`SKIP LOCKED` means the loser walks away empty-handed instead of
     blocking on the winner's lock.
 

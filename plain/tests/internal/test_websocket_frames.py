@@ -10,7 +10,6 @@ reader's promise that it survives a `recv` that hands back one byte at a time.
 import asyncio
 import struct
 
-import pytest
 from plain.http.websocket import select_subprotocol
 from plain.http.websocket_frames import (
     CLOSE_NO_STATUS,
@@ -34,6 +33,7 @@ from plain.http.websocket_frames import (
     parse_close_payload,
     read_frame,
 )
+from plain.test import cases, raises
 
 MAX_PAYLOAD = 1024 * 1024
 
@@ -178,7 +178,7 @@ class TestApplyMask:
         mask = b"\x12\x34\x56\x78"
         assert apply_mask(apply_mask(b"12345678", mask), mask) == b"12345678"
 
-    @pytest.mark.parametrize("size", [1, 7, 8, 9, 15, 16, 17, 2000])
+    @cases(1, 7, 8, 9, 15, 16, 17, 2000)
     def test_roundtrip_across_the_chunk_boundary(self, size):
         """The repeated mask must line up for every payload length, including the `n % 4` tail."""
         mask = b"\xde\xad\xbe\xef"
@@ -190,7 +190,7 @@ class TestApplyMask:
         assert masked == bytes(b ^ mask[i % 4] for i, b in enumerate(data))
 
     def test_invalid_mask_length(self):
-        with pytest.raises(ValueError, match="4 bytes"):
+        with raises(ValueError, match="4 bytes"):
             apply_mask(b"data", b"\x01\x02\x03")
 
 
@@ -217,20 +217,20 @@ class TestClosePayload:
         assert result.reason == ""
 
     def test_single_byte(self):
-        with pytest.raises(ProtocolError, match="at least 2 bytes"):
+        with raises(ProtocolError, match="at least 2 bytes"):
             parse_close_payload(b"\x00")
 
-    @pytest.mark.parametrize("code", [0, 999, 1004, 1005, 1006, 1015, 2999, 5000])
+    @cases(0, 999, 1004, 1005, 1006, 1015, 2999, 5000)
     def test_reserved_and_out_of_range_codes(self, code):
-        with pytest.raises(ProtocolError, match="Invalid close code"):
+        with raises(ProtocolError, match="Invalid close code"):
             parse_close_payload(struct.pack("!H", code))
 
-    @pytest.mark.parametrize("code", [1000, 1003, 1007, 1014, 3000, 3999, 4000, 4999])
+    @cases(1000, 1003, 1007, 1014, 3000, 3999, 4000, 4999)
     def test_accepted_codes(self, code):
         assert parse_close_payload(struct.pack("!H", code)).code == code
 
     def test_invalid_utf8_reason(self):
-        with pytest.raises(ProtocolError, match="Invalid UTF-8"):
+        with raises(ProtocolError, match="Invalid UTF-8"):
             parse_close_payload(struct.pack("!H", 1000) + b"\xff\xfe")
 
     def test_is_valid_close_code_table(self):
@@ -356,39 +356,39 @@ class TestReadFrame:
         assert second == Frame(fin=True, opcode=OP_CONTINUATION, payload=b"lo")
 
     def test_reject_unmasked_frame(self):
-        with pytest.raises(ProtocolError, match="not masked"):
+        with raises(ProtocolError, match="not masked"):
             _read_one(bytes([0x81, 0x05]) + b"hello")
 
-    @pytest.mark.parametrize("first_byte", [0xC1, 0xA1, 0x91])
+    @cases(0xC1, 0xA1, 0x91)
     def test_reject_rsv_bits(self, first_byte):
         """RSV1 too — no extension is ever negotiated."""
-        with pytest.raises(ProtocolError, match="RSV"):
+        with raises(ProtocolError, match="RSV"):
             _read_one(bytes([first_byte, 0x80, 0x01, 0x02, 0x03, 0x04]))
 
     def test_reject_unknown_opcode(self):
-        with pytest.raises(ProtocolError, match="Unknown opcode"):
+        with raises(ProtocolError, match="Unknown opcode"):
             _read_one(bytes([0x85, 0x80, 0x01, 0x02, 0x03, 0x04]))
 
     def test_reject_fragmented_control_frame(self):
-        with pytest.raises(ProtocolError, match="Fragmented control"):
+        with raises(ProtocolError, match="Fragmented control"):
             _read_one(_make_masked_frame(OP_PING, b"", fin=False))
 
     def test_reject_oversized_control_frame(self):
         data = _make_masked_frame(OP_PING, b"x" * (MAX_CONTROL_PAYLOAD + 1))
-        with pytest.raises(ProtocolError, match="Control frame payload too long"):
+        with raises(ProtocolError, match="Control frame payload too long"):
             _read_one(data)
 
     def test_reject_64_bit_length_with_high_bit_set(self):
         header = bytes([0x82, 0xFF]) + struct.pack("!Q", 1 << 63)
-        with pytest.raises(ProtocolError, match="high bit"):
+        with raises(ProtocolError, match="high bit"):
             _read_one(header)
 
     def test_payload_over_max_is_rejected(self):
         data = _make_masked_frame(OP_BINARY, b"x" * 200)
-        with pytest.raises(PayloadTooLarge) as excinfo:
+        with raises(PayloadTooLarge) as caught:
             _read_one(data, max_payload=100)
-        assert excinfo.value.length == 200
-        assert excinfo.value.max_payload == 100
+        assert caught.exception.length == 200
+        assert caught.exception.max_payload == 100
 
     def test_payload_too_large_is_a_protocol_error(self):
         # A size cap is policy, not a protocol violation: 1009, never 1002.
@@ -399,28 +399,28 @@ class TestReadFrame:
         header = bytes([0x82, 0xFF]) + struct.pack("!Q", 4 * 1024**3)
         recv = _Recv(header + b"\x01\x02\x03\x04")
 
-        with pytest.raises(PayloadTooLarge) as excinfo:
+        with raises(PayloadTooLarge) as caught:
             asyncio.run(read_frame(recv, 1024))
 
-        assert excinfo.value.length == 4 * 1024**3
+        assert caught.exception.length == 4 * 1024**3
         # Two header bytes plus the eight length bytes — the mask and payload
         # were never asked for.
         assert recv.handed_out == 10
 
     def test_eof_at_frame_boundary(self):
-        with pytest.raises(IncompleteFrame):
+        with raises(IncompleteFrame):
             _read_one(b"")
 
     def test_eof_mid_header(self):
-        with pytest.raises(IncompleteFrame):
+        with raises(IncompleteFrame):
             _read_one(_make_masked_frame(OP_TEXT, b"hello")[:4])
 
     def test_eof_mid_payload(self):
-        with pytest.raises(IncompleteFrame):
+        with raises(IncompleteFrame):
             _read_one(_make_masked_frame(OP_TEXT, b"hello")[:-2])
 
     def test_eof_mid_extended_length(self):
-        with pytest.raises(IncompleteFrame):
+        with raises(IncompleteFrame):
             _read_one(bytes([0x82, 0xFF, 0x00, 0x00]))
 
 
@@ -481,7 +481,7 @@ def test_short_read_sweep():
             ]
             assert frames == SWEEP_EXPECTED, f"chunk size {chunk}"
             assert recv.handed_out == len(SWEEP_STREAM), f"chunk size {chunk}"
-            with pytest.raises(IncompleteFrame):
+            with raises(IncompleteFrame):
                 await read_frame(recv, MAX_PAYLOAD)
 
     asyncio.run(run())

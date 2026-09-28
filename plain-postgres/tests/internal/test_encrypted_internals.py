@@ -6,13 +6,13 @@ through SECRET_KEY_FALLBACKS) is asserted through the model in
 `tests/public/test_encrypted_fields.py`. These pin the mechanism.
 """
 
-import pytest
 from plain.postgres.fields.encrypted import (
     _ENCRYPTED_PREFIX,
     _decrypt,
     _encrypt,
     _get_fernet,
 )
+from plain.test import raises
 
 
 class TestEncryptDecryptFunctions:
@@ -38,7 +38,7 @@ class TestEncryptDecryptFunctions:
 
     def test_decrypt_invalid_token_raises(self):
         """Corrupted encrypted data should raise a clear error."""
-        with pytest.raises(ValueError, match="Could not decrypt"):
+        with raises(ValueError, match="Could not decrypt"):
             _decrypt(_ENCRYPTED_PREFIX + "not-valid-fernet-data")
 
     def test_encrypt_empty_string(self):

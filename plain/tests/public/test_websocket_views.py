@@ -7,10 +7,9 @@ cross-origin rule apply before the socket exists, and middleware still
 gets its say on the response.
 """
 
-import pytest
 from middleware_helpers import fresh_client
 from plain.runtime import settings
-from plain.test import Client
+from plain.test import Client, cases, raises
 from plain.views import View
 from websocket_helpers import upgrade_headers
 
@@ -41,10 +40,7 @@ def test_plain_get_to_a_socket_only_view_is_405_without_leaking_the_handler() ->
     assert response.headers["Allow"] == "OPTIONS"
 
 
-@pytest.mark.parametrize(
-    "missing",
-    ["Upgrade", "Connection", "Sec-WebSocket-Version", "Sec-WebSocket-Key"],
-)
+@cases("Upgrade", "Connection", "Sec-WebSocket-Version", "Sec-WebSocket-Key")
 def test_incomplete_handshake_is_served_as_a_get(missing: str) -> None:
     headers = upgrade_headers()
     del headers[missing]
@@ -126,7 +122,7 @@ def test_after_response_middleware_runs_on_the_101() -> None:
 
 
 def test_a_sync_websocket_handler_is_rejected_at_class_definition() -> None:
-    with pytest.raises(TypeError, match="must be `async def`"):
+    with raises(TypeError, match="must be `async def`"):
 
         class Wrong(View):
             def websocket(self, ws):  # type: ignore[override]

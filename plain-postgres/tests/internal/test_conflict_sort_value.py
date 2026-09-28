@@ -14,11 +14,11 @@ from decimal import Decimal
 from enum import Enum, StrEnum
 from zoneinfo import ZoneInfo
 
-import pytest
 from app.examples.models.forms import FormsExample
 from app.examples.models.upsert import UpsertItem, UpsertValueKey
 from plain.exceptions import ValidationError
 from plain.postgres.query import conflict_sort_value
+from plain.test import raises
 
 AMOUNT = FormsExample.amount
 RATIO = FormsExample.ratio
@@ -99,7 +99,7 @@ def test_a_non_finite_decimal_is_rejected_before_the_sort_key():
     # DecimalField.to_python refuses NaN and infinity, so they never reach the
     # sort key. Finding that out before any query is issued is the point.
     for value in (Decimal("NaN"), Decimal("sNaN"), Decimal("Infinity")):
-        with pytest.raises(ValidationError):
+        with raises(ValidationError):
             sort_value(AMOUNT, value)
 
 

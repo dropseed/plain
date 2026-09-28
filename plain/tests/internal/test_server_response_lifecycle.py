@@ -19,7 +19,6 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
 import h2.events
-import pytest
 from plain.http import (
     AsyncStreamingResponse,
     FileResponse,
@@ -30,7 +29,7 @@ from plain.internal.handlers.response_lifecycle import (
     ResponseBodyError,
     ResponseLifecycle,
 )
-from plain.test import RequestFactory
+from plain.test import RequestFactory, raises
 from server_stubs import (
     ContextHandler,
     capture_logger,
@@ -320,10 +319,10 @@ def test_async_generator_keeps_its_task_across_yields() -> None:
                 pass
 
         started = time.monotonic()
-        with pytest.raises(ResponseBodyError) as raised:
+        with raises(ResponseBodyError) as raised:
             await asyncio.wait_for(lifecycle.send(write), timeout=2)
         # The generator's own timeout, well before wait_for's.
-        assert isinstance(raised.value.__cause__, TimeoutError)
+        assert isinstance(raised.exception.__cause__, TimeoutError)
         assert time.monotonic() - started < 1
 
     executor = _pool()

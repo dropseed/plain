@@ -11,21 +11,21 @@ sorting buys.
 import concurrent.futures
 import threading
 
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from plain.cache import cache
 from plain.cache.models import CachedItem
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
+from plain.postgres.test import isolated_db
+from plain.test import capture_spans
+from plain.test.otel import CapturedSpans
 
 
-def statements(otel_spans: InMemorySpanExporter) -> list[str]:
+def statements(spans: CapturedSpans) -> list[str]:
     """Every SQL statement the captured spans carry, in the order it ran."""
     return [
         " ".join(str(span.attributes["db.query.text"]).split())
-        for span in otel_spans.get_finished_spans()
+        for span in spans.get_finished_spans()
         if span.attributes and "db.query.text" in span.attributes
     ]
 
@@ -43,55 +43,46 @@ def assert_is_the_set_many_statement(sql: str) -> None:
     assert '"created_at"' not in set_clause
 
 
-def test_all_new_keys_is_one_statement(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
-    otel_spans.clear()
-    cache.set_many({"a": 1, "b": 2})
+def test_all_new_keys_is_one_statement() -> None:
+    with capture_spans() as spans:
+        cache.set_many({"a": 1, "b": 2})
 
-    sql = statements(otel_spans)
+    sql = statements(spans)
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
 
-def test_all_existing_keys_is_one_statement(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_all_existing_keys_is_one_statement() -> None:
     cache.set_many({"a": 1, "b": 2})
 
-    otel_spans.clear()
-    cache.set_many({"a": 10, "b": 20}, expiration=60)
+    with capture_spans() as spans:
+        cache.set_many({"a": 10, "b": 20}, expiration=60)
 
-    sql = statements(otel_spans)
+    sql = statements(spans)
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
 
-def test_mixed_new_and_existing_keys_is_one_statement(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_mixed_new_and_existing_keys_is_one_statement() -> None:
     cache.set_many({"a": 1})
 
-    otel_spans.clear()
-    cache.set_many({"a": 100, "c": 3})
+    with capture_spans() as spans:
+        cache.set_many({"a": 100, "c": 3})
 
-    sql = statements(otel_spans)
+    sql = statements(spans)
     assert len(sql) == 1
     assert_is_the_set_many_statement(sql[0])
 
 
-def test_empty_mapping_runs_no_statements(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
-    otel_spans.clear()
-    cache.set_many({})
+def test_empty_mapping_runs_no_statements() -> None:
+    with capture_spans() as spans:
+        cache.set_many({})
 
-    assert statements(otel_spans) == []
+    assert statements(spans) == []
 
 
-def test_concurrent_set_many_with_opposite_key_orders_does_not_deadlock(
-    isolated_db: None,
-) -> None:
+@isolated_db
+def test_concurrent_set_many_with_opposite_key_orders_does_not_deadlock() -> None:
     """Batches written in opposite orders at the same time.
 
     bulk_upsert() sorts the rows by conflict key, so every writer takes the

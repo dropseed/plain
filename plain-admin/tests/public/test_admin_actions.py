@@ -7,29 +7,22 @@ objects as a queryset. Assertions are limited to what a user observes — the
 redirect back to the list and the resulting database rows.
 """
 
-import pytest
+from admin_test_helpers import make_admin_client
 from app.users.models import User
 from plain.test import Client
 
 LIST_URL = "/admin/p/user"
 
 
-@pytest.fixture
-def admin_client(db) -> Client:
-    user = User.query.create(username="admin", is_admin=True)
-    client = Client()
-    client.force_login(user)
-    return client
-
-
 def run_action(client: Client, action_ids: str):
     return client.post(
         LIST_URL,
-        data={"action_name": "Make admin", "action_ids": action_ids},
+        form_data={"action_name": "Make admin", "action_ids": action_ids},
     )
 
 
-def test_selected_ids_only_touches_those_rows(admin_client):
+def test_selected_ids_only_touches_those_rows():
+    admin_client = make_admin_client()
     a = User.query.create(username="a")
     b = User.query.create(username="b")
     c = User.query.create(username="c")
@@ -42,7 +35,8 @@ def test_selected_ids_only_touches_those_rows(admin_client):
     assert User.query.get(id=c.id).is_admin is True
 
 
-def test_all_sentinel_touches_the_whole_filtered_view(admin_client):
+def test_all_sentinel_touches_the_whole_filtered_view():
+    admin_client = make_admin_client()
     users = [User.query.create(username=f"u{i}") for i in range(5)]
 
     response = run_action(admin_client, "__all__")
@@ -52,7 +46,8 @@ def test_all_sentinel_touches_the_whole_filtered_view(admin_client):
         assert User.query.get(id=user.id).is_admin is True
 
 
-def test_all_sentinel_respects_the_active_search_filter(admin_client):
+def test_all_sentinel_respects_the_active_search_filter():
+    admin_client = make_admin_client()
     keep = User.query.create(username="keep-me")
     other = User.query.create(username="other")
 
@@ -60,7 +55,7 @@ def test_all_sentinel_respects_the_active_search_filter(admin_client):
     # narrows what the action can reach.
     response = admin_client.post(
         f"{LIST_URL}?search=keep",
-        data={"action_name": "Make admin", "action_ids": "__all__"},
+        form_data={"action_name": "Make admin", "action_ids": "__all__"},
     )
 
     assert response.status_code == 302
@@ -68,7 +63,8 @@ def test_all_sentinel_respects_the_active_search_filter(admin_client):
     assert User.query.get(id=other.id).is_admin is False
 
 
-def test_action_survives_sorting_by_a_computed_field(admin_client):
+def test_action_survives_sorting_by_a_computed_field():
+    admin_client = make_admin_client()
     # Sorting by a non-column field pulls the list into memory for display, but
     # the action still needs a queryset — ordering must stay out of the action
     # path (regression: previously this handed perform_action a plain list and
@@ -78,7 +74,7 @@ def test_action_survives_sorting_by_a_computed_field(admin_client):
 
     response = admin_client.post(
         f"{LIST_URL}?order_by=username_upper",
-        data={"action_name": "Make admin", "action_ids": "__all__"},
+        form_data={"action_name": "Make admin", "action_ids": "__all__"},
     )
 
     assert response.status_code == 302
@@ -86,7 +82,8 @@ def test_action_survives_sorting_by_a_computed_field(admin_client):
     assert User.query.get(id=b.id).is_admin is True
 
 
-def test_malformed_id_is_ignored_not_fatal(admin_client):
+def test_malformed_id_is_ignored_not_fatal():
+    admin_client = make_admin_client()
     # A non-coercible id (stale hidden input, tampered/garbled POST) must be
     # dropped like any other unmatched id, not raise a 500.
     real = User.query.create(username="real")
@@ -97,7 +94,8 @@ def test_malformed_id_is_ignored_not_fatal(admin_client):
     assert User.query.get(id=real.id).is_admin is True
 
 
-def test_out_of_scope_id_is_ignored(admin_client):
+def test_out_of_scope_id_is_ignored():
+    admin_client = make_admin_client()
     visible = User.query.create(username="visible")
     hidden = User.query.create(username="hidden")
 
@@ -105,7 +103,10 @@ def test_out_of_scope_id_is_ignored(admin_client):
     # it rides along in the POST.
     response = admin_client.post(
         f"{LIST_URL}?search=visible",
-        data={"action_name": "Make admin", "action_ids": f"{visible.id},{hidden.id}"},
+        form_data={
+            "action_name": "Make admin",
+            "action_ids": f"{visible.id},{hidden.id}",
+        },
     )
 
     assert response.status_code == 302

@@ -7,14 +7,13 @@ query as the path it stands for. A reference to another model's field is
 refused when the class is defined.
 """
 
-import pytest
 from app.users.models import User
 from plain.admin.cards import TrendCard
 from plain.admin.field_refs import FieldRef
 from plain.admin.models import PinnedNavItem
 from plain.admin.views import AdminModelListView
 from plain.postgres import Field, QuerySet, types
-from plain.test import RequestFactory
+from plain.test import RequestFactory, raises
 
 from plain import postgres
 
@@ -73,7 +72,7 @@ def test_a_field_reference_builds_the_same_sql_as_the_string() -> None:
     )
 
 
-def test_a_field_reference_searches_the_column(db) -> None:
+def test_a_field_reference_searches_the_column() -> None:
     user = User.query.create(username="searchable")
     pinned = PinnedNavItem.query.create(user=user, view_slug="alpha_view")
     PinnedNavItem.query.create(user=user, view_slug="beta_view")
@@ -81,7 +80,7 @@ def test_a_field_reference_searches_the_column(db) -> None:
     assert [p.id for p in searched(LocalFieldRefSearch, "alpha")] == [pinned.id]
 
 
-def test_a_traversed_field_reference_searches_through_the_relation(db) -> None:
+def test_a_traversed_field_reference_searches_through_the_relation() -> None:
     matching = User.query.create(username="matching")
     other = User.query.create(username="other")
     pinned = PinnedNavItem.query.create(user=matching, view_slug="shared")
@@ -94,7 +93,7 @@ def test_a_traversed_field_reference_searches_through_the_relation(db) -> None:
     assert [p.id for p in searched(TraversedFieldRefSearch, "matching")] == [pinned.id]
 
 
-def test_a_string_search_field_still_works(db) -> None:
+def test_a_string_search_field_still_works() -> None:
     user = User.query.create(username="searchable")
     pinned = PinnedNavItem.query.create(user=user, view_slug="alpha_view")
     PinnedNavItem.query.create(user=user, view_slug="beta_view")
@@ -103,7 +102,7 @@ def test_a_string_search_field_still_works(db) -> None:
 
 
 def test_a_field_from_another_model_is_refused_at_class_definition() -> None:
-    with pytest.raises(TypeError, match="references PinnedNavItem.view_slug"):
+    with raises(TypeError, match="references PinnedNavItem.view_slug"):
 
         class CrossModel(AdminModelListView):
             model = User
@@ -113,7 +112,7 @@ def test_a_field_from_another_model_is_refused_at_class_definition() -> None:
 
 def test_a_traversed_field_from_another_model_is_refused() -> None:
     """A traversed reference belongs to the model the traversal started from."""
-    with pytest.raises(TypeError, match="references PinnedNavItem.user__id"):
+    with raises(TypeError, match="references PinnedNavItem.user__id"):
 
         class CrossModel(AdminModelListView):
             model = User
@@ -136,7 +135,7 @@ class PinnedTrendCard(TrendCard):
     datetime_field = PinnedNavItem.created_at
 
 
-def test_an_instance_can_replace_search_fields(db) -> None:
+def test_an_instance_can_replace_search_fields() -> None:
     """Configuration set per request has to reach the query, as it always did."""
     matching = User.query.create(username="matching")
     other = User.query.create(username="other")
@@ -202,7 +201,7 @@ def test_an_unattached_mixin_field_is_refused() -> None:
     class NamedMixin(postgres.ModelMixin):
         name: Field[str] = types.TextField(max_length=50)
 
-    with pytest.raises(TypeError, match="unattached"):
+    with raises(TypeError, match="unattached"):
 
         class MixinSearch(AdminModelListView):
             model = PinnedNavItem

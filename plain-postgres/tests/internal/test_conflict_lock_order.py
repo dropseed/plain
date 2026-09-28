@@ -13,9 +13,10 @@ whole guarantee, and asserting it directly can't flake.
 
 from app.examples.models.upsert import UpsertItem
 from plain.postgres.query import QuerySet
+from plain.test import patch
 
 
-def sent_key_runs(monkeypatch, items) -> list[list[str]]:
+def sent_key_runs(items) -> list[list[str]]:
     """The keys bulk_upsert() sends, grouped by statement."""
     runs: list[list[str]] = []
     original = QuerySet._batched_insert
@@ -24,21 +25,21 @@ def sent_key_runs(monkeypatch, items) -> list[list[str]]:
         runs.append([obj.key for obj in objs])
         return original(self, objs, fields, batch_size, **kwargs)
 
-    monkeypatch.setattr(QuerySet, "_batched_insert", recording)
-    UpsertItem.query.bulk_upsert(
-        items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
-    )
+    with patch(QuerySet, "_batched_insert", recording):
+        UpsertItem.query.bulk_upsert(
+            items, update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
+        )
     return runs
 
 
-def test_lock_order_is_the_sorted_key_when_no_object_carries_an_id(db, monkeypatch):
+def test_lock_order_is_the_sorted_key_when_no_object_carries_an_id():
     items = [UpsertItem(key=key, value=1) for key in ("d", "b", "c", "a")]
-    runs = sent_key_runs(monkeypatch, items)
+    runs = sent_key_runs(items)
 
     assert runs == [["a", "b", "c", "d"]]
 
 
-def test_lock_order_is_the_same_when_some_objects_carry_ids(db, monkeypatch):
+def test_lock_order_is_the_same_when_some_objects_carry_ids():
     # The reviewer's scenario: the same four keys, but c and d arrive with ids,
     # so they need their own statement. The keys still go out in sorted order.
     items = []
@@ -47,13 +48,13 @@ def test_lock_order_is_the_same_when_some_objects_carry_ids(db, monkeypatch):
         if key in ("c", "d"):
             item.id = {"c": 101, "d": 102}[key]
         items.append(item)
-    runs = sent_key_runs(monkeypatch, items)
+    runs = sent_key_runs(items)
 
     assert runs == [["a", "b"], ["c", "d"]]
     assert [key for run in runs for key in run] == ["a", "b", "c", "d"]
 
 
-def test_ids_interleaved_through_the_key_order_cost_a_statement_each(db, monkeypatch):
+def test_ids_interleaved_through_the_key_order_cost_a_statement_each():
     # A new statement starts only where the shape changes, so alternating ids
     # is the worst case -- and the key order still holds across all of them.
     items = []
@@ -62,12 +63,12 @@ def test_ids_interleaved_through_the_key_order_cost_a_statement_each(db, monkeyp
         if index % 2 == 0:
             item.id = 100 + index
         items.append(item)
-    runs = sent_key_runs(monkeypatch, items)
+    runs = sent_key_runs(items)
 
     assert runs == [["a"], ["b"], ["c"], ["d"]]
 
 
-def test_batch_size_splits_within_a_run_without_disturbing_the_order(db, monkeypatch):
+def test_batch_size_splits_within_a_run_without_disturbing_the_order():
     items = [UpsertItem(key=key, value=1) for key in ("d", "b", "c", "a")]
     runs: list[list[str]] = []
     original = QuerySet._batched_insert
@@ -76,13 +77,13 @@ def test_batch_size_splits_within_a_run_without_disturbing_the_order(db, monkeyp
         runs.append([obj.key for obj in objs])
         return original(self, objs, fields, batch_size, **kwargs)
 
-    monkeypatch.setattr(QuerySet, "_batched_insert", recording)
-    UpsertItem.query.bulk_upsert(
-        items,
-        update_fields=[UpsertItem.value],
-        unique_fields=[UpsertItem.key],
-        batch_size=2,
-    )
+    with patch(QuerySet, "_batched_insert", recording):
+        UpsertItem.query.bulk_upsert(
+            items,
+            update_fields=[UpsertItem.value],
+            unique_fields=[UpsertItem.key],
+            batch_size=2,
+        )
 
     # batch_size caps the statement inside a run; the run is still one call.
     assert runs == [["a", "b", "c", "d"]]

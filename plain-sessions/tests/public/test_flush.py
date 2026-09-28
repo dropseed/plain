@@ -5,56 +5,51 @@ and flush() must not go to the database at all. A store with a saved key
 deletes that row. Either way the store ends up empty with no key.
 """
 
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
+from plain.test import capture_spans
+from plain.test.otel import CapturedSpans
 
 
-def statements(otel_spans: InMemorySpanExporter) -> list[str]:
+def statements(spans: CapturedSpans) -> list[str]:
     """Every SQL statement the captured spans carry, in the order it ran."""
     return [
         " ".join(str(span.attributes["db.query.text"]).split())
-        for span in otel_spans.get_finished_spans()
+        for span in spans.get_finished_spans()
         if span.attributes and "db.query.text" in span.attributes
     ]
 
 
-def test_flushing_a_keyless_session_queries_nothing(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_flushing_a_keyless_session_queries_nothing() -> None:
     store = SessionStore()
     store["a"] = 1
 
     # Canary: prove the exporter is actually capturing statements, so the
     # zero-statement assertion below can't pass because capture is broken.
-    otel_spans.clear()
-    Session.query.exists()
-    assert statements(otel_spans) != []
+    with capture_spans() as canary_spans:
+        Session.query.exists()
+    assert statements(canary_spans) != []
 
-    otel_spans.clear()
-    store.flush()
+    with capture_spans() as spans:
+        store.flush()
 
-    assert statements(otel_spans) == []
+    assert statements(spans) == []
     assert store.session_key is None
     assert store.is_empty()
     assert dict(store) == {}
 
 
-def test_flushing_a_saved_session_deletes_the_row(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_flushing_a_saved_session_deletes_the_row() -> None:
     store = SessionStore()
     store["a"] = 1
     store.save()
     key = store.session_key
     assert key is not None
 
-    otel_spans.clear()
-    store.flush()
+    with capture_spans() as spans:
+        store.flush()
 
-    sql = statements(otel_spans)
+    sql = statements(spans)
     assert len(sql) == 2
     assert sql[0].startswith("SELECT")
     assert sql[1].startswith('DELETE FROM "plainsessions_session"')

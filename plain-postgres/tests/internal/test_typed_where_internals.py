@@ -7,13 +7,13 @@ The contract lives in `tests/public/test_typed_where.py` and
 under the hood and you get to decide whether it should have.
 """
 
-import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Widget, WidgetTag
 from plain.postgres.expressions import F
 from plain.postgres.fields.base import CONDITION_METHODS, STRING_CONDITION_LOOKUPS
+from plain.test import cases, raises
 
 
 def test_traversal_hands_back_the_field_itself():
@@ -28,14 +28,14 @@ def test_traversal_hands_back_the_field_itself():
     assert direct.name == "name"  # the original is untouched
 
 
-@pytest.mark.parametrize("method", CONDITION_METHODS)
+@cases(*CONDITION_METHODS)
 def test_every_condition_name_gets_the_relation_advice(method):
     """Sweep the whole condition surface, so a method added later can't quietly
     fall through to the generic "not a traversable field" message."""
-    with pytest.raises(AttributeError) as excinfo:
+    with raises(AttributeError) as caught:
         getattr(ChildCascade.parent, method)
 
-    message = str(excinfo.value)
+    message = str(caught.exception)
     assert "is a relation, not a field" in message
     assert f"parent.id.{method}(...)" in message
 
@@ -45,7 +45,6 @@ class TestEncryptedFieldTraversalBlocked:
     back the field itself. The message names the full path, since the prefixed
     copy carries it as its name."""
 
-    @pytest.fixture
     def traversed(self):
         # No model in the examples app has an FK to SecretStore, so prefix the
         # field directly. This is exactly what RelatedFieldRef hands back --
@@ -55,14 +54,14 @@ class TestEncryptedFieldTraversalBlocked:
             "store", DefaultsExample
         )
 
-    @pytest.mark.parametrize("method", [m for m in CONDITION_METHODS if m != "is_null"])
-    def test_traversed_condition_raises(self, traversed, method):
-        with pytest.raises(
-            TypeError, match=rf"store__api_key.*does not support \.{method}\("
-        ):
+    @cases(*[m for m in CONDITION_METHODS if m != "is_null"])
+    def test_traversed_condition_raises(self, method):
+        traversed = self.traversed()
+        with raises(TypeError, match=rf"store__api_key.*does not support \.{method}\("):
             getattr(traversed, method)("x")
 
-    def test_traversed_is_null_still_works(self, traversed):
+    def test_traversed_is_null_still_works(self):
+        traversed = self.traversed()
         assert traversed.is_null().children == [("store__api_key__isnull", True)]
 
 
@@ -76,7 +75,7 @@ def test_traversal_before_the_target_resolves_says_so():
         UnresolvedRelationError,
     )
 
-    with pytest.raises(UnresolvedRelationError, match=r"'Tag' hasn't been resolved"):
+    with raises(UnresolvedRelationError, match=r"'Tag' hasn't been resolved"):
         RelatedFieldRef(
             model="Tag",  # ty: ignore[invalid-argument-type]
             prefix="tags",
@@ -106,8 +105,8 @@ def _compiled(queryset):
     return queryset.sql_query.sql_with_params()
 
 
-@pytest.mark.parametrize(("method", "lookup"), STRING_CONDITION_LOOKUPS.items())
-def test_string_conditions_compile_like_their_filter_lookup(db, method, lookup):
+@cases(*STRING_CONDITION_LOOKUPS.items())
+def test_string_conditions_compile_like_their_filter_lookup(method, lookup):
     """Each string condition is the typed spelling of one `filter()` lookup,
     so the two have to compile to the same statement -- and the names don't
     all match (`iequals` builds `iexact`), which is what this pins."""
@@ -127,7 +126,7 @@ class TestComparingAgainstAnotherColumn:
     Public half: tests/public/test_typed_where.py.
     """
 
-    def test_compiles_like_the_f_expression(self, db):
+    def test_compiles_like_the_f_expression(self):
         typed = DefaultsExample.query.where(
             DefaultsExample.priority.lt(DefaultsExample.id)
         )
@@ -135,7 +134,7 @@ class TestComparingAgainstAnotherColumn:
 
         assert _compiled(typed) == _compiled(untyped)
 
-    def test_a_traversed_column_keeps_its_relation_prefix(self, db):
+    def test_a_traversed_column_keeps_its_relation_prefix(self):
         """A traversed field's `name` already carries the prefix, so both
         sides of the comparison name the joined column."""
         typed = WidgetTag.query.where(WidgetTag.widget.name.equals(WidgetTag.tag.name))
@@ -143,7 +142,7 @@ class TestComparingAgainstAnotherColumn:
 
         assert _compiled(typed) == _compiled(untyped)
 
-    def test_a_nullable_column_on_the_right(self, db):
+    def test_a_nullable_column_on_the_right(self):
         """The `Field[T | None]` arm. Nothing distinguishes it at runtime --
         it compiles like any other column reference -- but the checker needs
         the arm, so the runtime half is pinned here too. Static halves:
@@ -155,11 +154,11 @@ class TestComparingAgainstAnotherColumn:
 
         assert _compiled(typed) == _compiled(untyped)
 
-    def test_a_right_hand_column_from_another_model_is_rejected(self, db):
+    def test_a_right_hand_column_from_another_model_is_rejected(self):
         """The cross-model guard reads both sides -- a right-hand column from
         another model resolves against the queried model just as silently as a
         left-hand one would."""
-        with pytest.raises(TypeError, match="Widget.size"):
+        with raises(TypeError, match="Widget.size"):
             DefaultsExample.query.where(DefaultsExample.name.equals(Widget.size))
 
     def test_both_sides_are_recorded_as_origins(self):
@@ -181,21 +180,21 @@ class TestAnEncryptedColumnIsRefusedOnEitherSide:
     which is why these have no corpus counterpart.
     """
 
-    @pytest.mark.parametrize("method", ["equals", "not_equal", "gt", "lt"])
+    @cases("equals", "not_equal", "gt", "lt")
     def test_an_encrypted_right_hand_column_is_refused(self, method):
         # Without the hook this compiled to `name = api_key` -- plaintext
         # against ciphertext, which matches nothing and says nothing.
-        with pytest.raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+        with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
             getattr(SecretStore.name, method)(SecretStore.api_key)
 
-    @pytest.mark.parametrize("method", ["equals", "not_equal", "gt", "lt"])
+    @cases("equals", "not_equal", "gt", "lt")
     def test_the_mirror_case_is_still_refused(self, method):
         """The left-hand side was already blocked, by EncryptedField's own
         `_build_q`. A Field is not a deterministically matchable value."""
-        with pytest.raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+        with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
             getattr(SecretStore.api_key, method)(SecretStore.name)
 
-    def test_an_ordinary_column_is_unaffected(self, db):
+    def test_an_ordinary_column_is_unaffected(self):
         assert (
             SecretStore.query.where(SecretStore.name.equals(SecretStore.name)).count()
             == 0

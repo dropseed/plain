@@ -9,23 +9,23 @@ The static half -- which of these calls the checker must reject -- lives in
 `tests/internal/test_typed_get_sql.py`.
 """
 
-import pytest
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import Tag
+from plain.test import raises
 
 
-def test_get_by_primary_key(db):
+def test_get_by_primary_key():
     row = DefaultsExample.query.create(name="alice")
 
     assert DefaultsExample.query.get(row.id).id == row.id
 
 
-def test_get_by_primary_key_missing_row(db):
-    with pytest.raises(DefaultsExample.DoesNotExist):
+def test_get_by_primary_key_missing_row():
+    with raises(DefaultsExample.DoesNotExist):
         DefaultsExample.query.get(9_999_999)
 
 
-def test_get_by_condition(db):
+def test_get_by_condition():
     DefaultsExample.query.create(name="alice")
     DefaultsExample.query.create(name="bob")
 
@@ -34,7 +34,7 @@ def test_get_by_condition(db):
     )
 
 
-def test_get_ands_multiple_conditions(db):
+def test_get_ands_multiple_conditions():
     DefaultsExample.query.create(name="alice", priority=1)
     DefaultsExample.query.create(name="alice", priority=10)
 
@@ -45,33 +45,33 @@ def test_get_ands_multiple_conditions(db):
     assert row.priority == 10
 
 
-def test_get_with_conditions_still_asserts_one_row(db):
+def test_get_with_conditions_still_asserts_one_row():
     DefaultsExample.query.create(name="alice")
     DefaultsExample.query.create(name="alice")
 
-    with pytest.raises(DefaultsExample.MultipleObjectsReturned):
+    with raises(DefaultsExample.MultipleObjectsReturned):
         DefaultsExample.query.get(DefaultsExample.name.equals("alice"))
 
 
-def test_get_on_a_built_query_is_unchanged(db):
+def test_get_on_a_built_query_is_unchanged():
     DefaultsExample.query.create(name="alice")
 
     built = DefaultsExample.query.where(DefaultsExample.name.equals("alice"))
     assert built.get().name == "alice"
 
 
-def test_get_keyword_form_still_works(db):
+def test_get_keyword_form_still_works():
     row = DefaultsExample.query.create(name="alice")
 
     assert DefaultsExample.query.get(id=row.id).id == row.id
     assert DefaultsExample.query.get(name="alice").id == row.id
 
 
-def test_get_or_none_returns_none_for_a_missing_key(db):
+def test_get_or_none_returns_none_for_a_missing_key():
     assert DefaultsExample.query.get_or_none(9_999_999) is None
 
 
-def test_get_or_none_returns_the_row(db):
+def test_get_or_none_returns_the_row():
     row = DefaultsExample.query.create(name="alice")
 
     by_key = DefaultsExample.query.get_or_none(row.id)
@@ -84,15 +84,15 @@ def test_get_or_none_returns_the_row(db):
     assert by_condition.id == row.id
 
 
-def test_get_or_none_still_raises_on_multiple(db):
+def test_get_or_none_still_raises_on_multiple():
     DefaultsExample.query.create(name="alice")
     DefaultsExample.query.create(name="alice")
 
-    with pytest.raises(DefaultsExample.MultipleObjectsReturned):
+    with raises(DefaultsExample.MultipleObjectsReturned):
         DefaultsExample.query.get_or_none(DefaultsExample.name.equals("alice"))
 
 
-def test_first_and_last_take_conditions(db):
+def test_first_and_last_take_conditions():
     DefaultsExample.query.create(name="alice", priority=1)
     DefaultsExample.query.create(name="alice", priority=10)
     DefaultsExample.query.create(name="bob", priority=99)
@@ -106,35 +106,35 @@ def test_first_and_last_take_conditions(db):
     assert last.priority == 10
 
 
-def test_first_returns_none_when_nothing_matches(db):
+def test_first_returns_none_when_nothing_matches():
     assert DefaultsExample.query.first(DefaultsExample.name.equals("nobody")) is None
     assert DefaultsExample.query.last(DefaultsExample.name.equals("nobody")) is None
 
 
-def test_cross_model_condition_is_refused(db):
+def test_cross_model_condition_is_refused():
     """`where()`'s guard, reported under the terminal's own name."""
-    with pytest.raises(TypeError, match=r"get\(\) got a condition built from Tag.name"):
+    with raises(TypeError, match=r"get\(\) got a condition built from Tag.name"):
         DefaultsExample.query.get(Tag.name.equals("x"))
 
-    with pytest.raises(TypeError, match=r"first\(\) got a condition built from"):
+    with raises(TypeError, match=r"first\(\) got a condition built from"):
         DefaultsExample.query.first(Tag.name.equals("x"))
 
 
-def test_mixing_a_primary_key_with_conditions_is_refused(db):
-    with pytest.raises(TypeError, match=r"single primary key or typed conditions"):
+def test_mixing_a_primary_key_with_conditions_is_refused():
+    with raises(TypeError, match=r"single primary key or typed conditions"):
         DefaultsExample.query.get(5, DefaultsExample.name.equals("alice"))  # ty: ignore[invalid-argument-type]
 
 
-def test_a_primary_key_alongside_keyword_lookups_is_refused(db):
+def test_a_primary_key_alongside_keyword_lookups_is_refused():
     """A key is the whole lookup -- `get(5, id=5)` would AND it with itself."""
-    with pytest.raises(TypeError, match=r"also got keyword lookups"):
+    with raises(TypeError, match=r"also got keyword lookups"):
         DefaultsExample.query.get(5, id=5)  # ty: ignore[invalid-argument-type]
 
-    with pytest.raises(TypeError, match=r"also got keyword lookups"):
+    with raises(TypeError, match=r"also got keyword lookups"):
         DefaultsExample.query.get_or_none(5, name="alice")  # ty: ignore[invalid-argument-type]
 
 
-def test_conditions_alongside_keyword_lookups_still_work(db):
+def test_conditions_alongside_keyword_lookups_still_work():
     """Conditions are `filter()` arguments, so they combine with its kwargs."""
     DefaultsExample.query.create(name="alice", priority=1)
     DefaultsExample.query.create(name="alice", priority=10)
@@ -143,25 +143,25 @@ def test_conditions_alongside_keyword_lookups_still_work(db):
     assert row.priority == 10
 
 
-def test_a_non_condition_non_key_positional_is_refused(db):
-    with pytest.raises(TypeError, match=r"DefaultsExample.id is an int"):
+def test_a_non_condition_non_key_positional_is_refused():
+    with raises(TypeError, match=r"DefaultsExample.id is an int"):
         DefaultsExample.query.get("5")  # ty: ignore[no-matching-overload]
 
 
-def test_first_refuses_a_primary_key(db):
-    with pytest.raises(TypeError, match=r"first\(\) takes typed conditions"):
+def test_first_refuses_a_primary_key():
+    with raises(TypeError, match=r"first\(\) takes typed conditions"):
         DefaultsExample.query.first(5)  # ty: ignore[invalid-argument-type]
 
 
-def test_row_queryset_refuses_the_primary_key_form(db):
+def test_row_queryset_refuses_the_primary_key_form():
     DefaultsExample.query.create(name="alice")
 
     rows = DefaultsExample.query.select(DefaultsExample.name, flat=True)
-    with pytest.raises(TypeError, match=r"Cannot call get\(primary_key\) after select"):
+    with raises(TypeError, match=r"Cannot call get\(primary_key\) after select"):
         rows.get(5)
 
 
-def test_row_queryset_still_takes_conditions(db):
+def test_row_queryset_still_takes_conditions():
     DefaultsExample.query.create(name="alice")
 
     rows = DefaultsExample.query.select(DefaultsExample.name, flat=True)

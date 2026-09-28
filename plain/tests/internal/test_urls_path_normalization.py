@@ -7,7 +7,7 @@ double-slashes before the framework sees them — so the only way to
 exercise the parser's handling of `//foo/` is to call it directly.
 """
 
-import pytest
+from plain.test import cases
 from plain.urls.paths import (
     BadPath,
     ParsedPath,
@@ -76,13 +76,10 @@ def test_dotdot_at_end_redirects_to_directory_form():
     assert result == RedirectToCanonical(canonical="/")
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/..",  # bare `..` at root
-        "/foo/../..",  # second `..` would pop below root
-        "/../foo",  # `..` before anything else
-    ],
+@cases(
+    "/..",  # bare `..` at root
+    "/foo/../..",  # second `..` would pop below root
+    "/../foo",  # `..` before anything else
 )
 def test_dotdot_below_root_is_bad_path(path):
     """Any `..` that would resolve below the URL root is rejected as 400."""

@@ -11,17 +11,17 @@ from decimal import Decimal
 from string.templatelib import Template
 
 import psycopg
-import pytest
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.mixins import MixinTestModel
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import UpsertTenant
 from plain.exceptions import ValidationError
+from plain.postgres.test import capture_queries
+from plain.test import patch, raises
 
 
-@pytest.fixture
-def widgets(db):
+def create_widgets() -> tuple[Widget, Widget]:
     small = Widget.query.create(name="small-widget", size="small")
     large = Widget.query.create(name="large-widget", size="large")
     red = Tag.query.create(name="red")
@@ -48,14 +48,16 @@ class NameRow:
 # ---------------------------------------------------------------------------
 
 
-def test_model_reference_renders_the_table(widgets):
+def test_model_reference_renders_the_table():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT count(*) AS n FROM {Widget}", result_type=SizeCount
     )
     assert f'"{Widget.model_options.db_table}"' in statement.sql
 
 
-def test_field_reference_renders_the_qualified_column(widgets):
+def test_field_reference_renders_the_qualified_column():
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT {Widget.size} AS size, count(*) AS n
@@ -73,8 +75,9 @@ def test_field_reference_renders_the_qualified_column(widgets):
     ]
 
 
-def test_bare_column_reference_renders_the_column_alone(widgets):
+def test_bare_column_reference_renders_the_column_alone():
     """`{Model.field:name}` is the spelling an INSERT list needs."""
+    create_widgets()
     name = "fresh"
     size = "tiny"
     statement = Widget.query.sql(
@@ -88,9 +91,9 @@ def test_bare_column_reference_renders_the_column_alone(widgets):
     assert statement.get().name == "fresh"
 
 
-def test_foreign_key_reference_renders_the_id_column(widgets):
+def test_foreign_key_reference_renders_the_id_column():
     """A foreign key is a descriptor at class level; its column is the `_id`."""
-    small, _ = widgets
+    small, _ = create_widgets()
     table = WidgetTag.model_options.db_table
 
     @dataclass
@@ -112,7 +115,8 @@ def test_foreign_key_reference_renders_the_id_column(widgets):
     assert statement.get() == TagCount(widget_id=small.id, n=2)
 
 
-def test_star_reference_returns_model_instances(widgets):
+def test_star_reference_returns_model_instances():
+    create_widgets()
     size = "small"
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}"
@@ -123,7 +127,8 @@ def test_star_reference_returns_model_instances(widgets):
     assert widget._state.adding is False
 
 
-def test_value_binds_as_a_parameter(widgets):
+def test_value_binds_as_a_parameter():
+    create_widgets()
     name = "small-widget"
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = {name}"
@@ -133,7 +138,8 @@ def test_value_binds_as_a_parameter(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_a_value_used_twice_binds_twice(widgets):
+def test_a_value_used_twice_binds_twice():
+    create_widgets()
     name = "small"
     statement = Widget.query.sql(
         t"""
@@ -145,7 +151,8 @@ def test_a_value_used_twice_binds_twice(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_list_binds_as_an_array_for_any(widgets):
+def test_list_binds_as_an_array_for_any():
+    create_widgets()
     names = ["small-widget", "large-widget"]
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} = ANY({names}) ORDER BY 1"
@@ -153,7 +160,7 @@ def test_list_binds_as_an_array_for_any(widgets):
     assert len(statement.all()) == 2
 
 
-def test_dict_binds_as_jsonb(db):
+def test_dict_binds_as_jsonb():
     ReturningEvent.query.create(label="signup", count=1, payload={"plan": "pro"})
     ReturningEvent.query.create(label="churn", count=1, payload={"plan": "free"})
 
@@ -169,16 +176,18 @@ def test_dict_binds_as_jsonb(db):
     assert event.payload == {"plan": "pro"}
 
 
-def test_a_nested_template_renders_inline(widgets):
+def test_a_nested_template_renders_inline():
     """A shared predicate is a t-string, interpolated into the statement."""
+    create_widgets()
     small_only = t"{Widget.size} = 'small'"
     statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {small_only}")
     assert "= 'small'" in statement.sql
     assert statement.get().name == "small-widget"
 
 
-def test_a_nested_template_merges_its_parameters(widgets):
+def test_a_nested_template_merges_its_parameters():
     """The nested template's own values bind, in the order they appear."""
+    create_widgets()
     size = "small"
     named = "small-widget"
     predicate = t"{Widget.size} = {size}"
@@ -192,7 +201,8 @@ def test_a_nested_template_merges_its_parameters(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_a_nested_template_nests_again(widgets):
+def test_a_nested_template_nests_again():
+    create_widgets()
     size = "small"
     innermost = t"{Widget.size} = {size}"
     middle = t"({innermost})"
@@ -201,7 +211,8 @@ def test_a_nested_template_nests_again(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_embedded_queryset_becomes_a_subquery(widgets):
+def test_embedded_queryset_becomes_a_subquery():
+    create_widgets()
     small_widgets = Widget.query.where(Widget.size.equals("small"))
 
     statement = Widget.query.sql(
@@ -212,7 +223,8 @@ def test_embedded_queryset_becomes_a_subquery(widgets):
     assert statement.params == ("small",)
 
 
-def test_embedded_queryset_with_no_rows_still_renders(widgets):
+def test_embedded_queryset_with_no_rows_still_renders():
+    create_widgets()
     nothing = Widget.query.where(Widget.name.is_in([]))
 
     statement = Widget.query.sql(
@@ -222,7 +234,8 @@ def test_embedded_queryset_with_no_rows_still_renders(widgets):
     assert statement.all() == []
 
 
-def test_written_embeds_in_another_written(widgets):
+def test_written_embeds_in_another_written():
+    create_widgets()
     size = "small"
     inner = Widget.query.sql(
         t"SELECT {Widget.name} AS name FROM {Widget} WHERE {Widget.size} = {size}",
@@ -236,8 +249,9 @@ def test_written_embeds_in_another_written(widgets):
     assert outer.all() == [NameRow(name="small-widget")]
 
 
-def test_an_embedded_statement_ending_in_a_comment_survives(widgets):
+def test_an_embedded_statement_ending_in_a_comment_survives():
     """The embed is put on its own lines, so a `-- comment` can't eat the `)`."""
+    create_widgets()
     size = "small"
     inner = Widget.query.sql(
         t"""
@@ -253,7 +267,8 @@ def test_an_embedded_statement_ending_in_a_comment_survives(widgets):
     assert outer.all() == [NameRow(name="small-widget")]
 
 
-def test_a_literal_percent_survives_and_stays_readable(widgets):
+def test_a_literal_percent_survives_and_stays_readable():
+    create_widgets()
     pattern = "small"
     statement = Widget.query.sql(
         t"""
@@ -274,7 +289,7 @@ def test_a_literal_percent_survives_and_stays_readable(widgets):
 # ---------------------------------------------------------------------------
 
 
-def test_instances_decrypt_and_parse_their_fields(db):
+def test_instances_decrypt_and_parse_their_fields():
     SecretStore.query.create(
         name="prod", api_key="sk-live-123", notes="top secret", config={"a": 1}
     )
@@ -285,8 +300,9 @@ def test_instances_decrypt_and_parse_their_fields(db):
     assert secret.config == {"a": 1}
 
 
-def test_a_model_field_is_filled_from_the_star_expansion(widgets):
+def test_a_model_field_is_filled_from_the_star_expansion():
     """A statement that selects more than `{Model:*}` declares its own shape."""
+    create_widgets()
 
     @dataclass
     class WidgetRow:
@@ -312,7 +328,7 @@ def test_a_model_field_is_filled_from_the_star_expansion(widgets):
     assert rows[0].widget._state.adding is False
 
 
-def test_a_model_field_decrypts_and_parses_like_an_instance_row(db):
+def test_a_model_field_decrypts_and_parses_like_an_instance_row():
     """The expansion hydrates exactly as an instance statement's row does."""
     SecretStore.query.create(
         name="prod", api_key="sk-live-123", notes="top secret", config={"a": 1}
@@ -336,8 +352,9 @@ def test_a_model_field_decrypts_and_parses_like_an_instance_row(db):
     assert row.shouted == "PROD"
 
 
-def test_a_repeated_column_is_its_own_field(widgets):
+def test_a_repeated_column_is_its_own_field():
     """`{Widget:*}` and an expression over one of its columns: both arrive."""
+    create_widgets()
 
     @dataclass
     class DisplayRow:
@@ -358,12 +375,13 @@ def test_a_repeated_column_is_its_own_field(widgets):
     assert row.display_name == "SMALL-WIDGET"
 
 
-def test_a_self_join_hydrates_the_row_it_selected(widgets):
+def test_a_self_join_hydrates_the_row_it_selected():
     """The instance is `{Widget:*}`'s columns, not whatever traces to Widget.
 
     Both sides of a self-join trace back to the same table, so picking the
     expansion's columns by provenance would mix the two rows together.
     """
+    create_widgets()
     Widget.query.create(name="other-small", size="small")
     small = Widget.query.get(name="small-widget")
 
@@ -389,8 +407,9 @@ def test_a_self_join_hydrates_the_row_it_selected(widgets):
     assert row.other_name == "other-small"
 
 
-def test_two_models_fill_two_fields(widgets):
+def test_two_models_fill_two_fields():
     """One expansion each, matched to the field annotated with that model."""
+    create_widgets()
 
     @dataclass
     class Tagged:
@@ -414,8 +433,9 @@ def test_two_models_fill_two_fields(widgets):
     ]
 
 
-def test_an_expansion_below_the_select_list_is_just_columns(widgets):
+def test_an_expansion_below_the_select_list_is_just_columns():
     """A subquery's `{Model:*}` passed through the outer list maps by name."""
+    create_widgets()
 
     @dataclass
     class WidgetColumns:
@@ -442,7 +462,9 @@ def test_an_expansion_below_the_select_list_is_just_columns(widgets):
     assert [row.name for row in named] == ["large-widget", "small-widget"]
 
 
-def test_a_cte_expansion_is_just_columns(widgets):
+def test_a_cte_expansion_is_just_columns():
+    create_widgets()
+
     @dataclass
     class WidgetColumns:
         id: int
@@ -459,8 +481,9 @@ def test_a_cte_expansion_is_just_columns(widgets):
     assert [row.name for row in statement] == ["large-widget", "small-widget"]
 
 
-def test_union_branches_of_expansions_map_by_name(widgets):
+def test_union_branches_of_expansions_map_by_name():
     """Every branch is the outer select list, and they collapse onto one row."""
+    create_widgets()
 
     @dataclass
     class WidgetColumns:
@@ -483,8 +506,9 @@ def test_union_branches_of_expansions_map_by_name(widgets):
     ]
 
 
-def test_a_passed_through_expansion_still_gives_instances(widgets):
+def test_a_passed_through_expansion_still_gives_instances():
     """With nothing declared, a subquery's expansion is still what a row is."""
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT * FROM (SELECT {Widget:*} FROM {Widget}) sub ORDER BY sub.name"
     )
@@ -493,8 +517,9 @@ def test_a_passed_through_expansion_still_gives_instances(widgets):
     assert all(isinstance(widget, Widget) for widget in rows)
 
 
-def test_an_expansion_in_a_cte_can_repeat_in_the_select_list(widgets):
+def test_an_expansion_in_a_cte_can_repeat_in_the_select_list():
     """Only the outer one fills the field; the CTE's is just columns."""
+    create_widgets()
 
     @dataclass
     class WidgetRow:
@@ -526,13 +551,14 @@ class BracketRow:
     widget: Widget
 
 
-def test_a_parenthesis_in_a_string_literal_is_not_a_subquery(widgets):
+def test_a_parenthesis_in_a_string_literal_is_not_a_subquery():
     """Whether an expansion is in the outer select list is decided by `(` and `)`.
 
     Quoted text and comments carry parentheses that aren't structure, so the
     scan skips them — otherwise `'('` would read as a subquery and the
     expansion after it would stop being the outer list's.
     """
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT '(' AS bracket, {Widget:*} FROM {Widget} ORDER BY {Widget.name}",
         result_type=BracketRow,
@@ -543,7 +569,8 @@ def test_a_parenthesis_in_a_string_literal_is_not_a_subquery(widgets):
     assert row.widget.name == "large-widget"
 
 
-def test_a_parenthesis_in_a_dollar_quoted_string_is_not_a_subquery(widgets):
+def test_a_parenthesis_in_a_dollar_quoted_string_is_not_a_subquery():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT $tag$($tag$ AS bracket, {Widget:*} FROM {Widget} ORDER BY {Widget.name}",
         result_type=BracketRow,
@@ -553,7 +580,8 @@ def test_a_parenthesis_in_a_dollar_quoted_string_is_not_a_subquery(widgets):
     assert row.bracket == "("
 
 
-def test_a_parenthesis_in_a_line_comment_is_not_a_subquery(widgets):
+def test_a_parenthesis_in_a_line_comment_is_not_a_subquery():
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT '(' AS bracket, -- a ( nobody opened
@@ -567,7 +595,8 @@ def test_a_parenthesis_in_a_line_comment_is_not_a_subquery(widgets):
     assert row.widget.name == "large-widget"
 
 
-def test_a_parenthesis_in_a_block_comment_is_not_a_subquery(widgets):
+def test_a_parenthesis_in_a_block_comment_is_not_a_subquery():
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT '(' AS bracket, /* a ( nobody opened */ {Widget:*}
@@ -580,8 +609,9 @@ def test_a_parenthesis_in_a_block_comment_is_not_a_subquery(widgets):
     assert row.widget.name == "large-widget"
 
 
-def test_an_outer_join_that_matched_nothing_is_none(widgets):
+def test_an_outer_join_that_matched_nothing_is_none():
     """`Tag | None` is what the outer side of a LEFT JOIN needs."""
+    create_widgets()
     Widget.query.create(name="bare-widget", size="tiny")
 
     @dataclass
@@ -608,8 +638,9 @@ def test_an_outer_join_that_matched_nothing_is_none(widgets):
     assert rows[1].tag.name == "red"
 
 
-def test_star_columns_work_through_a_union(widgets):
+def test_star_columns_work_through_a_union():
     """A UNION drops every column's source; the expansion still says what a row is."""
+    create_widgets()
     small = "small"
     large = "large"
     statement = Widget.query.sql(
@@ -624,8 +655,9 @@ def test_star_columns_work_through_a_union(widgets):
     assert all(isinstance(widget, Widget) for widget in statement)
 
 
-def test_extra_columns_without_a_result_type_are_refused(widgets):
+def test_extra_columns_without_a_result_type_are_refused():
     """An instance is complete and carries only its columns; nothing is attached."""
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT {Widget:*}, count(wt.id) AS tag_count
@@ -634,11 +666,13 @@ def test_extra_columns_without_a_result_type_are_refused(widgets):
         GROUP BY {Widget.id}
         """,
     )
-    with pytest.raises(TypeError, match="shape of its own"):
+    with raises(TypeError, match="shape of its own"):
         statement.all()
 
 
-def test_a_model_field_with_no_expansion_is_refused(widgets):
+def test_a_model_field_with_no_expansion_is_refused():
+    create_widgets()
+
     @dataclass
     class WidgetRow:
         widget: Widget
@@ -646,25 +680,27 @@ def test_a_model_field_with_no_expansion_is_refused(widgets):
     statement = Widget.query.sql(
         t"SELECT {Widget.name} AS name FROM {Widget}", result_type=WidgetRow
     )
-    with pytest.raises(TypeError, match=r"nothing in this statement selects"):
+    with raises(TypeError, match=r"nothing in this statement selects"):
         statement.all()
 
 
-def test_an_expansion_the_dataclass_has_no_room_for_is_refused(widgets):
+def test_an_expansion_the_dataclass_has_no_room_for_is_refused():
     """The expansion is what the dataclass is missing, so that is what it says."""
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget}", result_type=NameRow
     )
-    with pytest.raises(TypeError, match="has no field for id, size"):
+    with raises(TypeError, match="has no field for id, size"):
         statement.all()
 
 
-def test_an_expansion_in_a_subquery_cannot_fill_a_model_field(widgets):
+def test_an_expansion_in_a_subquery_cannot_fill_a_model_field():
     """Its columns never reached the outer list, whatever else is named there.
 
     `Tag`'s columns are a prefix of `Widget`'s -- every model starts with
     `id` -- so a run that merely matches by name is not evidence.
     """
+    create_widgets()
 
     @dataclass
     class OnlyTag:
@@ -678,12 +714,13 @@ def test_an_expansion_in_a_subquery_cannot_fill_a_model_field(widgets):
         """,
         result_type=OnlyTag,
     )
-    with pytest.raises(TypeError, match="in the outer select list"):
+    with raises(TypeError, match="in the outer select list"):
         statement.all()
 
 
-def test_two_model_fields_never_read_the_same_columns(widgets):
+def test_two_model_fields_never_read_the_same_columns():
     """The joined subquery's `{Tag:*}` can't borrow the `{Widget:*}` run."""
+    create_widgets()
 
     @dataclass
     class Tagged:
@@ -697,11 +734,11 @@ def test_two_model_fields_never_read_the_same_columns(widgets):
         """,
         result_type=Tagged,
     )
-    with pytest.raises(TypeError, match="in the outer select list"):
+    with raises(TypeError, match="in the outer select list"):
         statement.all()
 
 
-def test_an_escape_string_does_not_hide_a_subquery(widgets):
+def test_an_escape_string_does_not_hide_a_subquery():
     """`E'it\\'s'` is one string: its backslash-escaped quote doesn't close it.
 
     Read as `''`-only, the escaped quote would close the string early and the
@@ -710,6 +747,7 @@ def test_an_escape_string_does_not_hide_a_subquery(widgets):
     columns' sources wrapped away nothing else would stop it filling `tag`
     from the widget's row.
     """
+    create_widgets()
 
     @dataclass
     class OnlyTag:
@@ -724,12 +762,13 @@ def test_an_escape_string_does_not_hide_a_subquery(widgets):
         """,
         result_type=OnlyTag,
     )
-    with pytest.raises(TypeError, match="in the outer select list"):
+    with raises(TypeError, match="in the outer select list"):
         statement.all()
 
 
-def test_two_models_on_one_run_of_a_union_are_refused(widgets):
+def test_two_models_on_one_run_of_a_union_are_refused():
     """Each branch's rows arrive in the same columns; a row can't say which it is."""
+    create_widgets()
     UpsertTenant.query.create(name="acme")
 
     @dataclass
@@ -744,14 +783,15 @@ def test_two_models_on_one_run_of_a_union_are_refused(widgets):
         """,
         result_type=OnlyTag,
     )
-    with pytest.raises(
+    with raises(
         TypeError, match=r"\{Tag:\*\} and \{UpsertTenant:\*\} onto the same run"
     ):
         statement.all()
 
 
-def test_a_mismatch_says_which_columns_a_model_field_took(widgets):
+def test_a_mismatch_says_which_columns_a_model_field_took():
     """Even when the expansion took every column the statement returned."""
+    create_widgets()
 
     @dataclass
     class Both:
@@ -760,24 +800,27 @@ def test_a_mismatch_says_which_columns_a_model_field_took(widgets):
         name: str
 
     statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Both)
-    with pytest.raises(
+    with raises(
         TypeError,
         match=r"returned id, name, size \(widget took id, name, size\)",
     ):
         statement.all()
 
 
-def test_a_field_that_names_two_models_is_refused(widgets):
+def test_a_field_that_names_two_models_is_refused():
+    create_widgets()
+
     @dataclass
     class Either:
         either: Widget | Tag
 
     statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Either)
-    with pytest.raises(TypeError, match=r"annotated Widget \| Tag"):
+    with raises(TypeError, match=r"annotated Widget \| Tag"):
         statement.all()
 
 
-def test_a_non_nullable_model_field_that_came_back_null_is_refused(widgets):
+def test_a_non_nullable_model_field_that_came_back_null_is_refused():
+    create_widgets()
     Widget.query.create(name="bare-widget", size="tiny")
 
     @dataclass
@@ -796,12 +839,13 @@ def test_a_non_nullable_model_field_that_came_back_null_is_refused(widgets):
         """,
         result_type=Tagged,
     )
-    with pytest.raises(TypeError, match=r"Annotate it `Tag \| None`"):
+    with raises(TypeError, match=r"Annotate it `Tag \| None`"):
         statement.all()
 
 
-def test_one_expansion_per_union_branch_fills_one_field(widgets):
+def test_one_expansion_per_union_branch_fills_one_field():
     """The branches collapse onto one set of columns, so both expansions are it."""
+    create_widgets()
 
     @dataclass
     class Ranked:
@@ -823,26 +867,29 @@ def test_one_expansion_per_union_branch_fills_one_field(widgets):
     ]
 
 
-def test_two_fields_of_one_model_are_refused(widgets):
+def test_two_fields_of_one_model_are_refused():
+    create_widgets()
+
     @dataclass
     class Pair:
         widget: Widget
         other: Widget
 
     statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}", result_type=Pair)
-    with pytest.raises(TypeError, match="more than one Widget field"):
+    with raises(TypeError, match="more than one Widget field"):
         statement.all()
 
 
-def test_prefetch_is_refused_on_a_result_type_statement(widgets):
+def test_prefetch_is_refused_on_a_result_type_statement():
     """`prefetch()` attaches to instances; a declared row is not one."""
+    create_widgets()
 
     @dataclass
     class WidgetRow:
         widget: Widget
         tag_count: int
 
-    with pytest.raises(TypeError, match="returns rows"):
+    with raises(TypeError, match="returns rows"):
         Widget.query.sql(
             t"""
             SELECT {Widget:*}, count(wt.id) AS tag_count
@@ -854,7 +901,8 @@ def test_prefetch_is_refused_on_a_result_type_statement(widgets):
         ).prefetch("tags")
 
 
-def test_result_type_maps_columns_by_name(widgets):
+def test_result_type_maps_columns_by_name():
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT count(*) AS n, {Widget.size} AS size
@@ -870,7 +918,7 @@ def test_result_type_maps_columns_by_name(widgets):
     ]
 
 
-def test_alias_markers_are_stripped(db):
+def test_alias_markers_are_stripped():
     """`AS "n!"` and `AS "oldest?"` map onto `n` and `oldest`."""
     MixinTestModel.query.create(name="one")
     MixinTestModel.query.create(name="one")
@@ -897,7 +945,7 @@ def test_alias_markers_are_stripped(db):
     assert isinstance(row.oldest, datetime.datetime)
 
 
-def test_result_type_converters_run(db):
+def test_result_type_converters_run():
     SecretStore.query.create(name="prod", api_key="sk-live-123", config={"a": 1})
 
     @dataclass
@@ -920,7 +968,7 @@ def test_result_type_converters_run(db):
     )
 
 
-def test_json_is_parsed_even_without_a_field(db):
+def test_json_is_parsed_even_without_a_field():
     """`jsonb` is loaded as text and parsed by a converter — including here."""
 
     @dataclass
@@ -935,7 +983,9 @@ def test_json_is_parsed_even_without_a_field(db):
     assert statement.get() == JsonRow(payload={"a": 1})
 
 
-def test_a_result_type_field_with_a_default_need_not_be_selected(widgets):
+def test_a_result_type_field_with_a_default_need_not_be_selected():
+    create_widgets()
+
     @dataclass
     class PartialRow:
         name: str
@@ -949,7 +999,7 @@ def test_a_result_type_field_with_a_default_need_not_be_selected(widgets):
     assert statement.first() == PartialRow(name="large-widget")
 
 
-def test_an_encrypted_column_that_lost_its_source_is_refused(db):
+def test_an_encrypted_column_that_lost_its_source_is_refused():
     """Nothing can decrypt a column whose source an expression threw away."""
     SecretStore.query.create(name="prod", api_key="sk-live-123")
 
@@ -961,11 +1011,12 @@ def test_an_encrypted_column_that_lost_its_source_is_refused(db):
         t"SELECT coalesce({SecretStore.api_key}, '') AS api_key FROM {SecretStore}",
         result_type=SecretRow,
     )
-    with pytest.raises(TypeError, match="nothing can decrypt it"):
+    with raises(TypeError, match="nothing can decrypt it"):
         statement.all()
 
 
-def test_prefetch_loads_related_objects(widgets, capture_queries, executed_sql):
+def test_prefetch_loads_related_objects():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} ORDER BY {Widget.name}"
     ).prefetch("tags")
@@ -983,7 +1034,8 @@ def test_prefetch_loads_related_objects(widgets, capture_queries, executed_sql):
 # ---------------------------------------------------------------------------
 
 
-def test_get_first_count_exists(widgets):
+def test_get_first_count_exists():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} ORDER BY {Widget.name}",
     )
@@ -1000,29 +1052,32 @@ def test_get_first_count_exists(widgets):
     assert one.get().name == "small-widget"
 
 
-def test_get_raises_the_models_exceptions(widgets):
+def test_get_raises_the_models_exceptions():
+    create_widgets()
     size = "nope"
     none = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}"
     )
-    with pytest.raises(Widget.DoesNotExist):
+    with raises(Widget.DoesNotExist):
         none.get()
 
     both = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
-    with pytest.raises(Widget.MultipleObjectsReturned):
+    with raises(Widget.MultipleObjectsReturned):
         both.get()
 
 
-def test_get_on_a_row_statement_raises_value_error(widgets):
+def test_get_on_a_row_statement_raises_value_error():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT {Widget.size} AS size, count(*) AS n FROM {Widget} GROUP BY 1",
         result_type=SizeCount,
     )
-    with pytest.raises(ValueError, match="2 rows"):
+    with raises(ValueError, match="2 rows"):
         statement.get()
 
 
-def test_exists_is_false_on_no_rows(widgets):
+def test_exists_is_false_on_no_rows():
+    create_widgets()
     size = "nope"
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size}"
@@ -1038,7 +1093,8 @@ def test_exists_is_false_on_no_rows(widgets):
 # ---------------------------------------------------------------------------
 
 
-def test_write_with_returning_gives_instances(widgets):
+def test_write_with_returning_gives_instances():
+    create_widgets()
     size = "medium"
     name = "small-widget"
     statement = Widget.query.sql(
@@ -1054,7 +1110,8 @@ def test_write_with_returning_gives_instances(widgets):
     assert Widget.query.get(name="small-widget").size == "medium"
 
 
-def test_write_without_returning_gives_a_row_count(widgets):
+def test_write_without_returning_gives_a_row_count():
+    create_widgets()
     size = "tiny"
     old = "small"
     statement = Widget.query.sql(
@@ -1068,22 +1125,24 @@ def test_write_without_returning_gives_a_row_count(widgets):
     assert Widget.query.filter(size="tiny").count() == 1
 
 
-def test_asking_a_resultless_write_about_rows_is_refused(widgets):
+def test_asking_a_resultless_write_about_rows_is_refused():
     """0 would read like "the UPDATE matched nothing"."""
+    create_widgets()
     size = "tiny"
     statement = Widget.query.sql(t"UPDATE {Widget} SET {Widget.size:name} = {size}")
-    with pytest.raises(TypeError, match="use execute\\(\\)"):
+    with raises(TypeError, match="use execute\\(\\)"):
         statement.count()
-    with pytest.raises(TypeError, match="use execute\\(\\)"):
+    with raises(TypeError, match="use execute\\(\\)"):
         statement.exists()
-    with pytest.raises(TypeError, match="use execute\\(\\)"):
+    with raises(TypeError, match="use execute\\(\\)"):
         bool(statement)
     # ...and it still ran exactly once.
     assert Widget.query.filter(size="tiny").count() == 2
 
 
-def test_execute_counts_rows_without_shaping_them(widgets):
+def test_execute_counts_rows_without_shaping_them():
     """A write can RETURNING without saying what a row is; execute() counts."""
+    create_widgets()
     size = "small"
     statement = Widget.query.sql(
         t"DELETE FROM {Widget} WHERE {Widget.size} = {size} RETURNING {Widget.id}"
@@ -1093,8 +1152,9 @@ def test_execute_counts_rows_without_shaping_them(widgets):
     assert Widget.query.filter(size="small").count() == 0
 
 
-def test_a_write_runs_once_however_it_is_asked(widgets):
+def test_a_write_runs_once_however_it_is_asked():
     """count()/first()/get() never run a write a second time."""
+    create_widgets()
     name = "once"
     size = "small"
     statement = Widget.query.sql(
@@ -1110,7 +1170,7 @@ def test_a_write_runs_once_however_it_is_asked(widgets):
     assert Widget.query.filter(name="once").count() == 1
 
 
-def test_insert_returning_a_result_type(db):
+def test_insert_returning_a_result_type():
     @dataclass
     class NewWidget:
         id: int
@@ -1131,16 +1191,17 @@ def test_insert_returning_a_result_type(db):
     assert Widget.query.get(id=row.id).name == "fresh"
 
 
-def test_unique_violation_maps_to_validation_error(widgets):
+def test_unique_violation_maps_to_validation_error():
     """Any model's constraint maps, not just the queryset's own."""
+    create_widgets()
     name = "red"  # unique_tag_name already holds "red"
     statement = Widget.query.sql(t"INSERT INTO {Tag} ({Tag.name:name}) VALUES ({name})")
-    with pytest.raises(ValidationError):
+    with raises(ValidationError):
         statement.execute()
 
 
-def test_foreign_key_violation_maps_to_validation_error(widgets):
-    small, _ = widgets
+def test_foreign_key_violation_maps_to_validation_error():
+    small, _ = create_widgets()
     widget_id = small.id
     tag_id = 999_999
     statement = WidgetTag.query.sql(
@@ -1149,7 +1210,7 @@ def test_foreign_key_violation_maps_to_validation_error(widgets):
         VALUES ({widget_id}, {tag_id})
         """
     )
-    with pytest.raises(ValidationError):
+    with raises(ValidationError):
         statement.execute()
 
 
@@ -1158,14 +1219,14 @@ def test_foreign_key_violation_maps_to_validation_error(widgets):
 # ---------------------------------------------------------------------------
 
 
-def test_a_string_is_not_a_template(db):
+def test_a_string_is_not_a_template():
     """The static half is in tests/typing/written_sql.py."""
     statement = "SELECT {Widget:*} FROM {Widget}"
-    with pytest.raises(TypeError, match="takes a t-string"):
+    with raises(TypeError, match="takes a t-string"):
         Widget.query.sql(statement)  # ty: ignore[invalid-argument-type]
 
 
-def test_a_hand_built_template_is_the_deliberate_escape_hatch(db):
+def test_a_hand_built_template_is_the_deliberate_escape_hatch():
     """What the type actually guarantees, stated honestly.
 
     `sql()` refuses a `str`, so no string reaches it by accident. Building a
@@ -1182,43 +1243,43 @@ def test_a_hand_built_template_is_the_deliberate_escape_hatch(db):
     assert Widget.query.sql(built, result_type=Row).get() == Row(n=1)
 
 
-def test_values_are_not_passed_by_keyword(db):
+def test_values_are_not_passed_by_keyword():
     """A t-string already carries its values; there is no `**values`."""
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
+    with raises(TypeError, match="unexpected keyword argument"):
         Widget.query.sql(  # ty: ignore[no-matching-overload]
             t"SELECT {Widget:*} FROM {Widget}", size="small"
         )
 
 
-def test_a_conversion_is_refused(db):
+def test_a_conversion_is_refused():
     size = "small"
-    with pytest.raises(ValueError, match="uses a conversion"):
+    with raises(ValueError, match="uses a conversion"):
         Widget.query.sql(
             t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size!r}"
         )
 
 
-def test_a_bad_format_spec_on_a_column_quotes_what_was_written(db):
-    with pytest.raises(ValueError, match=r"\{Widget\.size:bare\}"):
+def test_a_bad_format_spec_on_a_column_quotes_what_was_written():
+    with raises(ValueError, match=r"\{Widget\.size:bare\}"):
         Widget.query.sql(t"SELECT {Widget.size:bare} FROM {Widget}")
 
 
-def test_a_bad_format_spec_on_a_model_quotes_what_was_written(db):
-    with pytest.raises(ValueError, match=r"\{Widget:all\}"):
+def test_a_bad_format_spec_on_a_model_quotes_what_was_written():
+    with raises(ValueError, match=r"\{Widget:all\}"):
         Widget.query.sql(t"SELECT {Widget:all} FROM {Widget}")
 
 
-def test_a_format_spec_on_a_value_is_refused(db):
+def test_a_format_spec_on_a_value_is_refused():
     size = "small"
-    with pytest.raises(ValueError, match="a value takes no format spec"):
+    with raises(ValueError, match="a value takes no format spec"):
         Widget.query.sql(
             t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size:>10}"
         )
 
 
-def test_a_format_spec_on_a_nested_template_is_refused(db):
+def test_a_format_spec_on_a_nested_template_is_refused():
     predicate = t"{Widget.size} = 'small'"
-    with pytest.raises(ValueError, match="nested template takes no format spec"):
+    with raises(ValueError, match="nested template takes no format spec"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {predicate:x}")
 
 
@@ -1227,13 +1288,14 @@ def test_a_format_spec_on_a_nested_template_is_refused(db):
 # ---------------------------------------------------------------------------
 
 
-def test_an_undoubled_regex_quantifier_is_refused(db):
+def test_an_undoubled_regex_quantifier_is_refused():
     """`{2}` is a quantifier the braces weren't doubled in, not a parameter."""
-    with pytest.raises(ValueError, match="interpolates the number 2"):
+    with raises(ValueError, match="interpolates the number 2"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE name ~ '^a{2}$'")
 
 
-def test_a_doubled_regex_quantifier_renders_the_brace(widgets):
+def test_a_doubled_regex_quantifier_renders_the_brace():
+    create_widgets()
     Widget.query.create(name="aa", size="small")
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.name} ~ '^a{{2}}$'"
@@ -1242,18 +1304,18 @@ def test_a_doubled_regex_quantifier_renders_the_brace(widgets):
     assert statement.get().name == "aa"
 
 
-def test_an_undoubled_regex_range_is_refused(db):
+def test_an_undoubled_regex_range_is_refused():
     """`{2,5}` reaches the renderer as a tuple of two ints."""
-    with pytest.raises(ValueError, match="interpolates a tuple"):
+    with raises(ValueError, match="interpolates a tuple"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE name ~ '^a{2, 5}$'")
 
 
-def test_an_undoubled_array_literal_is_refused(db):
-    with pytest.raises(ValueError, match="interpolates a tuple"):
+def test_an_undoubled_array_literal_is_refused():
+    with raises(ValueError, match="interpolates a tuple"):
         Widget.query.sql(t"SELECT '{1, 2, 3}'::int[] AS ids")
 
 
-def test_a_doubled_array_literal_renders(db):
+def test_a_doubled_array_literal_renders():
     @dataclass
     class Ids:
         ids: list
@@ -1262,17 +1324,17 @@ def test_a_doubled_array_literal_renders(db):
     assert statement.get() == Ids(ids=[1, 2, 3])
 
 
-def test_an_undoubled_jsonb_literal_is_refused(db):
+def test_an_undoubled_jsonb_literal_is_refused():
     """`{"a": 1}` splits into the expression `"a"` and a junk format spec.
 
     So it lands on the format-spec refusal rather than the brace lookalike,
     and that message carries the doubling hint too.
     """
-    with pytest.raises(ValueError, match="double it"):
+    with raises(ValueError, match="double it"):
         Widget.query.sql(t"""SELECT '{"a": 1}'::jsonb AS payload""")
 
 
-def test_a_doubled_jsonb_literal_renders(db):
+def test_a_doubled_jsonb_literal_renders():
     @dataclass
     class Payload:
         payload: dict
@@ -1283,7 +1345,7 @@ def test_a_doubled_jsonb_literal_renders(db):
     assert statement.get() == Payload(payload={"a": 1})
 
 
-def test_none_binds_as_null(db):
+def test_none_binds_as_null():
     """`{None}` is a value, not a brace lookalike — it sets a column NULL."""
     ReturningEvent.query.create(label="signup", count=1, payload={"plan": "pro"})
 
@@ -1297,7 +1359,8 @@ def test_none_binds_as_null(db):
     assert statement.get().payload is None
 
 
-def test_a_string_literal_binds(widgets):
+def test_a_string_literal_binds():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {'small'}"
     )
@@ -1305,7 +1368,7 @@ def test_a_string_literal_binds(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_a_boolean_literal_binds(db):
+def test_a_boolean_literal_binds():
     @dataclass
     class Flag:
         flag: bool
@@ -1320,30 +1383,31 @@ def test_a_boolean_literal_binds(db):
 # ---------------------------------------------------------------------------
 
 
-def test_a_traversal_is_not_a_column(db):
+def test_a_traversal_is_not_a_column():
     """`where()` follows a relation by building a join; a written query can't."""
-    with pytest.raises(ValueError, match="is a traversal"):
+    with raises(ValueError, match="is a traversal"):
         WidgetTag.query.sql(t"SELECT {WidgetTag.widget.name} FROM {WidgetTag}")
 
 
-def test_a_model_instance_is_not_a_value(widgets):
+def test_a_model_instance_is_not_a_value():
     """`{job}` where `{job.id}` was meant, caught before it reaches psycopg."""
-    small, _ = widgets
-    with pytest.raises(TypeError, match="instance, not something"):
+    small, _ = create_widgets()
+    with raises(TypeError, match="instance, not something"):
         Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = {small}")
 
 
-def test_a_many_to_many_accessor_is_not_a_column(db):
-    with pytest.raises(TypeError, match="is a relation"):
+def test_a_many_to_many_accessor_is_not_a_column():
+    with raises(TypeError, match="is a relation"):
         Widget.query.sql(t"SELECT {Widget.tags} FROM {Widget}")
 
 
-def test_a_reverse_accessor_is_not_a_column(db):
-    with pytest.raises(TypeError, match="is a relation"):
+def test_a_reverse_accessor_is_not_a_column():
+    with raises(TypeError, match="is a relation"):
         Tag.query.sql(t"SELECT {Tag.widgets} FROM {Tag}")
 
 
-def test_a_trailing_semicolon_is_dropped(widgets):
+def test_a_trailing_semicolon_is_dropped():
+    create_widgets()
     size = "small"
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size};"
@@ -1351,8 +1415,9 @@ def test_a_trailing_semicolon_is_dropped(widgets):
     assert statement.get().name == "small-widget"
 
 
-def test_a_second_statement_is_refused_when_a_parameter_binds(widgets):
+def test_a_second_statement_is_refused_when_a_parameter_binds():
     """With a parameter the statement goes over the extended protocol."""
+    create_widgets()
     size = "small"
     statement = Widget.query.sql(
         t"""
@@ -1360,37 +1425,39 @@ def test_a_second_statement_is_refused_when_a_parameter_binds(widgets):
         DELETE FROM {Widget}
         """
     )
-    with pytest.raises(psycopg.errors.SyntaxError, match="multiple commands"):
+    with raises(psycopg.errors.SyntaxError, match="multiple commands"):
         statement.execute()
 
 
-def test_a_second_statement_is_refused_without_parameters(widgets):
+def test_a_second_statement_is_refused_without_parameters():
     """With nothing to bind psycopg sends a simple query, which would run both."""
-    with pytest.raises(ValueError, match="single statement"):
+    create_widgets()
+    with raises(ValueError, match="single statement"):
         Widget.query.sql(t"SELECT 1 AS n; DELETE FROM {Widget}")
     assert Widget.query.count() == 2
 
 
-def test_sql_needs_a_bare_queryset(db):
-    with pytest.raises(TypeError, match="where\\(\\)/filter\\(\\)"):
+def test_sql_needs_a_bare_queryset():
+    with raises(TypeError, match="where\\(\\)/filter\\(\\)"):
         Widget.query.where(Widget.size.equals("small")).sql(
             t"SELECT {Widget:*} FROM {Widget}"
         )
-    with pytest.raises(TypeError, match="order_by"):
+    with raises(TypeError, match="order_by"):
         Widget.query.order_by("name").sql(t"SELECT {Widget:*} FROM {Widget}")
-    with pytest.raises(TypeError, match="slicing"):
+    with raises(TypeError, match="slicing"):
         Widget.query.all()[:2].sql(t"SELECT {Widget:*} FROM {Widget}")
 
 
-def test_result_type_must_be_a_dataclass(db):
-    with pytest.raises(TypeError, match="requires a dataclass"):
+def test_result_type_must_be_a_dataclass():
+    with raises(TypeError, match="requires a dataclass"):
         Widget.query.sql(  # ty: ignore[no-matching-overload]
             t"SELECT 1 AS n FROM {Widget}", result_type=int
         )
 
 
-def test_a_star_inside_a_subquery_is_just_columns(widgets):
+def test_a_star_inside_a_subquery_is_just_columns():
     """`result_type=` says what a row is; a `{Model:*}` below it is columns."""
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT count(*) AS n, {Widget.size} AS size
@@ -1406,28 +1473,32 @@ def test_a_star_inside_a_subquery_is_just_columns(widgets):
     ]
 
 
-def test_a_star_that_cannot_be_found_says_where_to_look(widgets):
+def test_a_star_that_cannot_be_found_says_where_to_look():
+    create_widgets()
     statement = Widget.query.sql(
         t"SELECT count(*) AS n FROM (SELECT {Widget:*} FROM {Widget}) sub"
     )
-    with pytest.raises(TypeError, match="inside a subquery"):
+    with raises(TypeError, match="inside a subquery"):
         statement.all()
 
 
-def test_two_models_starred_are_refused(db):
-    with pytest.raises(TypeError, match="more than one model"):
+def test_two_models_starred_are_refused():
+    with raises(TypeError, match="more than one model"):
         Widget.query.sql(
             t"SELECT {Widget:*}, {Tag:*} FROM {Widget}, {Tag}",
         )
 
 
-def test_rows_with_no_result_type_are_refused(widgets):
+def test_rows_with_no_result_type_are_refused():
+    create_widgets()
     statement = Widget.query.sql(t"SELECT {Widget.size} AS size FROM {Widget}")
-    with pytest.raises(TypeError, match="result_type"):
+    with raises(TypeError, match="result_type"):
         statement.all()
 
 
-def test_result_type_column_mismatch(widgets):
+def test_result_type_column_mismatch():
+    create_widgets()
+
     @dataclass
     class Wrong:
         size: str
@@ -1436,11 +1507,13 @@ def test_result_type_column_mismatch(widgets):
     statement = Widget.query.sql(
         t"SELECT {Widget.size} AS size FROM {Widget}", result_type=Wrong
     )
-    with pytest.raises(TypeError, match="no column for missing"):
+    with raises(TypeError, match="no column for missing"):
         statement.all()
 
 
-def test_result_type_type_mismatch(widgets):
+def test_result_type_type_mismatch():
+    create_widgets()
+
     @dataclass
     class Wrong:
         size: Decimal
@@ -1450,12 +1523,13 @@ def test_result_type_type_mismatch(widgets):
         t"SELECT {Widget.size} AS size, count(*) AS n FROM {Widget} GROUP BY 1",
         result_type=Wrong,
     )
-    with pytest.raises(TypeError, match="comes back as str"):
+    with raises(TypeError, match="comes back as str"):
         statement.all()
 
 
-def test_the_plan_follows_the_columns_not_the_template(widgets):
+def test_the_plan_follows_the_columns_not_the_template():
     """The same statement with a different subquery is a different statement."""
+    create_widgets()
     by_name = Widget.query.values("name")
     names = Widget.query.sql(
         t'SELECT sub."name" AS name FROM {by_name} sub ORDER BY 1',
@@ -1468,12 +1542,13 @@ def test_the_plan_follows_the_columns_not_the_template(widgets):
         t'SELECT sub."name" AS name FROM {by_size} sub ORDER BY 1',
         result_type=NameRow,
     )
-    with pytest.raises(psycopg.errors.UndefinedColumn):
+    with raises(psycopg.errors.UndefinedColumn):
         sizes.all()
 
 
-def test_a_trailing_comment_survives_the_row_limit(widgets):
+def test_a_trailing_comment_survives_the_row_limit():
     """first()/get()/count() wrap the statement; a `-- comment` can't swallow it."""
+    create_widgets()
     statement = Widget.query.sql(
         t"""
         SELECT {Widget:*} FROM {Widget} ORDER BY {Widget.name}
@@ -1486,7 +1561,8 @@ def test_a_trailing_comment_survives_the_row_limit(widgets):
     assert statement.count() == 2
 
 
-def test_a_trailing_semicolon_is_dropped_from_the_sql_too(widgets):
+def test_a_trailing_semicolon_is_dropped_from_the_sql_too():
+    create_widgets()
     size = "small"
     statement = Widget.query.sql(
         t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.size} = {size};  "
@@ -1494,7 +1570,8 @@ def test_a_trailing_semicolon_is_dropped_from_the_sql_too(widgets):
     assert not statement.sql.rstrip().endswith(";")
 
 
-def test_prefetch_after_a_write_does_not_run_it_again(widgets):
+def test_prefetch_after_a_write_does_not_run_it_again():
+    create_widgets()
     name = "once"
     size = "small"
     statement = Widget.query.sql(
@@ -1509,7 +1586,7 @@ def test_prefetch_after_a_write_does_not_run_it_again(widgets):
     assert Widget.query.filter(name="once").count() == 1
 
 
-def test_a_ciphertext_column_is_refused_on_every_execution(db):
+def test_a_ciphertext_column_is_refused_on_every_execution():
     """A NULL first row, or a plan built by another statement, is no excuse."""
     SecretStore.query.create(name="null-one", api_key="k")
 
@@ -1526,11 +1603,11 @@ def test_a_ciphertext_column_is_refused_on_every_execution(db):
         t"SELECT coalesce({SecretStore.api_key}, '') AS v FROM {SecretStore}",
         result_type=Row,
     )
-    with pytest.raises(TypeError, match="nothing can decrypt it"):
+    with raises(TypeError, match="nothing can decrypt it"):
         leaky.all()
 
 
-def test_a_ciphertext_column_is_caught_past_the_first_row(db):
+def test_a_ciphertext_column_is_caught_past_the_first_row():
     SecretStore.query.create(name="a", api_key="k1", notes="")
     SecretStore.query.create(name="b", api_key="k2", notes="")
 
@@ -1548,27 +1625,28 @@ def test_a_ciphertext_column_is_caught_past_the_first_row(db):
         """,
         result_type=Row,
     )
-    with pytest.raises(TypeError, match="nothing can decrypt it"):
+    with raises(TypeError, match="nothing can decrypt it"):
         statement.all()
 
 
-def test_a_model_with_a_default_scope_can_still_write_sql(widgets, monkeypatch):
+def test_a_model_with_a_default_scope_can_still_write_sql():
     """A default-filtering queryset is the starting point, not a narrowing.
 
     The scope is *not* applied to the statement — that's the whole point of
     writing it — so the statement states its own predicate.
     """
+    create_widgets()
     from plain import postgres
 
     class SmallOnlyQuerySet(postgres.QuerySet):
         def __get__(self, instance, owner):
             return super().__get__(instance, owner).filter(size="small")
 
-    monkeypatch.setattr(Widget, "query", SmallOnlyQuerySet())
-    assert Widget.query.count() == 1  # the scope is live
+    with patch(Widget, "query", SmallOnlyQuerySet()):
+        assert Widget.query.count() == 1  # the scope is live
 
-    statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
-    assert len(statement.all()) == 2  # and not applied to written SQL
+        statement = Widget.query.sql(t"SELECT {Widget:*} FROM {Widget}")
+        assert len(statement.all()) == 2  # and not applied to written SQL
 
-    with pytest.raises(TypeError, match="order_by"):
-        Widget.query.order_by("name").sql(t"SELECT {Widget:*} FROM {Widget}")
+        with raises(TypeError, match="order_by"):
+            Widget.query.order_by("name").sql(t"SELECT {Widget:*} FROM {Widget}")

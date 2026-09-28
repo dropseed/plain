@@ -11,7 +11,7 @@ from plain.postgres.fields.reverse_related import ForeignKeyRel
 
 
 class TestMetaRelatedObjects:
-    def test_meta_related_objects_includes_reverse_fk(self, db):
+    def test_meta_related_objects_includes_reverse_fk(self):
         """Test that Meta.related_objects includes reverse FK relations.
 
         Regression test: related_objects was checking obj.field.one_to_many
