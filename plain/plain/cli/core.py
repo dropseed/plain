@@ -19,7 +19,6 @@ from .install import install
 from .memory import memory
 from .preflight import preflight_cli
 from .registry import cli_registry
-from .request import request
 from .scaffold import create
 from .server import server
 from .settings import settings
@@ -46,7 +45,6 @@ _PLAIN_ENV_DEFAULTS = {
 
 plain_cli.add_command(check)
 plain_cli.add_command(docs)
-plain_cli.add_command(request)
 plain_cli.add_command(memory)
 plain_cli.add_command(agent)
 plain_cli.add_command(preflight_cli)

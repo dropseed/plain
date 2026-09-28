@@ -15,7 +15,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["plain.testing<1.0.0"]
+dev = [
+  "plain.testing<1.0.0",
+  # `plain request --user` logs in through plain.auth, and is tested here.
+  "plain.dev<1.0.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

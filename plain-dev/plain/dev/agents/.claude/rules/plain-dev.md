@@ -15,6 +15,23 @@ line, that tunnel URL is the canonical app URL — use it for browser navigation
 screenshots, and shared links. Use the localhost `Server running at ...` URL only
 when there's no tunnel, or for local CLI checks (`curl`, `plain request`).
 
+## Requests without a server
+
+`uv run plain request /path` makes a request to the app in-process, against
+the dev database, and prints the response with a trace of what ran. It only
+runs when `DEBUG` is on.
+
+- `--user <id or email>` makes it that user's request. `--method`, `--data`,
+  `--header` and `--content-type` shape it.
+- `--status`, `--contains` and `--not-contains` assert on the response, and the
+  command exits non-zero when one fails.
+- Every response prints a trace summary: duration, span and query counts, and
+  each statement with its repeat count and call sites. There is one block per
+  request, so a followed redirect chain gets one per hop.
+- `--trace` adds the complete query list and the span tree. `--json` is the
+  context-frugal form: response metadata and the full traces, no response body.
+- Writes persist. It is the dev database, not a test one that rolls back.
+
 ## Worktrees and `.plain/`
 
 - `.plain/` holds a checkout's disposable _artifacts_ — logs, compiled assets,

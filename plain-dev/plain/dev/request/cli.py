@@ -1,15 +1,14 @@
 import json
 import os
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
+from plain.cli import register_cli
 from plain.preflight import set_check_counts
 from plain.runtime import settings
-from plain.test import Client
-from plain.test.client import ClientResponse
 
-from ._trace import (
+from .trace import (
     CapturedTrace,
     RawSpan,
     analyze_traces,
@@ -17,11 +16,14 @@ from ._trace import (
     capture_trace_spans,
 )
 
+if TYPE_CHECKING:
+    from plain.test import Client, ClientResponse
+
 _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
 
 _TRACE_UNAVAILABLE = (
-    "Trace capture skipped — it needs the OpenTelemetry SDK, which ships with "
-    "plain.connect or plain.testing."
+    "Trace capture skipped — the tracer provider installed in this process "
+    "isn't the OpenTelemetry SDK's, so there is nothing here to capture from."
 )
 
 _TRACE_EMPTY = (
@@ -38,10 +40,10 @@ def _trace_note(traces: list[CapturedTrace] | None) -> str | None:
     """Explain an unusable `traces`, or None when there is a trace to read.
 
     Anything that indexes into `traces` needs something to report instead of
-    an IndexError. `traces is None` with the SDK unavailable means capture was
-    skipped; with the SDK available it means dispatch was never reached, since
-    the analyzer runs unconditionally and any bug in it now propagates rather
-    than being folded into this note.
+    an IndexError. `traces is None` with capture unavailable means capture was
+    skipped; with it available it means dispatch was never reached, since the
+    analyzer runs unconditionally and any bug in it now propagates rather than
+    being folded into this note.
     """
     if traces is None:
         return _TRACE_UNAVAILABLE if not capture_available() else _TRACE_NOT_REACHED
@@ -61,7 +63,7 @@ _SQL_DISPLAY_WIDTH = 64
 def _dispatch_request(
     client: Client, method: str, path: str, kwargs: dict[str, Any]
 ) -> ClientResponse:
-    """Send the request through the test client."""
+    """Send the request through the client."""
     if method not in _HTTP_METHODS:
         click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
         raise SystemExit(1)
@@ -259,6 +261,7 @@ def _render_traces(traces: list[CapturedTrace] | None, *, detailed: bool) -> Non
         )
 
 
+@register_cli("request")
 @click.command()
 @click.argument("path")
 @click.option(
@@ -363,7 +366,11 @@ def request(
             click.secho("This command only works when DEBUG=True", fg="red", err=True)
             raise SystemExit(1)
 
-        # Create test client
+        # Imported here rather than at the top: plain.dev loads this module
+        # to register the command every time `plain` starts, and the client
+        # is only worth its import time when a request is actually made.
+        from plain.test import Client
+
         client = Client(headers={"Host": "localhost"})
 
         if user_id:
@@ -438,9 +445,8 @@ def request(
         # suite on first render, landing those queries in the captured trace.
         set_check_counts(errors=0, warnings=0)
 
-        # Dispatch the request, capturing a trace when the OpenTelemetry SDK
-        # is available (it ships with plain.connect / plain.testing, but is
-        # not a Plain core dependency).
+        # Dispatch the request, capturing a trace unless the process has a
+        # tracer provider we can't capture from.
         if capture_available():
             with capture_trace_spans() as otel_exporter:
                 try:
@@ -465,7 +471,7 @@ def request(
         elif response.status_code >= 500:
             failed.append(f"Server error: {response.status_code}")
 
-        # The test client reads a streaming body the way a server sends it,
+        # The client reads a streaming body the way a server sends it,
         # so a streamed body (e.g. an asset or export) is here to check too.
         body_bytes = response.body
         # A streamed body is only summarized below, so it's decoded just

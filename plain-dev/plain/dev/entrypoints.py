@@ -11,6 +11,7 @@ def setup() -> None:
     from .cli import cli  # noqa
     from .precommit import cli  # noqa
     from .contribute import cli  # noqa
+    from .request import request  # noqa
     from .services import auto_start_services
 
     has_postgres = find_spec("plain.postgres") is not None

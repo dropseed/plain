@@ -2,8 +2,8 @@
 
 Captures the OpenTelemetry spans emitted while handling a request and groups
 them — by statement, by trace — for human and agent inspection. Spans come
-back as a flat list per trace; `request.py` turns that into the printed tree.
-Internal to `request`; not public API.
+back as a flat list per trace; `cli.py` turns that into the printed tree.
+Internal to `plain request`; not public API.
 
 This reports, it does not diagnose. Repeated statements are counted and their
 call sites recorded, but nothing here decides that a repeat is an N+1 — the
@@ -15,7 +15,6 @@ across three hops would read as a 3x repeat that no one can fix.
 """
 
 from contextlib import contextmanager
-from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 
 from opentelemetry import trace
@@ -333,13 +332,10 @@ def _analyze_trace(spans: list[ReadableSpan]) -> CapturedTrace:
 def capture_available() -> bool:
     """Whether `capture_trace_spans` can run.
 
-    Needs the OpenTelemetry SDK importable (it ships with `plain.connect`
-    and `plain.testing`) and a global tracer provider `capture_trace_spans` knows
-    how to mutate — the SDK's own, or the proxy it can replace. A
-    third-party provider is left alone rather than crashed into.
+    Needs a global tracer provider `capture_trace_spans` knows how to mutate
+    — the SDK's own, or the proxy it can replace. A third-party provider is
+    left alone rather than crashed into.
     """
-    if find_spec("opentelemetry.sdk") is None:
-        return False
     from opentelemetry.sdk.trace import TracerProvider
 
     provider = trace.get_tracer_provider()
@@ -357,12 +353,19 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     is neither persisted nor shipped anywhere. The sampler and processors
     are restored on exit.
 
-    Requires the OpenTelemetry SDK — guard calls with `capture_available()`.
-    For one-shot, single-threaded callers such as CLI commands; it mutates
-    process-global tracing state.
+    This is not `plain.test.capture_spans`, which owns the process's tracer
+    provider and refuses to run when something else installed one. A test
+    process can promise that; `plain request` runs in the app as it is
+    configured for development, where `plain.connect` has usually installed
+    its provider already. So this one borrows that provider for the block
+    and hands it back.
+
+    Guard calls with `capture_available()`. For one-shot, single-threaded
+    callers such as CLI commands; it mutates process-global tracing state.
     """
-    # The SDK is not a Plain core dependency, so import it lazily — this
-    # module must stay importable on the CLI path without it.
+    # Imported here rather than at the top: plain.dev loads this module to
+    # register the command every time `plain` starts, and the SDK is only
+    # worth its import time when a request is actually made.
     from opentelemetry.sdk.trace import (
         SynchronousMultiSpanProcessor,
         TracerProvider,

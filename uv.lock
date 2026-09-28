@@ -781,6 +781,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "plain-dev" },
     { name = "plain-testing" },
 ]
 
@@ -792,7 +793,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "plain-testing", editable = "plain-testing" }]
+dev = [
+    { name = "plain-dev", editable = "plain-dev" },
+    { name = "plain-testing", editable = "plain-testing" },
+]
 
 [[package]]
 name = "plain-cache"
@@ -909,13 +913,13 @@ dependencies = [
     { name = "cryptography" },
     { name = "plain" },
     { name = "plain-assets" },
+    { name = "plain-testing" },
     { name = "rich" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "plain-postgres" },
-    { name = "plain-testing" },
 ]
 
 [package.metadata]
@@ -924,14 +928,12 @@ requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "plain", editable = "plain" },
     { name = "plain-assets", editable = "plain-assets" },
+    { name = "plain-testing", editable = "plain-testing" },
     { name = "rich" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "plain-postgres", editable = "plain-postgres" },
-    { name = "plain-testing", editable = "plain-testing" },
-]
+dev = [{ name = "plain-postgres", editable = "plain-postgres" }]
 
 [[package]]
 name = "plain-elements"

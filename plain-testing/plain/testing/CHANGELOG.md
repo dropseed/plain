@@ -29,6 +29,7 @@ Replace the dev dependency and move the tests off pytest. Assertions don't chang
 - Run `plain test`. A half-migrated suite says what is left: each `conftest.py` is reported with the fixtures it defines, and a test that still asks for a fixture is rejected when its file is collected, with the test and its parameters named.
 - Move what each `conftest.py` holds, then delete the file. Fixtures tests ask for become functions in a helper module such as `tests/helpers.py`. Autouse fixtures that protected every test become `tests/lifecycle.py`.
 - Import helper modules by their bare names: `from helpers import create_user`, not `from tests.helpers import ...` or `from .helpers import ...`.
+- `plain request` now comes from `plain.dev`, not Plain itself. Nothing to change if `plain.dev` is in your dev dependencies, which it is in a project made with `plain-start`. The command, its flags and its output are the same.
 
 Fixtures:
 

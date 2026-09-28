@@ -216,22 +216,21 @@ Now when you run `plain shell`, those objects will be automatically imported and
 
 Plain includes several built-in commands:
 
-| Command                | Description                             |
-| ---------------------- | --------------------------------------- |
-| `plain check`          | Run core validation checks              |
-| `plain shell`          | Interactive Python shell                |
-| `plain request <path>` | Make a request against the dev database |
-| `plain server`         | Production-ready HTTP server            |
-| `plain preflight`      | Validation checks before deployment     |
-| `plain create <name>`  | Create a new local package              |
-| `plain settings`       | View current settings                   |
-| `plain urls`           | List all URL patterns                   |
-| `plain docs`           | View package documentation              |
-| `plain install`        | Install package dependencies            |
-| `plain upgrade`        | Upgrade Plain packages                  |
-| `plain memory`         | Memory profiling tools                  |
+| Command               | Description                         |
+| --------------------- | ----------------------------------- |
+| `plain check`         | Run core validation checks          |
+| `plain shell`         | Interactive Python shell            |
+| `plain server`        | Production-ready HTTP server        |
+| `plain preflight`     | Validation checks before deployment |
+| `plain create <name>` | Create a new local package          |
+| `plain settings`      | View current settings               |
+| `plain urls`          | List all URL patterns               |
+| `plain docs`          | View package documentation          |
+| `plain install`       | Install package dependencies        |
+| `plain upgrade`       | Upgrade Plain packages              |
+| `plain memory`        | Memory profiling tools              |
 
-Additional commands are added by installed packages (like `plain migrations apply` from plain.postgres).
+Additional commands are added by installed packages, like `plain migrations apply` from plain.postgres and [`plain request`](../../../plain-dev/plain/dev/README.md#plain-request) from plain.dev.
 
 ### `plain check`
 
@@ -256,25 +255,6 @@ my-check = {cmd = "echo 'running my check'"}
 ```
 
 Custom commands run first, before any built-in checks.
-
-### `plain request`
-
-Makes an HTTP request against your dev database, without a server running, and prints what came back:
-
-```console
-$ plain request /admin/ --user 1
-```
-
-You can set the method and body (`--method`, `--data`, `--header`, `--content-type`), authenticate as a user by id or email (`--user`), and assert on the result (`--status`, `--contains`, `--not-contains`) so it works as a quick check in a script.
-
-Every response also prints a **trace** — duration, span and query counts, and each distinct statement with how many times it ran and the call sites that issued it, which is usually where an N+1 turns out to live. Plain reports what ran and leaves the diagnosis to you. A followed redirect chain is several requests, so it prints one block per hop rather than one merged summary.
-
-Two flags control how much of the trace you see:
-
-- `--trace` — the complete query list plus the full span tree.
-- `--json` — response metadata and the complete trace as JSON, with no response body. This is the form to pipe into other tools.
-
-Trace capture needs the OpenTelemetry SDK, which ships with [plain.connect](../../../plain-connect/plain/connect/README.md) and [plain.testing](../../../plain-testing/plain/testing/README.md). Without it the command still works and says the trace was skipped.
 
 ### `plain memory`
 

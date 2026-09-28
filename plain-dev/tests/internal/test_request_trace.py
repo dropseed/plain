@@ -14,22 +14,22 @@ from opentelemetry.semconv.attributes.db_attributes import (
 )
 from opentelemetry.semconv.attributes.http_attributes import HTTP_REQUEST_METHOD
 from opentelemetry.semconv.attributes.url_attributes import URL_PATH
-from plain.cli import request as request_cli
-from plain.cli._trace import (
-    CapturedTrace,
-    RawSpan,
-    TraceAnalysis,
-    analyze_traces,
-    capture_available,
-    capture_trace_spans,
-)
-from plain.cli.request import (
+from plain.dev.request import cli as request_cli
+from plain.dev.request.cli import (
     _TRACE_EMPTY,
     _TRACE_NOT_REACHED,
     _TRACE_UNAVAILABLE,
     _render_span_tree,
     _render_traces,
     _trace_note,
+)
+from plain.dev.request.trace import (
+    CapturedTrace,
+    RawSpan,
+    TraceAnalysis,
+    analyze_traces,
+    capture_available,
+    capture_trace_spans,
 )
 from plain.test import CapturedSpans, capture_spans, patch
 

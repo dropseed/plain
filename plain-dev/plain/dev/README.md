@@ -12,6 +12,7 @@
     - [`plain dev services`](#plain-dev-services)
     - [`plain dev logs`](#plain-dev-logs)
     - [`plain pre-commit`](#plain-pre-commit)
+    - [`plain request`](#plain-request)
 - [Databases](#databases)
     - [A database per checkout](#a-database-per-checkout)
     - [New checkouts start with your data](#new-checkouts-start-with-your-data)
@@ -116,6 +117,27 @@ Custom commands can be defined in `pyproject.toml` at `tool.plain.check.run` and
 [tool.plain.check.run]
 my-check = {cmd = "echo 'running my check'"}
 ```
+
+### `plain request`
+
+Makes a request to your app without a server running, against your dev database, and prints what came back:
+
+```console
+$ plain request /admin/ --user 1
+```
+
+You can set the method and body (`--method`, `--data`, `--header`, `--content-type`), make it a user's request by id or email (`--user`, which needs [plain.auth](../../../plain-auth/plain/auth/README.md)), and assert on the result (`--status`, `--contains`, `--not-contains`) so it works as a quick check in a script. Redirects are followed unless you pass `--no-follow`.
+
+It makes its requests with the same [client](../../../plain/plain/test/README.md) your tests use. What's different is the database: this is your dev database, so what a `POST` writes stays written. The command only runs when `DEBUG` is on.
+
+Every response also prints a **trace**: duration, span and query counts, and each distinct statement with how many times it ran and the call sites that issued it, which is usually where an N+1 turns out to live. It reports what ran and leaves the diagnosis to you. A followed redirect chain is several requests, so it prints one block per hop rather than one merged summary.
+
+Two flags control how much of the trace you see:
+
+- `--trace`: the complete query list plus the full span tree.
+- `--json`: response metadata and the complete trace as JSON, with no response body. This is the form to pipe into other tools.
+
+A request made this way isn't exported anywhere. If [plain.connect](../../../plain-connect/plain/connect/README.md) is sending traces to Plain Cloud, the command sets that aside for the length of the request and puts it back afterwards.
 
 ## Databases
 
