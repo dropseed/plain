@@ -47,7 +47,12 @@ class Reporter(Protocol):
     help="Leave out tests tagged NAME (repeatable)",
 )
 @click.option("-x", "--fail-fast", is_flag=True, help="Stop at the first failure")
-@click.option("-v", "--verbose", is_flag=True, help="Print one line per test")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Print one line per test (not with --json)",
+)
 @click.option(
     "--full-values",
     is_flag=True,
@@ -57,7 +62,18 @@ class Reporter(Protocol):
     "-s",
     "--show-output",
     is_flag=True,
-    help="Let what tests print and log through as they write it",
+    help="Let what tests print and log through as they write it (not with --json)",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print the run as one JSON document, when it is over",
+)
+@click.option(
+    "--list-passed",
+    is_flag=True,
+    help="With --json, list the tests that passed too",
 )
 def main(
     targets: tuple[str, ...],
@@ -68,6 +84,8 @@ def main(
     verbose: bool,
     full_values: bool,
     show_output: bool,
+    as_json: bool,
+    list_passed: bool,
 ) -> None:
     """Run tests
 
@@ -88,7 +106,29 @@ def main(
 
     What a test prints or logs is held while it runs. A test that fails has
     it printed with its failure, and a test that passes has it thrown away.
+
+    With --json nothing is printed until the run is over, and then one
+    document is: what was asked for, what ran, and for each failure
+    everything the text report would have said, as data.
     """
+    if as_json and verbose:
+        raise click.UsageError(
+            "--json prints one document when the run is over, and -v has"
+            " nothing to add to it. Pass --list-passed to have every test in"
+            " the document."
+        )
+    if as_json and show_output:
+        raise click.UsageError(
+            "--json writes one document to stdout and nothing else, so it"
+            " can't let output through with --show-output. A failure in the"
+            " document carries what its test wrote."
+        )
+    if list_passed and not as_json:
+        raise click.UsageError(
+            "--list-passed says what goes in the --json document. For a line"
+            " per test as they run, pass -v."
+        )
+
     # Tests run with PLAIN_ENV=test. The runner reads no `.env` files itself:
     # plain.dev does, for every command, from the hook it registers with
     # `plain.runtime.setup()`. With this set first, that hook picks
@@ -100,11 +140,13 @@ def main(
     # output a test is asserting on.
     os.environ["PLAIN_TEST_RUNNING"] = "1"
 
+    from .json_report import JsonReporter
     from .output_capture import OutputCapture
     from .report import Command
     from .reporting import TextReporter
 
     command = Command(
+        argv=tuple(sys.argv),
         directory=str(Path.cwd()),
         targets=targets,
         keyword=keyword,
@@ -116,9 +158,13 @@ def main(
 
     # Held from here, before the app is set up: setting it up writes too.
     with OutputCapture(show_output=show_output, full_output=full_values) as capture:
-        reporter = TextReporter(
-            out=capture.real_stdout, err=capture.real_stderr, verbose=verbose
-        )
+        reporter: Reporter
+        if as_json:
+            reporter = JsonReporter(out=capture.real_stdout, list_passed=list_passed)
+        else:
+            reporter = TextReporter(
+                out=capture.real_stdout, err=capture.real_stderr, verbose=verbose
+            )
         report = _run(command, capture=capture, reporter=reporter)
         reporter.finished(report)
 

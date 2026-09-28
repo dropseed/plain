@@ -29,6 +29,8 @@ EXIT_INTERRUPTED = 130
 class Command:
     """What the run was asked to do."""
 
+    # The command line, as the process was given it.
+    argv: tuple[str, ...]
     # Where the command was run from. Every path in a report is relative
     # to it.
     directory: str
@@ -59,8 +61,9 @@ class Counts:
     passed: int
     failed: int
     skipped: int
-    # Chosen and never started: the run stopped at a failure, with
-    # `--fail-fast`, or was interrupted.
+    # Chosen and never finished: the run stopped at a failure, with
+    # `--fail-fast`, or was interrupted. The test that was running when it
+    # was interrupted is one of them.
     not_run: int
     collection_errors: int
 

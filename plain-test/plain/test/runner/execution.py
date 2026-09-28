@@ -6,7 +6,6 @@ import asyncio
 import dataclasses
 import inspect
 import time
-import traceback
 from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -18,6 +17,7 @@ from .failure import (
     Failure,
     describe_failure,
     failure_that_could_not_be_described,
+    format_traceback,
 )
 from .output_capture import Output, OutputCapture
 
@@ -50,7 +50,7 @@ class InterruptedTest:
 class TeardownError:
     """A lifecycle that raised while being taken down, after the last test."""
 
-    # Formatted.
+    # Formatted, with the runner's own frames taken off the top.
     traceback: str
     # What had been written since the last test.
     output: Output
@@ -140,10 +140,10 @@ def run_tests(
             # One lifecycle's teardown failure shouldn't skip the others.
             try:
                 lifecycle.teardown_worker()
-            except Exception:
+            except Exception as error:
                 teardown_errors.append(
                     TeardownError(
-                        traceback=traceback.format_exc(), output=capture.take()
+                        traceback=format_traceback(error), output=capture.take()
                     )
                 )
 

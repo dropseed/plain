@@ -36,6 +36,7 @@
     - [What the test wrote](#what-the-test-wrote)
     - [Skipped tests](#skipped-tests)
     - [Collection errors](#collection-errors)
+    - [As JSON](#as-json)
 - [Assertions](#assertions)
 - [What packages do for every test](#what-packages-do-for-every-test)
 - [Project lifecycle](#project-lifecycle)
@@ -586,6 +587,7 @@ plain test -x                                   # stop at the first failure
 plain test -v                                   # one line per test, with its duration
 plain test --full-values                        # print every value in a failure whole
 plain test -s                                   # let what tests print through as they write it
+plain test --json                               # one JSON document, when the run is over
 ```
 
 | Flag                  | What it does                                          |
@@ -597,6 +599,8 @@ plain test -s                                   # let what tests print through a
 | `-v`, `--verbose`     | Print one line per test                               |
 | `--full-values`       | Print every value and all the output in a failure     |
 | `-s`, `--show-output` | Let what tests print and log through as it's written  |
+| `--json`              | Print the run as [one JSON document](#as-json)        |
+| `--list-passed`       | With `--json`, list the tests that passed too         |
 
 `plain test --help` prints the same list, and the forms a target can take.
 
@@ -927,6 +931,230 @@ COLLECTION ERROR tests/conftest.py
 
 The tests that needed nothing from it still run. The ones that asked for a fixture are collection errors of their own.
 
+### As JSON
+
+`plain test --json` prints nothing while the run goes, and one document when it's over. The document is all that's written to stdout, so it can be piped straight to what reads it. It says everything the text report says, with each thing the runner knew as a field of its own: no file, line, id or value has to be read out of a string.
+
+```bash
+plain test --json
+plain test --json tests/test_orders.py -x
+plain test --json --list-passed
+```
+
+```json
+{
+    "version": 1,
+    "outcome": "failed",
+    "exit_code": 1,
+    "duration": 0.0021,
+    "command": {
+        "argv": [
+            "plain",
+            "test",
+            "--json"
+        ],
+        "directory": "/project",
+        "targets": [],
+        "keyword": null,
+        "tags": [],
+        "exclude_tags": [],
+        "fail_fast": false,
+        "full_values": false
+    },
+    "counts": {
+        "selected": 3,
+        "passed": 1,
+        "failed": 1,
+        "skipped": 1,
+        "not_run": 0,
+        "collection_errors": 1
+    },
+    "tests_listed": "failed_and_skipped",
+    "tests": [
+        {
+            "id": "tests/test_orders.py::test_order_total",
+            "file": "tests/test_orders.py",
+            "line": 15,
+            "name": "test_order_total",
+            "tags": [
+                "checkout"
+            ],
+            "outcome": "failed",
+            "duration": 0.0014,
+            "skip_reason": null,
+            "failure": {
+                "error_type": "AssertionError",
+                "error_message": "",
+                "file": "tests/test_orders.py",
+                "line": 19,
+                "traceback": "Traceback (most recent call last):\n  File \"/project/tests/test_orders.py\", line 19, in test_order_total\n    assert order == {\n    ...<5 lines>...\n    }\nAssertionError\n",
+                "frames": [
+                    {
+                        "file": "tests/test_orders.py",
+                        "line": 19,
+                        "function": "test_order_total"
+                    }
+                ],
+                "assert": {
+                    "expression": "order == {\n    \"items\": [\"tea\", \"kettle\"],\n    \"currency\": \"USD\",\n    \"subtotal\": 40,\n    \"shipping\": 2,\n    \"total\": 42,\n}",
+                    "message": null,
+                    "parts": [
+                        {
+                            "source": "order",
+                            "depth": 0,
+                            "evaluated": true,
+                            "value": {
+                                "text": "<dict with 5 keys>",
+                                "cut_characters": 0
+                            }
+                        }
+                    ],
+                    "diff": {
+                        "lines": [
+                            "--- order",
+                            "+++ {'items': ['tea', 'kettle'], 'currency': 'USD', 'subtotal': 40, 'shipping': 2, 'total': 42}",
+                            "@@ -1,5 +1,5 @@",
+                            " {'currency': 'USD',",
+                            "  'items': ['tea', 'kettle'],",
+                            "- 'shipping': 0,",
+                            "+ 'shipping': 2,",
+                            "  'subtotal': 40,",
+                            "- 'total': 40}",
+                            "+ 'total': 42}"
+                        ],
+                        "cut_lines": 0
+                    }
+                },
+                "locals": [
+                    {
+                        "name": "items",
+                        "value": {
+                            "text": "['tea', 'kettle']",
+                            "cut_characters": 0
+                        }
+                    }
+                ],
+                "stdout": {
+                    "text": "pricing 2 items\n",
+                    "cut_characters": 0
+                },
+                "stderr": {
+                    "text": "",
+                    "cut_characters": 0
+                },
+                "rerun_command": "plain test tests/test_orders.py::test_order_total"
+            }
+        },
+        {
+            "id": "tests/test_orders.py::test_refund",
+            "file": "tests/test_orders.py",
+            "line": 28,
+            "name": "test_refund",
+            "tags": [],
+            "outcome": "skipped",
+            "duration": 0.0,
+            "skip_reason": "Waiting on the new billing API",
+            "failure": null
+        }
+    ],
+    "collection_errors": [
+        {
+            "file": "tests/test_invoices.py",
+            "line": 1,
+            "is_definition_error": false,
+            "error_type": "ModuleNotFoundError",
+            "message": "No module named 'billing_helpers'",
+            "traceback": "Traceback (most recent call last):\n  File \"/project/tests/test_invoices.py\", line 1, in <module>\n    from billing_helpers import create_invoice\nModuleNotFoundError: No module named 'billing_helpers'",
+            "stdout": {
+                "text": "",
+                "cut_characters": 0
+            },
+            "stderr": {
+                "text": "",
+                "cut_characters": 0
+            }
+        }
+    ],
+    "stopped": null,
+    "interrupted": null,
+    "teardown_errors": []
+}
+```
+
+- **`outcome`** is `"passed"`, `"failed"`, `"interrupted"` or `"stopped"`, and `exit_code` is what the command [exits with](#exit-codes).
+- **`tests`** lists the tests that failed and the tests that were skipped. The ones that passed are counted in `counts`. `--list-passed` lists them too, and `tests_listed` says which it was: `"failed_and_skipped"` or `"all"`. A suite of 1,700 passing tests is a document of 5 KB without them and 640 KB with them.
+- **Every test has the same fields**, whatever came of it. `skip_reason` and `failure` are `null` when there's nothing to say.
+- **A test's `file` and `line`** are where it's defined. **A failure's `file` and `line`** are the statement in the test that failed, or that called what failed. `frames` is the traceback as data, outermost first, down to where the error was raised. A failure that came from a lifecycle, not the test, has `null` for both.
+- **`assert`** is `null` for a failure that wasn't a failed assert. Its `parts` are what the text report prints under the assert: each part of the expression as written, how far inside it is, and what it was. A part Python never evaluated has `evaluated: false` and a `null` value.
+- **A value is an object**: `text` is what the text report prints, and `cut_characters` is how much the cap left off the end of it. `stdout` and `stderr` are the same, with `cut_characters` counting what was left off the start. `--full-values` leaves nothing off either.
+- **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead.
+- **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
+- **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
+
+`--json` takes the same targets and filters as any run. It can't be combined with `-v` or `-s`: there's one document, and nothing else goes to stdout.
+
+A run stopped with Ctrl-C still prints its document. `interrupted` says which test was running and what it had written:
+
+```json
+{
+    "interrupted": {
+        "id": "tests/test_sync.py::test_every_page",
+        "file": "tests/test_sync.py",
+        "line": 1,
+        "stdout": {
+            "text": "fetching page 1\n",
+            "cut_characters": 0
+        },
+        "stderr": {
+            "text": "",
+            "cut_characters": 0
+        }
+    }
+}
+```
+
+A run that couldn't start prints one too, with no tests in it. `reason` is `"lifecycle_error"`, `"target_not_found"` or `"no_tests_found"`:
+
+```json
+{
+    "stopped": {
+        "reason": "lifecycle_error",
+        "message": "/project/tests/lifecycle.py doesn't define a TestLifecycle subclass, so it would protect nothing. Define one:\n\n    from contextlib import contextmanager\n\n    from plain.test import TestLifecycle\n\n\n    class AppTestLifecycle(TestLifecycle):\n        @contextmanager\n        def around_test(self, test):\n            ...\n            yield",
+        "traceback": null,
+        "stdout": {
+            "text": "loading the lifecycle\n",
+            "cut_characters": 0
+        },
+        "stderr": {
+            "text": "",
+            "cut_characters": 0
+        }
+    }
+}
+```
+
+An error in the runner itself is the one thing that isn't a document: it's a traceback on stderr, and the command exits `1`.
+
+`teardown_errors` has an entry for each lifecycle that raised while being taken down, after the last test:
+
+```json
+{
+    "teardown_errors": [
+        {
+            "traceback": "Traceback (most recent call last):\n  File \"/project/tests/lifecycle.py\", line 7, in teardown_worker\n    raise RuntimeError(\"still in use\")\nRuntimeError: still in use\n",
+            "stdout": {
+                "text": "dropping the database\n",
+                "cut_characters": 0
+            },
+            "stderr": {
+                "text": "",
+                "cut_characters": 0
+            }
+        }
+    ]
+}
+```
+
 ## Assertions
 
 Use bare `assert`. When one fails, the [failure](#failures) shows the expression as you wrote it, and under it every value inside it:
@@ -1174,7 +1402,7 @@ No. This isn't pytest, and there's nothing to load a plugin into. A library that
 
 #### What about my editor's test explorer?
 
-Editors speak pytest's protocol, which this runner doesn't. Run tests from the terminal. Every failure prints the command that runs it again.
+Editors speak pytest's protocol, which this runner doesn't. Run tests from the terminal. Every failure prints the command that runs it again. Something that wants a run as data reads [`plain test --json`](#as-json).
 
 #### Why aren't there fixtures?
 
