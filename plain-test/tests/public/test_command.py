@@ -32,7 +32,8 @@ def test_the_app_lifecycle_wraps_tests_it_was_never_mentioned_in():
         {
             "tests/lifecycle.py": PRINTING_LIFECYCLE,
             "tests/test_one.py": "def test_one():\n    print('test body')\n",
-        }
+        },
+        "--show-output",
     )
     assert result.exit_code == 0
     lines = result.output.splitlines()

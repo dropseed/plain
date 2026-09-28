@@ -14,7 +14,10 @@ from pathlib import Path
 @dataclass
 class CommandResult:
     exit_code: int
+    # Everything it printed: stdout, then stderr.
     output: str
+    stdout: str = ""
+    stderr: str = ""
 
 
 def make_project(files: dict[str, str]) -> Path:
@@ -28,23 +31,34 @@ def make_project(files: dict[str, str]) -> Path:
     return root
 
 
-def run_runner(directory: Path, *arguments: str) -> CommandResult:
-    """Run `python -m plain.test` from a directory."""
+def run_runner(
+    directory: Path, *arguments: str, typed: str | None = None
+) -> CommandResult:
+    """
+    Run `python -m plain.test` from a directory. `typed` is what the command
+    reads from stdin, as if someone had typed it.
+    """
     completed = subprocess.run(
         [sys.executable, "-m", "plain.test", *arguments],
         cwd=directory,
         capture_output=True,
         text=True,
         check=False,
+        input=typed,
+        stdin=subprocess.DEVNULL if typed is None else None,
     )
     return CommandResult(
         exit_code=completed.returncode,
         output=completed.stdout + completed.stderr,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
     )
 
 
-def run_in_project(files: dict[str, str], *arguments: str) -> CommandResult:
-    return run_runner(make_project(files), *arguments)
+def run_in_project(
+    files: dict[str, str], *arguments: str, typed: str | None = None
+) -> CommandResult:
+    return run_runner(make_project(files), *arguments, typed=typed)
 
 
 def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
@@ -69,3 +83,18 @@ def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
         exit_code=completed.returncode,
         output=completed.stdout + completed.stderr,
     )
+
+
+def block(output: str, heading: str) -> list[str]:
+    """
+    The lines of one part of a failure, from the line that starts with
+    `heading` to the next blank line, without the report's indentation.
+    """
+    lines = [line.removeprefix("  ") for line in output.splitlines()]
+    starts = [n for n, line in enumerate(lines) if line.startswith(heading)]
+    assert starts, f"no line starts with {heading!r} in:\n{output}"
+    # The traceback quotes the assert's line too. The report's own is last.
+    found = lines[starts[-1] :]
+    if "" in found:
+        found = found[: found.index("")]
+    return found

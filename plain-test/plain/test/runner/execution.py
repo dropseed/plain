@@ -3,12 +3,13 @@ Test execution: drives lifecycles around each collected test.
 """
 
 import asyncio
+import dataclasses
 import inspect
 import time
 import traceback
 from collections.abc import Callable
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..lifecycle import TestLifecycle
 from ..skipping import TestSkipped
@@ -18,6 +19,7 @@ from .failure import (
     describe_failure,
     failure_that_could_not_be_described,
 )
+from .output_capture import Output, OutputCapture
 
 __all__ = []
 
@@ -36,9 +38,31 @@ class TestResult:
 
 
 @dataclass
+class InterruptedTest:
+    """The test that was running when the run was stopped from outside."""
+
+    test: RunnableTest
+    # What it had written by then.
+    output: Output
+
+
+@dataclass
+class TeardownError:
+    """A lifecycle that raised while being taken down, after the last test."""
+
+    # Formatted.
+    traceback: str
+    # What had been written since the last test.
+    output: Output
+
+
+@dataclass
 class TestRun:
     results: list[TestResult]
     duration: float
+    # Set when Ctrl-C stopped the run. The tests after it were not run.
+    interrupted: InterruptedTest | None = None
+    teardown_errors: list[TeardownError] = field(default_factory=list)
 
     @property
     def passed(self) -> list[TestResult]:
@@ -54,7 +78,7 @@ class TestRun:
 
     @property
     def ok(self) -> bool:
-        return not self.failed
+        return not self.failed and self.interrupted is None
 
 
 def run_tests(
@@ -64,9 +88,24 @@ def run_tests(
     fail_fast: bool = False,
     full_values: bool = False,
     on_result: Callable[[TestResult], None] | None = None,
+    capture: OutputCapture | None = None,
 ) -> TestRun:
+    """
+    Run the tests, each inside every lifecycle.
+
+    `capture` is the run's hold on what is written to stdout and stderr. A
+    failed test's failure is given what the test wrote, and what a passing
+    test wrote is thrown away. Without one, output goes where it always
+    went.
+    """
+    if capture is None:
+        # Entered by nobody, it holds nothing and has nothing to give.
+        capture = OutputCapture(show_output=True)
+
     run_start = time.monotonic()
     results: list[TestResult] = []
+    interrupted = None
+    teardown_errors = []
 
     # Track which lifecycles actually set up, so a failure partway through
     # setup still tears down the ones that completed (e.g. drops the test
@@ -77,8 +116,20 @@ def run_tests(
             lifecycle.setup_worker()
             started.append(lifecycle)
 
+        # What setting up wrote is the run's, not the first test's.
+        capture.discard()
+
         for test in tests:
-            result = _run_one(test, lifecycles=lifecycles, full_values=full_values)
+            try:
+                result = _run_one(
+                    test,
+                    lifecycles=lifecycles,
+                    full_values=full_values,
+                    capture=capture,
+                )
+            except KeyboardInterrupt:
+                interrupted = InterruptedTest(test=test, output=capture.take())
+                break
             results.append(result)
             if on_result is not None:
                 on_result(result)
@@ -90,13 +141,26 @@ def run_tests(
             try:
                 lifecycle.teardown_worker()
             except Exception:
-                traceback.print_exc()
+                teardown_errors.append(
+                    TeardownError(
+                        traceback=traceback.format_exc(), output=capture.take()
+                    )
+                )
 
-    return TestRun(results=results, duration=time.monotonic() - run_start)
+    return TestRun(
+        results=results,
+        duration=time.monotonic() - run_start,
+        interrupted=interrupted,
+        teardown_errors=teardown_errors,
+    )
 
 
 def _run_one(
-    test: RunnableTest, *, lifecycles: list[TestLifecycle], full_values: bool
+    test: RunnableTest,
+    *,
+    lifecycles: list[TestLifecycle],
+    full_values: bool,
+    capture: OutputCapture,
 ) -> TestResult:
     if test.skip_reason is not None:
         return TestResult(test=test, outcome="skipped", skip_reason=test.skip_reason)
@@ -140,6 +204,7 @@ def _run_one(
     except TestSkipped as skipped:
         # Raised by `skip_test()` in the test body. It left through the
         # lifecycles' `with` blocks like any exception, so they have exited.
+        capture.discard()
         return TestResult(
             test=test,
             outcome="skipped",
@@ -152,6 +217,12 @@ def _run_one(
             # one that came out, with the test's own above it in the
             # traceback if the test had failed too.
             failure = described(error)
+        # Taken now that the lifecycles have exited: what they wrote on the
+        # way out (a rollback that failed) is the test's too.
+        output = capture.take()
+        failure = dataclasses.replace(
+            failure, stdout=output.stdout, stderr=output.stderr
+        )
         return TestResult(
             test=test,
             outcome="failed",
@@ -159,4 +230,5 @@ def _run_one(
             failure=failure,
         )
 
+    capture.discard()
     return TestResult(test=test, outcome="passed", duration=time.monotonic() - start)

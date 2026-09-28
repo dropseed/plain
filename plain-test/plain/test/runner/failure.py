@@ -10,6 +10,7 @@ The reporter turns a `Failure` into what is printed. Anything else that
 reports a run reads the same structure.
 """
 
+import ast
 import inspect
 import shlex
 import traceback
@@ -18,8 +19,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..definition import TestDefinitionError
 from . import assertions
-from .collection import RunnableTest
+from .collection import CollectionError, RunnableTest
+from .output_capture import NO_OUTPUT, Output, StreamOutput
 from .printing import Describer, Diff, PrintedValue, ValuePrinter
 
 __all__ = []
@@ -68,12 +71,30 @@ class LocalValue:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Frame:
+    """One step of a traceback."""
+
+    # Relative to where the run started, when it is under there.
+    file: str
+    line: int
+    function: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class Failure:
     # "AssertionError", "KeyError"
     error_type: str
     error_message: str
+    # The statement in the test function that failed, or that called what
+    # failed. None when the test function isn't in the traceback: the error
+    # came from a lifecycle.
+    file: str | None
+    line: int | None
     # Formatted, with the runner's own frames taken off the top.
     traceback: str
+    # The same steps as data, outermost first. The error's own, without
+    # the ones of an error it was raised from.
+    frames: tuple[Frame, ...]
     # None when what failed wasn't an assert in a test file.
     failed_assert: FailedAssert | None
     # The test function's, in the order they were bound, without the ones
@@ -81,6 +102,99 @@ class Failure:
     locals: tuple[LocalValue, ...]
     # The command that runs this test again, safe to paste.
     rerun_command: str
+    # What the test wrote, from before its lifecycles entered to after they
+    # exited. It is added when they have exited.
+    stdout: StreamOutput = NO_OUTPUT.stdout
+    stderr: StreamOutput = NO_OUTPUT.stderr
+
+
+@dataclass(frozen=True, kw_only=True)
+class CollectionFailure:
+    """A file no tests could be collected from, and why."""
+
+    file: str
+    # Whether the file is written in a way the runner can't run. Then
+    # `message` says what is wrong and what to write instead, and there is
+    # no traceback. Otherwise it is an error like any other, raised while
+    # the file was being loaded.
+    is_definition_error: bool
+    error_type: str
+    message: str
+    traceback: str | None
+    # Where in the file, when the error says.
+    line: int | None
+    # What loading the file wrote.
+    stdout: StreamOutput = NO_OUTPUT.stdout
+    stderr: StreamOutput = NO_OUTPUT.stderr
+
+
+def describe_collection_error(
+    error: CollectionError, *, file: str, output: Output = NO_OUTPUT
+) -> CollectionFailure:
+    cause = error.error
+    if isinstance(cause, TestDefinitionError):
+        return CollectionFailure(
+            file=file,
+            is_definition_error=True,
+            error_type=type(cause).__qualname__,
+            message=str(cause),
+            traceback=None,
+            line=None,
+            stdout=output.stdout,
+            stderr=output.stderr,
+        )
+
+    return CollectionFailure(
+        file=file,
+        is_definition_error=False,
+        error_type=type(cause).__qualname__,
+        message=_guarded_str(cause),
+        traceback=format_collection_traceback(cause),
+        line=_line_in_the_file(cause, path=error.path),
+        stdout=output.stdout,
+        stderr=output.stderr,
+    )
+
+
+def format_collection_traceback(cause: BaseException) -> str:
+    """
+    The traceback of an error raised while a test file was being loaded,
+    starting at the test file.
+
+    The frames above the test file are the runner loading it, by way of
+    `ast` or the import system. A SyntaxError has no frames below those: it
+    names the file and the line itself.
+    """
+    not_the_test_file = (_RUNNER_DIRECTORY, ast.__file__, "<frozen importlib")
+    tb = cause.__traceback__
+    while tb is not None:
+        if not tb.tb_frame.f_code.co_filename.startswith(not_the_test_file):
+            break
+        tb = tb.tb_next
+    return "".join(traceback.format_exception(type(cause), cause, tb)).rstrip()
+
+
+def _line_in_the_file(cause: BaseException, *, path: Path) -> int | None:
+    if isinstance(cause, SyntaxError):
+        return cause.lineno
+
+    # The deepest step that is in the file itself.
+    line = None
+    tb = cause.__traceback__
+    while tb is not None:
+        if tb.tb_frame.f_code.co_filename == str(path):
+            line = tb.tb_lineno
+        tb = tb.tb_next
+    return line
+
+
+def shown_path(filename: str) -> str:
+    """A path the way the run's output writes it: relative to where it started."""
+    path = Path(filename)
+    root = Path.cwd()
+    if path.is_absolute() and path.is_relative_to(root):
+        return path.relative_to(root).as_posix()
+    return filename
 
 
 def describe_failure(
@@ -101,10 +215,14 @@ def describe_failure(
     if failed_assert is not None:
         already_printed = {part.source for part in failed_assert.parts}
 
+    file, line = _where_in_the_test(error, test=test)
     return Failure(
         error_type=type(error).__qualname__,
         error_message=_guarded_str(error),
+        file=file,
+        line=line,
         traceback=format_traceback(error),
+        frames=_frames(error),
         failed_assert=failed_assert,
         locals=_locals_of_the_test(
             error, test=test, printer=printer, already_printed=already_printed
@@ -120,12 +238,16 @@ def failure_that_could_not_be_described(
     The failure with its traceback and nothing more, for when describing it
     went wrong. The test's own error is what the reader came for.
     """
+    file, line = _where_in_the_test(error, test=test)
     return Failure(
         error_type=type(error).__qualname__,
         error_message=_guarded_str(error),
+        file=file,
+        line=line,
         traceback=format_traceback(error)
         + "\n(The values couldn't be printed: "
         + f"{type(while_describing).__qualname__}: {while_describing})\n",
+        frames=_frames(error),
         failed_assert=None,
         locals=(),
         rerun_command=rerun_command(test.id),
@@ -148,18 +270,56 @@ def rerun_command(test_id: str) -> str:
     return f"plain test {shlex.quote(test_id)}"
 
 
-def format_traceback(error: BaseException) -> str:
-    """Format a traceback with the runner's own frames trimmed off the top."""
+def _without_the_runners_frames(error: BaseException) -> types.TracebackType | None:
     tb = error.__traceback__
     while tb is not None:
         filename = tb.tb_frame.f_code.co_filename
         if not filename.startswith(_RUNNER_DIRECTORY) and "contextlib" not in filename:
             break
         tb = tb.tb_next
+    return tb or error.__traceback__
 
+
+def format_traceback(error: BaseException) -> str:
+    """Format a traceback with the runner's own frames trimmed off the top."""
     return "".join(
-        traceback.format_exception(type(error), error, tb or error.__traceback__)
+        traceback.format_exception(
+            type(error), error, _without_the_runners_frames(error)
+        )
     )
+
+
+def _frames(error: BaseException) -> tuple[Frame, ...]:
+    frames = []
+    tb = _without_the_runners_frames(error)
+    while tb is not None:
+        code = tb.tb_frame.f_code
+        frames.append(
+            Frame(
+                file=shown_path(code.co_filename),
+                line=tb.tb_lineno,
+                function=code.co_qualname,
+            )
+        )
+        tb = tb.tb_next
+    return tuple(frames)
+
+
+def _where_in_the_test(
+    error: BaseException, *, test: RunnableTest
+) -> tuple[str | None, int | None]:
+    step = _step_of_the_test(error, test=test)
+    if step is None:
+        return None, None
+    return shown_path(step.tb_frame.f_code.co_filename), step.tb_lineno
+
+
+def where_defined(test: RunnableTest) -> tuple[str, int | None]:
+    """The file a test is in, and the line its definition starts on."""
+    file = test.id.partition("::")[0]
+    if test.function is None:
+        return file, None
+    return file, inspect.unwrap(test.function).__code__.co_firstlineno
 
 
 def _failed_assert(
@@ -264,9 +424,10 @@ def _locals_of_the_test(
     printer: ValuePrinter,
     already_printed: set[str],
 ) -> tuple[LocalValue, ...]:
-    frame = _frame_of_the_test(error, test=test)
-    if frame is None:
+    step = _step_of_the_test(error, test=test)
+    if step is None:
         return ()
+    frame = step.tb_frame
 
     values = []
     for name, value in frame.f_locals.items():
@@ -278,12 +439,12 @@ def _locals_of_the_test(
     return tuple(values)
 
 
-def _frame_of_the_test(
+def _step_of_the_test(
     error: BaseException, *, test: RunnableTest
-) -> types.FrameType | None:
+) -> types.TracebackType | None:
     """
-    The frame the test function ran in. It is where the failure started
-    from, however far below it the error was raised.
+    The step of the traceback that is the test function. It is where the
+    failure started from, however far below it the error was raised.
     """
     if test.function is None:
         return None
@@ -294,6 +455,6 @@ def _frame_of_the_test(
     tb = error.__traceback__
     while tb is not None:
         if tb.tb_frame.f_code is code:
-            return tb.tb_frame
+            return tb
         tb = tb.tb_next
     return None

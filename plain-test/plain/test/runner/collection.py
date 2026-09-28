@@ -29,6 +29,7 @@ from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
 from .layout import Layout
 from .loading import load_test_module
+from .output_capture import NO_OUTPUT, OutputCapture
 
 __all__ = []
 
@@ -48,6 +49,8 @@ class CollectionError(Exception):
     def __init__(self, path: Path, error: BaseException) -> None:
         self.path = path
         self.error = error
+        # What loading the file wrote, when the run is holding output.
+        self.output = NO_OUTPUT
         super().__init__(f"Failed to collect {path}: {error!r}")
 
 
@@ -76,6 +79,7 @@ def collect_tests(
     root: Path | None = None,
     exclude_dirs: Iterable[str] = (),
     helper_directory: Path | None = None,
+    capture: OutputCapture | None = None,
 ) -> tuple[list[RunnableTest], list[CollectionError]]:
     """
     Collect tests from the given targets (files, directories, or
@@ -90,6 +94,10 @@ def collect_tests(
     one, helper modules are found from `root` and no import is refused for
     its name, since `root` can be called anything. Either way the caller has
     already put that directory on `sys.path`.
+
+    `capture` is the run's hold on what is written to stdout and stderr. What
+    loading a file writes is kept with that file's error, and thrown away
+    when the file loads.
 
     Returns the collected tests plus any per-file collection errors — one
     unimportable file shouldn't stop every other file's tests from running.
@@ -121,9 +129,13 @@ def collect_tests(
             raise FileNotFoundError(f"No such test target: {target}")
 
         for file in files:
+            if capture is not None:
+                capture.discard()
             try:
                 tests = _collect_file(file, layout=layout)
             except CollectionError as error:
+                if capture is not None:
+                    error.output = capture.take()
                 errors.append(error)
                 continue
             if name_part:

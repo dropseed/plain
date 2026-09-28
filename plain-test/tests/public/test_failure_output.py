@@ -5,22 +5,7 @@ between two large values, and what else the test had in hand.
 Each test runs the command on a project with one failing test in it.
 """
 
-from plain_test_helpers import run_in_project
-
-
-def block(output: str, heading: str) -> list[str]:
-    """
-    The lines of one part of a failure, from the line that starts with
-    `heading` to the next blank line, without the report's indentation.
-    """
-    lines = [line.removeprefix("  ") for line in output.splitlines()]
-    starts = [n for n, line in enumerate(lines) if line.startswith(heading)]
-    assert starts, f"no line starts with {heading!r} in:\n{output}"
-    # The traceback quotes the assert's line too. The report's own is last.
-    found = lines[starts[-1] :]
-    if "" in found:
-        found = found[: found.index("")]
-    return found
+from plain_test_helpers import block, run_in_project
 
 
 def failing(

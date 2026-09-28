@@ -11,6 +11,7 @@ uv run plain test [targets] [options]
 - `uv run plain test -v` - One line per test
 - `uv run plain test --tag slow` / `--exclude-tag slow` - Select by tag
 - `uv run plain test --full-values` - Print every value in a failure whole
+- `uv run plain test -s` - Let what tests print and log through as it's written. Without it output is held: a failing test's is printed with its failure, a passing test's is thrown away
 
 ## Writing tests
 

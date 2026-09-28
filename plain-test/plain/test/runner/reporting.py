@@ -1,22 +1,30 @@
 """
-Test output: answers "what do I do next", not just "what happened".
+Test output as text: answers "what do I do next", not just "what happened".
 
 Every failure block ends with the exact re-run command for that test,
 quoted so that pasting it into a shell runs that test and no other.
+
+What is printed here is read from the same `RunReport` that `--json` prints
+as a document. Nothing here works anything out about the run.
 """
 
-import ast
 import textwrap
-import traceback
-from pathlib import Path
+from typing import TextIO
 
 import click
 
 from ..definition import TestDefinitionError
-from .collection import CollectionError
-from .execution import TestResult, TestRun
-from .failure import AssertedPart, Failure, LocalValue
+from .execution import TestResult
+from .failure import (
+    AssertedPart,
+    CollectionFailure,
+    Failure,
+    LocalValue,
+    format_collection_traceback,
+)
+from .output_capture import Output, StreamOutput
 from .printing import FULL_VALUES_FLAG, PrintedValue
+from .report import RunReport, StoppedRun
 
 __all__ = []
 
@@ -27,8 +35,6 @@ _STATUS_COLORS = {
 }
 
 _DOTS = {"passed": ".", "failed": "F", "skipped": "s"}
-
-_RUNNER_DIRECTORY = str(Path(__file__).parent)
 
 
 def collection_error_text(cause: BaseException) -> str:
@@ -42,24 +48,14 @@ def collection_error_text(cause: BaseException) -> str:
     """
     if isinstance(cause, TestDefinitionError):
         return str(cause)
-
-    # The frames above the test file are the runner loading it, by way of
-    # `ast` or the import system. A SyntaxError has no frames below those:
-    # it names the file and the line itself.
-    not_the_test_file = (_RUNNER_DIRECTORY, ast.__file__, "<frozen importlib")
-    tb = cause.__traceback__
-    while tb is not None:
-        if not tb.tb_frame.f_code.co_filename.startswith(not_the_test_file):
-            break
-        tb = tb.tb_next
-    return "".join(traceback.format_exception(type(cause), cause, tb)).rstrip()
+    return format_collection_traceback(cause)
 
 
 def failure_text(failure: Failure) -> str:
     """
     What is printed for one failed test, under its `FAILED` line: where it
-    failed, the assert with the values inside it, what differs, and what
-    else the test had in hand.
+    failed, the assert with the values inside it, what differs, what else
+    the test had in hand, and what it wrote.
     """
     sections = [failure.traceback.rstrip()]
 
@@ -89,7 +85,31 @@ def failure_text(failure: Failure) -> str:
             lines.extend(_local_lines(local))
         sections.append("\n".join(lines))
 
+    sections.extend(
+        output_sections(Output(stdout=failure.stdout, stderr=failure.stderr))
+    )
+
     return "\n\n".join(sections)
+
+
+def output_sections(output: Output) -> list[str]:
+    """What was written to stdout and to stderr, each under its name."""
+    sections = []
+    for name, stream in (("stdout", output.stdout), ("stderr", output.stderr)):
+        if stream.text:
+            sections.append("\n".join(_stream_lines(name, stream)))
+    return sections
+
+
+def _stream_lines(name: str, stream: StreamOutput) -> list[str]:
+    lines = [f"{name}:"]
+    if stream.cut_characters:
+        lines.append(
+            f"  ... {stream.cut_characters:,} characters before this"
+            f" ({FULL_VALUES_FLAG} prints them)"
+        )
+    lines.extend(f"  {line}" for line in stream.text.splitlines())
+    return lines
 
 
 def _part_lines(part: AssertedPart) -> list[str]:
@@ -121,14 +141,37 @@ def _named_value_lines(name: str, value: PrintedValue, *, indent: str) -> list[s
     return lines
 
 
-class Reporter:
-    def __init__(self, *, verbose: bool = False) -> None:
+class TextReporter:
+    """
+    Prints a run as it goes, and what came of it when it is over.
+
+    `out` and `err` are where the runner's own output goes. While the run
+    holds what tests write, they are not `sys.stdout` and `sys.stderr`.
+    """
+
+    def __init__(self, *, out: TextIO, err: TextIO, verbose: bool = False) -> None:
+        self.out = out
+        self.err = err
         self.verbose = verbose
         self._dots_on_line = 0
 
+    def _print(
+        self,
+        text: str = "",
+        *,
+        newline: bool = True,
+        fg: str | None = None,
+        bold: bool = False,
+        dim: bool = False,
+    ) -> None:
+        click.secho(text, file=self.out, nl=newline, fg=fg, bold=bold, dim=dim)
+
+    def _print_error(self, text: str = "", *, fg: str | None = None) -> None:
+        click.secho(text, file=self.err, fg=fg)
+
     def collected(self, count: int) -> None:
         plural = "" if count == 1 else "s"
-        click.secho(f"Collected {count} test{plural}", dim=True)
+        self._print(f"Collected {count} test{plural}", dim=True)
 
     def result(self, result: TestResult) -> None:
         color = _STATUS_COLORS[result.outcome]
@@ -140,60 +183,105 @@ class Reporter:
                 line += f" ({result.skip_reason})"
             else:
                 line += f" ({result.duration:.3f}s)"
-            click.secho(line, fg=color, bold=bold)
+            self._print(line, fg=color, bold=bold)
         else:
-            click.secho(_DOTS[result.outcome], nl=False, fg=color, bold=bold)
+            self._print(_DOTS[result.outcome], newline=False, fg=color, bold=bold)
             self._dots_on_line += 1
             if self._dots_on_line >= 80:
-                click.echo()
+                self._print()
                 self._dots_on_line = 0
 
-    def failures(self, run: TestRun) -> None:
-        if not self.verbose and self._dots_on_line:
-            click.echo()
-        for result in run.failed:
-            click.echo()
-            click.secho(f"FAILED {result.test.id}", fg="red", bold=True)
-            click.echo()
-            assert result.failure is not None
-            click.echo(textwrap.indent(failure_text(result.failure), "  "))
-            click.echo()
-            click.secho(f"Re-run: {result.failure.rerun_command}", dim=True)
-
-    def skips(self, run: TestRun) -> None:
-        # Verbose output already gave each skipped test its own line.
-        if self.verbose or not run.skipped:
+    def _stopped(self, stopped: StoppedRun) -> None:
+        """The run ended before any test was run."""
+        if stopped.reason == "no_tests_found":
+            self._print(stopped.message, fg="yellow")
             return
-        click.echo()
-        for result in run.skipped:
-            click.secho(f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow")
 
-    def lifecycle_error(self, error: TestDefinitionError) -> None:
-        """The project's lifecycle can't be used, so nothing is going to run."""
-        click.secho(str(error), fg="red", err=True)
-        if error.__cause__ is not None:
-            click.echo(err=True)
-            click.echo(
-                textwrap.indent(collection_error_text(error.__cause__), "  "),
-                err=True,
-            )
+        self._print_error(stopped.message, fg="red")
+        if stopped.traceback is not None:
+            self._print_error()
+            self._print_error(textwrap.indent(stopped.traceback, "  "))
+        for section in output_sections(stopped.output):
+            self._print_error()
+            self._print_error(textwrap.indent(section, "  "))
 
-    def collection_errors(self, errors: list[CollectionError]) -> None:
-        for error in errors:
-            click.echo()
-            click.secho(f"COLLECTION ERROR {error.path}", fg="red", bold=True)
-            click.echo()
-            click.echo(textwrap.indent(collection_error_text(error.error), "  "))
+    def finished(self, report: RunReport) -> None:
+        if report.stopped is not None:
+            self._stopped(report.stopped)
+            return
 
-    def summary(self, run: TestRun, *, collection_error_count: int = 0) -> None:
-        parts = [f"{len(run.passed)} passed"]
-        if run.failed:
-            parts.append(f"{len(run.failed)} failed")
-        if run.skipped:
-            parts.append(f"{len(run.skipped)} skipped")
-        if collection_error_count:
-            parts.append(f"{collection_error_count} collection errors")
+        run = report.run
+        assert run is not None
+
+        if not self.verbose and self._dots_on_line:
+            self._print()
+
+        for result in run.failed:
+            assert result.failure is not None
+            self._print()
+            self._print(f"FAILED {result.test.id}", fg="red", bold=True)
+            self._print()
+            self._print(textwrap.indent(failure_text(result.failure), "  "))
+            self._print()
+            self._print(f"Re-run: {result.failure.rerun_command}", dim=True)
+
+        # Verbose output already gave each skipped test its own line.
+        if run.skipped and not self.verbose:
+            self._print()
+            for result in run.skipped:
+                self._print(
+                    f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow"
+                )
+
+        for failure in report.collection_failures:
+            self._print()
+            self._print(f"COLLECTION ERROR {failure.file}", fg="red", bold=True)
+            self._print()
+            self._print(textwrap.indent(_collection_failure_text(failure), "  "))
+
+        for error in run.teardown_errors:
+            self._print()
+            self._print("TEARDOWN ERROR", fg="red", bold=True)
+            self._print()
+            sections = [error.traceback.rstrip(), *output_sections(error.output)]
+            self._print(textwrap.indent("\n\n".join(sections), "  "))
+
+        if run.interrupted is not None:
+            self._print()
+            self._print(f"INTERRUPTED {run.interrupted.test.id}", fg="red", bold=True)
+            for section in output_sections(run.interrupted.output):
+                self._print()
+                self._print(textwrap.indent(section, "  "))
+
+        self._summary(report)
+
+    def _summary(self, report: RunReport) -> None:
+        run = report.run
+        assert run is not None
+        counts = report.counts
+
+        parts = [f"{counts.passed} passed"]
+        if counts.failed:
+            parts.append(f"{counts.failed} failed")
+        if counts.skipped:
+            parts.append(f"{counts.skipped} skipped")
+        if counts.collection_errors:
+            parts.append(f"{counts.collection_errors} collection errors")
+        if counts.not_run:
+            parts.append(f"{counts.not_run} not run")
         line = f"{', '.join(parts)} in {run.duration:.2f}s"
-        failed = run.failed or collection_error_count
-        click.echo()
-        click.secho(line, fg="red" if failed else "green", bold=True)
+        if run.interrupted is not None:
+            line = f"Interrupted: {line}"
+
+        self._print()
+        self._print(line, fg="green" if report.exit_code == 0 else "red", bold=True)
+
+
+def _collection_failure_text(failure: CollectionFailure) -> str:
+    text = failure.message if failure.is_definition_error else failure.traceback
+    assert text is not None
+    sections = [
+        text,
+        *output_sections(Output(stdout=failure.stdout, stderr=failure.stderr)),
+    ]
+    return "\n\n".join(sections)

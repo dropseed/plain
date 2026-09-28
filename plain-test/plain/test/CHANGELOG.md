@@ -22,6 +22,9 @@
 - Every failure prints the test function's locals.
 - A value is printed whole up to 2,000 characters and a diff up to 60 lines, and says how much was cut. `--full-values` prints everything. The 400-character and 20-item limits are gone.
 - A lifecycle's `describe_value(value)` says how a failure prints a value its package owns. plain.postgres prints a model instance with its fields and a queryset with its SQL or its rows, and runs no query to do it.
+- What a test writes to stdout and stderr is held while it runs, whatever writes it: `print()`, a log handler, a subprocess, a C extension. A test that fails has it printed with its failure, and a test that passes has it thrown away. `-s` (`--show-output`) lets it through as it is written. `breakpoint()` gets the terminal until its test is over.
+- A run stopped with Ctrl-C reports the failures it had and what the running test had written, and exits `130`.
+- A lifecycle that raises being taken down is reported after the run. A collection error names its file relative to where the run started, as a test's id does.
 - Test modules are loaded through the import machinery, so they have a spec and a loader, and an instance of a class defined in one can be pickled. Their rewritten bytecode is cached under a name of its own in `__pycache__`.
 - `CollectedTest`, what a lifecycle's `around_test(test)` receives, is in `plain.test`. Nothing in `plain.test.runner` is an importable API.
 - `capture_spans`, `capture_metrics`, `capture_logs` and `plain.postgres.test.capture_queries` hand back one shape: a read-only sequence of what was captured, read after the block ends. Reading one inside its block raises. `spans.filter(name=, kind=)`, `metrics.number_points()` / `metrics.histogram_points()`, `logs.messages` and `queries.sql_statements()` are the finders. Captures can be nested.

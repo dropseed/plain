@@ -32,6 +32,8 @@
     - [Shared helpers](#shared-helpers)
 - [Reading the output](#reading-the-output)
     - [Failures](#failures)
+    - [Large values](#large-values)
+    - [What the test wrote](#what-the-test-wrote)
     - [Skipped tests](#skipped-tests)
     - [Collection errors](#collection-errors)
 - [Assertions](#assertions)
@@ -583,16 +585,18 @@ plain test --exclude-tag slow                   # everything but
 plain test -x                                   # stop at the first failure
 plain test -v                                   # one line per test, with its duration
 plain test --full-values                        # print every value in a failure whole
+plain test -s                                   # let what tests print through as they write it
 ```
 
-| Flag                 | What it does                                          |
-| -------------------- | ----------------------------------------------------- |
-| `-k TEXT`            | Keep the tests whose id contains `TEXT`               |
-| `--tag NAME`         | Keep the tests with this tag. Repeat it to allow more |
-| `--exclude-tag NAME` | Drop the tests with this tag. Repeat it to drop more  |
-| `-x`, `--fail-fast`  | Stop at the first failure                             |
-| `-v`, `--verbose`    | Print one line per test                               |
-| `--full-values`      | Print every value in a failure whole, however long    |
+| Flag                  | What it does                                          |
+| --------------------- | ----------------------------------------------------- |
+| `-k TEXT`             | Keep the tests whose id contains `TEXT`               |
+| `--tag NAME`          | Keep the tests with this tag. Repeat it to allow more |
+| `--exclude-tag NAME`  | Drop the tests with this tag. Repeat it to drop more  |
+| `-x`, `--fail-fast`   | Stop at the first failure                             |
+| `-v`, `--verbose`     | Print one line per test                               |
+| `--full-values`       | Print every value and all the output in a failure     |
+| `-s`, `--show-output` | Let what tests print and log through as it's written  |
 
 `plain test --help` prints the same list, and the forms a target can take.
 
@@ -619,12 +623,13 @@ Targets, `-k` and the tag flags combine: a test runs when it's inside a target a
 
 ### Exit codes
 
-| Code | Meaning                                                                                                 |
-| ---- | ------------------------------------------------------------------------------------------------------- |
-| `0`  | Every test that ran passed. Skipped tests don't change this                                             |
-| `1`  | A test failed, or a file couldn't be collected                                                          |
-| `2`  | The run couldn't start: a target doesn't exist, or the [project lifecycle](#project-lifecycle) is wrong |
-| `5`  | No tests matched                                                                                        |
+| Code  | Meaning                                                                                                 |
+| ----- | ------------------------------------------------------------------------------------------------------- |
+| `0`   | Every test that ran passed. Skipped tests don't change this                                             |
+| `1`   | A test failed, or a file couldn't be collected                                                          |
+| `2`   | The run couldn't start: a target doesn't exist, or the [project lifecycle](#project-lifecycle) is wrong |
+| `5`   | No tests matched                                                                                        |
+| `130` | The run was stopped with Ctrl-C. What had run by then is reported                                       |
 
 ### Environment
 
@@ -713,7 +718,7 @@ The last line counts what happened:
 41 passed, 1 failed, 2 skipped, 1 collection errors in 0.62s
 ```
 
-Output isn't captured. What a test prints or logs shows up where it happens, between the progress characters.
+That's all a run that passes prints. What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away.
 
 ### Failures
 
@@ -793,6 +798,58 @@ Run the test again with `--full-values` to print everything.
 
 A value whose `repr` raises doesn't stop the report. It's printed as `<Order: its repr raised ValueError: no total>`, and everything else is printed as usual.
 
+### What the test wrote
+
+What a failed test wrote to stdout and stderr is printed with its failure, each under its own name and in the order it was written:
+
+```
+FAILED tests/test_orders.py::test_order_total
+
+  Traceback (most recent call last):
+    File "/project/tests/test_orders.py", line 16, in test_order_total
+      assert order["total"] == 42
+  AssertionError
+
+  assert order["total"] == 42
+    order["total"] = 0
+      order = {'total': 0}
+
+  stdout:
+    pricing 2 items
+
+  stderr:
+    No price for kettle
+
+Re-run: plain test tests/test_orders.py::test_order_total
+```
+
+It's held however it was written: `print()`, a log handler, a subprocess the test started, a C extension. What a test reads for itself stays the test's, so `contextlib.redirect_stdout`, `capture_logs`, a `CliRunner` and a subprocess with its own pipes all work as they do anywhere.
+
+A test's output starts when its [lifecycles](#project-lifecycle) enter and ends when they've exited, so what `around_test()` writes on the way in and out belongs to the test. What's written before the first test, while the app is set up and the test database is made, belongs to no test and isn't printed.
+
+The last 10,000 characters of each stream are kept, and the failure says how much came before them. `--full-values` prints all of it:
+
+```
+  stdout:
+    ... 40,015 characters before this (--full-values prints them)
+    line 4000
+    line 4001
+```
+
+`-s` (`--show-output`) holds nothing: everything is written where it would have been, as it happens, between the progress characters. Use it to watch a test that hangs, or to see what a passing test prints.
+
+A run stopped with Ctrl-C reports what it had: the failures so far, and what the test that was running had written.
+
+```
+INTERRUPTED tests/test_sync.py::test_every_page
+
+  stdout:
+    fetching page 1
+    fetching page 2
+
+Interrupted: 12 passed, 30 not run in 4.18s
+```
+
 ### Skipped tests
 
 A skipped test is listed with its reason, whether it came from `@skip` or from [`skip_test`](#skipping-from-inside-a-test), and it's counted in the summary:
@@ -806,7 +863,7 @@ SKIPPED tests/test_uploads.py::test_upload_to_bucket (No bucket reachable from t
 A file that can't be turned into tests is a collection error. The other files still run, and the run exits `1`.
 
 ```
-COLLECTION ERROR /project/tests/test_signup.py
+COLLECTION ERROR tests/test_signup.py
 
   These tests can't be run as written:
 
@@ -832,10 +889,10 @@ Every test in the file with a problem is named at once. Here is what each messag
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
 
-Anything else is an error of the file's own, raised while it was being imported. It's printed with its traceback, starting at the test file:
+Anything else is an error of the file's own, raised while it was being imported. It's printed with its traceback, starting at the test file, and with what the file wrote while it was loading:
 
 ```
-COLLECTION ERROR /project/tests/test_billing.py
+COLLECTION ERROR tests/test_billing.py
 
   Traceback (most recent call last):
     File "/project/tests/test_billing.py", line 3, in <module>
@@ -846,7 +903,7 @@ COLLECTION ERROR /project/tests/test_billing.py
 A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name:
 
 ```
-COLLECTION ERROR /project/tests/conftest.py
+COLLECTION ERROR tests/conftest.py
 
   conftest.py is a pytest file, and nothing reads it here. There are no
   fixtures: nothing in this file runs, and nothing is passed to a test
@@ -1103,7 +1160,9 @@ From the standard library. `tempfile.TemporaryDirectory()` gives a directory tha
 
 #### How do I debug a failing test?
 
-Put `breakpoint()` where you want to stop and run the test. The runner doesn't capture output or input, so the debugger prompt works the way it does in any script. Every failure prints the command that runs it again, so you can copy that to run the one test.
+Put `breakpoint()` where you want to stop and run the test. The debugger gets the terminal: from the breakpoint until that test is over, output is written as it happens. Calling `pdb.set_trace()` yourself doesn't do that, so use `breakpoint()`, or run with `-s`. Every failure prints the command that runs it again, so you can copy that to run the one test.
+
+To see what a test prints without stopping it, `print()` and make it fail, or run it with `-s`.
 
 #### Does coverage work?
 
