@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -17,7 +18,7 @@ from .trace import (
 )
 
 if TYPE_CHECKING:
-    from plain.test import Client, ClientResponse
+    from plain.test import ClientResponse
 
 _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
 
@@ -58,16 +59,6 @@ _QUERY_LIST_LIMIT = 10
 
 # Width SQL is elided to in the terminal.
 _SQL_DISPLAY_WIDTH = 64
-
-
-def _dispatch_request(
-    client: Client, method: str, path: str, kwargs: dict[str, Any]
-) -> ClientResponse:
-    """Send the request through the client."""
-    if method not in _HTTP_METHODS:
-        click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
-        raise SystemExit(1)
-    return client.request(method=method, path=path, **kwargs)
 
 
 def _get_request_user(response: ClientResponse) -> Any:
@@ -429,36 +420,46 @@ def request(
                 click.secho(f"Invalid JSON data: {e}", fg="red", err=True)
                 raise SystemExit(1)
 
-        # Make the request
         method = method.upper()
-        kwargs: dict[str, Any] = {
-            "follow_redirects": follow,
-        }
-        kwargs["headers"] = header_dict
+        if method not in _HTTP_METHODS:
+            click.secho(f"Unsupported HTTP method: {method}", fg="red", err=True)
+            raise SystemExit(1)
 
-        if method in ("POST", "PUT", "PATCH") and data:
-            kwargs["body"] = data
-            if content_type:
-                kwargs["content_type"] = content_type
+        # Only these methods send the data, with its content type.
+        sends_data = method in ("POST", "PUT", "PATCH") and bool(data)
 
         # The admin toolbar's preflight badge otherwise runs the full preflight
         # suite on first render, landing those queries in the captured trace.
         set_check_counts(errors=0, warnings=0)
 
-        # Dispatch the request, capturing a trace unless the process has a
+        # Make the request, capturing a trace unless the process has a
         # tracer provider we can't capture from.
-        if capture_available():
-            with capture_trace_spans() as otel_exporter:
-                try:
-                    response = _dispatch_request(client, method, path, kwargs)
-                finally:
-                    # Analyze in a `finally` so a view that raises still leaves
-                    # a trace behind — that is the request you most want one
-                    # for. Spans are exported as they end, so the ones that
-                    # completed before the raise are already here.
+        capture = capture_trace_spans() if capture_available() else nullcontext()
+        with capture as otel_exporter:
+            try:
+                response = client.request(
+                    method,
+                    path,
+                    body=data if sends_data else None,
+                    content_type=content_type if sends_data else None,
+                    headers=header_dict,
+                    follow_redirects=follow,
+                )
+            finally:
+                # Analyze in a `finally` so a view that raises still leaves
+                # a trace behind — that is the request you most want one
+                # for. Spans are exported as they end, so the ones that
+                # completed before the raise are already here.
+                if otel_exporter is not None:
                     traces = analyze_traces(otel_exporter.get_finished_spans())
-        else:
-            response = _dispatch_request(client, method, path, kwargs)
+
+        # The route that handled the request, by name. None when a
+        # middleware answered it, or nothing matched.
+        resolver_match = response.request.resolver_match
+        url_pattern = resolver_match.namespaced_url_name if resolver_match else None
+
+        # Whether the app streamed the body (an asset, an export).
+        streaming = response.returned_response.streaming
 
         # Run assertions (shared by text and JSON output)
         failed: list[str] = []
@@ -476,7 +477,7 @@ def request(
         body_bytes = response.body
         # A streamed body is only summarized below, so it's decoded just
         # for assertions — a large binary download never is.
-        if response.streaming and not (assert_contains or assert_not_contains):
+        if streaming and not (assert_contains or assert_not_contains):
             body_text = ""
         else:
             body_text = body_bytes.decode("utf-8", errors="replace")
@@ -501,13 +502,8 @@ def request(
                 response_data["redirects"] = [
                     {"url": url, "status": status} for url, status in redirects
                 ]
-            if response.resolver_match:
-                resolver_match = response.resolver_match
-                url_name = getattr(
-                    resolver_match, "namespaced_url_name", None
-                ) or getattr(resolver_match, "url_name", None)
-                if url_name:
-                    response_data["url_pattern"] = url_name
+            if url_pattern:
+                response_data["url_pattern"] = url_pattern
             if response.headers:
                 response_data["headers"] = dict(response.headers)
             json_output: dict[str, Any] = {
@@ -540,14 +536,8 @@ def request(
             )
             click.secho(f"  Redirected: {hops}", fg="yellow")
 
-        # URL pattern
-        if response.resolver_match:
-            match = response.resolver_match
-            namespaced_url_name = getattr(match, "namespaced_url_name", None)
-            url_name_attr = getattr(match, "url_name", None)
-            url_name = namespaced_url_name or url_name_attr
-            if url_name:
-                click.echo(f"  URL pattern: {url_name}")
+        if url_pattern:
+            click.echo(f"  URL pattern: {url_pattern}")
 
         # Always show auth state — authed vs anonymous should never be ambiguous.
         request_user = _get_request_user(response)
@@ -575,7 +565,7 @@ def request(
         # Show response content last
         if no_body:
             pass
-        elif response.streaming:
+        elif streaming:
             # Streaming/file responses (e.g. assets, exports): summarize
             # instead of dumping what may be a large or binary body.
             click.secho("Response Body:", fg="yellow", bold=True)
