@@ -68,14 +68,11 @@ def main(
 
     import plain.runtime
 
+    from ..definition import TestDefinitionError
     from .collection import collect_tests
     from .execution import run_tests
-    from .layout import find_tests_directory
-    from .lifecycle_discovery import (
-        AppLifecycleError,
-        load_app_lifecycle,
-        load_package_lifecycles,
-    )
+    from .layout import find_tests_directory, import_helper_modules_from
+    from .lifecycle_discovery import load_app_lifecycle, load_package_lifecycles
     from .reporting import Reporter
 
     # App mode: a resolvable Plain app gets the packages' lifecycles. Library
@@ -92,28 +89,33 @@ def main(
         # the runner knows, not the collection kernel.
         exclude_dirs = ("app",)
 
+    reporter = Reporter(verbose=verbose)
+
+    # Where this run's tests are is worked out here, once. Helper modules are
+    # imported from the tests directory. A project with no tests directory
+    # keeps them beside its test files, at the root.
+    root = Path.cwd()
+    tests_directory = find_tests_directory(root)
+    has_tests_directory = tests_directory.is_dir()
+    import_helper_modules_from(tests_directory if has_tests_directory else root)
+
     # The project's own lifecycle goes last, so it wraps closest to the test:
     # it enters with the packages' protection already in place (the database
     # transaction is open) and exits before theirs is taken down.
     try:
-        app_lifecycle = load_app_lifecycle(Path.cwd())
-    except AppLifecycleError as e:
-        click.secho(str(e), fg="red", err=True)
+        app_lifecycle = load_app_lifecycle(root=root, tests_directory=tests_directory)
+    except TestDefinitionError as e:
+        reporter.lifecycle_error(e)
         raise SystemExit(2)
     if app_lifecycle is not None:
         lifecycles.append(app_lifecycle)
 
-    reporter = Reporter(verbose=verbose)
-
-    # Helper modules are imported from the tests directory. A project with
-    # no tests directory keeps them beside its test files, at the root.
-    tests_directory = find_tests_directory(Path.cwd())
-
     try:
         tests, collection_errors = collect_tests(
             list(targets),
+            root=root,
             exclude_dirs=exclude_dirs,
-            helper_directory=tests_directory if tests_directory.is_dir() else None,
+            helper_directory=tests_directory if has_tests_directory else None,
         )
     except FileNotFoundError as e:
         click.secho(str(e), fg="red", err=True)

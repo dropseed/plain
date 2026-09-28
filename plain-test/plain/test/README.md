@@ -728,7 +728,7 @@ A file that can't be turned into tests is a collection error. The other files st
 ```
 COLLECTION ERROR /project/tests/test_signup.py
 
-  TestDefinitionError: These tests can't be run as written:
+  These tests can't be run as written:
 
     test_signup(db, client) takes parameters, and nothing passes them in.
 
@@ -744,19 +744,31 @@ Every test in the file with a problem is named at once. Here is what each messag
 | `test_x(db, client) takes parameters, and nothing passes them in.` | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`              |
 | `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value.`    | Make that case pass as many values as the test has parameters                                           |
 | `TestCart::test_add() is a method, and has no self parameter.`     | Add `self`                                                                                              |
-| `TypeError: test_x already has @cases.`                            | Use one `@cases`. For every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))` |
-| `TypeError: @skip requires a reason`                               | Write `@skip("why")`, not a bare `@skip`                                                                |
-| `TypeError: @tag requires at least one name`                       | Write `@tag("slow")`, not a bare `@tag`                                                                 |
+| `line 8: test_x already has @cases.`                               | Use one `@cases`. For every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))` |
+| `line 8: @skip requires a reason`                                  | Write `@skip("why")`, not a bare `@skip`                                                                |
+| `line 8: @tag requires at least one name`                          | Write `@tag("slow")`, not a bare `@tag`                                                                 |
 | `from tests.helpers import x should be from helpers import x`      | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
-| `ConftestNotSupported: conftest.py is a pytest file, ...`          | Move what the file holds, then delete it. See below                                                     |
-| Anything else, such as `ModuleNotFoundError: No module named 'x'`  | The file raised while it was being imported. Fix the import or the module-level code                    |
+| `conftest.py is a pytest file, ...`                                | Move what the file holds, then delete it. See below                                                     |
+
+Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
+
+Anything else is an error of the file's own, raised while it was being imported. It's printed with its traceback, starting at the test file:
+
+```
+COLLECTION ERROR /project/tests/test_billing.py
+
+  Traceback (most recent call last):
+    File "/project/tests/test_billing.py", line 3, in <module>
+      from billing_helpers import create_invoice
+  ModuleNotFoundError: No module named 'billing_helpers'
+```
 
 A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name:
 
 ```
 COLLECTION ERROR /project/tests/conftest.py
 
-  ConftestNotSupported: conftest.py is a pytest file, and nothing reads it here. There are no
+  conftest.py is a pytest file, and nothing reads it here. There are no
   fixtures: nothing in this file runs, and nothing is passed to a test
   by name. Move what it holds, then delete the file.
 
@@ -845,7 +857,7 @@ class AppTestLifecycle(TestLifecycle):
 The runner finds the file by its path. There is nothing to register and no other place it looks.
 
 - **One file, one class.** `tests/lifecycle.py` defines exactly one [`TestLifecycle`](#test-lifecycles) subclass, under any name. `around_test(test)` wraps each test, and `setup_worker()` / `teardown_worker()` run once, before the first test and after the last.
-- **It fails loudly.** If the file is there and doesn't import, defines no `TestLifecycle` subclass, defines more than one, or defines one that can't be created without arguments, the run stops before any test with a message saying which.
+- **It fails loudly.** If the file is there and doesn't import, defines no `TestLifecycle` subclass, defines more than one, or defines one that can't be created without arguments, the run stops before any test with a message saying which. When the file raised an error of its own, its traceback follows.
 - **It runs closest to the test.** Package lifecycles enter first, in the order of their entry point names, and the project's enters last. So the database transaction is already open when yours starts, and yours exits before the transaction is rolled back.
 - **It's for protection, not setup.** A user, an organization, a logged-in client: a test that reads one builds it in its body, by calling a helper. If a test would be wrong without the thing but never mentions it, that's the lifecycle's job.
 

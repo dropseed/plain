@@ -25,7 +25,9 @@ class TestResult:
     test: RunnableTest
     outcome: str  # "passed" | "failed" | "skipped"
     duration: float = 0.0
-    error: BaseException | None = None
+    # A failure's traceback, already formatted. The exception itself isn't
+    # kept: it would hold every frame it passed through, and everything
+    # those frames had in hand, until the run ends.
     traceback_text: str = ""
     # Why a skipped test was skipped — from `@skip` or from `skip_test()`.
     skip_reason: str | None = None
@@ -118,14 +120,13 @@ def _run_one(test: RunnableTest, *, lifecycles: list[TestLifecycle]) -> TestResu
             test=test,
             outcome="failed",
             duration=time.monotonic() - start,
-            error=e,
-            traceback_text=_format_traceback(e),
+            traceback_text=format_traceback(e),
         )
 
     return TestResult(test=test, outcome="passed", duration=time.monotonic() - start)
 
 
-def _format_traceback(error: BaseException) -> str:
+def format_traceback(error: BaseException) -> str:
     """Format a traceback with the runner's own frames trimmed off the top."""
     tb = error.__traceback__
     while tb is not None:

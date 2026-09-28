@@ -5,11 +5,15 @@ Every failure block ends with the exact re-run command for that test,
 quoted so that pasting it into a shell runs that test and no other.
 """
 
+import ast
 import shlex
 import textwrap
+import traceback
+from pathlib import Path
 
 import click
 
+from ..definition import TestDefinitionError
 from .collection import CollectionError
 from .execution import TestResult, TestRun
 
@@ -22,6 +26,32 @@ _STATUS_COLORS = {
 }
 
 _DOTS = {"passed": ".", "failed": "F", "skipped": "s"}
+
+_RUNNER_DIRECTORY = str(Path(__file__).parent)
+
+
+def collection_error_text(cause: BaseException) -> str:
+    """
+    What to print for a file that couldn't be collected.
+
+    A TestDefinitionError is printed as its message: it already says what is
+    wrong and what to write instead. Anything else is an error in the test
+    file like any other (a NameError, an ImportError), and is printed with
+    the traceback that says where, starting at the test file.
+    """
+    if isinstance(cause, TestDefinitionError):
+        return str(cause)
+
+    # The frames above the test file are the runner loading it, by way of
+    # `ast` or the import system. A SyntaxError has no frames below those:
+    # it names the file and the line itself.
+    not_the_test_file = (_RUNNER_DIRECTORY, ast.__file__, "<frozen importlib")
+    tb = cause.__traceback__
+    while tb is not None:
+        if not tb.tb_frame.f_code.co_filename.startswith(not_the_test_file):
+            break
+        tb = tb.tb_next
+    return "".join(traceback.format_exception(type(cause), cause, tb)).rstrip()
 
 
 def rerun_command(test_id: str) -> str:
@@ -79,13 +109,22 @@ class Reporter:
         for result in run.skipped:
             click.secho(f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow")
 
+    def lifecycle_error(self, error: TestDefinitionError) -> None:
+        """The project's lifecycle can't be used, so nothing is going to run."""
+        click.secho(str(error), fg="red", err=True)
+        if error.__cause__ is not None:
+            click.echo(err=True)
+            click.echo(
+                textwrap.indent(collection_error_text(error.__cause__), "  "),
+                err=True,
+            )
+
     def collection_errors(self, errors: list[CollectionError]) -> None:
         for error in errors:
             click.echo()
             click.secho(f"COLLECTION ERROR {error.path}", fg="red", bold=True)
             click.echo()
-            cause = error.error
-            click.echo(textwrap.indent(f"{type(cause).__name__}: {cause}", "  "))
+            click.echo(textwrap.indent(collection_error_text(error.error), "  "))
 
     def summary(self, run: TestRun, *, collection_error_count: int = 0) -> None:
         parts = [f"{len(run.passed)} passed"]

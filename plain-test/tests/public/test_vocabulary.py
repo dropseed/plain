@@ -1,6 +1,6 @@
 import os
 
-from plain.test import case, cases, patch, raises, skip, tag
+from plain.test import TestDefinitionError, case, cases, patch, raises, skip, tag
 
 
 def test_raises_catches_and_exposes_exception():
@@ -125,12 +125,12 @@ def test_case_ids_pass_arguments(value, expected):
 
 
 def test_case_requires_a_non_empty_id():
-    with raises(TypeError, match="non-empty id"):
+    with raises(TestDefinitionError, match="non-empty id"):
         case("x", id="")
 
 
 def test_cases_rejects_duplicate_ids():
-    with raises(TypeError, match="ids must be unique"):
+    with raises(TestDefinitionError, match="ids must be unique"):
         cases(case("a", id="same"), case("b", id="same"))
 
 
@@ -143,29 +143,29 @@ def test_a_second_cases_raises_instead_of_replacing_the_first():
         pass
 
     cases(1, 2)(test_pairs)
-    with raises(TypeError, match="test_pairs already has @cases") as caught:
+    with raises(TestDefinitionError, match="test_pairs already has @cases") as caught:
         cases("a", "b")(test_pairs)
     assert "itertools.product" in str(caught.exception)
 
 
 def test_skip_requires_a_reason():
-    with raises(TypeError, match="@skip requires a reason"):
+    with raises(TestDefinitionError, match="@skip requires a reason"):
         skip("")
 
     def test_never():
         pass
 
     # A bare `@skip` hands the function in where the reason goes.
-    with raises(TypeError, match="@skip requires a reason"):
+    with raises(TestDefinitionError, match="@skip requires a reason"):
         skip(test_never)  # ty: ignore[invalid-argument-type]
 
 
 def test_tag_requires_names():
-    with raises(TypeError, match="@tag requires at least one name"):
+    with raises(TestDefinitionError, match="@tag requires at least one name"):
         tag()
 
     def test_never():
         pass
 
-    with raises(TypeError, match="@tag requires at least one name"):
+    with raises(TestDefinitionError, match="@tag requires at least one name"):
         tag(test_never)  # ty: ignore[invalid-argument-type]

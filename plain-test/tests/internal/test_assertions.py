@@ -95,3 +95,35 @@ def test_an_expression_written_over_several_lines_keeps_its_shape():
         "    'b': 2,",
         "}",
     ]
+
+
+def test_the_expression_is_found_by_bytes_not_characters():
+    # The parser counts columns in UTF-8 bytes, and "é" is two of them.
+    with raises(AssertionError) as caught:
+        run_rewritten('name = "é"; assert name == "e"\n')
+    assert str(caught.exception).splitlines()[0] == 'assert name == "e"'
+
+
+def test_a_form_feed_does_not_count_as_the_end_of_a_line():
+    with raises(AssertionError) as caught:
+        run_rewritten("first = 1\n\x0csecond = 2\nassert first == second\n")
+    assert str(caught.exception).splitlines()[0] == "assert first == second"
+
+
+def test_a_tab_indented_expression_over_several_lines_keeps_its_shape():
+    with raises(AssertionError) as caught:
+        run_rewritten(
+            "def check():\n"
+            "\tresult = {'a': 1}\n"
+            "\tassert result == {\n"
+            "\t\t'a': 1,\n"
+            "\t\t'b': 2,\n"
+            "\t}\n"
+            "check()\n"
+        )
+    assert str(caught.exception).splitlines()[:4] == [
+        "assert result == {",
+        "\t'a': 1,",
+        "\t'b': 2,",
+        "}",
+    ]

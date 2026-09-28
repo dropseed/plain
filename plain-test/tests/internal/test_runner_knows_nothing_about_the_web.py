@@ -2,8 +2,9 @@
 
 It lives inside `plain.test`, beside the client and the captures, and takes
 from the package around it only what it needs to do its job: the test it hands
-to a lifecycle, the lifecycle class, the exception `skip_test` raises, and the
-names of the attributes the decorators set.
+to a lifecycle, the lifecycle class, the exception `skip_test` raises, the
+error for a test that is written wrongly, and the names of the attributes the
+decorators set.
 
 This is about what the runner's code uses, not what is loaded: importing
 `plain.test.runner` imports `plain.test` first, as importing any subpackage
@@ -17,6 +18,7 @@ import plain.test.runner
 
 VOCABULARY_THE_RUNNER_USES = (
     "plain.test.decorators",
+    "plain.test.definition",
     "plain.test.lifecycle",
     "plain.test.skipping",
 )

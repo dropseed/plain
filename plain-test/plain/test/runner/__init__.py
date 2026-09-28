@@ -7,8 +7,8 @@ Nothing in this package is meant to be imported. What it offers is the
 so. What a test file imports is in `plain.test` itself.
 
 The runner knows nothing about the web. It imports `CollectedTest`,
-`TestLifecycle`, `TestSkipped` and the decorators' attribute names from the
-package around it, and nothing else.
+`TestLifecycle`, `TestSkipped`, `TestDefinitionError` and the decorators'
+attribute names from the package around it, and nothing else.
 """
 
 __all__ = []

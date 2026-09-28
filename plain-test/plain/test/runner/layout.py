@@ -2,6 +2,7 @@
 Where a project keeps its tests.
 """
 
+import sys
 from pathlib import Path
 
 __all__ = []
@@ -19,3 +20,12 @@ def find_tests_directory(root: Path) -> Path:
     if root.name == "tests":
         return root
     return root / "tests"
+
+
+def import_helper_modules_from(directory: Path) -> None:
+    """
+    Put the directory helper modules live in on `sys.path`, so a test file
+    and `lifecycle.py` both import `<directory>/helpers.py` as `helpers`.
+    """
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))

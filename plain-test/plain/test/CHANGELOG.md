@@ -11,6 +11,7 @@
 - A project declares its own lifecycle in `tests/lifecycle.py`: one `TestLifecycle` subclass, found by its path, entered after the packages' lifecycles so it wraps closest to the test. A file that is there but doesn't hold exactly one usable lifecycle stops the run before any test.
 - Tests that can't run as written are rejected at collection, all of a file's at once: a test with parameters nothing passes in (there are no fixtures), a case with the wrong number of values, a second `@cases` on one test, a bare `@skip` or `@tag`.
 - A `conftest.py` anywhere under the tests is a collection error that lists the fixtures it defines and says where each kind goes.
+- Every way of writing a test the runner can't run is one error, `TestDefinitionError`, printed as its message with the line it was raised on. Any other error in a test file, or in `tests/lifecycle.py`, is printed with its traceback, starting at that file.
 - A helper module is imported by its bare name (`tests/helpers.py` is `helpers`) from any test file, wherever the command runs from. An import through `tests.` or a relative import is a collection error that gives the import to write.
 - A project lifecycle in a file the runner doesn't read (`tests/lifecycles.py`, `lifecycle.py` beside `tests/`) stops the run and says where it belongs.
 - `plain test --help` lists the flags and the forms a target takes.

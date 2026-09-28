@@ -1,6 +1,7 @@
 from .captured import Captured
 from .client import Client, ClientResponse
 from .decorators import case, cases, skip, tag
+from .definition import TestDefinitionError
 from .exceptions import AppRequiredError
 from .lifecycle import CollectedTest, TestLifecycle
 from .logs import CapturedLogs, capture_logs
@@ -20,6 +21,7 @@ __all__ = [
     "Client",
     "ClientResponse",
     "CollectedTest",
+    "TestDefinitionError",
     "TestLifecycle",
     "WebSocketRejected",
     "WebSocketTestConnection",

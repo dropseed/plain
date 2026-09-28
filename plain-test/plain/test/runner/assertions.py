@@ -15,6 +15,7 @@ own text. Regenerating it from the syntax tree drops parentheses, and
 """
 
 import ast
+import re
 import reprlib
 import textwrap
 from typing import Any
@@ -64,16 +65,56 @@ def format_truth(source: str, msg: Any = None) -> str:
     return f"assert {source}"
 
 
+# What ends a line as the parser counts lines. `str.splitlines()` also splits
+# on form feeds and a few other characters, which would put every line after
+# one at the wrong number.
+_LINE_ENDING = re.compile(r"\r\n|\r|\n")
+
+
+def _lines_with_their_endings(source: str) -> list[str]:
+    lines = []
+    start = 0
+    for ending in _LINE_ENDING.finditer(source):
+        lines.append(source[start : ending.end()])
+        start = ending.end()
+    if start < len(source):
+        lines.append(source[start:])
+    return lines
+
+
 class _AssertRewriter(ast.NodeTransformer):
     def __init__(self, source: str) -> None:
-        self.source = source
+        # Split once for the whole file. `ast.get_source_segment()` splits
+        # the source it is given on every call, which for a file with a few
+        # hundred asserts is most of the time collection takes.
+        self.lines = _lines_with_their_endings(source)
 
     def _source_as_written(self, node: ast.expr) -> str:
-        # padded: a continuation line keeps its indentation relative to the
-        # first, so an expression written over several lines keeps its shape.
-        written = ast.get_source_segment(self.source, node, padded=True)
-        if written is None:
+        if node.end_lineno is None or node.end_col_offset is None:
             return ast.unparse(node)
+
+        # Column offsets count UTF-8 bytes, not characters.
+        first_line = self.lines[node.lineno - 1].encode()
+        if node.end_lineno == node.lineno:
+            written = first_line[node.col_offset : node.end_col_offset].decode()
+            return written.strip()
+
+        # An expression written over several lines keeps its shape: the
+        # first line is padded back out to the column it started at, so the
+        # continuation lines keep their indentation relative to it. A tab
+        # stays a tab, since that is what the lines under it are indented by.
+        padding = "".join(
+            character if character == "\t" else " "
+            for character in first_line[: node.col_offset].decode()
+        )
+        last_line = self.lines[node.end_lineno - 1].encode()
+        written = "".join(
+            [
+                padding + first_line[node.col_offset :].decode(),
+                *self.lines[node.lineno : node.end_lineno - 1],
+                last_line[: node.end_col_offset].decode(),
+            ]
+        )
         return textwrap.dedent(written).strip()
 
     def visit_Assert(self, node: ast.Assert) -> list[ast.stmt] | ast.stmt:

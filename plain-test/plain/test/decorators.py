@@ -9,6 +9,8 @@ attributes they attach.
 from collections.abc import Callable
 from typing import Any
 
+from .definition import TestDefinitionError
+
 __all__ = ["case", "cases", "skip", "tag"]
 
 # Attribute names the runner reads. Unique and greppable on purpose.
@@ -38,7 +40,7 @@ class case:
 
     def __init__(self, *values: Any, id: str) -> None:
         if not id or not id.strip():
-            raise TypeError("case() requires a non-empty id")
+            raise TestDefinitionError("case() requires a non-empty id")
         self.values = values
         self.id = id
 
@@ -76,19 +78,21 @@ def cases(*case_args: Any) -> Callable:
             normalized.append(((entry,), None))
 
     if not normalized:
-        raise TypeError("cases() requires at least one case")
+        raise TestDefinitionError("cases() requires at least one case")
 
     explicit_ids = [case_id for _, case_id in normalized if case_id is not None]
     duplicates = {
         case_id for case_id in explicit_ids if explicit_ids.count(case_id) > 1
     }
     if duplicates:
-        raise TypeError(f"cases() ids must be unique — repeated: {sorted(duplicates)}")
+        raise TestDefinitionError(
+            f"cases() ids must be unique — repeated: {sorted(duplicates)}"
+        )
 
     def decorator(func: Callable) -> Callable:
         if TEST_CASES_ATTRIBUTE in vars(func):
             name = getattr(func, "__name__", "this test")
-            raise TypeError(
+            raise TestDefinitionError(
                 f"{name} already has @cases. A second one would "
                 "replace the first, not combine with it. Write the "
                 "combinations as one @cases:\n"
@@ -111,7 +115,7 @@ def skip(reason: str) -> Callable:
     # A bare `@skip` would hand the test function in as the reason, and the
     # test would silently stop existing.
     if not isinstance(reason, str) or not reason.strip():
-        raise TypeError('@skip requires a reason: @skip("why")')
+        raise TestDefinitionError('@skip requires a reason: @skip("why")')
 
     def decorator(func: Callable) -> Callable:
         setattr(func, TEST_SKIP_ATTRIBUTE, reason)
@@ -130,7 +134,7 @@ def tag(*names: str) -> Callable:
     # A bare `@tag` would hand the test function in as a name, and the test
     # would silently stop existing.
     if not names or not all(isinstance(name, str) and name.strip() for name in names):
-        raise TypeError('@tag requires at least one name: @tag("slow")')
+        raise TestDefinitionError('@tag requires at least one name: @tag("slow")')
 
     def decorator(func: Callable) -> Callable:
         existing = getattr(func, TEST_TAGS_ATTRIBUTE, ())

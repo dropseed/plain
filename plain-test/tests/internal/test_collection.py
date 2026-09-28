@@ -1,13 +1,10 @@
 import tempfile
 from pathlib import Path
 
-from plain.test import raises
-from plain.test.runner.collection import (
-    ConftestNotSupported,
-    TestDefinitionError,
-    collect_tests,
-)
+from plain.test import TestDefinitionError, raises
+from plain.test.runner.collection import collect_tests
 from plain.test.runner.execution import run_tests
+from plain.test.runner.reporting import collection_error_text
 
 
 def write_tests(files: dict[str, str]) -> Path:
@@ -255,7 +252,70 @@ def test_a_second_cases_is_a_collection_error():
     tests, errors = collect_tests(["."], root=root)
     assert tests == []
     assert len(errors) == 1
+    assert isinstance(errors[0].error, TestDefinitionError)
     assert "test_pairs already has @cases" in str(errors[0].error)
+
+
+def test_a_decorator_used_wrongly_says_which_line_of_the_file():
+    root = write_tests(
+        {
+            "test_bare.py": (
+                "from plain.test import skip\n"
+                "\n"
+                "def test_fine():\n"
+                "    assert True\n"
+                "\n"
+                "@skip\n"
+                "def test_never():\n"
+                "    assert True\n"
+            )
+        }
+    )
+    _, errors = collect_tests(["."], root=root)
+    assert isinstance(errors[0].error, TestDefinitionError)
+    assert str(errors[0].error) == 'line 6: @skip requires a reason: @skip("why")'
+
+
+def test_a_definition_error_is_printed_as_its_message():
+    error = TestDefinitionError("line 6: @skip requires a reason")
+    assert collection_error_text(error) == "line 6: @skip requires a reason"
+
+
+def test_an_error_of_the_test_files_own_is_printed_with_its_traceback():
+    root = write_tests(
+        {
+            "test_broken.py": (
+                "def load_settings():\n"
+                "    return UNDEFINED_NAME\n"
+                "\n"
+                "SETTINGS = load_settings()\n"
+                "\n"
+                "def test_one():\n"
+                "    assert True\n"
+            )
+        }
+    )
+    _, errors = collect_tests(["."], root=root)
+    text = collection_error_text(errors[0].error)
+    lines = text.splitlines()
+    assert lines[0] == "Traceback (most recent call last):"
+    # It starts at the test file. How the runner got there isn't the reader's
+    # problem.
+    assert lines[1].startswith(f'  File "{root.resolve() / "test_broken.py"}", line 4')
+    assert ", line 2, in load_settings" in text
+    assert lines[-1] == "NameError: name 'UNDEFINED_NAME' is not defined"
+    assert "collection.py" not in text
+
+
+def test_a_syntax_error_names_the_file_and_the_line():
+    root = write_tests({"test_broken.py": "def test_one(:\n    assert True\n"})
+    _, errors = collect_tests(["."], root=root)
+    text = collection_error_text(errors[0].error)
+    assert text.splitlines()[0] == (
+        f'  File "{root.resolve() / "test_broken.py"}", line 1'
+    )
+    assert "SyntaxError" in text.splitlines()[-1]
+    assert "Traceback" not in text
 
 
 def test_skip_test_skips_one_case_and_runs_the_others():
@@ -300,7 +360,21 @@ def test_a_conftest_is_a_collection_error_wherever_it_is():
         root.resolve() / "conftest.py",
         root.resolve() / "accounts" / "conftest.py",
     ]
-    assert all(isinstance(error.error, ConftestNotSupported) for error in errors)
+    assert all(isinstance(error.error, TestDefinitionError) for error in errors)
+
+
+def test_a_conftest_in_a_directory_that_is_never_searched_is_not_reported():
+    root = write_tests(
+        {
+            ".venv/lib/conftest.py": "",
+            "node_modules/thing/conftest.py": "",
+            "node_modules/thing/test_theirs.py": "def test_x():\n    assert True\n",
+            "test_one.py": "def test_one():\n    assert True\n",
+        }
+    )
+    tests, errors = collect_tests(["."], root=root)
+    assert [t.id for t in tests] == ["test_one.py::test_one"]
+    assert errors == []
 
 
 def test_a_conftest_above_a_single_file_target_is_found():

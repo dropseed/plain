@@ -7,8 +7,8 @@ methods (a fresh instance per test). Test modules get assertion rewriting
 when imported; helper modules do not.
 
 Helper modules are imported by their bare name from one directory, the
-helper directory, which is on `sys.path`. A test module can't reach them any
-other way: see `_import_problems`.
+helper directory. The caller puts it on `sys.path` before collecting. A test
+module can't reach them any other way: see `_import_problems`.
 """
 
 import ast
@@ -26,6 +26,7 @@ from ..decorators import (
     TEST_SKIP_ATTRIBUTE,
     TEST_TAGS_ATTRIBUTE,
 )
+from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
 from .assertions import rewrite_asserts
 
@@ -37,18 +38,17 @@ _CONFTEST_FILE_NAME = "conftest.py"
 
 
 class CollectionError(Exception):
+    """
+    One file the runner couldn't collect from, and why. The cause is a
+    TestDefinitionError when the file is written in a way the runner can't
+    run, and whatever was raised (an ImportError, a SyntaxError) when the
+    file couldn't be loaded at all.
+    """
+
     def __init__(self, path: Path, error: BaseException) -> None:
         self.path = path
         self.error = error
         super().__init__(f"Failed to collect {path}: {error!r}")
-
-
-class TestDefinitionError(Exception):
-    """A test is written in a way the runner can't run."""
-
-
-class ConftestNotSupported(Exception):
-    """A `conftest.py` is in the tests. Nothing reads it."""
 
 
 _NO_FIXTURES_ADVICE = (
@@ -100,7 +100,8 @@ def collect_tests(
     test module imports `<helper_directory>/helpers.py` as `helpers`, and is
     refused an import that goes through the directory's own name. Without
     one, helper modules are found from `root` and no import is refused for
-    its name, since `root` can be called anything.
+    its name, since `root` can be called anything. Either way the caller has
+    already put that directory on `sys.path`.
 
     Returns the collected tests plus any per-file collection errors — one
     unimportable file shouldn't stop every other file's tests from running.
@@ -113,11 +114,6 @@ def collect_tests(
     )
     skip_dir_names = _SKIP_DIR_NAMES | set(exclude_dirs)
 
-    # Test modules import helpers (and each other's routers/models) as
-    # top-level modules, so the directory they live in goes on sys.path.
-    if str(layout.helper_directory) not in sys.path:
-        sys.path.insert(0, str(layout.helper_directory))
-
     collected: list[RunnableTest] = []
     errors: list[CollectionError] = []
     conftest_files: list[Path] = []
@@ -129,10 +125,10 @@ def collect_tests(
             files = [base]
             conftest_files.extend(_conftest_files_above(base, root=root))
         elif base.is_dir():
-            files = _find_test_files(base, skip_dir_names=skip_dir_names)
-            conftest_files.extend(
-                _find_conftest_files(base, skip_dir_names=skip_dir_names)
+            files, conftest_files_found = _find_test_and_conftest_files(
+                base, skip_dir_names=skip_dir_names
             )
+            conftest_files.extend(conftest_files_found)
         else:
             raise FileNotFoundError(f"No such test target: {target}")
 
@@ -151,7 +147,7 @@ def collect_tests(
         errors.append(
             CollectionError(
                 conftest_file,
-                ConftestNotSupported(_conftest_message(conftest_file, layout=layout)),
+                TestDefinitionError(_conftest_message(conftest_file, layout=layout)),
             )
         )
 
@@ -171,8 +167,12 @@ def _matches_target(name: str, target: str) -> bool:
     return name == target or name.startswith((f"{target}[", f"{target}::"))
 
 
-def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
-    files = []
+def _find_test_and_conftest_files(
+    directory: Path, *, skip_dir_names: set[str]
+) -> tuple[list[Path], list[Path]]:
+    """The test files under a directory, and the conftest files among them."""
+    test_files = []
+    conftest_files = []
     for dirpath, dirnames, filenames in os.walk(directory):
         # Prune skipped directories in place so os.walk never descends into
         # them (rglob can't prune — a .venv or node_modules would get a full
@@ -180,23 +180,14 @@ def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]
         dirnames[:] = sorted(
             d for d in dirnames if d not in skip_dir_names and not d.startswith(".")
         )
-        files.extend(
+        test_files.extend(
             Path(dirpath) / f
             for f in sorted(filenames)
             if f.startswith("test_") and f.endswith(".py")
         )
-    return files
-
-
-def _find_conftest_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
-    files = []
-    for dirpath, dirnames, filenames in os.walk(directory):
-        dirnames[:] = sorted(
-            d for d in dirnames if d not in skip_dir_names and not d.startswith(".")
-        )
         if _CONFTEST_FILE_NAME in filenames:
-            files.append(Path(dirpath) / _CONFTEST_FILE_NAME)
-    return files
+            conftest_files.append(Path(dirpath) / _CONFTEST_FILE_NAME)
+    return test_files, conftest_files
 
 
 def _conftest_files_above(test_file: Path, *, root: Path) -> list[Path]:
@@ -506,8 +497,29 @@ def _import_test_module(path: Path, *, layout: _Layout) -> types.ModuleType:
         module.__file__ = str(path)
         sys.modules[module_name] = module
         exec(code, module.__dict__)  # noqa: S102 — running test files is the job
+    except TestDefinitionError as e:
+        sys.modules.pop(module_name, None)
+        raise CollectionError(path, _with_its_line(e, path=path)) from e
     except Exception as e:
         sys.modules.pop(module_name, None)
         raise CollectionError(path, e) from e
 
     return module
+
+
+def _with_its_line(error: TestDefinitionError, *, path: Path) -> TestDefinitionError:
+    """
+    A definition error raised while the test file ran, such as a `@skip` with
+    no reason, with the line of the file that raised it in front. The
+    message is all that gets printed, and "@skip requires a reason" doesn't
+    say which of a file's tests it means.
+    """
+    line = None
+    traceback = error.__traceback__
+    while traceback is not None:
+        if traceback.tb_frame.f_code.co_filename == str(path):
+            line = traceback.tb_lineno
+        traceback = traceback.tb_next
+    if line is None:
+        return error
+    return TestDefinitionError(f"line {line}: {error}")

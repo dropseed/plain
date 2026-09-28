@@ -121,6 +121,64 @@ def test_a_broken_app_lifecycle_stops_the_run_before_any_test():
     assert "passed" not in result.output
 
 
+def test_a_lifecycle_that_raises_is_shown_with_its_traceback():
+    result = run_in_project(
+        {
+            "tests/lifecycle.py": (
+                "from plain.test import TestLifecycle\n"
+                "\n"
+                "LIMIT = int('ten')\n"
+                "\n"
+                "class AppTestLifecycle(TestLifecycle):\n"
+                "    pass\n"
+            ),
+            "tests/test_one.py": "def test_one():\n    print('test body')\n",
+        }
+    )
+    assert result.exit_code == 2
+    assert "tests/lifecycle.py could not be imported." in result.output
+    assert 'tests/lifecycle.py", line 3, in <module>' in result.output
+    assert "ValueError: invalid literal for int()" in result.output
+    # The runner's own frames aren't part of what went wrong.
+    assert "lifecycle_discovery.py" not in result.output
+    assert "test body" not in result.output
+
+
+def test_a_name_error_in_a_test_file_says_where():
+    result = run_in_project(
+        {
+            "tests/test_broken.py": (
+                "LIMIT = UNDEFINED_NAME\n\ndef test_one():\n    assert True\n"
+            ),
+            "tests/test_fine.py": "def test_ok():\n    assert True\n",
+        }
+    )
+    assert result.exit_code == 1
+    assert "COLLECTION ERROR" in result.output
+    assert 'tests/test_broken.py", line 1, in <module>' in result.output
+    assert "NameError: name 'UNDEFINED_NAME' is not defined" in result.output
+    assert "1 passed, 1 collection errors" in result.output
+
+
+def test_a_bare_skip_says_which_line():
+    result = run_in_project(
+        {
+            "tests/test_bare.py": (
+                "from plain.test import skip\n"
+                "\n"
+                "@skip\n"
+                "def test_never():\n"
+                "    assert True\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert '  line 3: @skip requires a reason: @skip("why")' in result.output
+    # The message is the whole of it: no class name, no traceback.
+    assert "TestDefinitionError" not in result.output
+    assert "Traceback" not in result.output
+
+
 def test_a_test_that_asks_for_fixtures_is_told_what_to_do():
     result = run_in_project(
         {
