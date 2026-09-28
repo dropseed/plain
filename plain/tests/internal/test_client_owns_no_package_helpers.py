@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 import plain.test
-from plain.test import Client, RequestFactory, cases
+from plain.test import Client, cases
 
 
 def imported_module_names(source: str) -> list[str]:
@@ -35,7 +35,3 @@ def test_plain_test_imports_no_optional_package() -> None:
 def test_client_does_not_have(name: str) -> None:
     assert not hasattr(Client, name)
     assert name not in vars(Client())
-
-
-def test_request_factory_does_not_have_trace() -> None:
-    assert not hasattr(RequestFactory, "trace")

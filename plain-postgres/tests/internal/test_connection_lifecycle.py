@@ -27,7 +27,7 @@ from plain.postgres.db import (
 )
 from plain.postgres.middleware import DatabaseConnectionMiddleware
 from plain.runtime import settings
-from plain.test import Client, RequestFactory, override_settings
+from plain.test import Client, build_request, override_settings
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import ServerSentEvent, ServerSentEventsView, View
@@ -202,7 +202,7 @@ def _with_db_middleware():
 
 def _fresh_client():
     """A new Client, which builds its middleware chain at its first request."""
-    client = Client(raise_request_exception=True)
+    client = Client(raise_exceptions=True)
     return client
 
 
@@ -381,7 +381,7 @@ class TestStreamingResponseCleanup:
             ):
                 handler = BaseHandler()
                 handler.load_middleware()
-                request = RequestFactory().get("/streaming-db-query")
+                request = build_request("GET", "/streaming-db-query")
 
                 async def run() -> bytes:
                     with concurrent.futures.ThreadPoolExecutor(
@@ -428,7 +428,7 @@ class TestStreamingResponseCleanup:
             _lazy_query_wrappers.clear()
             handler = BaseHandler()
             handler.load_middleware()
-            request = RequestFactory().get("/streaming-lazy-query")
+            request = build_request("GET", "/streaming-lazy-query")
 
             async def run() -> bytes:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:

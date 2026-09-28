@@ -1,17 +1,15 @@
-from typing import Any
 from unittest.mock import patch
 
 from plain.csrf.middleware import CsrfViewMiddleware
-from plain.test import RequestFactory, cases, raises
+from plain.test import build_request, cases, raises
 
 
 @cases("GET", "HEAD", "OPTIONS")
 def test_safe_methods_allowed(method):
     """Safe HTTP methods should always be allowed."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = getattr(rf, method.lower())("/test/")
+    request = build_request(method, "/test/")
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is True
@@ -36,10 +34,11 @@ def test_sec_fetch_site_header(
     sec_fetch_site, expected_allowed, expected_reason_contains
 ):
     """Test various Sec-Fetch-Site header values."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Sec-Fetch-Site": sec_fetch_site})
+    request = build_request(
+        "POST", "/test/", headers={"Sec-Fetch-Site": sec_fetch_site}
+    )
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is expected_allowed
@@ -72,13 +71,12 @@ def test_trusted_origins(
     origin, trusted_origins, expected_allowed, expected_reason_contains
 ):
     """Test trusted origins allow-list functionality."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     with patch("plain.csrf.origin.settings") as mock_settings:
         mock_settings.CSRF_TRUSTED_ORIGINS = trusted_origins
 
-        request = rf.post("/test/", headers={"Origin": origin})
+        request = build_request("POST", "/test/", headers={"Origin": origin})
         allowed, reason = csrf_middleware.should_allow_request(request)
 
         assert allowed is expected_allowed
@@ -91,10 +89,9 @@ def test_trusted_origins(
 )
 def test_old_browser_fallback(headers):
     """Requests without proper headers should be allowed (old browsers)."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers=headers)
+    request = build_request("POST", "/test/", headers=headers)
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is True
@@ -125,15 +122,10 @@ def test_old_browser_fallback(headers):
 )
 def test_origin_host_comparison(origin, expected_allowed, expected_reason_contains):
     """Test Origin vs Host header comparison scenarios."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    # Configure request based on the origin
-    request_kwargs: dict[str, Any] = {"headers": {"Origin": origin}}
-    if origin in ("https://testserver:443", "https://testserver"):
-        request_kwargs["secure"] = True
-
-    request = rf.post("/test/", **request_kwargs)
+    # The request goes to https://testserver, so the first two origins match.
+    request = build_request("POST", "/test/", headers={"Origin": origin})
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is expected_allowed
@@ -142,10 +134,9 @@ def test_origin_host_comparison(origin, expected_allowed, expected_reason_contai
 
 def test_invalid_origin_url():
     """Invalid Origin URLs should be rejected."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Origin": "not-a-valid-url"})
+    request = build_request("POST", "/test/", headers={"Origin": "not-a-valid-url"})
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is False
@@ -154,14 +145,13 @@ def test_invalid_origin_url():
 
 def test_sec_fetch_site_priority_over_origin_check():
     """Sec-Fetch-Site should take priority over Origin vs Host check."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     # This would normally match (same host) but Sec-Fetch-Site rejects it first
-    request = rf.post(
+    request = build_request(
+        "POST",
         "/test/",
         headers={"Origin": "https://testserver", "Sec-Fetch-Site": "cross-site"},
-        secure=True,
     )
     allowed, reason = csrf_middleware.should_allow_request(request)
 
@@ -250,11 +240,12 @@ def test_path_based_csrf_exemption(
         settings.CSRF_EXEMPT_PATHS = exempt_patterns
 
         # Need to recreate middleware to compile new patterns
-        rf = RequestFactory()
         csrf_middleware = CsrfViewMiddleware()
 
         # Test path with malicious origin to ensure exemption works
-        request = rf.post(test_path, headers={"Origin": "https://attacker.com"})
+        request = build_request(
+            "POST", test_path, headers={"Origin": "https://attacker.com"}
+        )
         allowed, reason = csrf_middleware.should_allow_request(request)
 
         assert allowed is expected_allowed
@@ -266,16 +257,15 @@ def test_path_based_csrf_exemption(
 
 
 def test_request_factory_naturally_bypasses_csrf():
-    """Test that RequestFactory naturally bypasses CSRF due to missing headers.
+    """Test that a built request naturally bypasses CSRF due to missing headers.
 
     This demonstrates why enforce_csrf_checks was removed - it's redundant
     because test clients naturally lack browser headers and thus bypass CSRF anyway.
     """
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     # Create a POST request with NO Origin or Sec-Fetch-Site headers (typical for test clients)
-    request = rf.post("/test/")
+    request = build_request("POST", "/test/")
 
     # Verify no headers are present
     assert request.headers.get("Origin") is None
@@ -294,10 +284,11 @@ def test_middleware_integration_rejected_request():
     """Rejected requests should raise SuspiciousOperationError400."""
     from plain.http import SuspiciousOperationError400
 
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
+    request = build_request(
+        "POST", "/test/", headers={"Origin": "https://attacker.com"}
+    )
 
     # Should raise SuspiciousOperationError400
     with raises(SuspiciousOperationError400) as exc_info:

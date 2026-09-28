@@ -101,12 +101,16 @@ The test client, where everything after the path is now keyword-only:
 | `response.json()`, `json.loads(response.content)` | `response.json_data`                                                        |
 | `response.url` on a redirect                      | `response.redirect_to`                                                      |
 | `response.user`                                   | `get_request_user(response.request)` from `plain.auth.requests`             |
-| `RequestFactory().generic("PUT", "/x")`           | `RequestFactory().request(method="PUT", path="/x")`                         |
+| `RequestFactory().get("/x")`, `.post("/x", ...)`  | `build_request("GET", "/x")`, `build_request("POST", "/x", ...)`            |
+| `RequestFactory().generic("PUT", "/x")`           | `build_request("PUT", "/x")`                                                |
 | `RequestFactory().request(data=, query_string=)`  | the client's keywords: `body=`, `form_data=`, `json_data=`, `query_params=` |
-| `server_name=`, `server_port=`                    | `headers={"Host": "example.com"}`                                           |
+| `RequestFactory(headers=...)`, `factory.cookies`  | `headers=` on each `build_request()`, with a `Cookie` header for cookies    |
 | `RequestFactory(json_encoder=...)`                | gone. Encode it yourself and pass `body=`                                   |
-| `client.trace(path)`                              | `client.request(method="TRACE", path=path)`, for any method                 |
-| `client.request(request)` with a built `Request`  | `client.request(method=..., path=...)`                                      |
+| `secure=False`                                    | a full URL: `client.get("http://testserver/x")`                             |
+| `server_name=`, `server_port=`                    | a full URL: `client.get("https://example.com:8443/x")`                      |
+| `Client(raise_request_exception=False)`           | `Client(raise_exceptions=False)`                                            |
+| `client.trace(path)`                              | `client.request("TRACE", path)`, for any method                             |
+| `client.request(request)` with a built `Request`  | `client.request(method, path, ...)`                                         |
 | `client.force_login(user)`                        | `login_client(client, user)` from `plain.auth.test`                         |
 | `client.logout()`                                 | `logout_client(client)` from `plain.auth.test`                              |
 | `client.session`                                  | `get_client_session(client)` from `plain.sessions.test`                     |

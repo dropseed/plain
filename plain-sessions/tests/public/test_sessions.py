@@ -1,7 +1,7 @@
 from plain.sessions import SessionNotAvailable, get_request_session
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
-from plain.test import Client, RequestFactory, raises
+from plain.test import Client, build_request, raises
 
 
 def test_session_created():
@@ -52,8 +52,7 @@ def test_mapping_attributes():
 
 def test_session_not_available():
     """Test that SessionNotAvailable is raised when session hasn't been set up."""
-    rf = RequestFactory()
-    request = rf.get("/")
+    request = build_request("GET", "/")
 
     # Session hasn't been set up by middleware yet
     with raises(SessionNotAvailable) as caught:

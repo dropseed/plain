@@ -10,7 +10,7 @@ from plain.mcp.views import (
     META_SERVER_INFO,
     PROTOCOL_VERSION,
 )
-from plain.test import RequestFactory, patch, raises
+from plain.test import build_request, patch, raises
 
 if TYPE_CHECKING:
     # Only ever an annotation here, so the name never exists at runtime.
@@ -28,7 +28,7 @@ class _Mode(enum.StrEnum):
 
 def _instantiate(cls: type[MCPView]) -> MCPView:
     """Build an MCPView instance with a stub request for unit tests."""
-    request = RequestFactory().post("/mcp", body=b"", content_type="application/json")
+    request = build_request("POST", "/mcp", body=b"", content_type="application/json")
     return cls(request=request)
 
 

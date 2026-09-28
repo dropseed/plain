@@ -11,7 +11,7 @@ from opentelemetry import trace
 from plain.http import AsyncStreamingResponse
 from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.inprocess import SentResponse
-from plain.test import ClientResponse, RequestFactory, raises
+from plain.test import ClientResponse, build_request, raises
 
 
 async def _stream() -> AsyncIterator[bytes]:
@@ -19,7 +19,7 @@ async def _stream() -> AsyncIterator[bytes]:
 
 
 def _read(response: AsyncStreamingResponse, *, method: str = "GET") -> bytes:
-    request = RequestFactory().request(method=method, path="/")
+    request = build_request(method=method, path="/")
     lifecycle = ResponseLifecycle(
         response,
         request=request,
@@ -67,7 +67,7 @@ def test_head_never_reads_the_stream() -> None:
 def test_client_response_status_is_read_only() -> None:
     response = ClientResponse(
         SentResponse(
-            request=RequestFactory().get("/"),
+            request=build_request("GET", "/"),
             response=AsyncStreamingResponse(
                 _stream(), content_type="text/event-stream"
             ),

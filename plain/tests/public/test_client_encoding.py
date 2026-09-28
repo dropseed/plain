@@ -7,26 +7,27 @@ content type it will see in production.
 
 from io import BytesIO
 
-from plain.test import RequestFactory, raises
+from plain.test import build_request, raises
 
 
 def test_form_data_is_urlencoded_without_files():
     """What a browser sends for a form with no file input."""
-    request = RequestFactory().post("/x", form_data={"a": "b", "c": "d"})
+    request = build_request("POST", "/x", form_data={"a": "b", "c": "d"})
 
     assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
     assert dict(request.form_data) == {"a": ["b"], "c": ["d"]}
 
 
 def test_empty_form_data_is_still_a_form():
-    request = RequestFactory().post("/x", form_data={})
+    request = build_request("POST", "/x", form_data={})
 
     assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
     assert request.body == b""
 
 
 def test_form_data_is_multipart_when_files_are_present():
-    request = RequestFactory().post(
+    request = build_request(
+        "POST",
         "/x",
         form_data={"title": "Report"},
         files={"upload": BytesIO(b"contents")},
@@ -38,7 +39,7 @@ def test_form_data_is_multipart_when_files_are_present():
 
 
 def test_json_data_sets_its_own_content_type():
-    request = RequestFactory().post("/x", json_data={"name": "Alice"})
+    request = build_request("POST", "/x", json_data={"name": "Alice"})
 
     assert request.headers["Content-Type"] == "application/json"
     assert request.json_data == {"name": "Alice"}
@@ -48,16 +49,16 @@ def test_content_type_without_a_body_says_what_to_pass():
     """An empty body under a content type that promises a parseable one would
     fail somewhere inside the view instead of here."""
     with raises(TypeError, match="content_type needs a body"):
-        RequestFactory().post("/x", content_type="application/json")
+        build_request("POST", "/x", content_type="application/json")
 
 
 def test_content_type_alongside_form_data_is_rejected():
     with raises(TypeError, match="only applies to a raw body"):
-        RequestFactory().post("/x", form_data={"a": "b"}, content_type="text/plain")
+        build_request("POST", "/x", form_data={"a": "b"}, content_type="text/plain")
 
 
 def test_raw_body_keeps_the_content_type_it_was_given():
-    request = RequestFactory().post("/x", body=b"{}", content_type="application/json")
+    request = build_request("POST", "/x", body=b"{}", content_type="application/json")
 
     assert request.headers["Content-Type"] == "application/json"
     assert request.body == b"{}"

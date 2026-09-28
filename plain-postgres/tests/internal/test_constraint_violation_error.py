@@ -12,7 +12,7 @@ from plain.postgres.constraints import BaseConstraint
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.postgres.test import capture_queries
-from plain.test import RequestFactory, cases, patch, raises
+from plain.test import build_request, cases, patch, raises
 
 
 def _check_constraint() -> CheckConstraint:
@@ -148,9 +148,10 @@ def test_form_skips_check_constraint_over_shape_failed_field() -> None:
                 model = ConstraintExample
                 fields = ("name", "description")
 
-        rf = RequestFactory()
         form = Form(
-            request=rf.post("/x/", form_data={"name": "bogus", "description": "d"})
+            request=build_request(
+                "POST", "/x/", form_data={"name": "bogus", "description": "d"}
+            )
         )
         assert not form.is_valid()
         assert "name" in form.errors
@@ -197,9 +198,10 @@ def test_check_constraint_dict_violation_error_routes_to_field() -> None:
                 model = ConstraintExample
                 fields = ("name", "description")
 
-        rf = RequestFactory()
         form = Form(
-            request=rf.post("/x/", form_data={"name": "bad", "description": "d"})
+            request=build_request(
+                "POST", "/x/", form_data={"name": "bad", "description": "d"}
+            )
         )
         assert not form.is_valid()
         assert form.errors.get("name"), form.errors
@@ -223,9 +225,10 @@ def test_check_constraint_string_violation_error_lands_on_non_field_errors() -> 
                 model = ConstraintExample
                 fields = ("name", "description")
 
-        rf = RequestFactory()
         form = Form(
-            request=rf.post("/x/", form_data={"name": "bad", "description": "d"})
+            request=build_request(
+                "POST", "/x/", form_data={"name": "bad", "description": "d"}
+            )
         )
         assert not form.is_valid()
         assert "name" not in form.errors
@@ -273,9 +276,10 @@ def test_unique_constraint_single_field_string_routes_to_field() -> None:
                 model = ConstraintExample
                 fields = ("name", "description")
 
-        rf = RequestFactory()
         form = Form(
-            request=rf.post("/x/", form_data={"name": "dup", "description": "d2"})
+            request=build_request(
+                "POST", "/x/", form_data={"name": "dup", "description": "d2"}
+            )
         )
         assert not form.is_valid()
         assert any("That name is taken." in m for m in form.errors.get("name", [])), (

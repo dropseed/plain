@@ -2,7 +2,7 @@
 what was sent, and nothing borrowed from the response the view returned."""
 
 from plain.http import Request, Response
-from plain.test import Client, RequestFactory
+from plain.test import Client, build_request
 from plain.test.client import ClientResponse
 
 
@@ -61,8 +61,8 @@ def test_any_method_can_be_sent() -> None:
     assert response.request.method == "POST"
 
 
-def test_request_factory_request_takes_the_clients_keywords() -> None:
-    request = RequestFactory().request(
+def test_build_request_takes_the_clients_keywords() -> None:
+    request = build_request(
         method="PUT",
         path="/things",
         query_params={"page": "2"},

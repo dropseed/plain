@@ -18,7 +18,7 @@ from plain.views import ServerSentEvent, ServerSentEventsView, View
 def fresh_client() -> Client:
     """A new Client. It builds its middleware chain from the settings in place
     at its first request, and keeps a 5xx as a response instead of raising."""
-    client = Client(raise_request_exception=False)
+    client = Client(raise_exceptions=False)
     return client
 
 

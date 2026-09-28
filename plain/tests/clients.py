@@ -22,7 +22,7 @@ def _swap_router(
             URLS_TRAILING_SLASH=urls_trailing_slash,
         ):
             _get_cached_resolver.cache_clear()
-            client = Client(raise_request_exception=False)
+            client = Client(raise_exceptions=False)
             yield client
     finally:
         # Settings are restored by override_settings; clear the resolver

@@ -9,7 +9,7 @@ from middleware_helpers import (
 from plain.http import Response
 from plain.internal.handlers.base import BaseHandler
 from plain.runtime import settings
-from plain.test import Client, RequestFactory
+from plain.test import Client, build_request
 from plain.urls.resolvers import _get_cached_resolver
 
 
@@ -46,7 +46,7 @@ def test_async_pipeline_shares_contextvars_across_threads():
     try:
         handler = BaseHandler()
         handler.load_middleware()
-        request = RequestFactory().get("/")
+        request = build_request("GET", "/")
 
         async def run() -> Response:
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:

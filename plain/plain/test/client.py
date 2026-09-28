@@ -3,16 +3,22 @@ import re
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urljoin, urlparse, urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from plain.http import Request, WebSocketResponse
-from plain.json import PlainJSONEncoder
 from plain.server.inprocess import InProcessServer, SentResponse
 from plain.urls import get_resolver
 from plain.utils.http import urlencode
 
-from .encoding import encode_multipart
 from .exceptions import RedirectCycleError, require_app
+from .request_builder import (
+    DEFAULT_PORTS,
+    Target,
+    build_encoded_request,
+    encode_request_body,
+    join_query_strings,
+    split_target,
+)
 
 if TYPE_CHECKING:
     from plain.http import Response
@@ -24,15 +30,11 @@ if TYPE_CHECKING:
 __all__ = [
     "Client",
     "ClientResponse",
-    "RequestFactory",
 ]
 
 
-_BOUNDARY = "BoUnDaRyStRiNg"
-_MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
 _JSON_CONTENT_TYPE_RE = re.compile(r"^application\/(.+\+)?json")
-_CHARSET_RE = re.compile(r".*; charset=([\w-]+);?")
 
 _REDIRECT_STATUS_CODES = (
     HTTPStatus.MOVED_PERMANENTLY,
@@ -141,7 +143,7 @@ class ClientResponse:
     @property
     def exception(self) -> Exception | None:
         """The exception behind a 5xx response, when
-        `Client(raise_request_exception=False)` kept it from being raised."""
+        `Client(raise_exceptions=False)` kept it from being raised."""
         return self._returned_response.exception
 
     @property
@@ -186,356 +188,6 @@ class ClientResponse:
         )
 
 
-def _encode_request_body(
-    *,
-    form_data: dict[str, Any] | None,
-    json_data: Any,
-    body: bytes | str | None,
-    files: dict[str, Any] | None,
-    content_type: str | None,
-) -> tuple[bytes, str]:
-    """
-    Encode the body arguments into (bytes, content_type).
-
-    Exactly one body source may be given: form_data (optionally with files),
-    json_data, or a raw body. `content_type` only applies to a raw body.
-
-    A form encodes the way a browser would: urlencoded, and multipart only
-    when there are files. Views under test then see the content type they'd
-    see in production.
-    """
-    sources = [
-        form_data is not None or files is not None,
-        json_data is not None,
-        body is not None,
-    ]
-    if sum(sources) > 1:
-        raise TypeError(
-            "Pass only one of form_data/files, json_data, or body per request"
-        )
-    if content_type is not None and body is None:
-        if not any(sources):
-            # `post(path, content_type="application/json")` with nothing to
-            # send. Building an empty body here would hand the view a b"" that
-            # its content type says is parseable, and the failure would
-            # surface somewhere further in. Say it at the call instead.
-            raise TypeError(
-                "content_type needs a body — pass body=... alongside it "
-                '(body=b"" for a deliberately empty one)'
-            )
-        raise TypeError(
-            "content_type only applies to a raw body — form_data and json_data set their own"
-        )
-
-    if json_data is not None:
-        return (
-            json.dumps(json_data, cls=PlainJSONEncoder).encode(),
-            "application/json",
-        )
-
-    if body is not None:
-        resolved_content_type = content_type or "application/octet-stream"
-        if isinstance(body, str):
-            # Encode a string body with the charset the content type
-            # declares, so the payload bytes match what the request
-            # advertises. Bytes pass through untouched.
-            charset_match = _CHARSET_RE.match(resolved_content_type)
-            charset = charset_match[1] if charset_match else "utf-8"
-            body = body.encode(charset)
-        return (body, resolved_content_type)
-
-    if files:
-        # Files can only travel as multipart, and any form fields sent with
-        # them ride along in the same body.
-        merged: dict[str, Any] = dict(form_data or {})
-        merged.update(files)
-        return (
-            encode_multipart(_BOUNDARY, merged),
-            _MULTIPART_CONTENT,
-        )
-
-    if form_data is not None or files is not None:
-        # A plain form — what a browser (and htmx) sends without a file input.
-        return (
-            urlencode(form_data or {}, doseq=True).encode(),
-            "application/x-www-form-urlencoded",
-        )
-
-    return (b"", "")
-
-
-class RequestFactory:
-    """
-    Builds `Request` objects without sending them, for calling a view or a
-    middleware directly.
-
-        request = RequestFactory().post("/submit/", form_data={"foo": "bar"})
-
-    It takes the same keywords as `Client`.
-    """
-
-    def __init__(self, *, headers: dict[str, str] | None = None) -> None:
-        self._default_headers: dict[str, str] = headers or {}
-        self.cookies: SimpleCookie = SimpleCookie()
-
-    def request(
-        self,
-        *,
-        method: str,
-        path: str,
-        query_params: dict[str, Any] | None = None,
-        form_data: dict[str, Any] | None = None,
-        json_data: Any = None,
-        body: bytes | str | None = None,
-        files: dict[str, Any] | None = None,
-        content_type: str | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a request with any method."""
-        encoded_body, encoded_content_type = _encode_request_body(
-            form_data=form_data,
-            json_data=json_data,
-            body=body,
-            files=files,
-            content_type=content_type,
-        )
-        return self._build_request(
-            method=method,
-            path=path,
-            body=encoded_body,
-            content_type=encoded_content_type,
-            query_string=urlencode(query_params or {}, doseq=True),
-            secure=secure,
-            headers=headers,
-        )
-
-    def _build_request(
-        self,
-        *,
-        method: str,
-        path: str,
-        body: bytes = b"",
-        content_type: str = "",
-        query_string: str = "",
-        secure: bool = True,
-        server_name: str = "testserver",
-        server_port: str = "",
-        headers: dict[str, str] | None = None,
-    ) -> Request:
-        """Build a Request from an already-encoded body and query string.
-
-        `server_name` and `server_port` are here for following a redirect to
-        another host. A test sets the host with `headers={"Host": ...}`.
-        """
-        # A URL can carry its own query string; merge it in front of any
-        # explicitly-passed query string.
-        parsed = urlparse(str(path))  # path can be lazy
-        path = parsed.path
-        if parsed.params:
-            path += ";" + parsed.params
-        if parsed.query:
-            query_string = (
-                f"{parsed.query}&{query_string}" if query_string else parsed.query
-            )
-
-        # Merge headers: defaults first, then per-request overrides
-        all_headers: dict[str, str] = dict(self._default_headers)
-        if headers:
-            all_headers.update(headers)
-
-        # Add cookies
-        cookie_str = "; ".join(
-            sorted(
-                f"{morsel.key}={morsel.coded_value}" for morsel in self.cookies.values()
-            )
-        )
-        if cookie_str:
-            all_headers["Cookie"] = cookie_str
-
-        # Content headers follow the content type, not the byte count: a POST
-        # of an empty form still declares what it is, with Content-Length: 0,
-        # the same as a browser submitting a form with nothing filled in.
-        # Requests with no body source at all (a GET) resolve to no content
-        # type and get neither header.
-        if content_type:
-            all_headers["Content-Type"] = content_type
-            all_headers["Content-Length"] = str(len(body))
-
-        request = Request(
-            method=method,
-            path=path,
-            headers=all_headers,
-            query_string=query_string,
-            body=body,
-            server_scheme="https" if secure else "http",
-            server_name=server_name,
-            server_port=server_port or ("443" if secure else "80"),
-            remote_addr="127.0.0.1",
-        )
-
-        return request
-
-    def get(
-        self,
-        path: str,
-        *,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a GET request."""
-        return self.request(
-            method="GET",
-            path=path,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def head(
-        self,
-        path: str,
-        *,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a HEAD request."""
-        return self.request(
-            method="HEAD",
-            path=path,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def options(
-        self,
-        path: str,
-        *,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct an OPTIONS request."""
-        return self.request(
-            method="OPTIONS",
-            path=path,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def post(
-        self,
-        path: str,
-        *,
-        form_data: dict[str, Any] | None = None,
-        json_data: Any = None,
-        body: bytes | str | None = None,
-        files: dict[str, Any] | None = None,
-        content_type: str | None = None,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a POST request."""
-        return self.request(
-            method="POST",
-            path=path,
-            form_data=form_data,
-            json_data=json_data,
-            body=body,
-            files=files,
-            content_type=content_type,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def put(
-        self,
-        path: str,
-        *,
-        form_data: dict[str, Any] | None = None,
-        json_data: Any = None,
-        body: bytes | str | None = None,
-        files: dict[str, Any] | None = None,
-        content_type: str | None = None,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a PUT request."""
-        return self.request(
-            method="PUT",
-            path=path,
-            form_data=form_data,
-            json_data=json_data,
-            body=body,
-            files=files,
-            content_type=content_type,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def patch(
-        self,
-        path: str,
-        *,
-        form_data: dict[str, Any] | None = None,
-        json_data: Any = None,
-        body: bytes | str | None = None,
-        files: dict[str, Any] | None = None,
-        content_type: str | None = None,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a PATCH request."""
-        return self.request(
-            method="PATCH",
-            path=path,
-            form_data=form_data,
-            json_data=json_data,
-            body=body,
-            files=files,
-            content_type=content_type,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-    def delete(
-        self,
-        path: str,
-        *,
-        form_data: dict[str, Any] | None = None,
-        json_data: Any = None,
-        body: bytes | str | None = None,
-        files: dict[str, Any] | None = None,
-        content_type: str | None = None,
-        query_params: dict[str, Any] | None = None,
-        headers: dict[str, str] | None = None,
-        secure: bool = True,
-    ) -> Request:
-        """Construct a DELETE request."""
-        return self.request(
-            method="DELETE",
-            path=path,
-            form_data=form_data,
-            json_data=json_data,
-            body=body,
-            files=files,
-            content_type=content_type,
-            query_params=query_params,
-            headers=headers,
-            secure=secure,
-        )
-
-
 class Client:
     """
     A client for making requests against the app without running a server.
@@ -544,33 +196,41 @@ class Client:
     as `request.form_data`, `json_data=` as `request.json_data`, `files=` as
     `request.files`, and `query_params=` as `request.query_params`.
 
+    A path makes a request to `https://testserver`. Pass a full URL when the
+    scheme, host or port matter: `client.get("http://testserver/")`.
+
     Client objects are stateful — they keep the cookies (and so the session)
     that responses set, for the lifetime of the Client instance. `cookies` is
     that jar: logging a client in is writing the session cookie to it, which
     is what `plain.auth.test.login_client` does.
+
+    `headers` are sent with every request. `raise_exceptions=False` keeps an
+    exception the app raised as the 5xx response it became, on
+    `response.exception`, where the default is to raise it from the request.
     """
 
     def __init__(
         self,
         *,
-        raise_request_exception: bool = True,
+        raise_exceptions: bool = True,
         headers: dict[str, str] | None = None,
     ) -> None:
         require_app("Client")
-        self._request_factory = RequestFactory(headers=headers)
+        self.raise_exceptions = raise_exceptions
+        self._headers: dict[str, str] = headers or {}
+        self._cookies: SimpleCookie = SimpleCookie()
         self._server = InProcessServer()
-        self.raise_request_exception = raise_request_exception
 
     @property
     def cookies(self) -> SimpleCookie:
         """The cookies sent with every request, updated by every response."""
-        return self._request_factory.cookies
+        return self._cookies
 
     def request(
         self,
-        *,
         method: str,
         path: str,
+        *,
         query_params: dict[str, Any] | None = None,
         form_data: dict[str, Any] | None = None,
         json_data: Any = None,
@@ -579,26 +239,28 @@ class Client:
         content_type: str | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a request with any method."""
-        encoded_body, encoded_content_type = _encode_request_body(
+        encoded_body, encoded_content_type = encode_request_body(
             form_data=form_data,
             json_data=json_data,
             body=body,
             files=files,
             content_type=content_type,
         )
-        request = self._request_factory._build_request(
-            method=method,
-            path=path,
-            body=encoded_body,
-            content_type=encoded_content_type,
-            query_string=urlencode(query_params or {}, doseq=True),
-            secure=secure,
-            headers=headers,
+        target = split_target(path)
+        target.query_string = join_query_strings(
+            target.query_string, urlencode(query_params or {}, doseq=True)
         )
-        response = self._send(request)
+        response = self._send(
+            self._build_request(
+                method,
+                target,
+                body=encoded_body,
+                content_type=encoded_content_type,
+                headers=headers,
+            )
+        )
         if follow_redirects:
             response = self._follow_redirects(
                 response,
@@ -608,16 +270,52 @@ class Client:
             )
         return response
 
+    def _build_request(
+        self,
+        method: str,
+        target: Target,
+        *,
+        body: bytes = b"",
+        content_type: str = "",
+        headers: dict[str, str] | None,
+    ) -> Request:
+        """Build a request as this client sends it: with the client's
+        headers under the request's own, and the cookies in its jar."""
+        all_headers: dict[str, str] = dict(self._headers)
+        if headers:
+            all_headers.update(headers)
+
+        cookie_header = "; ".join(
+            sorted(
+                f"{morsel.key}={morsel.coded_value}"
+                for morsel in self._cookies.values()
+            )
+        )
+        if cookie_header:
+            all_headers["Cookie"] = cookie_header
+
+        return build_encoded_request(
+            method,
+            target.path,
+            scheme=target.scheme,
+            host=target.host,
+            port=target.port,
+            query_string=target.query_string,
+            body=body,
+            content_type=content_type,
+            headers=all_headers,
+        )
+
     def _send(self, request: Request) -> ClientResponse:
         """Run a Request through the app and wrap what came back."""
         response = ClientResponse(self._server.handle(request).send())
 
         # Only 5xx errors have an exception.
-        if response.exception and self.raise_request_exception:
+        if response.exception and self.raise_exceptions:
             raise response.exception
 
         if response.cookies:
-            self.cookies.update(response.cookies)
+            self._cookies.update(response.cookies)
         return response
 
     def get(
@@ -627,16 +325,14 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a GET request."""
         return self.request(
-            method="GET",
-            path=path,
+            "GET",
+            path,
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def head(
@@ -646,16 +342,14 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a HEAD request."""
         return self.request(
-            method="HEAD",
-            path=path,
+            "HEAD",
+            path,
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def options(
@@ -665,16 +359,14 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make an OPTIONS request."""
         return self.request(
-            method="OPTIONS",
-            path=path,
+            "OPTIONS",
+            path,
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def post(
@@ -689,12 +381,11 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a POST request."""
         return self.request(
-            method="POST",
-            path=path,
+            "POST",
+            path,
             form_data=form_data,
             json_data=json_data,
             body=body,
@@ -703,7 +394,6 @@ class Client:
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def put(
@@ -718,12 +408,11 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a PUT request."""
         return self.request(
-            method="PUT",
-            path=path,
+            "PUT",
+            path,
             form_data=form_data,
             json_data=json_data,
             body=body,
@@ -732,7 +421,6 @@ class Client:
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def patch(
@@ -747,12 +435,11 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a PATCH request."""
         return self.request(
-            method="PATCH",
-            path=path,
+            "PATCH",
+            path,
             form_data=form_data,
             json_data=json_data,
             body=body,
@@ -761,7 +448,6 @@ class Client:
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def delete(
@@ -776,12 +462,11 @@ class Client:
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         follow_redirects: bool = False,
-        secure: bool = True,
     ) -> ClientResponse:
         """Make a DELETE request."""
         return self.request(
-            method="DELETE",
-            path=path,
+            "DELETE",
+            path,
             form_data=form_data,
             json_data=json_data,
             body=body,
@@ -790,7 +475,6 @@ class Client:
             query_params=query_params,
             headers=headers,
             follow_redirects=follow_redirects,
-            secure=secure,
         )
 
     def websocket(
@@ -800,7 +484,6 @@ class Client:
         subprotocols: tuple[str, ...] = (),
         query_params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        secure: bool = True,
         timeout: float = 5.0,
     ) -> WebSocketTestConnection:
         """Open a websocket to `path` and drive the view's `websocket()` in-process.
@@ -824,12 +507,15 @@ class Client:
         if headers:
             handshake.update(headers)
 
-        request = self._request_factory.get(
-            path, query_params=query_params, headers=handshake, secure=secure
+        target = split_target(path)
+        target.query_string = join_query_strings(
+            target.query_string, urlencode(query_params or {}, doseq=True)
         )
+        request = self._build_request("GET", target, headers=handshake)
+
         handled = self._server.handle(request)
         if handled.response.cookies:
-            self.cookies.update(handled.response.cookies)
+            self._cookies.update(handled.response.cookies)
         if not isinstance(handled.response, WebSocketResponse):
             raise WebSocketRejected(ClientResponse(handled.send()))
         return WebSocketTestConnection(handled, timeout=timeout)
@@ -847,59 +533,32 @@ class Client:
         """
         redirect_chain: list[tuple[str, int]] = []
         while response.status_code in _REDIRECT_STATUS_CODES:
-            response_url = response.redirect_to
-            if response_url is None:
+            location = response.redirect_to
+            if location is None:
                 break  # a 3xx without a Location header — nowhere to go
-            redirect_chain.append((response_url, response.status_code))
+            redirect_chain.append((location, response.status_code))
 
-            url = urlsplit(response_url)
+            previous = response.request
+            target = _redirect_target(location, previous=previous)
 
-            # Inherit server settings from the previous response's request
-            secure = response.request.scheme == "https"
-            server_name = response.request.server_name
-            server_port = response.request.server_port
-
-            if url.scheme:
-                secure = url.scheme == "https"
-            if url.hostname:
-                server_name = url.hostname
-            if url.port:
-                server_port = str(url.port)
-
-            path = url.path
-            # RFC 3986 Section 6.2.3: Empty path should be normalized to "/".
-            if not path and url.netloc:
-                path = "/"
-            # Prepend the request path to handle relative path redirects
-            if not path.startswith("/"):
-                path = urljoin(response.request.path, path)
-
-            method = response.request.method
+            method = previous.method
             if response.status_code in (
                 HTTPStatus.TEMPORARY_REDIRECT,
                 HTTPStatus.PERMANENT_REDIRECT,
             ) and method not in ("GET", "HEAD"):
                 # 307/308 preserve the request method and body.
-                request = self._request_factory._build_request(
-                    method=method,
-                    path=path,
+                request = self._build_request(
+                    method,
+                    target,
                     body=body,
                     content_type=content_type,
-                    query_string=url.query,
-                    secure=secure,
-                    server_name=server_name,
-                    server_port=server_port,
                     headers=headers,
                 )
             else:
                 # Everything else redirects as a GET without a body.
-                request = self._request_factory._build_request(
-                    method="GET" if method not in ("GET", "HEAD") else method,
-                    path=path,
-                    query_string=url.query,
-                    secure=secure,
-                    server_name=server_name,
-                    server_port=server_port,
+                request = self._build_request(
+                    "GET" if method not in ("GET", "HEAD") else method,
+                    target,
                     headers=headers,
                 )
                 body = b""
@@ -921,3 +580,38 @@ class Client:
                 raise RedirectCycleError("Too many redirects.", last_response=response)
 
         return response
+
+
+def _redirect_target(location: str, *, previous: Request) -> Target:
+    """Where a `Location` header leads, from the request that was redirected.
+
+    As a browser resolves it: whatever the location leaves out is the
+    previous request's. One that names a scheme or a host without a port
+    goes to that scheme's port, not the previous request's.
+    """
+    url = urlsplit(location)
+
+    scheme = url.scheme or previous.scheme
+    host = url.hostname or previous.server_name
+    if url.port:
+        port = str(url.port)
+    elif url.scheme or url.hostname:
+        port = DEFAULT_PORTS.get(scheme, previous.server_port)
+    else:
+        port = previous.server_port
+
+    path = url.path
+    # RFC 3986 Section 6.2.3: Empty path should be normalized to "/".
+    if not path and url.netloc:
+        path = "/"
+    # Prepend the request path to handle relative path redirects
+    if not path.startswith("/"):
+        path = urljoin(previous.path, path)
+
+    return Target(
+        scheme=scheme,
+        host=host,
+        port=port,
+        path=path,
+        query_string=url.query,
+    )

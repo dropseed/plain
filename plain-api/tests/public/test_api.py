@@ -7,7 +7,7 @@ from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
 from plain.http import HTTPException
-from plain.test import Client, RequestFactory, raises
+from plain.test import Client, build_request, raises
 from plain.urls import Router, path
 
 
@@ -36,7 +36,7 @@ def test_tuple_status_code_return_overrides_default_200():
 
 def test_tuple_bodiless_status_sends_empty_response():
     """`return 204, {}` sends a bodiless 204 (a 204 can't carry JSON)."""
-    view = APIView(request=RequestFactory().post("/"))
+    view = APIView(request=build_request("POST", "/"))
     response = view.convert_result_to_response((204, {}))
     assert response.status_code == 204
     assert response.content == b""
@@ -57,7 +57,7 @@ def test_bodiless_http_exception_renders_bodiless():
         def get(self):
             raise NotModified304()
 
-    view = RaisingView(request=RequestFactory().get("/"))
+    view = RaisingView(request=build_request("GET", "/"))
     response = view.get_response()
     assert response.status_code == 304
     assert response.content == b""
@@ -66,7 +66,7 @@ def test_bodiless_http_exception_renders_bodiless():
 
 def test_tuple_bodiless_status_with_data_raises():
     """`return 204, {...}` is a contradiction — raise with a pointed message."""
-    view = APIView(request=RequestFactory().post("/"))
+    view = APIView(request=build_request("POST", "/"))
     with raises(ValueError, match="cannot include data"):
         view.convert_result_to_response((204, {"deleted": True}))
 
@@ -136,7 +136,7 @@ def test_validation_error_is_returned_as_400_json():
 def test_unhandled_exception_attaches_response_exception():
     """APIView 5xx responses carry the original exception so observability
     tooling can record it from the response."""
-    client = Client(raise_request_exception=False)
+    client = Client(raise_exceptions=False)
 
     response = client.get("/unhandled-exception")
     assert response.status_code == 500

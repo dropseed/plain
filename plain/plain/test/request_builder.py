@@ -1,0 +1,237 @@
+"""Building a `Request` without sending it.
+
+`build_request()` is the public function. The two it is made of are what
+`Client` uses as well, so a request the client sends is encoded and built
+exactly as one a test builds by hand.
+"""
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Any
+from urllib.parse import urlsplit
+
+from plain.http import Request
+from plain.json import PlainJSONEncoder
+from plain.utils.http import urlencode
+
+from .encoding import encode_multipart
+
+__all__ = ["build_request"]
+
+_BOUNDARY = "BoUnDaRyStRiNg"
+_MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
+_CHARSET_RE = re.compile(r".*; charset=([\w-]+);?")
+
+# Where a request goes when its path doesn't say: https://testserver.
+DEFAULT_SCHEME = "https"
+DEFAULT_HOST = "testserver"
+DEFAULT_PORTS = {"https": "443", "http": "80"}
+
+
+def build_request(
+    method: str,
+    path: str,
+    *,
+    query_params: dict[str, Any] | None = None,
+    form_data: dict[str, Any] | None = None,
+    json_data: Any = None,
+    body: bytes | str | None = None,
+    files: dict[str, Any] | None = None,
+    content_type: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> Request:
+    """
+    Build a `Request` without sending it, to hand to a view or a middleware
+    directly.
+
+        request = build_request("POST", "/submit", form_data={"name": "Ada"})
+
+    It takes the keywords `Client`'s methods take, and encodes the body the
+    same way.
+
+    `path` is a path, which makes a request to `https://testserver`. Pass a
+    full URL when the scheme, host or port matter:
+
+        request = build_request("GET", "http://testserver/")  # not HTTPS
+    """
+    encoded_body, encoded_content_type = encode_request_body(
+        form_data=form_data,
+        json_data=json_data,
+        body=body,
+        files=files,
+        content_type=content_type,
+    )
+    target = split_target(path)
+    return build_encoded_request(
+        method,
+        target.path,
+        scheme=target.scheme,
+        host=target.host,
+        port=target.port,
+        query_string=join_query_strings(
+            target.query_string, urlencode(query_params or {}, doseq=True)
+        ),
+        body=encoded_body,
+        content_type=encoded_content_type,
+        headers=headers,
+    )
+
+
+@dataclass
+class Target:
+    """Where a request goes: the parts of the path or URL it was given."""
+
+    scheme: str
+    host: str
+    port: str
+    path: str
+    query_string: str
+
+
+def split_target(path: str) -> Target:
+    """Split a path, or a full http(s) URL, into where the request goes.
+
+    A path goes to the default scheme and host. A URL names its own; its
+    port is the one it gives, or its scheme's.
+    """
+    parts = urlsplit(str(path))  # path can be lazy
+
+    if parts.scheme in DEFAULT_PORTS:
+        scheme = parts.scheme
+        host = parts.hostname or DEFAULT_HOST
+        port = str(parts.port) if parts.port else DEFAULT_PORTS[scheme]
+    else:
+        scheme = DEFAULT_SCHEME
+        host = DEFAULT_HOST
+        port = DEFAULT_PORTS[scheme]
+
+    return Target(
+        scheme=scheme,
+        host=host,
+        port=port,
+        path=parts.path,
+        query_string=parts.query,
+    )
+
+
+def join_query_strings(first: str, second: str) -> str:
+    """A URL can carry its own query string; `query_params` go after it."""
+    if first and second:
+        return f"{first}&{second}"
+    return first or second
+
+
+def build_encoded_request(
+    method: str,
+    path: str,
+    *,
+    scheme: str,
+    host: str,
+    port: str,
+    query_string: str,
+    body: bytes,
+    content_type: str,
+    headers: dict[str, str] | None,
+) -> Request:
+    """Build a `Request` from a body that is already bytes."""
+    all_headers: dict[str, str] = dict(headers or {})
+
+    # Content headers follow the content type, not the byte count: a POST
+    # of an empty form still declares what it is, with Content-Length: 0,
+    # the same as a browser submitting a form with nothing filled in.
+    # Requests with no body source at all (a GET) resolve to no content
+    # type and get neither header.
+    if content_type:
+        all_headers["Content-Type"] = content_type
+        all_headers["Content-Length"] = str(len(body))
+
+    return Request(
+        method=method,
+        path=path,
+        headers=all_headers,
+        query_string=query_string,
+        body=body,
+        server_scheme=scheme,
+        server_name=host,
+        server_port=port,
+        remote_addr="127.0.0.1",
+    )
+
+
+def encode_request_body(
+    *,
+    form_data: dict[str, Any] | None,
+    json_data: Any,
+    body: bytes | str | None,
+    files: dict[str, Any] | None,
+    content_type: str | None,
+) -> tuple[bytes, str]:
+    """
+    Encode the body arguments into (bytes, content_type).
+
+    Exactly one body source may be given: form_data (optionally with files),
+    json_data, or a raw body. `content_type` only applies to a raw body.
+
+    A form encodes the way a browser would: urlencoded, and multipart only
+    when there are files. Views under test then see the content type they'd
+    see in production.
+    """
+    sources = [
+        form_data is not None or files is not None,
+        json_data is not None,
+        body is not None,
+    ]
+    if sum(sources) > 1:
+        raise TypeError(
+            "Pass only one of form_data/files, json_data, or body per request"
+        )
+    if content_type is not None and body is None:
+        if not any(sources):
+            # `post(path, content_type="application/json")` with nothing to
+            # send. Building an empty body here would hand the view a b"" that
+            # its content type says is parseable, and the failure would
+            # surface somewhere further in. Say it at the call instead.
+            raise TypeError(
+                "content_type needs a body — pass body=... alongside it "
+                '(body=b"" for a deliberately empty one)'
+            )
+        raise TypeError(
+            "content_type only applies to a raw body — form_data and json_data set their own"
+        )
+
+    if json_data is not None:
+        return (
+            json.dumps(json_data, cls=PlainJSONEncoder).encode(),
+            "application/json",
+        )
+
+    if body is not None:
+        resolved_content_type = content_type or "application/octet-stream"
+        if isinstance(body, str):
+            # Encode a string body with the charset the content type
+            # declares, so the payload bytes match what the request
+            # advertises. Bytes pass through untouched.
+            charset_match = _CHARSET_RE.match(resolved_content_type)
+            charset = charset_match[1] if charset_match else "utf-8"
+            body = body.encode(charset)
+        return (body, resolved_content_type)
+
+    if files:
+        # Files can only travel as multipart, and any form fields sent with
+        # them ride along in the same body.
+        merged: dict[str, Any] = dict(form_data or {})
+        merged.update(files)
+        return (
+            encode_multipart(_BOUNDARY, merged),
+            _MULTIPART_CONTENT,
+        )
+
+    if form_data is not None or files is not None:
+        # A plain form — what a browser (and htmx) sends without a file input.
+        return (
+            urlencode(form_data or {}, doseq=True).encode(),
+            "application/x-www-form-urlencoded",
+        )
+
+    return (b"", "")

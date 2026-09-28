@@ -6,7 +6,7 @@ import logging
 
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
-from plain.test import CapturedLogs, RequestFactory, capture_logs, patch, raises
+from plain.test import CapturedLogs, build_request, capture_logs, patch, raises
 from plain.views import View
 
 
@@ -34,7 +34,7 @@ class TestAfterResponseChaining:
             def get(self):
                 return Response("hi")
 
-        request = RequestFactory().get("/")
+        request = build_request("GET", "/")
         response = Composed(request=request).get_response()
         assert response.headers.get("X-A") == "a"
         assert response.headers.get("X-B") == "b"
@@ -60,7 +60,7 @@ class TestAfterResponseChaining:
             def get(self):
                 return Response("hi")
 
-        Composed(request=RequestFactory().get("/")).get_response()
+        Composed(request=build_request("GET", "/")).get_response()
         assert order == ["inner", "outer"]
 
     def test_override_that_skips_super_short_circuits_chain(self):
@@ -82,7 +82,7 @@ class TestAfterResponseChaining:
             def get(self):
                 return Response("hi")
 
-        response = Composed(request=RequestFactory().get("/")).get_response()
+        response = Composed(request=build_request("GET", "/")).get_response()
         assert response.headers.get("X-Outer") == "1"
         assert response.headers.get("X-Inner") is None
 
@@ -109,7 +109,7 @@ class TestHandleExceptionLogging:
                         return Response("bad", status_code=400)
                     return super().handle_exception(exc)
 
-            response = MappedView(request=RequestFactory().get("/")).get_response()
+            response = MappedView(request=build_request("GET", "/")).get_response()
 
             assert response.status_code == 400
             assert response.exception is None
@@ -136,7 +136,7 @@ class TestHandleExceptionLogging:
                         return Response("oops", status_code=500)
                     return super().handle_exception(exc)
 
-            response = MappedView(request=RequestFactory().get("/")).get_response()
+            response = MappedView(request=build_request("GET", "/")).get_response()
 
             assert response.status_code == 500
             assert isinstance(response.exception, AppError)
@@ -150,7 +150,7 @@ class TestHandleExceptionLogging:
                 raise RuntimeError("boom")
 
         with raises(RuntimeError, match="boom"):
-            Boom(request=RequestFactory().get("/")).get_response()
+            Boom(request=build_request("GET", "/")).get_response()
 
     def test_framework_logs_reraised_exception(self):
         """When handle_exception re-raises and the framework catches it,
@@ -162,7 +162,7 @@ class TestHandleExceptionLogging:
                 def get(self):
                     raise RuntimeError("boom")
 
-            request = RequestFactory().get("/")
+            request = build_request("GET", "/")
             try:
                 Boom(request=request).get_response()
             except Exception as exc:
@@ -193,7 +193,7 @@ class TestHandleExceptionLogging:
             raise LookupError(label)
 
         with patch(packages_registry, "get_package_config", _missing):
-            request = RequestFactory().get("/")
+            request = build_request("GET", "/")
             response = response_for_exception(request, RuntimeError("boom"))
 
         assert response.status_code == 500
@@ -210,7 +210,7 @@ class TestHandleExceptionLogging:
             from plain.logs import log_exception
 
             exc = RuntimeError("once")
-            request = RequestFactory().get("/")
+            request = build_request("GET", "/")
 
             log_exception(request, exc)
             log_exception(request, exc)
@@ -229,7 +229,7 @@ class TestHandleExceptionLogging:
 
         with capture_logs("plain.security") as logs:
             log_exception(
-                RequestFactory().get("/api/app/config"),
+                build_request("GET", "/api/app/config"),
                 SuspiciousOperationError400("CSRF rejected"),
             )
 
@@ -250,7 +250,7 @@ class TestHandleExceptionLogging:
                     raise ResponseException(Response("handled", status_code=418))
 
             response = ViaResponseException(
-                request=RequestFactory().get("/")
+                request=build_request("GET", "/")
             ).get_response()
 
             assert response.status_code == 418

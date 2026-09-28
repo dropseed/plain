@@ -13,7 +13,7 @@ from plain.admin.field_refs import FieldRef
 from plain.admin.models import PinnedNavItem
 from plain.admin.views import AdminModelListView
 from plain.postgres import Field, QuerySet, types
-from plain.test import RequestFactory, raises
+from plain.test import build_request, raises
 
 from plain import postgres
 
@@ -51,7 +51,7 @@ class TraversedFieldRefSearch(AdminModelListView):
 def searched(
     view_class: type[AdminModelListView], term: str
 ) -> QuerySet[PinnedNavItem]:
-    view = view_class(request=RequestFactory().get(f"/?search={term}"))
+    view = view_class(request=build_request("GET", f"/?search={term}"))
     return view.search_queryset(PinnedNavItem.query.all())
 
 
@@ -142,7 +142,7 @@ def test_an_instance_can_replace_search_fields() -> None:
     pinned = PinnedNavItem.query.create(user=matching, view_slug="shared")
     PinnedNavItem.query.create(user=other, view_slug="shared")
 
-    view = LocalFieldRefSearch(request=RequestFactory().get("/?search=matching"))
+    view = LocalFieldRefSearch(request=build_request("GET", "/?search=matching"))
     view.search_fields = (PinnedNavItem.user.username,)  # ty: ignore[unresolved-attribute]
 
     assert view.get_search_fields() == ("user__username",)
@@ -152,7 +152,7 @@ def test_an_instance_can_replace_search_fields() -> None:
 
 
 def test_an_instance_can_replace_queryset_order() -> None:
-    view = LocalFieldRefSearch(request=RequestFactory().get("/"))
+    view = LocalFieldRefSearch(request=build_request("GET", "/"))
     view.queryset_order = (PinnedNavItem.view_slug,)
 
     assert view.get_queryset_order() == ("view_slug",)
@@ -163,7 +163,7 @@ def test_an_instance_can_replace_queryset_order() -> None:
 
 def test_a_property_declaration_is_normalized_at_runtime() -> None:
     """A property computes its value per instance, so class definition skips it."""
-    view = PropertySearch(request=RequestFactory().get("/?search=alpha"))
+    view = PropertySearch(request=build_request("GET", "/?search=alpha"))
 
     assert view.get_search_fields() == ("view_slug",)
 

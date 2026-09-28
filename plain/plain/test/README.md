@@ -22,7 +22,7 @@
     - [Log records](#log-records)
     - [Annotating helpers, and writing a capture of your own](#annotating-helpers-and-writing-a-capture-of-your-own)
 - [WebSockets](#websockets)
-- [RequestFactory](#requestfactory)
+- [Building a request](#building-a-request)
 - [Test lifecycles](#test-lifecycles)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -100,7 +100,7 @@ response = client.delete("/api/users/1/")
 For any other method, `request()` takes the method by name and the same keywords:
 
 ```python
-response = client.request(method="PROPFIND", path="/files/")
+response = client.request("PROPFIND", "/files/")
 assert response.status_code == 405
 ```
 
@@ -133,25 +133,38 @@ You can also set default headers when creating the client.
 client = Client(headers={"Accept-Language": "en-US"})
 ```
 
+### Schemes and hosts
+
+A path makes a request to `https://testserver`. When the scheme, host or port is what you're testing, pass a full URL:
+
+```python
+response = client.get("http://testserver/")  # a request that didn't come over HTTPS
+assert response.redirect_to == "https://testserver/"
+
+response = client.get("https://shop.example.com:8443/cart/")
+```
+
+A URL without a port goes to its scheme's port. A followed redirect resolves its `Location` the way a browser does, against the request that was redirected.
+
 ## Inspecting responses
 
 Responses are data, not assertion methods — bare `assert` is the assertion API. A [`ClientResponse`](./client.py#ClientResponse) has these names, and no others:
 
-| Name                | What it is                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| `status_code`       | The status that went out                                                            |
-| `headers`           | The response headers                                                                |
-| `cookies`           | The cookies this response set                                                       |
-| `body`              | The bytes the response sent                                                         |
-| `text`              | The body decoded as a string                                                        |
-| `json_data`         | The body parsed as JSON (requires a JSON content type)                              |
-| `redirect_to`       | The redirect target on a 3xx response, `None` otherwise                             |
-| `redirect_chain`    | The `(url, status_code)` of each redirect that was followed; empty if none were     |
-| `request`           | The request that produced this response, after middleware ran                       |
-| `exception`         | The exception behind a 5xx, when `raise_request_exception=False` kept it a response |
-| `streaming`         | Whether the body was streamed                                                       |
-| `resolver_match`    | The URL route the path resolves to, `None` if it has none                           |
-| `returned_response` | The `Response` object the app returned                                              |
+| Name                | What it is                                                                      |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `status_code`       | The status that went out                                                        |
+| `headers`           | The response headers                                                            |
+| `cookies`           | The cookies this response set                                                   |
+| `body`              | The bytes the response sent                                                     |
+| `text`              | The body decoded as a string                                                    |
+| `json_data`         | The body parsed as JSON (requires a JSON content type)                          |
+| `redirect_to`       | The redirect target on a 3xx response, `None` otherwise                         |
+| `redirect_chain`    | The `(url, status_code)` of each redirect that was followed; empty if none were |
+| `request`           | The request that produced this response, after middleware ran                   |
+| `exception`         | The exception behind a 5xx, when `raise_exceptions=False` kept it a response    |
+| `streaming`         | Whether the body was streamed                                                   |
+| `resolver_match`    | The URL route the path resolves to, `None` if it has none                       |
+| `returned_response` | The `Response` object the app returned                                          |
 
 ```python
 response = client.get("/api/users/")
@@ -169,7 +182,7 @@ assert isinstance(response.returned_response, FileResponse)
 
 Its own `content` and `status_code` can differ from what went out — after a HEAD, a 204, or a streaming body that failed — which is why the client's response doesn't pass them through. Reading any other name raises an `AttributeError` that lists the ones above.
 
-By default, the client re-raises unhandled view exceptions so failures point at the real error. Pass `Client(raise_request_exception=False)` to get the 500 response instead.
+By default, the client re-raises unhandled view exceptions so failures point at the real error. Pass `Client(raise_exceptions=False)` to get the 500 response instead.
 
 ### Streaming responses
 
@@ -182,7 +195,7 @@ assert response.body.startswith(b"id,name")
 
 Because the whole body is read, a stream that never ends (an endless event feed) makes the request never return — test those views' pieces directly instead. HEAD requests and bodiless statuses (204, 304) never read the body.
 
-If a body raises partway through, the error is re-raised from the request unless the client was created with `raise_request_exception=False`, in which case `response.exception` holds it and `body` has what came before. A body that fails before producing anything is answered with a 500, as a server would, and `status_code` says so.
+If a body raises partway through, the error is re-raised from the request unless the client was created with `raise_exceptions=False`, in which case `response.exception` holds it and `body` has what came before. A body that fails before producing anything is answered with a 500, as a server would, and `status_code` says so.
 
 ## Cookies, logins and sessions
 
@@ -409,7 +422,7 @@ from plain.test import Client, capture_logs
 
 def test_server_error_is_logged():
     with capture_logs() as logs:
-        Client(raise_request_exception=False).get("/broken/")
+        Client(raise_exceptions=False).get("/broken/")
 
     assert "Server error" in logs.messages
     assert logs[0].path == "/broken/"
@@ -475,7 +488,7 @@ def test_login_required():
     assert caught.exception.response.status_code == 403
 ```
 
-It takes `query_params=`, `headers=`, and `secure=` like `get()`, plus `subprotocols=` and `timeout=`.
+It takes `query_params=` and `headers=` like `get()`, plus `subprotocols=` and `timeout=`.
 
 - `ws.send(message)` sends one message to the view; `ws.receive()` returns the next one it sends.
 - `ws.close(code=1000, reason="")` closes from the client side and waits for the view to finish. Leaving the `with` block closes it if the test didn't.
@@ -486,19 +499,24 @@ It takes `query_params=`, `headers=`, and `secure=` like `get()`, plus `subproto
 
 The view runs on the test's own thread, inside a copy of the test's context, so the test database transaction is visible to it. Because the connection steps its own event loop, `Client.websocket()` is for synchronous tests, not `async def` ones.
 
-## RequestFactory
+## Building a request
 
-[`RequestFactory`](./client.py#RequestFactory) builds `Request` objects without sending them — useful for testing middleware or request handling in isolation. It has the same methods as the client and takes the same keywords, without `follow_redirects=`.
+[`build_request()`](./request_builder.py#build_request) builds a `Request` without sending it, for calling a view or a middleware yourself. It takes the method, the path, and the keywords the client's methods take, without `follow_redirects=`.
 
 ```python
-from plain.test import RequestFactory
+from plain.test import build_request
 
-request = RequestFactory().get("/hello/", query_params={"name": "Alice"})
-request = RequestFactory().post("/hello/", json_data={"name": "Alice"})
-request = RequestFactory().request(method="PROPFIND", path="/files/")
+request = build_request("GET", "/hello/", query_params={"name": "Alice"})
+request = build_request("POST", "/hello/", json_data={"name": "Alice"})
+request = build_request("PROPFIND", "/files/")
+
+view = HelloView(request=request)
+response = view.get_response()
 ```
 
-Requests are HTTPS to `testserver` unless you say otherwise: `secure=False` makes one plain HTTP, and `headers={"Host": "example.com"}` names another host.
+The body is encoded the way the client encodes it, and a path goes to `https://testserver` unless you pass a [full URL](#schemes-and-hosts). The client's cookies and default headers belong to the client, so a built request has only the `headers=` you give it.
+
+It returns an ordinary [`Request`](../http/README.md#constructing-a-request). When the body is already bytes and you don't need it encoded, you can construct one directly.
 
 ## Test lifecycles
 
@@ -549,9 +567,9 @@ A project declares its own lifecycle in `tests/lifecycle.py`, with nothing to re
 
 ## FAQs
 
-#### What is the difference between Client and RequestFactory?
+#### What is the difference between Client and build_request?
 
-`Client` sends the request through the full middleware and view pipeline and returns the response. `RequestFactory` only constructs the `Request` object — you call the view or middleware yourself.
+`Client` sends the request through the full middleware and view pipeline and returns the response. `build_request()` only constructs the `Request` object — you call the view or middleware yourself.
 
 #### How do I test file uploads?
 

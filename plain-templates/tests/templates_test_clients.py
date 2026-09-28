@@ -16,7 +16,7 @@ def swap_router(
     router_path: str,
     *,
     debug: bool | None = None,
-    raise_request_exception: bool = True,
+    raise_exceptions: bool = True,
 ) -> Generator[Client]:
     """Yield a Client routed to a different URLS_ROUTER for the duration of the block."""
     overrides: dict[str, object] = {"URLS_ROUTER": router_path}
@@ -26,7 +26,7 @@ def swap_router(
     try:
         with override_settings(**overrides):
             _get_cached_resolver.cache_clear()
-            client = Client(raise_request_exception=raise_request_exception)
+            client = Client(raise_exceptions=raise_exceptions)
             yield client
     finally:
         # Settings are restored by override_settings; clear the resolver
@@ -40,7 +40,7 @@ def error_client() -> Generator[Client]:
     with swap_router(
         "templates_error_routers.ErrorRouter",
         debug=False,
-        raise_request_exception=False,
+        raise_exceptions=False,
     ) as client:
         yield client
 

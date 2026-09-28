@@ -13,7 +13,7 @@ from app.users.models import User
 from plain.auth.test import login_client
 from plain.email.test import outbox
 from plain.loginlink.links import generate_link_url
-from plain.test import Client, RequestFactory
+from plain.test import Client, build_request
 
 
 def is_logged_in(client: Client) -> bool:
@@ -145,7 +145,7 @@ class TestFollowLink:
         user = User.query.create(email="expired@example.com")
         # Mint an already-expired link with the package's public helper.
         url = generate_link_url(
-            request=RequestFactory().get("/"),
+            request=build_request("GET", "/"),
             user=user,
             email=user.email,
             expires_in=-3600,

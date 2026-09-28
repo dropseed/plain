@@ -1,6 +1,6 @@
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView
-from plain.test import RequestFactory, override_settings
+from plain.test import build_request, override_settings
 
 
 def make_asset_view(manifest: AssetsManifest, path: str) -> AssetView:
@@ -10,8 +10,7 @@ def make_asset_view(manifest: AssetsManifest, path: str) -> AssetView:
         def get_manifest(self):
             return manifest
 
-    rf = RequestFactory()
-    request = rf.get(f"/assets/{path}")
+    request = build_request("GET", f"/assets/{path}")
     view = TestAssetView(request=request, url_kwargs={"path": path})
     return view
 

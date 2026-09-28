@@ -139,8 +139,8 @@ class TestHttpsRedirectMiddleware:
         try:
             settings.HTTPS_REDIRECT_ENABLED = True
             client = fresh_client()
-            # Must use secure=False to send an HTTP (not HTTPS) request
-            response = client.get("/", follow_redirects=False, secure=False)
+            # An http:// URL, to send a request that didn't come over HTTPS
+            response = client.get("http://testserver/", follow_redirects=False)
             assert response.status_code == 301
             assert response.headers["Location"].startswith("https://")
         finally:

@@ -45,14 +45,14 @@ def test_body_error_is_raised() -> None:
 
 
 def test_body_error_without_raising_keeps_what_came_before() -> None:
-    response = Client(raise_request_exception=False).get("/stream-fails")
+    response = Client(raise_exceptions=False).get("/stream-fails")
 
     assert isinstance(response.exception, ValueError)
     assert response.body == b"line 1\n"
 
 
 def test_async_body_error_without_raising_keeps_what_came_before() -> None:
-    response = Client(raise_request_exception=False).get("/async-stream-fails")
+    response = Client(raise_exceptions=False).get("/async-stream-fails")
 
     assert isinstance(response.exception, ValueError)
     assert response.body == b"data: 1\n\n"
@@ -68,7 +68,7 @@ def test_file_response_stays_a_file_response() -> None:
 def test_body_failing_before_its_first_chunk_is_a_500() -> None:
     # What a server sends: the headers go out with the first chunk, so a
     # body that fails before one is answered with a 500.
-    response = Client(raise_request_exception=False).get("/stream-fails-first")
+    response = Client(raise_exceptions=False).get("/stream-fails-first")
 
     assert response.status_code == 500
     assert response.body == b""

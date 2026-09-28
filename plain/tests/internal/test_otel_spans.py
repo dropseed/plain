@@ -7,7 +7,7 @@ from opentelemetry import trace
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.response_lifecycle import ResponseBodyError
 from plain.runtime import settings
-from plain.test import CapturedSpans, Client, RequestFactory, capture_spans
+from plain.test import CapturedSpans, Client, build_request, capture_spans
 from plain.urls.resolvers import _get_cached_resolver
 from server_stubs import capture_logger
 
@@ -34,7 +34,7 @@ def test_404_span_name_omits_path() -> None:
     # in the span name — keeps span-name cardinality bounded under scanner
     # traffic on /xmlrpc.php, /wp-login.php, etc.
     with capture_spans() as spans:
-        Client(raise_request_exception=False).get("/does-not-exist")
+        Client(raise_exceptions=False).get("/does-not-exist")
 
     span = _server_span(spans)
     assert span.name == "GET"
@@ -72,7 +72,7 @@ def _invoke_handler(router_path: str) -> CapturedSpans:
     try:
         handler = BaseHandler()
         handler.load_middleware()
-        request = RequestFactory().get("/")
+        request = build_request("GET", "/")
 
         async def run():
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:

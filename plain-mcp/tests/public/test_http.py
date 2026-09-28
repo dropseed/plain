@@ -324,7 +324,7 @@ class TestUnhandledException:
     tooling can record it from the response."""
 
     def test_unhandled_exception_attaches_response_exception(self) -> None:
-        client = Client(raise_request_exception=False)
+        client = Client(raise_exceptions=False)
         response = mcp_post("/boom", "tools/list", client=client)
         assert response.status_code == 500
         assert isinstance(response.exception, RuntimeError)

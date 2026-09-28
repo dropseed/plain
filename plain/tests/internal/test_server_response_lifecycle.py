@@ -29,7 +29,7 @@ from plain.internal.handlers.response_lifecycle import (
     ResponseBodyError,
     ResponseLifecycle,
 )
-from plain.test import RequestFactory, raises
+from plain.test import build_request, raises
 from server_stubs import (
     ContextHandler,
     capture_logger,
@@ -228,7 +228,7 @@ def _pool() -> ThreadPoolExecutor:
 
 
 def _lifecycle(response: Response, executor: ThreadPoolExecutor) -> ResponseLifecycle:
-    return stub_lifecycle(RequestFactory().get("/"), response, executor)
+    return stub_lifecycle(build_request("GET", "/"), response, executor)
 
 
 def test_failing_aclose_still_runs_the_resource_closers() -> None:

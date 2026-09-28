@@ -24,7 +24,7 @@ from plain.assets.compile import compile_assets
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView
 from plain.runtime import PLAIN_TEMP_PATH
-from plain.test import RequestFactory, patch
+from plain.test import build_request, patch
 
 
 @contextmanager
@@ -168,7 +168,7 @@ class TestDistServedImmutable:
                 return manifest
 
         view = _View(
-            request=RequestFactory().get("/assets/dist/app-A1B2C3.js"),
+            request=build_request("GET", "/assets/dist/app-A1B2C3.js"),
             url_kwargs={"path": "dist/app-A1B2C3.js"},
         )
         assert view.is_immutable("dist/app-A1B2C3.js") is True
