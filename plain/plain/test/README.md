@@ -41,7 +41,7 @@ def test_homepage():
 
 The client maintains cookies and session state across requests, so you can test multi-step flows like login and logout.
 
-Tests are run by [`plain.testing`](../../../plain-testing/plain/testing/README.md) — the `plain test` command. This module is the authoring side: the client, the assertion helpers, the declarative decorators, and the context managers your test files import.
+This module is what a test file imports: the client, `raises`, the decorators, and the `with` helpers. Running tests is [plain.testing](../../../plain-testing/plain/testing/README.md), the `plain test` command. That's also where you'll find how tests are discovered, what the output means, and what a failed `assert` shows.
 
 ## Making requests
 
@@ -392,7 +392,7 @@ It takes `query_params=`, `headers=`, and `secure=` like `get()`, plus `subproto
 - `ws.close(code=1000, reason="")` closes from the client side and waits for the view to finish. Leaving the `with` block closes it if the test didn't.
 - `ws.subprotocol` is the negotiated subprotocol and `ws.response` is the 101 itself, for asserting on its headers and cookies.
 - Every call has a timeout (5 seconds by default, `receive(timeout=...)` per call) and raises `TimeoutError` when it elapses.
-- An exception raised by the view surfaces from `receive()` and again when the `with` block exits; a view that closes the socket makes `receive()` raise `WebSocketClosed` with its code and reason.
+- An exception raised by the view surfaces from `receive()` and again when the `with` block exits; a view that closes the socket makes `receive()` raise `WebSocketClosed` (from `plain.http`) with its code and reason.
 - A handshake that doesn't produce a socket — a 403, a redirect — raises `WebSocketRejected` carrying the response as `.response`.
 
 The view runs on the test's own thread, inside a copy of the test's context, so the test database transaction is visible to it. Because the connection steps its own event loop, `Client.websocket()` is for synchronous tests, not `async def` ones.
@@ -409,29 +409,50 @@ request = RequestFactory().get("/hello/", query_params={"name": "Alice"})
 
 ## Test lifecycles
 
-A [`TestLifecycle`](./lifecycle.py#TestLifecycle) is what happens around every test without the test asking: [plain.postgres](../../../plain-postgres/plain/postgres/README.md) wraps each one in a rolled-back transaction, [plain.email](../../../plain-email/plain/email/README.md) resets the outbox. It is for protection — what keeps tests from reaching each other or the outside world — not for setup a test reads, which the test gets in its own body.
+A [`TestLifecycle`](./lifecycle.py#TestLifecycle) is what happens around every test without the test asking. [plain.postgres](../../../plain-postgres/plain/postgres/README.md#testing) wraps each test in a transaction and rolls it back, and [plain.email](../../../plain-email/plain/email/README.md#testing) empties the outbox. It's for protection, which keeps tests from reaching each other or the outside world. It isn't for setup a test reads, which the test gets in its own body.
 
-There are two places a lifecycle comes from:
-
-- **A package** registers one under the `plain.testing` entry point group. Packages never import the runner.
-- **Your project** declares one in `tests/lifecycle.py`.
+If you're writing a package, subclass it:
 
 ```python
-# tests/lifecycle.py
+# mypackage/test.py
 from contextlib import contextmanager
 
-from plain.test import TestLifecycle, override_settings
+from plain.test import TestLifecycle
+
+from .registry import registry
 
 
-class AppTestLifecycle(TestLifecycle):
+class MyPackageTestLifecycle(TestLifecycle):
+    required_package = "mypackage"
+
+    def setup_worker(self):
+        registry.use_in_memory_store()
+
+    def teardown_worker(self):
+        registry.use_default_store()
+
     @contextmanager
     def around_test(self, test):
-        # No test reaches the payment provider, whatever the environment holds.
-        with override_settings(PAYMENTS_API_KEY=""):
-            yield
+        registry.clear()
+        yield
 ```
 
-The file holds exactly one `TestLifecycle` subclass, under any name. Override `around_test` to wrap each test, and `setup_worker` / `teardown_worker` for what happens once per run. See the [plain.testing docs](../../../plain-testing/plain/testing/README.md#project-lifecycle) for the order lifecycles run in.
+Then register it under the `plain.testing` entry point group:
+
+```toml
+# pyproject.toml
+[project.entry-points."plain.testing"]
+mypackage = "mypackage.test:MyPackageTestLifecycle"
+```
+
+- `setup_worker()` runs once before the first test, and `teardown_worker()` once after the last.
+- `around_test(test)` is a context manager entered around each test. `test.id` is the test's id and `test.tags` holds its `@tag` names, so a lifecycle can treat a tagged test differently. That's how `@isolated_db` works.
+- `required_package` keeps the lifecycle from loading unless that package is in the app's `INSTALLED_PACKAGES`. An entry point is visible whenever the package is installed in the environment, which is wider than "the app uses it".
+- Lifecycles are entered in the order of their entry point names. The runner creates each one with no arguments.
+
+Your package never imports the runner. The entry point is a string, and the runner imports your class when it runs.
+
+A project declares its own lifecycle in `tests/lifecycle.py`, with nothing to register. See [Project lifecycle](../../../plain-testing/plain/testing/README.md#project-lifecycle).
 
 ## FAQs
 
@@ -445,7 +466,16 @@ Pass file-like objects via `files={...}` — they're encoded into a multipart bo
 
 #### Where are the database and email helpers?
 
-Package-specific helpers live with their packages: `plain.postgres.test` (`isolated_db`, `capture_queries`, `max_queries`), `plain.email.test` (`outbox`). `plain.test` holds only the framework-generic vocabulary.
+With their packages. `plain.test` holds only what isn't specific to one package, and each package documents its own helpers:
+
+- [plain.postgres](../../../plain-postgres/plain/postgres/README.md#testing): `isolated_db`, `capture_queries`, `max_queries`, `span_sql_statements`
+- [plain.email](../../../plain-email/plain/email/README.md#testing): `outbox`
+- [plain.auth](../../../plain-auth/plain/auth/README.md#testing-with-authenticated-users): `login_client`, `logout_client`
+- [plain.sessions](../../../plain-sessions/plain/sessions/README.md#testing): `get_client_session`
+
+#### How do I get a temporary directory, or read what was printed?
+
+From the standard library. `tempfile.TemporaryDirectory()` gives a directory that's removed when the block exits, and `contextlib.redirect_stdout(io.StringIO())` collects what was printed.
 
 ## Installation
 

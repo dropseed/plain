@@ -20,6 +20,10 @@
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
 - [Tracing](#tracing)
+- [Testing](#testing)
+    - [Tests that can't run in a transaction](#tests-that-cant-run-in-a-transaction)
+    - [Setting a query budget](#setting-a-query-budget)
+    - [Reading the queries a block ran](#reading-the-queries-a-block-ran)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -2344,6 +2348,108 @@ with suppress_db_tracing():
 ```
 
 This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
+
+## Testing
+
+With `plain.postgres` installed, every test runs against a test database and leaves nothing behind. There's nothing to set up and nothing to ask for.
+
+```python
+from plain.test import Client
+
+from app.users.models import User
+
+
+def test_signup_creates_a_user():
+    Client().post("/signup/", form_data={"email": "a@example.com"})
+    assert User.query.count() == 1
+```
+
+Two things happen around your tests:
+
+- **A test database for the run.** When the run starts, a database named `test_<your database>` is created on the same server, then migrated and converged. It's dropped when the run ends. One left over from an interrupted run is replaced.
+- **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
+
+The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
+
+### Tests that can't run in a transaction
+
+A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./test/decorators.py#isolated_db):
+
+```python
+from plain.postgres.test import isolated_db
+
+
+@isolated_db
+def test_convergence_adds_the_index(): ...
+```
+
+That test gets a database of its own, created and migrated for it and dropped afterwards. It's a whole database setup for one test, so keep it for the tests that need it.
+
+### Setting a query budget
+
+[`max_queries`](./test/helpers.py#max_queries) fails the test if the block runs more queries than you allow:
+
+```python
+from plain.postgres.test import max_queries
+from plain.test import Client
+
+
+def test_dashboard_query_budget():
+    with max_queries(5):
+        Client().get("/dashboard/")
+```
+
+The failure lists every query that ran, so you can see which ones to remove:
+
+```
+AssertionError: Expected at most 5 queries, 6 were executed:
+  SELECT "users_user"."id", "users_user"."email" FROM "users_user" WHERE "users_user"."id" = 1
+  ...
+```
+
+### Reading the queries a block ran
+
+There are two helpers, and they show you different SQL.
+
+| Helper                                                         | The SQL you get                           | Looks like                 |
+| -------------------------------------------------------------- | ----------------------------------------- | -------------------------- |
+| [`capture_queries`](./test/helpers.py#capture_queries)         | What ran, with the values filled in       | `WHERE "email" = 'a@b.co'` |
+| [`span_sql_statements`](./test/helpers.py#span_sql_statements) | What was sent, with its `%s` placeholders | `WHERE "email" = %s`       |
+
+Reach for `capture_queries` to count queries or to check the values one ran with. Reach for `span_sql_statements` to pin the shape of a statement, where the values would only get in the way.
+
+`capture_queries` yields a list that's filled in when the block exits, so read it after the `with`:
+
+```python
+from plain.postgres.test import capture_queries
+
+
+def test_lookup_is_one_query():
+    with capture_queries() as queries:
+        list(User.query.filter(email="a@example.com"))
+
+    assert len(queries) == 1
+    assert "a@example.com" in queries[0]["sql"]
+```
+
+`span_sql_statements` reads the spans from [`capture_spans`](../../../plain/plain/test/README.md#capturing-opentelemetry-signals), and returns the statements in the order they ran:
+
+```python
+from plain.postgres.test import span_sql_statements
+from plain.test import capture_spans
+
+
+def test_lookup_filters_on_email():
+    with capture_spans() as spans:
+        list(User.query.filter(email="a@example.com"))
+
+    statements = span_sql_statements(spans)
+    assert statements[0].endswith('WHERE "users_user"."email" = %s')
+```
+
+Runs of whitespace are collapsed to single spaces, so a statement written across several lines compares as one. Pass `table="users_user"` to keep only the statements that name that table. The name is matched as a quoted identifier, so `users_user` doesn't match `users_usertag`.
+
+Queries that run with tracing turned off, inside [`suppress_db_tracing()`](#tracing), have no span, so only `capture_queries` sees them.
 
 ## Settings
 

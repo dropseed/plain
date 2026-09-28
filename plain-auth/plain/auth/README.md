@@ -186,7 +186,7 @@ from app.users.models import User
 
 
 def test_profile_view():
-    user = User.objects.create(email="test@example.com")
+    user = User.query.create(email="test@example.com")
     client = Client()
     login_client(client, user)
 
@@ -201,6 +201,17 @@ from plain.auth.test import login_client, logout_client
 
 # ... after logging in
 logout_client(client)
+```
+
+`client.force_login(user)` and `client.logout()` on the [test client](../../../plain/plain/test/README.md#authentication) call these two for you.
+
+To check who a request was authenticated as, read the user from the request the response came from:
+
+```python
+from plain.auth.requests import get_request_user
+
+response = client.get("/profile/")
+assert get_request_user(response.request) == user
 ```
 
 ## Settings

@@ -22,7 +22,8 @@ uv run plain test [targets] [options]
 - `raises(ExcType, match=...)` for expected exceptions; the caught exception is `caught.exception`.
 - Bare `assert` everywhere — failures show both sides of comparisons.
 - Database isolation is automatic (rolled-back transaction per test). DDL-heavy tests use `@isolated_db` from `plain.postgres.test`.
-- Package helpers import from their package: `plain.email.test.outbox`, `plain.postgres.test.capture_queries` / `max_queries` / `span_sql_statements` (the SQL captured spans carry, placeholders kept).
+- Package helpers import from their package, and that package's docs cover them under Testing: `plain.email.test.outbox`, `plain.postgres.test.capture_queries` (SQL with values filled in) / `max_queries` / `span_sql_statements` (SQL as sent, `%s` placeholders kept), `plain.auth.test.login_client`, `plain.sessions.test.get_client_session`.
+- Import a shared helper module by its path from where you run: `from tests.helpers import create_user`. Relative imports don't work in test files.
 - `Client` (from `plain.test`) speaks request vocabulary: `form_data=`, `json_data=`, `query_params=`, `files=`, `body=`/`content_type=`; `follow_redirects=True`; responses expose `status_code`, `text`, `body`, `json_data`, `redirect_to`, `request`. `client.websocket(path)` opens a socket to a view's `websocket()` (`WebSocketRejected` if the handshake is refused).
 
 Run `uv run plain docs testing` and `uv run plain docs test` for full documentation.
