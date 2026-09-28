@@ -26,7 +26,7 @@ def test_no_trace_button_when_export_is_not_configured():
     with override_settings(DEBUG=True):
         response = Client().get("/")
         assert response.status_code == 200
-        assert b"plainframework.com/t/" not in response.content
+        assert b"plainframework.com/t/" not in response.body
 
 
 def test_trace_button_links_to_the_dashboard():
@@ -37,10 +37,8 @@ def test_trace_button_links_to_the_dashboard():
     ):
         response = Client().get("/")
         assert response.status_code == 200
-        match = re.search(
-            rb"https://plainframework\.com/t/[0-9a-f]{32}", response.content
-        )
-        assert match, f"no trace link in toolbar: {response.content!r}"
+        match = re.search(rb"https://plainframework\.com/t/[0-9a-f]{32}", response.body)
+        assert match, f"no trace link in toolbar: {response.body!r}"
 
 
 def test_trace_link_uses_the_configured_cloud_url():
@@ -53,6 +51,4 @@ def test_trace_link_uses_the_configured_cloud_url():
     ):
         response = Client().get("/")
         assert response.status_code == 200
-        assert re.search(
-            rb"https://cloud\.example\.com/t/[0-9a-f]{32}", response.content
-        )
+        assert re.search(rb"https://cloud\.example\.com/t/[0-9a-f]{32}", response.body)

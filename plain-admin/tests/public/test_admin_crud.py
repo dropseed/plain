@@ -35,7 +35,7 @@ class TestListAndDetail:
         response = admin_client.get(LIST_URL)
 
         assert response.status_code == 200
-        assert "list-probe" in response.content.decode()
+        assert "list-probe" in response.text
 
     def test_detail_loads(self):
         admin_client = make_admin_client()
@@ -44,7 +44,7 @@ class TestListAndDetail:
         response = admin_client.get(detail_url(user))
 
         assert response.status_code == 200
-        assert "detail-probe" in response.content.decode()
+        assert "detail-probe" in response.text
 
 
 class TestCreate:
@@ -53,7 +53,7 @@ class TestCreate:
         response = admin_client.get(CREATE_URL)
 
         assert response.status_code == 200
-        assert 'name="username"' in response.content.decode()
+        assert 'name="username"' in response.text
 
     def test_valid_post_creates_object_and_redirects(self):
         admin_client = make_admin_client()
@@ -73,7 +73,7 @@ class TestCreate:
         response = admin_client.post(CREATE_URL, form_data={"username": ""})
 
         assert response.status_code == 200
-        assert 'aria-invalid="true"' in response.content.decode()
+        assert 'aria-invalid="true"' in response.text
         assert User.query.count() == before
 
 
@@ -85,7 +85,7 @@ class TestUpdate:
         response = admin_client.get(edit_url(user))
 
         assert response.status_code == 200
-        assert 'value="before-edit"' in response.content.decode()
+        assert 'value="before-edit"' in response.text
 
     def test_valid_post_persists_changes(self):
         admin_client = make_admin_client()
@@ -103,7 +103,7 @@ class TestUpdate:
         response = admin_client.post(edit_url(user), form_data={"username": ""})
 
         assert response.status_code == 200
-        assert 'aria-invalid="true"' in response.content.decode()
+        assert 'aria-invalid="true"' in response.text
         assert User.query.filter(id=user.id, username="keep").exists()
 
 

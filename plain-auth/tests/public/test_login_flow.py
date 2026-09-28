@@ -31,7 +31,7 @@ def test_login_persists_across_requests():
     # The same client is now recognized on a later, separate request.
     resp = client.get("/whoami")
     assert resp.status_code == 200
-    assert resp.content == b"alice"
+    assert resp.body == b"alice"
 
 
 def test_login_rotates_session_key():
@@ -73,10 +73,10 @@ def test_login_as_different_user_replaces_session():
     client = Client()
 
     client.post("/session-login", form_data={"user_id": first.id})
-    assert client.get("/whoami").content == b"first"
+    assert client.get("/whoami").body == b"first"
 
     client.post("/session-login", form_data={"user_id": second.id})
-    assert client.get("/whoami").content == b"second"
+    assert client.get("/whoami").body == b"second"
 
 
 def test_session_holding_a_string_user_id_still_resolves():
@@ -91,7 +91,7 @@ def test_session_holding_a_string_user_id_still_resolves():
 
     resp = client.get("/whoami")
     assert resp.status_code == 200
-    assert resp.content == b"dave"
+    assert resp.body == b"dave"
 
 
 def test_session_holding_an_unparseable_user_id_is_no_user():

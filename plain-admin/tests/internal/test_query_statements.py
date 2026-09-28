@@ -13,14 +13,14 @@ whether it should have.
 from admin_test_helpers import make_admin_client
 from app.users.models import User
 from plain.admin.models import PinnedNavItem
+from plain.postgres.test import span_sql_statements
 from plain.test import capture_spans
-from plain.test.otel import CapturedSpans
 
 LIST_URL = "/admin/p/user"
 LIST_VIEW_SLUG = "app_users_admin_useradmin_listview"
 
-PINNED_TABLE = '"plainadmin_pinnednavitem"'
-USER_TABLE = '"users_user"'
+PINNED_TABLE = "plainadmin_pinnednavitem"
+USER_TABLE = "users_user"
 
 # One column, no join. PinnedNavItem orders by ("order", "created_at"), so the
 # ORDER BY is the model's default, not something a call site asked for.
@@ -51,17 +51,6 @@ USERS_BY_SELECTED_IDS = (
 )
 
 
-def statements(spans: CapturedSpans, table: str) -> list[str]:
-    """Every statement the captured spans carry that touches `table`, in order."""
-    return [
-        " ".join(str(span.attributes["db.query.text"]).split())
-        for span in spans.get_finished_spans()
-        if span.attributes
-        and "db.query.text" in span.attributes
-        and table in str(span.attributes["db.query.text"])
-    ]
-
-
 def test_a_page_render_reads_only_the_pinned_view_slugs():
     """registry.get_nav_tabs() and AdminView's template context, in that order."""
     admin_client = make_admin_client()
@@ -69,7 +58,10 @@ def test_a_page_render_reads_only_the_pinned_view_slugs():
     with capture_spans() as spans:
         assert admin_client.get(LIST_URL).status_code == 200
 
-    assert statements(spans, PINNED_TABLE) == [NAV_TAB_SLUGS, PINNED_SLUGS]
+    assert span_sql_statements(spans, table=PINNED_TABLE) == [
+        NAV_TAB_SLUGS,
+        PINNED_SLUGS,
+    ]
 
 
 def test_pinning_reads_only_the_order_column():
@@ -81,7 +73,7 @@ def test_pinning_reads_only_the_order_column():
         )
     assert response.status_code == 302
 
-    sql = statements(spans, PINNED_TABLE)
+    sql = span_sql_statements(spans, table=PINNED_TABLE)
     assert len(sql) == 4
     assert sql[0].startswith('SELECT COUNT(*) AS "__count"')
     assert sql[1] == MAX_ORDER
@@ -101,7 +93,7 @@ def test_reordering_reads_only_the_pinned_view_slugs():
         )
     assert response.status_code == 200
 
-    sql = statements(spans, PINNED_TABLE)
+    sql = span_sql_statements(spans, table=PINNED_TABLE)
     assert len(sql) == 2
     assert sql[0] == PINNED_SLUGS
     assert sql[1].startswith('UPDATE "plainadmin_pinnednavitem" SET "order" = %s')
@@ -116,7 +108,7 @@ def test_the_detail_view_looks_its_object_up_by_id():
 
     # Two lookups with the same shape: the session resolving the logged-in
     # user, then AdminModelDetailView.get_object().
-    assert statements(spans, USER_TABLE) == [USER_BY_ID, USER_BY_ID]
+    assert span_sql_statements(spans, table=USER_TABLE) == [USER_BY_ID, USER_BY_ID]
 
 
 def test_an_action_matches_the_selected_ids_with_any_of():
@@ -133,4 +125,7 @@ def test_an_action_matches_the_selected_ids_with_any_of():
 
     # select_objects_by_id() keeps the queryset lazy, so the membership test
     # lands on the UPDATE the action performs.
-    assert statements(spans, USER_TABLE) == [USER_BY_ID, USERS_BY_SELECTED_IDS]
+    assert span_sql_statements(spans, table=USER_TABLE) == [
+        USER_BY_ID,
+        USERS_BY_SELECTED_IDS,
+    ]

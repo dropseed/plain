@@ -87,7 +87,7 @@ def test_dummy_signup():
         # Now logged in
         response = client.get("/")
         assert response.status_code == 200
-        assert b"Hello dummy_username!\n" in response.content
+        assert b"Hello dummy_username!\n" in response.body
 
         # Check the user and connection that was created
         user = get_request_user(response.request)
@@ -164,7 +164,7 @@ def test_dummy_login_connection():
         # Now logged in
         response = client.get("/")
         assert response.status_code == 200
-        assert b"Hello dummy_username!\n" in response.content
+        assert b"Hello dummy_username!\n" in response.body
 
         # Check the user and connection that was created
         user = get_request_user(response.request)
@@ -223,7 +223,7 @@ def test_dummy_login_without_connection():
         # Provider redirects to the callback url
         response = client.get("/oauth/dummy/callback?code=test_code&state=dummy_state")
         assert response.status_code == 400
-        assert b"OAuth Error" in response.content
+        assert b"OAuth Error" in response.body
 
 
 def test_dummy_connect():

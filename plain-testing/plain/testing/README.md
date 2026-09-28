@@ -3,14 +3,17 @@
 **Plain's own test runner — plain functions, bare asserts, and a runner that knows your whole stack.**
 
 - [Overview](#overview)
+- [Design rules](#design-rules)
 - [Status](#status)
 - [Writing tests](#writing-tests)
 - [The test client](#the-test-client)
 - [Assertions](#assertions)
 - [Test metadata](#test-metadata)
+    - [Skipping from inside a test](#skipping-from-inside-a-test)
 - [Overriding context](#overriding-context)
 - [Database access](#database-access)
 - [Package test helpers](#package-test-helpers)
+- [Project lifecycle](#project-lifecycle)
 - [Running tests](#running-tests)
 - [Testing code outside the app](#testing-code-outside-the-app)
 - [Parallelism](#parallelism)
@@ -44,15 +47,50 @@ Run it with `plain test`:
 plain test
 ```
 
-Everything a test uses is either an explicit import, an explicit `with` block, or something the framework does for every test automatically (like wrapping it in a database transaction). If you can read the test file, you know everything that happens.
+Everything a test uses is either an explicit import, an explicit `with` block, or protection the runner gives every test (like wrapping it in a database transaction). If you can read the test file, you know everything that happens.
 
 And because the runner is part of the framework, it knows your whole stack: every test runs inside OpenTelemetry capture, so failures report the queries and spans behind them; the runner knows your URL routes, so it can tell you which ones are untested; and the database, email outbox, and cache are isolated per test without any setup on your part.
 
-The guiding rule for the API: **decorators declare, bodies acquire.** Decorators attach static facts to a test (its cases, its tags, its timeout). Runtime state — settings overrides, frozen time, captured spans — always enters through a `with` block or a function call in the body, where you can see its scope.
+## Design rules
+
+The runner and `plain.test` are built by eight rules. When a question about the API comes up, these settle it.
+
+1. **No backwards compatibility.** There is one spelling of each thing, and no alias kept for an old one. `/plain-upgrade` rewrites what changes.
+2. **Explicit over implicit.** Everything a test depends on is visible in its own file, as an import, a call, or a `with` block. Decorators declare, bodies acquire: a decorator attaches a static fact (its cases, its tags), and runtime state always enters in the body, where its scope is indentation.
+3. **One name per thing.** If two spellings do the same job, one goes. The bytes a response sent are `body`, and nothing else.
+4. **Fail early, and say what to do.** A mistake is rejected when the file is collected, with a message naming the fix. Nothing is silently overwritten or ignored: a test that asks for parameters nothing passes in, a second `@cases`, a bare `@skip`.
+5. **The report tells the truth.** A test that didn't run is reported as skipped, with its reason. Nothing disappears from the count.
+6. **Repetition earns a helper, never magic.** When the same lines appear in many tests, the answer is a named function or context manager the tests call. It is never injection.
+7. **Standard library first, and helpers live with their owner.** The runner doesn't wrap what Python already does well (`tempfile.TemporaryDirectory`, `math.isclose`, `contextlib.redirect_stdout`). A helper specific to a package ships in that package's `plain.<package>.test`.
+8. **Setup is explicit, protection is automatic.** State a test reads is acquired in its body. What guards tests from each other and from the outside world belongs in a lifecycle, which wraps every test without being asked. Packages ship theirs; your project declares its own in [one place](#project-lifecycle).
 
 ## Status
 
-This README is the spec; the engine is being built against it. **Working today**: collection (functions, `Test*` classes, async), assertion rewriting, `raises`/`@cases`/`@skip`/`@tag`, `override_settings`/`patch`/`capture_spans`/`capture_metrics`, the redesigned `Client`, the lifecycle entry point with automatic database (rolled-back transaction, `@isolated_db`) and email outbox isolation, and the runner flags `-k`/`-x`/`-v`/`--tag`/`--exclude-tag`. **Not built yet**: `freeze_time`, `@timeout`, `--lf`, `--pdb`, parallelism and the template-database clone, `--shuffle`, flake classification, `max_queries`-in-strict-mode/route coverage, `--json`/`--changed`, browser testing, and the built-in suite — those sections below describe where this is going.
+This README is the spec; the engine is being built against it. Sections about something not built yet describe where this is going.
+
+**Working today:**
+
+- Collection of functions, `Test*` classes, and async tests, with tests that can't run as written rejected at collection
+- Assertion rewriting: a failed single comparison shows the left and right values
+- `raises`, `@cases` / `case`, `@skip`, `@tag`, and `skip_test`
+- `override_settings`, `patch`, `capture_spans`, `capture_metrics`, `capture_logs`
+- The redesigned `Client`, including `Client.websocket()`
+- Lifecycles: the package entry point, with the automatic database (rolled-back transaction, `@isolated_db`) and email outbox isolation, and the [project lifecycle](#project-lifecycle)
+- `capture_queries`, `max_queries`, and `span_sql_statements` from `plain.postgres.test`
+- The runner flags `-k`, `-x`, `-v`, `--tag`, `--exclude-tag`
+
+**Not built yet:**
+
+- `freeze_time` and `@timeout`
+- `--lf` and `--pdb`
+- Parallelism (`-n`), the template-database clone, `--shuffle`, and flake classification
+- Output capture: what a test prints or logs appears between the progress dots
+- Assertion diffs beyond left and right values
+- `capture_jobs`, `override_flag`, cache isolation, and model factories (`User.test.create`)
+- N+1 flags in failure reports, `--strict`, and route coverage
+- `--json` and `--changed`
+- Browser testing and the built-in suite
+- The `/plain-upgrade` migration from pytest
 
 ## Writing tests
 
@@ -225,6 +263,46 @@ def test_big_import(): ...
 
 That's the whole decorator surface — anything dynamic belongs in the test body.
 
+`@cases` is the only way a test takes parameters. A test whose parameters nothing passes in is rejected when its file is collected, and so is a case with the wrong number of values:
+
+```
+COLLECTION ERROR tests/test_signup.py
+
+  TestDefinitionError: These tests can't be run as written:
+
+    test_signup(db, client) takes parameters, and nothing passes them in.
+
+  There are no fixtures: nothing is passed to a test by name. A test gets
+  what it needs in its body, by calling a helper or entering a `with`
+  block, and takes values only from @cases(...).
+```
+
+A test takes one `@cases`. A second one raises instead of replacing the first; for every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))`.
+
+### Skipping from inside a test
+
+When only the running test can tell whether it applies, call `skip_test` in its body:
+
+```python
+from plain.test import skip_test
+
+
+def test_upload_to_bucket():
+    if not bucket_is_reachable():
+        skip_test("No bucket reachable from this machine")
+    ...
+```
+
+The test stops there and is reported as skipped. Every skipped test is listed with its reason, whether it came from `@skip` or `skip_test`, and counted in the summary:
+
+```
+SKIPPED tests/test_uploads.py::test_upload_to_bucket (No bucket reachable from this machine)
+
+41 passed, 1 skipped in 0.62s
+```
+
+`with` blocks the test entered still exit, and the database transaction is rolled back as usual.
+
 ## Overriding context
 
 Runtime state changes are context managers, so their scope is visible as indentation:
@@ -236,7 +314,7 @@ from plain.test import override_settings, freeze_time, patch
 def test_debug_error_page():
     with override_settings(DEBUG=True):
         response = Client().get("/broken/")
-    assert b"Traceback" in response.content
+    assert "Traceback" in response.text
 
 
 def test_code_expiry():
@@ -309,6 +387,37 @@ def test_homepage_traced():
 The cache is isolated per test automatically, like the database — no helper needed.
 
 This is a deliberate boundary: `plain.test` and the runner stay package-agnostic, and each package owns its own testing story. Anything specific to a package's domain ships with that package — HTMX request helpers (the `HX-Request` / `Plain-HX-Action` headers) come from `plain.htmx.test` rather than growing on the client, query budgets come from `plain.postgres.test`, job execution from `plain.jobs.test`. The core surface stays small, and a package's test helpers evolve with the package itself.
+
+## Project lifecycle
+
+Some things have to be true for every test, and a test that forgets one fails in a way that's hard to see: a request reaches a real payment provider, or a rate limiter still holds the last test's count. That's protection, and it doesn't belong in each test's body. Declare it once, in `tests/lifecycle.py`:
+
+```python
+# tests/lifecycle.py
+from contextlib import contextmanager
+
+from plain.test import TestLifecycle, override_settings
+
+from app.accounts import throttles
+
+
+class AppTestLifecycle(TestLifecycle):
+    @contextmanager
+    def around_test(self, test):
+        throttles.reset_all()
+        # No test reaches the payment provider, whatever the environment holds.
+        with override_settings(PAYMENTS_API_KEY=""):
+            yield
+```
+
+The runner finds the file by its path. There is nothing to register and no other place it looks.
+
+- **One file, one class.** `tests/lifecycle.py` defines exactly one `TestLifecycle` subclass, under any name. It's the same class packages use: `around_test(test)` wraps each test, and `setup_worker()` / `teardown_worker()` run once per run.
+- **It fails loudly.** If the file is there and doesn't import, defines no `TestLifecycle` subclass, defines more than one, or defines one that can't be created without arguments, the run stops before any test with a message saying which. A file someone wrote to protect their tests is never quietly skipped.
+- **It runs closest to the test.** Package lifecycles enter first, in the order of their entry point names, and the project's enters last. So the database transaction is already open when yours starts, and yours exits before the transaction is rolled back.
+- **It's for protection, not setup.** A user, an organization, a logged-in client: a test that reads one builds it in its body, by calling a helper. If a test would be wrong without the thing but never mentions it, that's the lifecycle's job.
+
+`tests/` is the directory beside `app/`. A package whose test app lives inside its tests directory (`tests/app/`) runs `plain test` from there, and its file is that directory's `lifecycle.py`.
 
 ## Running tests
 
@@ -397,9 +506,9 @@ Every test runs inside OpenTelemetry capture, which makes the framework's perfor
 from plain.postgres.test import max_queries
 
 
-def test_dashboard_query_budget(user):
+def test_dashboard_query_budget():
     client = Client()
-    client.force_login(user)
+    client.force_login(create_user())
     with max_queries(5):
         client.get("/dashboard/")
 ```
@@ -457,9 +566,9 @@ End-to-end tests drive a real browser against a real server:
 from plain.testing.browser import testbrowser
 
 
-def test_dashboard(user):
+def test_dashboard():
     with testbrowser() as browser:
-        browser.force_login(user)
+        browser.force_login(create_user())
         page = browser.new_page()
         page.goto("/dashboard/")
         assert "Welcome" in page.content()
@@ -520,40 +629,59 @@ class TestLifecycle:  # protocol, defined in plain.test
     def teardown_worker(self): ...
 ```
 
-`plain.postgres` builds the template database and wraps each test in a lazy rolled-back transaction. `plain.email` resets the outbox. `plain.cache` isolates the cache. The engine discovers and drives them; the packages never import the engine. This entry point group is the **entire** extension API.
+`plain.postgres` builds the template database and wraps each test in a lazy rolled-back transaction. `plain.email` resets the outbox. `plain.cache` isolates the cache. The engine discovers and drives them; the packages never import the engine.
+
+A project declares its own lifecycle in [`tests/lifecycle.py`](#project-lifecycle). Those two — the entry point group and that one file — are the **entire** extension API.
 
 The dependency arrows only point one way:
 
 ```
 your tests ──imports──▶ plain.test (core) + plain.<pkg>.test helpers
 plain.testing (engine) ──drives──▶ lifecycle entry points ──live in──▶ each package
+plain.testing (engine) ──drives──▶ tests/lifecycle.py     ──lives in──▶ your project
 ```
 
 Since entry points are just strings in `pyproject.toml`, a package like `plain-postgres` declares its lifecycle without depending on `plain.testing` — the implementation is only imported when the engine runs it.
 
 ## Migrating from pytest
 
-This is Plain's test runner — there's exactly one, and upgrading an existing project (which will have used pytest via the retired `plain.pytest` package) is a one-time, automated migration. Test bodies survive untouched — bare `assert` and `Client` are the same. What changes is the machinery around them:
+This is Plain's test runner — there's exactly one, and upgrading an existing project (which will have used pytest via the retired `plain.pytest` package) is a one-time migration. Assertions survive untouched. What changes is the machinery around them:
 
-| pytest                                      | plain.testing                                     |
-| ------------------------------------------- | ------------------------------------------------- |
-| `def test_x(db):`                           | `def test_x():` — database lifecycle is automatic |
-| `settings` fixture                          | `with override_settings(...)`                     |
-| `pytest.raises(...)`                        | `plain.test.raises(...)`                          |
-| `pytest.mark.parametrize`                   | `@cases(...)`                                     |
-| `pytest.mark.skip` / custom marks           | `@skip(...)` / `@tag(...)`                        |
-| `monkeypatch`                               | `with patch(...)`                                 |
-| `otel_spans` / `otel_metrics` fixtures      | `capture_spans()` / `capture_metrics()`           |
-| `conftest.py` fixtures                      | helper functions you import                       |
-| `pytest-xdist` (`-n auto`)                  | built in                                          |
-| `pytest-asyncio`                            | built in                                          |
-| `pytest-randomly`                           | `--shuffle`                                       |
-| `pytest-timeout`                            | `--timeout` / `@timeout`                          |
-| `pytest-rerunfailures`                      | flake classification (flaky stays red)            |
-| `freezegun` / `time-machine`                | `freeze_time()`                                   |
-| `pytest-playwright` + `testbrowser` fixture | `testbrowser()` context manager                   |
+| pytest                                      | plain.testing                                                   |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `def test_x(db):`                           | `def test_x():` — database lifecycle is automatic               |
+| a fixture a test reads (`user`, `client`)   | a helper function the test calls in its body                    |
+| a fixture with teardown (`yield`)           | a `@contextmanager` helper the test enters with `with`          |
+| `conftest.py`                               | a helper module you import                                      |
+| an autouse fixture that protects every test | [`tests/lifecycle.py`](#project-lifecycle)                      |
+| an autouse fixture that sets up one file    | an explicit `with helper():` in each test that needs it         |
+| `settings` fixture                          | `with override_settings(...)`                                   |
+| `monkeypatch.setattr(obj, "name", value)`   | `with patch(obj, "name", value)`                                |
+| `monkeypatch.setenv("KEY", "value")`        | `with patch(os.environ, "KEY", "value")`                        |
+| `pytest.raises(...)`, `excinfo.value`       | `raises(...)`, `caught.exception`                               |
+| `pytest.mark.parametrize`                   | `@cases(...)`                                                   |
+| `pytest.param(..., id="x")`                 | `case(..., id="x")`                                             |
+| stacked `parametrize`                       | one `@cases(*itertools.product(...))`                           |
+| `pytest.mark.skip` / custom marks           | `@skip(...)` / `@tag(...)`                                      |
+| `pytest.skip("reason")` in a test           | `skip_test("reason")`                                           |
+| `otel_spans` / `otel_metrics` fixtures      | `capture_spans()` / `capture_metrics()`                         |
+| `caplog`                                    | `capture_logs()`                                                |
+| `capsys`                                    | `contextlib.redirect_stdout(io.StringIO())`                     |
+| `tmp_path`                                  | `tempfile.TemporaryDirectory()`                                 |
+| `pytest.approx`                             | `math.isclose(...)`                                             |
+| `pytest-asyncio`                            | built in: `async def test_*` runs as written                    |
+| `client.post(path, data={...})`, `json=`    | `form_data={...}`, `json_data=`                                 |
+| `response.content`, `response.json()`       | `response.body` (or `response.text`), `response.json_data`      |
+| `pytest-xdist` (`-n auto`)                  | not built yet                                                   |
+| `pytest-randomly`                           | not built yet (`--shuffle`)                                     |
+| `pytest-timeout`                            | not built yet (`@timeout`)                                      |
+| `pytest-rerunfailures`                      | not built yet (flake classification)                            |
+| `freezegun` / `time-machine`                | not built yet (`freeze_time()`); both keep working as libraries |
+| `pytest-playwright` + `testbrowser` fixture | not built yet (`testbrowser()`)                                 |
 
-The rewrites are mechanical, and the `/plain-upgrade` agent handles them. Anything it can't map — an un-absorbed pytest plugin, an unusual fixture — it reports instead of silently dropping.
+A test that still asks for a fixture is rejected when its file is collected, with the test and the parameters named, so a half-migrated suite says exactly what is left.
+
+The rewrites are mechanical. The `/plain-upgrade` migration that performs them is not written yet.
 
 ## FAQs
 
@@ -579,7 +707,11 @@ Editors speak pytest's protocol, which this runner doesn't implement. `plain tes
 
 #### Why aren't there fixtures?
 
-Fixtures solve a real problem — shared lifecycle — with an injection mechanism you can't see at the call site. The runner solves the same problem two other ways: framework-owned lifecycle for the infrastructure everyone needs (database, outbox, cache), and explicit imports for everything else. What's left over is ordinary Python.
+Fixtures solve a real problem — shared lifecycle — with an injection mechanism you can't see at the call site. The runner solves the same problem two other ways: a lifecycle for protection every test needs (the database and outbox from packages, your own in [`tests/lifecycle.py`](#project-lifecycle)), and explicit imports for everything else. What's left over is ordinary Python.
+
+#### What replaces an autouse fixture?
+
+It depends on what the fixture was for. If it protected every test — no network, counters reset — it becomes the [project lifecycle](#project-lifecycle). If it set something up for the tests in one file, it becomes a context manager those tests enter with `with`. That repeats a line in each test, and it's the line that says what the test depends on.
 
 ## Installation
 
@@ -595,4 +727,4 @@ Then run your tests:
 plain test
 ```
 
-No configuration file is required. Tests are discovered in `tests/`, `.env.test` is loaded automatically, and installed Plain packages wire up their own test lifecycles.
+No configuration file is required. Tests are discovered in `tests/`, `.env.test` is loaded automatically, installed Plain packages wire up their own test lifecycles, and `tests/lifecycle.py` adds yours.

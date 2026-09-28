@@ -41,7 +41,7 @@ class TestFormsExampleCreate:
         client = Client()
         response = client.post("/examples/forms/create", form_data=_valid_post_data())
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         assert response.headers["Location"] == "/ok/"
 
         obj = FormsExample.query.get()
@@ -68,7 +68,7 @@ class TestFormsExampleCreate:
         del data["is_active"]  # unchecked checkboxes aren't posted
         response = client.post("/examples/forms/create", form_data=data)
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         assert FormsExample.query.get().is_active is False
 
     def test_invalid_integer_returns_400_with_field_error(self):
@@ -78,7 +78,7 @@ class TestFormsExampleCreate:
         response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "count" in errors
 
     def test_invalid_choice_returns_400(self):
@@ -88,7 +88,7 @@ class TestFormsExampleCreate:
         response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "status" in errors
 
     def test_invalid_uuid_returns_400(self):
@@ -98,7 +98,7 @@ class TestFormsExampleCreate:
         response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "external_id" in errors
 
     def test_invalid_date_returns_400(self):
@@ -108,7 +108,7 @@ class TestFormsExampleCreate:
         response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "event_date" in errors
 
     def test_blank_required_field_returns_400_with_error(self):
@@ -119,7 +119,7 @@ class TestFormsExampleCreate:
         response = client.post("/examples/forms/create", form_data=data)
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "name" in errors
 
     def test_omitted_required_field_returns_400(self):
@@ -156,7 +156,7 @@ class TestFormsExampleUpdate:
 
         response = client.post(f"/examples/forms/{existing.id}/update", form_data=data)
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
 
         existing.refresh_from_db()
         assert existing.name == "After"
@@ -201,7 +201,7 @@ class TestFormsExampleDelete:
 
         response = client.post(f"/examples/forms/{existing.id}/delete")
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         assert response.headers["Location"] == "/ok/"
         assert not FormsExample.query.filter(id=existing.id).exists()
 
@@ -216,7 +216,7 @@ class TestForeignKeyRoundTrip:
             "/examples/child-cascade/create", form_data={"parent": str(parent.id)}
         )
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         child = ChildCascade.query.get()
         assert child.parent.id == parent.id
 
@@ -227,7 +227,7 @@ class TestForeignKeyRoundTrip:
         )
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "parent" in errors
 
     def test_create_with_blank_required_fk_returns_400(self):
@@ -237,7 +237,7 @@ class TestForeignKeyRoundTrip:
         )
 
         assert response.status_code == 400
-        errors = json.loads(response.content)
+        errors = response.json_data
         assert "parent" in errors
 
 
@@ -253,7 +253,7 @@ class TestDBExpressionDefaultsRoundTrip:
             form_data={"name": "sample", "db_uuid": "", "created_at": ""},
         )
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         obj = DBDefaultsExample.query.get()
         assert obj.name == "sample"
         assert isinstance(obj.db_uuid, uuid.UUID)
@@ -271,7 +271,7 @@ class TestDBExpressionDefaultsRoundTrip:
             },
         )
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         obj = DBDefaultsExample.query.get()
         assert obj.db_uuid == uuid.UUID(supplied)
         assert obj.created_at.year == 2026
@@ -295,7 +295,7 @@ class TestEncryptedFieldsRoundTrip:
             },
         )
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         obj = SecretStore.query.get()
         assert obj.name == "prod-key"
         assert obj.api_key == "sk-live-abc123"
@@ -314,7 +314,7 @@ class TestEncryptedFieldsRoundTrip:
             },
         )
 
-        assert response.status_code == 302, response.content
+        assert response.status_code == 302, response.body
         obj = SecretStore.query.get()
         assert obj.name == "minimal"
         assert obj.api_key == "sk-test"

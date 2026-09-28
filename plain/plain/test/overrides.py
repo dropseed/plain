@@ -5,6 +5,7 @@ Scope is visible as indentation — state changes enter through `with` blocks,
 never through injection.
 """
 
+import inspect
 from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from typing import Any
@@ -62,9 +63,20 @@ def patch(target: Any, name: str, value: Any) -> Generator[None]:
             else:
                 target[name] = original
     else:
+        # Raises AttributeError for a name the target doesn't have.
         original = getattr(target, name)
+        if inspect.isclass(target):
+            # Restore what the class itself held, not what attribute lookup
+            # found. Lookup unwraps a staticmethod or classmethod, and finds
+            # attributes the class only inherits — putting that value back
+            # would leave a plain function, or a copy of the inherited
+            # attribute, on the class.
+            original = vars(target).get(name, _MISSING)
         setattr(target, name, value)
         try:
             yield
         finally:
-            setattr(target, name, original)
+            if original is _MISSING:
+                delattr(target, name)
+            else:
+                setattr(target, name, original)

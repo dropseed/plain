@@ -13,7 +13,7 @@ def test_view_without_login_required():
     client = Client()
     response = client.get("/open")
     assert response.status_code == 200
-    assert response.content == b"open"
+    assert response.body == b"open"
     assert "Cache-Control" not in response.headers
 
 
@@ -32,7 +32,7 @@ def test_admin_required():
     # now admin -> success
     resp = client.get("/admin")
     assert resp.status_code == 200
-    assert resp.content == b"admin"
+    assert resp.body == b"admin"
     assert resp.headers["Cache-Control"] == "private"
 
 

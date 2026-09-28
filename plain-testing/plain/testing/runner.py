@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from plain.test.lifecycle import TestLifecycle
+from plain.test.skipping import TestSkipped
 
 from .collection import CollectedTest
 
@@ -27,6 +28,8 @@ class TestResult:
     duration: float = 0.0
     error: BaseException | None = None
     traceback_text: str = ""
+    # Why a skipped test was skipped — from `@skip` or from `skip_test()`.
+    skip_reason: str | None = None
 
 
 @dataclass
@@ -90,7 +93,7 @@ def run_tests(
 
 def _run_one(test: CollectedTest, *, lifecycles: list[TestLifecycle]) -> TestResult:
     if test.skip_reason is not None:
-        return TestResult(test=test, outcome="skipped")
+        return TestResult(test=test, outcome="skipped", skip_reason=test.skip_reason)
 
     start = time.monotonic()
     try:
@@ -102,6 +105,15 @@ def _run_one(test: CollectedTest, *, lifecycles: list[TestLifecycle]) -> TestRes
                 asyncio.run(outcome)
     except KeyboardInterrupt:
         raise
+    except TestSkipped as skipped:
+        # Raised by `skip_test()` in the test body. It left through the
+        # lifecycles' `with` blocks like any exception, so they have exited.
+        return TestResult(
+            test=test,
+            outcome="skipped",
+            duration=time.monotonic() - start,
+            skip_reason=skipped.reason,
+        )
     except BaseException as e:
         return TestResult(
             test=test,

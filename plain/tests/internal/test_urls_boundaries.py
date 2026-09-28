@@ -23,7 +23,7 @@ def test_canonical_include_resolves():
     with boundary_client() as client:
         response = client.get("/admin-canonical/home/")
         assert response.status_code == 200
-        assert response.content == b"hello"
+        assert response.body == b"hello"
 
 
 def test_canonical_include_nested_resolves():
@@ -31,7 +31,7 @@ def test_canonical_include_nested_resolves():
     with boundary_client() as client:
         response = client.get("/admin-canonical/nested/users/")
         assert response.status_code == 200
-        assert response.content == b"users-list"
+        assert response.body == b"users-list"
 
 
 def test_canonical_include_nested_with_param():
@@ -39,7 +39,7 @@ def test_canonical_include_nested_with_param():
     with boundary_client() as client:
         response = client.get("/admin-canonical/nested/users/42/")
         assert response.status_code == 200
-        assert response.content == b"user-42"
+        assert response.body == b"user-42"
 
 
 def test_include_without_trailing_slash_resolves():
@@ -51,7 +51,7 @@ def test_include_without_trailing_slash_resolves():
     with boundary_client() as client:
         response = client.get("/admin-boundary/home/")
         assert response.status_code == 200
-        assert response.content == b"hello"
+        assert response.body == b"hello"
 
 
 def test_include_without_slash_no_longer_concatenates():
@@ -69,7 +69,7 @@ def test_root_include_resolves():
     with boundary_client() as client:
         response = client.get("/root-hello/")
         assert response.status_code == 200
-        assert response.content == b"hello"
+        assert response.body == b"hello"
 
 
 def test_include_with_leading_slash_resolves():
@@ -81,7 +81,7 @@ def test_include_with_leading_slash_resolves():
     with boundary_client() as client:
         response = client.get("/admin-leading/home/")
         assert response.status_code == 200
-        assert response.content == b"hello"
+        assert response.body == b"hello"
 
 
 def test_path_with_leading_slash_resolves():
@@ -93,4 +93,4 @@ def test_path_with_leading_slash_resolves():
     with boundary_client() as client:
         response = client.get("/leading-slash/")
         assert response.status_code == 200
-        assert response.content == b"hello"
+        assert response.body == b"hello"

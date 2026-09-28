@@ -22,7 +22,7 @@ def test_data_persists_across_requests():
     response = client.get("/get")
 
     assert response.status_code == 200
-    assert response.content == b"hello"
+    assert response.body == b"hello"
 
 
 def test_separate_clients_have_separate_sessions():
@@ -32,8 +32,8 @@ def test_separate_clients_have_separate_sessions():
     first.get("/set?value=one")
 
     # A brand-new client shares nothing with the first.
-    assert second.get("/get").content == b"<none>"
-    assert first.get("/get").content == b"one"
+    assert second.get("/get").body == b"<none>"
+    assert first.get("/get").body == b"one"
 
 
 def test_session_cookie_is_reused():
@@ -57,7 +57,7 @@ def test_expired_session_is_not_loaded():
     # Force the stored session to be expired.
     Session.query.update(expires_at=timezone.now() - timedelta(seconds=1))
 
-    assert client.get("/get").content == b"<none>"
+    assert client.get("/get").body == b"<none>"
 
 
 def test_flush_clears_data_and_deletes_row():
@@ -71,5 +71,5 @@ def test_flush_clears_data_and_deletes_row():
     # The flushed row is deleted, and a later read (which writes nothing)
     # creates no replacement.
     assert Session.query.count() == 0
-    assert client.get("/get").content == b"<none>"
+    assert client.get("/get").body == b"<none>"
     assert Session.query.count() == 0

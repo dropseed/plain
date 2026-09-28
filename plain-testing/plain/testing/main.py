@@ -35,23 +35,38 @@ def main(
     import plain.runtime
 
     from .collection import collect_tests
-    from .lifecycles import load_lifecycles
+    from .lifecycles import (
+        AppLifecycleError,
+        load_app_lifecycle,
+        load_package_lifecycles,
+    )
     from .reporting import Reporter
     from .runner import run_tests
 
-    # App mode: a resolvable Plain app gets the full lifecycle. Library mode:
-    # no app, kernel only — collection, assertions, and runner still work.
-    # The runtime is the authority on whether there's an app.
+    # App mode: a resolvable Plain app gets the packages' lifecycles. Library
+    # mode: no app, kernel only — collection, assertions, and runner still
+    # work. The runtime is the authority on whether there's an app.
     try:
         plain.runtime.setup()
     except plain.runtime.AppPathNotFound:
         lifecycles = []
         exclude_dirs: tuple[str, ...] = ()
     else:
-        lifecycles = load_lifecycles()
+        lifecycles = load_package_lifecycles()
         # The Plain `app` directory isn't a place tests live — a convention
         # the runner knows, not the collection kernel.
         exclude_dirs = ("app",)
+
+    # The project's own lifecycle goes last, so it wraps closest to the test:
+    # it enters with the packages' protection already in place (the database
+    # transaction is open) and exits before theirs is taken down.
+    try:
+        app_lifecycle = load_app_lifecycle(Path.cwd())
+    except AppLifecycleError as e:
+        click.secho(str(e), fg="red", err=True)
+        raise SystemExit(2)
+    if app_lifecycle is not None:
+        lifecycles.append(app_lifecycle)
 
     reporter = Reporter(verbose=verbose)
 
@@ -84,6 +99,7 @@ def main(
     )
 
     reporter.failures(run)
+    reporter.skips(run)
     reporter.collection_errors(collection_errors)
     reporter.summary(run, collection_error_count=len(collection_errors))
 

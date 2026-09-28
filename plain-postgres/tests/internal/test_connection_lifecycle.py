@@ -235,7 +235,7 @@ class TestConnectionLifecycle:
                 response = client.get("/db-query")
 
             assert response.status_code == 200
-            assert response.content == b"1"
+            assert response.body == b"1"
             assert count[0] == 1, f"Expected 1 connection created, got {count[0]}"
             assert isinstance(_db_conn.get(), DatabaseConnection)
 
@@ -323,7 +323,7 @@ class TestAsyncViewConnectionLifecycle:
                 response = client.get("/async-db-query")
 
             assert response.status_code == 200
-            assert response.content == b"1"
+            assert response.body == b"1"
             assert count[0] == 1, (
                 f"Async view should create exactly 1 connection, got {count[0]}"
             )
@@ -340,7 +340,7 @@ class TestAsyncViewConnectionLifecycle:
 
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["Content-Type"]
-            assert "data: 1\n\n" in response.content.decode()
+            assert "data: 1\n\n" in response.text
             assert count[0] == 1, (
                 f"SSE view should create exactly 1 connection, got {count[0]}"
             )

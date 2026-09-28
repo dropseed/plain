@@ -62,6 +62,9 @@ def cases(*case_args: Any) -> Callable:
     A non-tuple case is passed as a single argument. Cases are reported by
     position (`test_email_validation[0]`); wrap one in `case(..., id="...")`
     to name it instead.
+
+    A test takes one `@cases`. For every combination of two lists, pass the
+    combinations: `@cases(*itertools.product(FIRST, SECOND))`.
     """
     normalized: list[tuple[tuple[Any, ...], str | None]] = []
     for entry in case_args:
@@ -83,6 +86,16 @@ def cases(*case_args: Any) -> Callable:
         raise TypeError(f"cases() ids must be unique — repeated: {sorted(duplicates)}")
 
     def decorator(func: Callable) -> Callable:
+        if TEST_CASES_ATTRIBUTE in vars(func):
+            name = getattr(func, "__name__", "this test")
+            raise TypeError(
+                f"{name} already has @cases. A second one would "
+                "replace the first, not combine with it. Write the "
+                "combinations as one @cases:\n"
+                "\n"
+                "    @cases(*itertools.product(FIRST, SECOND))\n"
+                f"    def {name}(first, second): ..."
+            )
         setattr(func, TEST_CASES_ATTRIBUTE, normalized)
         return func
 
@@ -90,7 +103,15 @@ def cases(*case_args: Any) -> Callable:
 
 
 def skip(reason: str) -> Callable:
-    """Always skip this test, with the reason shown in the report."""
+    """
+    Always skip this test, with the reason shown in the report.
+
+    To skip from inside a running test, call `skip_test(reason)`.
+    """
+    # A bare `@skip` would hand the test function in as the reason, and the
+    # test would silently stop existing.
+    if not isinstance(reason, str) or not reason.strip():
+        raise TypeError('@skip requires a reason: @skip("why")')
 
     def decorator(func: Callable) -> Callable:
         setattr(func, TEST_SKIP_ATTRIBUTE, reason)
@@ -105,6 +126,11 @@ def tag(*names: str) -> Callable:
     lifecycles that change behavior per-test (e.g. `@isolated_db` from
     plain.postgres is a tag under the hood).
     """
+
+    # A bare `@tag` would hand the test function in as a name, and the test
+    # would silently stop existing.
+    if not names or not all(isinstance(name, str) and name.strip() for name in names):
+        raise TypeError('@tag requires at least one name: @tag("slow")')
 
     def decorator(func: Callable) -> Callable:
         existing = getattr(func, TEST_TAGS_ATTRIBUTE, ())

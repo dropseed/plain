@@ -25,7 +25,12 @@ from plain.test.decorators import (
 
 from .assertions import rewrite_asserts
 
-__all__ = ["CollectedTest", "CollectionError", "collect_tests"]
+__all__ = [
+    "CollectedTest",
+    "CollectionError",
+    "TestDefinitionError",
+    "collect_tests",
+]
 
 _SKIP_DIR_NAMES = {"__pycache__", "node_modules"}
 
@@ -35,6 +40,17 @@ class CollectionError(Exception):
         self.path = path
         self.error = error
         super().__init__(f"Failed to collect {path}: {error!r}")
+
+
+class TestDefinitionError(Exception):
+    """A test is written in a way the runner can't run."""
+
+
+_NO_FIXTURES_ADVICE = (
+    "There are no fixtures: nothing is passed to a test by name. A test gets\n"
+    "what it needs in its body, by calling a helper or entering a `with`\n"
+    "block, and takes values only from @cases(...)."
+)
 
 
 @dataclass
@@ -135,6 +151,9 @@ def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
     relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else path
 
     tests: list[CollectedTest] = []
+    # Every test the file defines wrongly is reported together, so a file
+    # that needs the same fix twenty times says so once.
+    problems: list[str] = []
     for name, obj in vars(module).items():
         # Only functions and classes are ever tests. Anything else in the
         # module's namespace is left alone entirely — a test module can hold
@@ -145,14 +164,63 @@ def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
             continue  # imported, not defined here
 
         if inspect.isfunction(obj) and name.startswith("test_"):
+            problems.extend(_argument_problems(obj, name=name, is_method=False))
             tests.extend(_expand(obj, base_id=f"{relative}::{name}"))
         elif inspect.isclass(obj) and name.startswith("Test"):
-            tests.extend(_collect_class(obj, relative=str(relative)))
+            tests.extend(_collect_class(obj, relative=str(relative), problems=problems))
+
+    if problems:
+        listed = "\n".join(f"  {problem}" for problem in problems)
+        error = TestDefinitionError(
+            f"These tests can't be run as written:\n\n{listed}\n\n{_NO_FIXTURES_ADVICE}"
+        )
+        raise CollectionError(path, error)
 
     return tests
 
 
-def _collect_class(cls: type, *, relative: str) -> list[CollectedTest]:
+def _argument_problems(
+    func: types.FunctionType, *, name: str, is_method: bool
+) -> list[str]:
+    """
+    What is wrong with how a test's parameters get their values: parameters
+    nothing passes in, or @cases that don't fit them.
+    """
+    # follow_wrapped=False: a decorator that passes arguments in itself
+    # (`@mock.patch(...)`) wraps the test in a function that takes anything,
+    # and that wrapper is what the runner calls.
+    signature = inspect.signature(func, follow_wrapped=False)
+    # A method is called on a fresh instance, which fills its first parameter.
+    instance = (object(),) if is_method else ()
+    if is_method and not signature.parameters:
+        return [f"{name}() is a method, and has no `self` parameter."]
+    parameters = list(signature.parameters.values())[len(instance) :]
+    written = f"{name}({', '.join(str(parameter) for parameter in parameters)})"
+
+    case_list = getattr(func, TEST_CASES_ATTRIBUTE, None)
+    if case_list is None:
+        try:
+            signature.bind(*instance)
+        except TypeError:
+            return [f"{written} takes parameters, and nothing passes them in."]
+        return []
+
+    problems = []
+    for index, (values, case_id) in enumerate(case_list):
+        try:
+            signature.bind(*instance, *values)
+        except TypeError:
+            label = case_id if case_id is not None else index
+            count = "1 value" if len(values) == 1 else f"{len(values)} values"
+            problems.append(
+                f"{written} doesn't fit its @cases: case [{label}] passes {count}."
+            )
+    return problems
+
+
+def _collect_class(
+    cls: type, *, relative: str, problems: list[str]
+) -> list[CollectedTest]:
     # Walk the MRO base-first so inherited test methods are collected too,
     # with subclass overrides replacing the base definition in place.
     methods_by_name: dict[str, types.FunctionType] = {}
@@ -169,6 +237,9 @@ def _collect_class(cls: type, *, relative: str) -> list[CollectedTest]:
 
     tests = []
     for name, method in methods:
+        problems.extend(
+            _argument_problems(method, name=f"{cls.__name__}::{name}", is_method=True)
+        )
 
         def make_call(cls: type = cls, method_name: str = name) -> Callable:
             def call(*args: object) -> object:

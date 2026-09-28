@@ -57,7 +57,7 @@ def test_github_provider():
         # Now logged in
         response = client.get("/")
         assert response.status_code == 200
-        assert b"Hello userone!\n" in response.content
+        assert b"Hello userone!\n" in response.body
 
         # Check the user and connection that was created
         user = get_request_user(response.request)

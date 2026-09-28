@@ -15,6 +15,7 @@
 - [Sessions](#sessions)
 - [Expected exceptions](#expected-exceptions)
 - [Test metadata](#test-metadata)
+    - [Skipping from inside a test](#skipping-from-inside-a-test)
 - [Overriding context](#overriding-context)
 - [Capturing OpenTelemetry signals](#capturing-opentelemetry-signals)
 - [Capturing log records](#capturing-log-records)
@@ -129,7 +130,7 @@ Responses are data, not assertion methods — bare `assert` is the assertion API
 
 - `status_code` — the status that went out
 - `headers` — response headers
-- `body` — the bytes the response sent (`content` also works)
+- `body` — the bytes the response sent
 - `text` — the body decoded as a string
 - `json_data` — the body parsed as JSON (requires a JSON content type)
 - `redirect_to` — the redirect target on a 3xx response, `None` otherwise
@@ -232,6 +233,8 @@ def test_big_import(): ...
 - [`skip`](./decorators.py#skip) — always skipped, reason shown in the report
 - [`tag`](./decorators.py#tag) — labels for selection (`plain test --tag slow`)
 
+`@cases` is the only way a test takes parameters. Nothing is passed to a test by name, so a test whose parameters no case fills is rejected when the file is collected, with a message naming the test and the parameters.
+
 Cases are reported by position — `test_email_validation[0]`, `[1]`. Wrap one in [`case`](./decorators.py#case) to name it instead:
 
 ```python
@@ -247,6 +250,35 @@ def test_email_validation(email, valid):
 ```
 
 That reports as `test_email_validation[no at sign]`, and the re-run command in the failure output names the case. The id sits on the case it names, so adding or reordering cases can't shift the names onto the wrong values.
+
+A test takes one `@cases`. A second one raises instead of replacing the first. For every combination of two lists, pass the combinations:
+
+```python
+import itertools
+
+from plain.test import cases
+
+
+@cases(*itertools.product(["kwargs", "object"], ["insert", "update"]))
+def test_write_paths(source, operation): ...
+```
+
+### Skipping from inside a test
+
+`@skip` is for a test that never runs. When only the running test can tell, call [`skip_test`](./skipping.py#skip_test) in its body:
+
+```python
+from plain.test import cases, skip_test
+
+
+@cases("text", "encrypted")
+def test_field_supports_contains(kind):
+    if kind == "encrypted":
+        skip_test("Encrypted fields have no substring match")
+    assert "contains" in lookups_for(kind)
+```
+
+The test stops there and is reported as skipped, with the reason. Everything it entered still exits: `with` blocks unwind and the database transaction is rolled back. An `except Exception:` around the call doesn't swallow the skip.
 
 ## Overriding context
 
@@ -269,6 +301,8 @@ def test_external_call():
 - [`override_settings`](./overrides.py#override_settings) — set Plain settings for the block, restored on exit
 - [`patch`](./overrides.py#patch) — replace an attribute (or a mapping key, e.g. `os.environ`) for the block
 
+`patch` takes the object and the attribute name, not a dotted string. On exit a class gets back exactly what it held: a `staticmethod` is still one, and an attribute the class only inherited is inherited again.
+
 ## Capturing OpenTelemetry signals
 
 ```python
@@ -286,6 +320,16 @@ def test_homepage_span():
 ```
 
 [`capture_spans`](./otel.py#capture_spans) yields the spans emitted during the block (`.get_finished_spans()`, `.find(kind=..., name=...)`). [`capture_metrics`](./otel.py#capture_metrics) yields the metrics — `.points(name)` returns every data point recorded for a metric, `.collect()` forces observable callbacks, `.clear()` forgets what's been captured so far.
+
+What they yield is importable for annotating your own helpers: `CapturedSpans` and `CapturedMetrics`.
+
+```python
+from plain.test import CapturedSpans
+
+
+def route_of(spans: CapturedSpans) -> str:
+    return spans.find(kind=trace.SpanKind.SERVER).attributes["http.route"]
+```
 
 ## Capturing log records
 
@@ -365,7 +409,29 @@ request = RequestFactory().get("/hello/", query_params={"name": "Alice"})
 
 ## Test lifecycles
 
-[`TestLifecycle`](./lifecycle.py#TestLifecycle) is the protocol packages implement to participate in test runs — [plain.postgres](../../../plain-postgres/plain/postgres/README.md) wraps each test in a rolled-back transaction, [plain.email](../../../plain-email/plain/email/README.md) resets the outbox. Implementations register under the `plain.testing` entry point group and are driven by the runner; packages never import the runner.
+A [`TestLifecycle`](./lifecycle.py#TestLifecycle) is what happens around every test without the test asking: [plain.postgres](../../../plain-postgres/plain/postgres/README.md) wraps each one in a rolled-back transaction, [plain.email](../../../plain-email/plain/email/README.md) resets the outbox. It is for protection — what keeps tests from reaching each other or the outside world — not for setup a test reads, which the test gets in its own body.
+
+There are two places a lifecycle comes from:
+
+- **A package** registers one under the `plain.testing` entry point group. Packages never import the runner.
+- **Your project** declares one in `tests/lifecycle.py`.
+
+```python
+# tests/lifecycle.py
+from contextlib import contextmanager
+
+from plain.test import TestLifecycle, override_settings
+
+
+class AppTestLifecycle(TestLifecycle):
+    @contextmanager
+    def around_test(self, test):
+        # No test reaches the payment provider, whatever the environment holds.
+        with override_settings(PAYMENTS_API_KEY=""):
+            yield
+```
+
+The file holds exactly one `TestLifecycle` subclass, under any name. Override `around_test` to wrap each test, and `setup_worker` / `teardown_worker` for what happens once per run. See the [plain.testing docs](../../../plain-testing/plain/testing/README.md#project-lifecycle) for the order lifecycles run in.
 
 ## FAQs
 

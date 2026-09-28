@@ -5,15 +5,15 @@ def test_html_page():
     client = Client()
     response = client.get("/about")
     assert response.status_code == 200
-    assert b"About" in response.content
+    assert b"About" in response.body
 
 
 def test_markdown_page_returns_html():
     client = Client()
     response = client.get("/", headers={"Accept": "text/html"})
     assert response.status_code == 200
-    assert b"<h1" in response.content
-    assert b"Welcome" in response.content
+    assert b"<h1" in response.body
+    assert b"Welcome" in response.body
 
 
 def test_markdown_accept_header_returns_rendered_markdown():
@@ -23,8 +23,8 @@ def test_markdown_accept_header_returns_rendered_markdown():
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
     # Should be raw markdown, not HTML
-    assert b"<h1" not in response.content
-    assert b"# Welcome" in response.content
+    assert b"<h1" not in response.body
+    assert b"# Welcome" in response.body
 
 
 def test_markdown_url_returns_rendered_markdown():
@@ -33,7 +33,7 @@ def test_markdown_url_returns_rendered_markdown():
     response = client.get("/index.md")
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert b"# Welcome" in response.content
+    assert b"# Welcome" in response.body
 
 
 def test_markdown_jinja_rendered_via_accept_header():
@@ -41,7 +41,7 @@ def test_markdown_jinja_rendered_via_accept_header():
     client = Client()
     response = client.get("/jinja-test", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
-    content = response.content.decode()
+    content = response.text
     # Jinja should be rendered — no raw {{ }} tags
     assert "{{ page.title }}" not in content
     assert "Jinja Test" in content
@@ -53,7 +53,7 @@ def test_markdown_jinja_rendered_via_md_url():
     client = Client()
     response = client.get("/jinja-test.md")
     assert response.status_code == 200
-    content = response.content.decode()
+    content = response.text
     assert "{{ page.title }}" not in content
     assert "Jinja Test" in content
     assert "{{ DEBUG }}" not in content
@@ -65,7 +65,7 @@ def test_wildcard_accept_prefers_markdown():
     response = client.get("/", headers={"Accept": "*/*"})
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert b"# Welcome" in response.content
+    assert b"# Welcome" in response.body
 
 
 def test_html_page_ignores_markdown_accept():
@@ -73,8 +73,8 @@ def test_html_page_ignores_markdown_accept():
     client = Client()
     response = client.get("/about", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
-    assert b"About" in response.content
-    assert b"<h1>" in response.content
+    assert b"About" in response.body
+    assert b"<h1>" in response.body
 
 
 def test_render_plain_skips_jinja():
@@ -82,7 +82,7 @@ def test_render_plain_skips_jinja():
     client = Client()
     response = client.get("/raw.md")
     assert response.status_code == 200
-    content = response.content.decode()
+    content = response.text
     # The raw {{ not_rendered }} should pass through unchanged
     assert "{{ not_rendered }}" in content
 
@@ -91,7 +91,7 @@ def test_markdown_frontmatter_stripped():
     """Frontmatter should not appear in markdown responses."""
     client = Client()
     response = client.get("/index.md")
-    content = response.content.decode()
+    content = response.text
     assert "---" not in content
     assert "title:" not in content
 
@@ -101,8 +101,8 @@ def test_paired_html_page():
     client = Client()
     response = client.get("/paired")
     assert response.status_code == 200
-    assert b"Paired HTML" in response.content
-    assert b"<h1>" in response.content
+    assert b"Paired HTML" in response.body
+    assert b"<h1>" in response.body
 
 
 def test_paired_markdown_url():
@@ -111,7 +111,7 @@ def test_paired_markdown_url():
     response = client.get("/paired.md")
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert b"# Paired Markdown" in response.content
+    assert b"# Paired Markdown" in response.body
 
 
 def test_paired_accept_header():
@@ -120,15 +120,15 @@ def test_paired_accept_header():
     response = client.get("/paired", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-    assert b"# Paired Markdown" in response.content
-    assert b"<h1>" not in response.content
+    assert b"# Paired Markdown" in response.body
+    assert b"<h1>" not in response.body
 
 
 def test_paired_accept_header_uses_companion_context():
     """Companion markdown served via Accept header should render with its own page context."""
     client = Client()
     response = client.get("/paired", headers={"Accept": "text/markdown"})
-    content = response.content.decode()
+    content = response.text
     # Should use the companion .md's frontmatter (title: "Paired Page"),
     # not the HTML page's default title
     assert "Title is Paired Page." in content
@@ -140,8 +140,8 @@ def test_paired_html_ignores_html_accept():
     client = Client()
     response = client.get("/paired", headers={"Accept": "text/html"})
     assert response.status_code == 200
-    assert b"Paired HTML" in response.content
-    assert b"<h1>" in response.content
+    assert b"Paired HTML" in response.body
+    assert b"<h1>" in response.body
 
 
 def test_paired_html_has_vary_header():
@@ -166,5 +166,5 @@ def test_paired_serve_markdown_disabled():
         client = Client()
         response = client.get("/paired", headers={"Accept": "text/markdown"})
         assert response.status_code == 200
-        assert b"Paired HTML" in response.content
-        assert b"<h1>" in response.content
+        assert b"Paired HTML" in response.body
+        assert b"<h1>" in response.body

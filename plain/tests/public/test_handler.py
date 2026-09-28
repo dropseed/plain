@@ -21,7 +21,7 @@ def test_handler():
     response = client.get("/")
 
     assert response.status_code == 200
-    assert response.content == b"Hello, world!"
+    assert response.body == b"Hello, world!"
 
 
 def test_async_pipeline_shares_contextvars_across_threads():

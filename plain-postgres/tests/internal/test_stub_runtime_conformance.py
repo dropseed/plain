@@ -31,7 +31,7 @@ from plain.postgres.fields.base import (
     Field,
 )
 from plain.postgres.fields.encrypted import EncryptedField
-from plain.test import case, cases
+from plain.test import case, cases, skip_test
 
 # PEP 681 field specifiers take these names from the *checker*, not from the
 # runtime -- they configure the synthesized constructor. `init=False` on
@@ -217,14 +217,9 @@ def test_the_string_valued_field_set_is_not_empty() -> None:
     assert "IntegerField" not in STRING_VALUED_FIELDS
 
 
-# The exception is a field that blocks the condition statically too: an
-# encrypted column has no meaningful substring match, and the `Never`
-# declaration is what refuses the call site. It blocks every string condition
-# at runtime as well, so it is left out of the sweep rather than checked.
 STRING_CONDITION_CASES = [
     case(name, method, id=f"{name}-{method}")
     for name in STRING_VALUED_FIELDS
-    if not issubclass(SPECIFIERS[name], EncryptedField)
     for method in STRING_CONDITION_METHODS
 ]
 
@@ -236,10 +231,16 @@ def test_string_valued_fields_support_the_string_conditions(
     """The `self: Field[str] | Field[str | None]` restriction admits every
     field the stub types as string-valued -- including the ones that don't
     inherit TextField. Each of them has to register the lookup, or the call
-    type-checks and raises. Encrypted fields are the exception, left out of
-    `STRING_CONDITION_CASES` above.
+    type-checks and raises.
+
+    The exception is a field that blocks the condition statically too: an
+    encrypted column has no meaningful substring match, and the `Never`
+    declaration is what refuses the call site.
     """
     field_class: Any = SPECIFIERS[name]
+    if issubclass(field_class, EncryptedField):
+        skip_test(f"{name} blocks .{method}() statically (Never) and at runtime")
+
     lookup = STRING_CONDITION_LOOKUPS[method]
     assert lookup in field_class.get_lookups(), (
         f"{name} is typed `str` by types.pyi, so `Field.{method}`'s `self` "

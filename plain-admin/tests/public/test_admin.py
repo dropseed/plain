@@ -75,7 +75,7 @@ def test_ui_view_renders():
 
     resp = client.get("/admin/ui")
     assert resp.status_code == 200
-    body = resp.content.decode()
+    body = resp.text
     # Sanity-check a few markers from each major section
     assert "Customizing the admin" in body
     assert "btn-primary" in body

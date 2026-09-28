@@ -14,21 +14,21 @@ def test_catchall_matches_unslashed_request():
     with catchall_client() as client:
         response = client.get("/missing")
         assert response.status_code == 404
-        assert response.content == b"404: missing"
+        assert response.body == b"404: missing"
 
 
 def test_catchall_matches_slashed_request_from_same_mount():
     with catchall_client() as client:
         response = client.get("/missing/")
         assert response.status_code == 404
-        assert response.content == b"404: missing/"
+        assert response.body == b"404: missing/"
 
 
 def test_catchall_matches_multi_segment_path():
     with catchall_client() as client:
         response = client.get("/nested/deep/path")
         assert response.status_code == 404
-        assert response.content == b"404: nested/deep/path"
+        assert response.body == b"404: nested/deep/path"
 
 
 def test_catchall_yields_to_specific_slash_mismatch():
@@ -44,7 +44,7 @@ def test_specific_match_beats_catchall():
     with catchall_client() as client:
         response = client.get("/login/")
         assert response.status_code == 200
-        assert response.content == b"login"
+        assert response.body == b"login"
 
 
 def test_catchall_does_not_match_root():
@@ -68,4 +68,4 @@ def test_catchall_inside_include_still_fires_for_unmatched():
     with included_catchall_client() as client:
         response = client.get("/missing")
         assert response.status_code == 404
-        assert response.content == b"404: missing"
+        assert response.body == b"404: missing"

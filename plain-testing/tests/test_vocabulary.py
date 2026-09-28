@@ -1,6 +1,6 @@
 import os
 
-from plain.test import case, cases, patch, raises
+from plain.test import case, cases, patch, raises, skip, tag
 
 
 def test_raises_catches_and_exposes_exception():
@@ -60,6 +60,51 @@ def test_patch_attribute_restores():
     assert Thing.attr == "original"
 
 
+class InheritingThing(Thing):
+    pass
+
+
+def test_patch_inherited_attribute_leaves_nothing_on_the_subclass():
+    with patch(InheritingThing, "attr", "changed"):
+        assert InheritingThing.attr == "changed"
+        assert Thing.attr == "original"
+    assert "attr" not in vars(InheritingThing)
+    assert InheritingThing.attr == "original"
+
+
+class ThingWithMethods:
+    @staticmethod
+    def double(value):
+        return value * 2
+
+    @classmethod
+    def name(cls):
+        return cls.__name__
+
+
+def test_patch_staticmethod_restores_a_staticmethod():
+    with patch(ThingWithMethods, "double", lambda value: value * 3):
+        assert ThingWithMethods.double(2) == 6
+    # Called through an instance: a plain function here would receive `self`.
+    assert ThingWithMethods().double(2) == 4
+
+
+def test_patch_classmethod_restores_a_classmethod():
+    with patch(ThingWithMethods, "name", lambda: "patched"):
+        assert ThingWithMethods.name() == "patched"
+
+    class Child(ThingWithMethods):
+        pass
+
+    # A bound method put back in place would still answer for the parent.
+    assert Child.name() == "Child"
+
+
+def test_patch_rejects_a_name_the_target_does_not_have():
+    with raises(AttributeError), patch(Thing, "no_such_attribute", "value"):
+        pass
+
+
 def test_patch_mapping_restores_and_removes():
     with patch(os.environ, "PLAIN_TESTING_PATCH_TEST", "on"):
         assert os.environ["PLAIN_TESTING_PATCH_TEST"] == "on"
@@ -91,3 +136,36 @@ def test_cases_rejects_duplicate_ids():
 
 def test_case_repr_names_its_values_and_id():
     assert repr(case(1, 2, id="pair")) == "case(1, 2, id='pair')"
+
+
+def test_a_second_cases_raises_instead_of_replacing_the_first():
+    def test_pairs(letter, number):
+        pass
+
+    cases(1, 2)(test_pairs)
+    with raises(TypeError, match="test_pairs already has @cases") as caught:
+        cases("a", "b")(test_pairs)
+    assert "itertools.product" in str(caught.exception)
+
+
+def test_skip_requires_a_reason():
+    with raises(TypeError, match="@skip requires a reason"):
+        skip("")
+
+    def test_never():
+        pass
+
+    # A bare `@skip` hands the function in where the reason goes.
+    with raises(TypeError, match="@skip requires a reason"):
+        skip(test_never)  # ty: ignore[invalid-argument-type]
+
+
+def test_tag_requires_names():
+    with raises(TypeError, match="@tag requires at least one name"):
+        tag()
+
+    def test_never():
+        pass
+
+    with raises(TypeError, match="@tag requires at least one name"):
+        tag(test_never)  # ty: ignore[invalid-argument-type]

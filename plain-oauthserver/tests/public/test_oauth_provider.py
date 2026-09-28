@@ -175,7 +175,7 @@ class TestAuthorize:
             },
         )
         assert response.status_code == 200
-        body = response.content.decode()
+        body = response.text
         assert "Test App" in body
         assert "Approve" in body
         assert "Deny" in body
@@ -192,7 +192,7 @@ class TestAuthorize:
             },
         )
         assert response.status_code == 200
-        assert "code_challenge" in response.content.decode()
+        assert "code_challenge" in response.text
 
     def test_approve_redirects_with_code_and_iss(self):
         public_app = make_public_app()

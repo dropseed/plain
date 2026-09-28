@@ -28,7 +28,7 @@ def test_slash_route_with_slash_matches():
     with slash_client() as client:
         response = client.get("/with-slash/")
         assert response.status_code == 200
-        assert response.content == b"with-slash GET"
+        assert response.body == b"with-slash GET"
 
 
 def test_slash_route_without_slash_redirects():
@@ -43,7 +43,7 @@ def test_noslash_route_without_slash_matches():
     with slash_client() as client:
         response = client.get("/without-slash")
         assert response.status_code == 200
-        assert response.content == b"without-slash GET"
+        assert response.body == b"without-slash GET"
 
 
 def test_noslash_route_with_slash_redirects():
@@ -62,7 +62,7 @@ def test_post_method_preserved_across_redirect():
         )
         assert response.redirect_chain == [("/with-slash/", 308)]
         assert response.request.method == "POST"
-        assert response.content == b"with-slash POST"
+        assert response.body == b"with-slash POST"
 
 
 def test_post_method_preserved_without_body():
@@ -73,7 +73,7 @@ def test_post_method_preserved_without_body():
         response = client.post("/with-slash", form_data={}, follow_redirects=True)
         assert response.redirect_chain == [("/with-slash/", 308)]
         assert response.request.method == "POST"
-        assert response.content == b"with-slash POST"
+        assert response.body == b"with-slash POST"
         # 308 must preserve the body shape: the followed request carries the
         # same empty form body and content headers as the initial request.
         assert (
@@ -89,11 +89,11 @@ def test_both_slash_forms_explicit_no_redirect():
     with slash_client() as client:
         response = client.get("/dual/")
         assert response.status_code == 200
-        assert response.content == b"dual with slash"
+        assert response.body == b"dual with slash"
 
         response = client.get("/dual")
         assert response.status_code == 200
-        assert response.content == b"dual without slash"
+        assert response.body == b"dual without slash"
 
 
 def test_redirect_preserves_query_string():
@@ -175,7 +175,7 @@ def test_path_converter_obeys_route_trailing_slash():
 
         response = client.get("/docs/a/b/c")
         assert response.status_code == 200
-        assert response.content == b"docs a/b/c"
+        assert response.body == b"docs a/b/c"
 
 
 def test_path_converter_requires_at_least_one_segment():
@@ -326,7 +326,7 @@ def test_root_route_is_slash_neutral_under_global_true():
     with setting_client(_R, urls_trailing_slash=True) as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.content == b"ok"
+        assert response.body == b"ok"
 
 
 def test_root_route_is_slash_neutral_under_global_false():
@@ -339,4 +339,4 @@ def test_root_route_is_slash_neutral_under_global_false():
     with setting_client(_R, urls_trailing_slash=False) as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.content == b"ok"
+        assert response.body == b"ok"

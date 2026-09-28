@@ -8,6 +8,7 @@ import textwrap
 
 import click
 
+from .collection import CollectionError
 from .runner import TestResult, TestRun
 
 __all__ = ["Reporter"]
@@ -36,9 +37,9 @@ class Reporter:
         if self.verbose:
             status = result.outcome.upper()
             line = f"{status:<7} {result.test.id}"
-            if result.outcome == "skipped" and result.test.skip_reason:
-                line += f" ({result.test.skip_reason})"
-            if result.outcome != "skipped":
+            if result.outcome == "skipped":
+                line += f" ({result.skip_reason})"
+            else:
                 line += f" ({result.duration:.3f}s)"
             click.secho(line, fg=color, bold=bold)
         else:
@@ -59,11 +60,21 @@ class Reporter:
             click.echo()
             click.secho(f"Re-run: plain test {result.test.id}", dim=True)
 
-    def collection_errors(self, errors: list) -> None:
+    def skips(self, run: TestRun) -> None:
+        # Verbose output already gave each skipped test its own line.
+        if self.verbose or not run.skipped:
+            return
+        click.echo()
+        for result in run.skipped:
+            click.secho(f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow")
+
+    def collection_errors(self, errors: list[CollectionError]) -> None:
         for error in errors:
             click.echo()
             click.secho(f"COLLECTION ERROR {error.path}", fg="red", bold=True)
-            click.echo(f"  {error.error!r}")
+            click.echo()
+            cause = error.error
+            click.echo(textwrap.indent(f"{type(cause).__name__}: {cause}", "  "))
 
     def summary(self, run: TestRun, *, collection_error_count: int = 0) -> None:
         parts = [f"{len(run.passed)} passed"]

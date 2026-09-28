@@ -31,7 +31,7 @@ def test_unsupported_subprotocol_is_not_echoed() -> None:
 def test_plain_get_still_serves_the_page() -> None:
     response = Client().get("/websocket/echo")
     assert response.status_code == 200
-    assert response.content == b"websocket page"
+    assert response.body == b"websocket page"
 
 
 def test_plain_get_to_a_socket_only_view_is_405_without_leaking_the_handler() -> None:

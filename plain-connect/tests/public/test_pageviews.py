@@ -34,16 +34,16 @@ def test_tag_renders_nothing_without_a_token():
     # CONNECT_PAGEVIEWS_PUBLIC_TOKEN defaults to "" — the tag stays silent.
     response = Client().get("/")
     assert response.status_code == 200
-    assert b"<script" not in response.content
+    assert b"<script" not in response.body
 
 
 def test_tag_renders_the_beacon_script_when_token_is_set():
     with override_settings(CONNECT_PAGEVIEWS_PUBLIC_TOKEN=TOKEN):
         response = Client().get("/")
         assert response.status_code == 200
-        assert f'data-token="{TOKEN}"'.encode() in response.content
+        assert f'data-token="{TOKEN}"'.encode() in response.body
         # No identity key configured, so there is nothing to attribute.
-        assert _data_identity(response.content) == ""
+        assert _data_identity(response.body) == ""
 
 
 def test_anonymous_visitor_carries_no_identity():
@@ -52,7 +52,7 @@ def test_anonymous_visitor_carries_no_identity():
     ):
         response = Client().get("/")
         assert response.status_code == 200
-        assert _data_identity(response.content) == ""
+        assert _data_identity(response.body) == ""
 
 
 def test_matched_route_is_rendered_into_the_tag():
@@ -62,7 +62,7 @@ def test_matched_route_is_rendered_into_the_tag():
     with override_settings(CONNECT_PAGEVIEWS_PUBLIC_TOKEN=TOKEN):
         response = Client().get("/")
         assert response.status_code == 200
-        assert _data_route(response.content) == "/"
+        assert _data_route(response.body) == "/"
 
 
 def test_signed_in_user_identity_is_encrypted_into_the_tag():
@@ -78,7 +78,7 @@ def test_signed_in_user_identity_is_encrypted_into_the_tag():
         response = client.get("/")
         assert response.status_code == 200
 
-        token = _data_identity(response.content)
+        token = _data_identity(response.body)
         assert token, "data-identity should be populated for a signed-in user"
         # The HTML only carries the encrypted token; it decrypts back to the id.
         assert _decrypt(token, IDENTITY_KEY) == str(user.id)

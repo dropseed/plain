@@ -39,7 +39,7 @@ class TestLogin:
         response = Client().get("/login")
 
         assert response.status_code == 200
-        assert 'name="email"' in response.content.decode()
+        assert 'name="email"' in response.text
 
     def test_valid_credentials_log_in_and_redirect(self):
         make_user(email="login-ok@example.com")
@@ -64,7 +64,7 @@ class TestLogin:
         )
 
         assert response.status_code == 200
-        assert "form-error" in response.content.decode()
+        assert "form-error" in response.text
         assert not is_logged_in(client)
 
     def test_unknown_email_is_rejected(self):
@@ -76,7 +76,7 @@ class TestLogin:
         )
 
         assert response.status_code == 200
-        assert "form-error" in response.content.decode()
+        assert "form-error" in response.text
         assert not is_logged_in(client)
 
 
@@ -109,7 +109,7 @@ class TestSignup:
         )
 
         assert response.status_code == 200
-        assert "form-error" in response.content.decode()
+        assert "form-error" in response.text
         assert not User.query.filter(email="mismatch@example.com").exists()
 
 
@@ -198,7 +198,7 @@ class TestChangePassword:
         )
 
         assert response.status_code == 200
-        assert "form-error" in response.content.decode()
+        assert "form-error" in response.text
         assert password_works("change-bad@example.com", OLD_PASSWORD)  # unchanged
 
     def test_mismatched_new_passwords_are_rejected(self):
@@ -215,5 +215,5 @@ class TestChangePassword:
         )
 
         assert response.status_code == 200
-        assert "form-error" in response.content.decode()
+        assert "form-error" in response.text
         assert password_works("change-mismatch@example.com", OLD_PASSWORD)  # unchanged

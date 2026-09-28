@@ -24,7 +24,7 @@ def test_canonical_path_resolves():
     with path_client() as client:
         response = client.get("/target/")
         assert response.status_code == 200
-        assert response.content == b"target GET"
+        assert response.body == b"target GET"
 
 
 def test_double_slash_in_middle_redirects():

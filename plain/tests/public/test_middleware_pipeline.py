@@ -19,7 +19,7 @@ class TestMiddlewarePipelineBasics:
         client = Client()
         response = client.get("/")
         assert response.status_code == 200
-        assert response.content == b"Hello, world!"
+        assert response.body == b"Hello, world!"
 
     def test_response_has_content_length(self):
         """DefaultHeadersMiddleware should add Content-Length."""
@@ -252,7 +252,7 @@ class TestMiddlewareOrdering:
             client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
-            assert response.content == b"blocked"
+            assert response.body == b"blocked"
             assert call_log == ["blocking"]
         finally:
             settings.MIDDLEWARE = original
@@ -422,7 +422,7 @@ class TestSSEViews:
             assert "text/event-stream" in response.headers["Content-Type"]
             assert response.headers["Cache-Control"] == "no-cache"
 
-            body = response.content.decode()
+            body = response.text
             # Three ServerSentEvent instances with different data types
             assert "data: hello\n\n" in body
             assert 'data: {"count": 1}\n\n' in body
@@ -466,7 +466,7 @@ class TestSSEViews:
             client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
-            assert response.content == b"blocked"
+            assert response.body == b"blocked"
         finally:
             settings.MIDDLEWARE = original_middleware
             settings.URLS_ROUTER = original_router

@@ -50,7 +50,7 @@ def test_small_upload_stays_in_memory():
     response = _upload(size)
 
     assert response.status_code == 200
-    assert response.content == f"InMemoryUploadedFile:{size}".encode()
+    assert response.body == f"InMemoryUploadedFile:{size}".encode()
 
 
 def test_large_upload_streams_to_temp_file():
@@ -64,7 +64,7 @@ def test_large_upload_streams_to_temp_file():
     response = _upload(size)
 
     assert response.status_code == 200
-    assert response.content == f"TemporaryUploadedFile:{size}".encode()
+    assert response.body == f"TemporaryUploadedFile:{size}".encode()
 
 
 def test_body_over_data_upload_limit_is_413():

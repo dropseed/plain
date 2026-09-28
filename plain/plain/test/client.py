@@ -96,11 +96,6 @@ class ClientResponse:
         return self._content
 
     @property
-    def content(self) -> bytes:
-        """The same bytes as `body`, under the name the response itself uses."""
-        return self._content
-
-    @property
     def text(self) -> str:
         """The body the response sent, decoded as a string."""
         return self._content.decode(self._response.charset)
@@ -136,6 +131,14 @@ class ClientResponse:
             raise AttributeError(
                 "The test client reads a streaming body the way a server"
                 " sends it — use `response.body`."
+            )
+        if name == "content":
+            # The body the client received is `response.body`. Delegating
+            # would hand back the wrapped response's own bytes, which can
+            # differ from what went out (a HEAD, a 204, a streaming body).
+            raise AttributeError(
+                "The test client's response has no `content` — use"
+                " `response.body`, `response.text`, or `response.json_data`."
             )
         return getattr(object.__getattribute__(self, "_response"), name)
 

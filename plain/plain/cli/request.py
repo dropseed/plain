@@ -461,7 +461,7 @@ def request(
 
         # The test client reads a streaming body the way a server sends it,
         # so a streamed body (e.g. an asset or export) is here to check too.
-        body_bytes = response.content
+        body_bytes = response.body
         # A streamed body is only summarized below, so it's decoded just
         # for assertions — a large binary download never is.
         if response.streaming and not (assert_contains or assert_not_contains):

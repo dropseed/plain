@@ -76,11 +76,18 @@ def test_streaming_content_points_to_body() -> None:
         _ = response.streaming_content
 
 
-def test_text_and_content_read_the_sent_body() -> None:
+def test_text_and_body_read_the_sent_body() -> None:
     response = Client().get("/stream-generator")
 
     assert response.text == "line 1\nline 2\n"
-    assert response.content == response.body
+    assert response.body == b"line 1\nline 2\n"
+
+
+def test_content_points_to_body() -> None:
+    response = Client().get("/stream-generator")
+
+    with raises(AttributeError, match="response.body"):
+        _ = response.content
 
 
 def test_head_of_a_buffered_response_has_no_body() -> None:
@@ -89,5 +96,4 @@ def test_head_of_a_buffered_response_has_no_body() -> None:
     response = Client().head("/")
 
     assert response.body == b""
-    assert response.content == b""
     assert response.text == ""

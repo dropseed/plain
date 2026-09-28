@@ -32,7 +32,7 @@ class TestRequestLink:
         response = Client().get("/login")
 
         assert response.status_code == 200
-        assert 'name="email"' in response.content.decode()
+        assert 'name="email"' in response.text
 
     def test_known_email_sends_link(self):
         User.query.create(email="known@example.com")
@@ -137,7 +137,7 @@ class TestFollowLink:
         )
 
         assert response.status_code == 200
-        assert "Link Invalid" in response.content.decode()
+        assert "Link Invalid" in response.text
         assert not is_logged_in(client)
 
     def test_expired_link_shows_failure_page(self):
@@ -153,4 +153,4 @@ class TestFollowLink:
         response = Client().get(urlsplit(url).path, follow_redirects=True)
 
         assert response.status_code == 200
-        assert "Link Expired" in response.content.decode()
+        assert "Link Expired" in response.text

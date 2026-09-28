@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from plain.test import TestLifecycle, skip
+from plain.test import TestLifecycle, raises, skip, skip_test
 from plain.testing.collection import CollectedTest
 from plain.testing.runner import run_tests
 
@@ -120,6 +120,86 @@ def test_teardown_failure_does_not_skip_other_teardowns():
     run = run_tests([make_test(lambda: log.append("test"))], lifecycles=[a, b])
     assert run.ok
     assert "teardown:a" in log  # a's teardown ran despite b's raising
+
+
+def test_skip_test_reports_the_test_skipped_with_its_reason():
+    ran = []
+
+    def skips_partway():
+        ran.append("before")
+        skip_test("no bucket reachable")
+        ran.append("after")
+
+    run = run_tests([make_test(skips_partway)], lifecycles=[])
+    assert [r.outcome for r in run.results] == ["skipped"]
+    assert run.results[0].skip_reason == "no bucket reachable"
+    assert ran == ["before"]
+    assert run.ok
+
+
+def test_skip_decorator_reason_is_on_the_result():
+    run = run_tests([make_test(lambda: None, skip_reason="not yet")], lifecycles=[])
+    assert run.results[0].skip_reason == "not yet"
+
+
+def test_skip_test_still_exits_the_lifecycles():
+    log = []
+    a = RecordingLifecycle("a", log)
+
+    def skips():
+        log.append("test")
+        skip_test("not here")
+
+    run = run_tests([make_test(skips)], lifecycles=[a])
+    assert run.results[0].outcome == "skipped"
+    assert log == ["setup:a", "enter:a", "test", "exit:a", "teardown:a"]
+
+
+def test_skip_test_works_in_an_async_test():
+    async def skips():
+        skip_test("async and skipped")
+
+    run = run_tests([make_test(skips)], lifecycles=[])
+    assert run.results[0].outcome == "skipped"
+    assert run.results[0].skip_reason == "async and skipped"
+
+
+def test_skip_test_is_not_swallowed_by_except_exception():
+    ran = []
+
+    def catches_everything_ordinary():
+        try:
+            skip_test("skipped inside a try")
+        except Exception:
+            ran.append("swallowed")
+        ran.append("carried on")
+
+    run = run_tests([make_test(catches_everything_ordinary)], lifecycles=[])
+    assert run.results[0].outcome == "skipped"
+    assert ran == []
+
+
+def test_skip_test_requires_a_reason():
+    with raises(TypeError, match="requires a reason"):
+        skip_test("")
+    with raises(TypeError, match="requires a reason"):
+        skip_test("   ")
+
+
+def test_a_failing_lifecycle_exit_outranks_the_skip():
+    class FailsOnExit(TestLifecycle):
+        @contextmanager
+        def around_test(self, test):
+            try:
+                yield
+            finally:
+                raise RuntimeError("could not clean up")
+
+    def skips():
+        skip_test("skipped, but the cleanup breaks")
+
+    run = run_tests([make_test(skips)], lifecycles=[FailsOnExit()])
+    assert run.results[0].outcome == "failed"
 
 
 @skip("proves @skip works when collected by the engine itself")

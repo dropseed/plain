@@ -21,14 +21,14 @@ class TestPlainViewFallsThroughToText:
             response = error_client.get("/plain-404")
             assert response.status_code == 404
             assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-            assert response.content == b"404 Not Found"
+            assert response.body == b"404 Not Found"
 
     def test_500_renders_plain_text(self):
         with _error_client() as error_client:
             response = error_client.get("/plain-500")
             assert response.status_code == 500
             assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-            assert response.content == b"500 Internal Server Error"
+            assert response.body == b"500 Internal Server Error"
 
 
 class TestTemplateViewRendersHtml:
@@ -38,13 +38,13 @@ class TestTemplateViewRendersHtml:
         with _error_client() as error_client:
             response = error_client.get("/template-404")
             assert response.status_code == 404
-            assert b"Test 404 page" in response.content
+            assert b"Test 404 page" in response.body
 
     def test_500_renders_500_html(self):
         with _error_client() as error_client:
             response = error_client.get("/template-500")
             assert response.status_code == 500
-            assert b"Test 500 page" in response.content
+            assert b"Test 500 page" in response.body
 
     def test_403_without_matching_template_falls_back_to_text(self):
         """No 403.html → plain-text response with status + reason."""
@@ -52,7 +52,7 @@ class TestTemplateViewRendersHtml:
             response = error_client.get("/template-403")
             assert response.status_code == 403
             assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-            assert response.content == b"403 Forbidden"
+            assert response.body == b"403 Forbidden"
 
 
 class TestNotFoundViewCatchAll:
@@ -65,7 +65,7 @@ class TestNotFoundViewCatchAll:
         with _error_client() as error_client:
             response = error_client.get("/no-such-path")
             assert response.status_code == 404
-            assert b"Test 404 page" in response.content
+            assert b"Test 404 page" in response.body
 
     def test_post_to_unknown_url_is_404_not_405(self):
         """`before_request` raises before method dispatch, so non-GET methods
@@ -73,7 +73,7 @@ class TestNotFoundViewCatchAll:
         with _error_client() as error_client:
             response = error_client.post("/no-such-path", form_data={})
             assert response.status_code == 404
-            assert b"Test 404 page" in response.content
+            assert b"Test 404 page" in response.body
 
 
 class TestCustomHTTPExceptionSubclass:
@@ -84,7 +84,7 @@ class TestCustomHTTPExceptionSubclass:
             response = error_client.get("/plain-402")
             assert response.status_code == 402
             assert response.headers["Content-Type"] == "text/plain; charset=utf-8"
-            assert response.content == b"402 Payment Required"
+            assert response.body == b"402 Payment Required"
 
 
 class TestRenderFailureFallsBackToText:
@@ -106,5 +106,5 @@ class TestRenderFailureFallsBackToText:
         with _error_client() as error_client, patch(Template, "render", boom_on_500):
             response = error_client.get("/template-500")
             assert response.status_code == 500
-            assert response.content == b""
+            assert response.body == b""
             assert response.exception is not None
