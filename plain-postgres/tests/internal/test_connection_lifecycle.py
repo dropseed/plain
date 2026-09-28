@@ -43,10 +43,16 @@ def _sync_db_query():
         return row[0]
 
 
+# The wrapper each DBQueryView request used. A request runs in a context of
+# its own, so this is the only way a test gets hold of it.
+_view_wrappers: list[DatabaseConnection] = []
+
+
 class DBQueryView(View):
     """Sync view that executes a real DB query via get_connection()."""
 
     def get(self):
+        _view_wrappers.append(get_connection())
         return Response(str(_sync_db_query()))
 
 
@@ -179,6 +185,19 @@ def _clean_connection():
 
 
 @contextmanager
+def _recorded_view_wrappers():
+    """The wrappers DBQueryView requests used inside the block, closed on
+    the way out: nothing else holds them once their requests are over."""
+    _view_wrappers.clear()
+    try:
+        yield _view_wrappers
+    finally:
+        for wrapper in _view_wrappers:
+            wrapper.close()
+        _view_wrappers.clear()
+
+
+@contextmanager
 def _test_router():
     """Point the URL resolver at our minimal test router."""
     _get_cached_resolver.cache_clear()
@@ -224,8 +243,9 @@ class TestConnectionLifecycle:
     """Full request lifecycle tests for connection creation and reuse."""
 
     def test_single_request_creates_exactly_one_connection(self):
-        """A request should create exactly one DatabaseConnection, stored in the ContextVar."""
-        with _clean_connection(), _test_router():
+        """A request creates exactly one DatabaseConnection, in its own
+        context. The caller's context is left as it was."""
+        with _clean_connection(), _test_router(), _recorded_view_wrappers():
             assert not has_connection()
 
             with _patched_init_counter() as count:
@@ -235,64 +255,77 @@ class TestConnectionLifecycle:
             assert response.status_code == 200
             assert response.body == b"1"
             assert count[0] == 1, f"Expected 1 connection created, got {count[0]}"
-            assert isinstance(_db_conn.get(), DatabaseConnection)
+            assert not has_connection()
 
-    def test_multiple_requests_create_one_connection_total(self):
-        """Three sequential requests should create exactly one connection, reused across all."""
+    def test_each_request_creates_its_own_connection(self):
+        """A request has a context of its own, as under a server, so a
+        caller with no connection gets a new wrapper for each request."""
+        with (
+            _clean_connection(),
+            _test_router(),
+            _recorded_view_wrappers() as wrappers,
+        ):
+            with _patched_init_counter() as count:
+                client = _fresh_client()
+
+                for _ in range(3):
+                    response = client.get("/db-query")
+                    assert response.status_code == 200
+
+            assert count[0] == 3, f"Expected 3 connections, got {count[0]}"
+            assert len({id(wrapper) for wrapper in wrappers}) == 3
+
+    def test_requests_share_the_callers_connection(self):
+        """A request's context starts as a copy of the caller's, so a caller
+        that has a connection (a test inside its transaction) shares it
+        with every request it makes."""
         with _clean_connection(), _test_router():
+            callers_wrapper = get_connection()
+
             with _patched_init_counter() as count:
                 client = _fresh_client()
+                client.get("/db-query")
+                client.get("/db-query")
 
-                response1 = client.get("/db-query")
-                assert response1.status_code == 200
-                first_conn_id = id(_db_conn.get())
+            assert count[0] == 0, f"Expected no new connection, got {count[0]}"
+            assert _view_wrappers[-2:] == [callers_wrapper, callers_wrapper]
+            _view_wrappers.clear()
 
-                response2 = client.get("/db-query")
-                assert response2.status_code == 200
-
-                response3 = client.get("/db-query")
-                assert response3.status_code == 200
-
-            assert count[0] == 1, (
-                f"Expected 1 connection for 3 requests, got {count[0]}"
-            )
-            assert id(_db_conn.get()) == first_conn_id, (
-                "All requests should use the same connection object"
-            )
-
-    def test_middleware_returns_connection_between_requests(self):
+    def test_middleware_returns_connection_when_the_request_ends(self):
         """
-        With `DatabaseConnectionMiddleware` installed, the wrapper persists
-        in the ContextVar across requests but its underlying psycopg
-        connection is returned to the pool between requests.
+        With `DatabaseConnectionMiddleware` installed, a request's psycopg
+        connection is back in the pool once the request is over.
         """
-        with _clean_connection(), _test_router(), _with_db_middleware():
-            with _patched_init_counter() as count:
-                client = _fresh_client()
+        with (
+            _clean_connection(),
+            _test_router(),
+            _with_db_middleware(),
+            _recorded_view_wrappers() as wrappers,
+        ):
+            client = _fresh_client()
 
-                response1 = client.get("/db-query")
-                assert response1.status_code == 200
+            response1 = client.get("/db-query")
+            assert response1.status_code == 200
+            [first] = wrappers
+            assert first.connection is None, (
+                "Inner psycopg connection should be returned to the pool"
+            )
 
-                # Wrapper persists; inner connection was returned to the pool.
-                conn = _db_conn.get()
-                assert conn is not None
-                assert conn.connection is None, (
-                    "Inner psycopg connection should be returned to pool between requests"
-                )
-
-                # Second request: same wrapper, checks out a connection, returns it.
-                response2 = client.get("/db-query")
-                assert response2.status_code == 200
-                assert conn is _db_conn.get()
-
-            assert count[0] == 1, f"Expected 1 wrapper across requests, got {count[0]}"
+            response2 = client.get("/db-query")
+            assert response2.status_code == 200
+            [first, second] = wrappers
+            assert second.connection is None
 
     def test_middleware_after_response_sees_view_connection(self):
         """
-        `after_response` runs on the same thread as the view, so it sees
-        the ContextVar-backed DB connection the view just used.
+        `after_response` runs in the request's context, as the view did, so
+        it sees the ContextVar-backed DB connection the view just used.
         """
-        with _clean_connection(), _test_router():
+        with (
+            _clean_connection(),
+            _test_router(),
+            _recorded_view_wrappers() as wrappers,
+        ):
             _tracking_seen.clear()
             middleware = [f"{__name__}._ContextVarTrackingMiddleware"] + list(
                 settings.MIDDLEWARE
@@ -302,9 +335,8 @@ class TestConnectionLifecycle:
                 response = client.get("/db-query")
                 assert response.status_code == 200
 
-                assert len(_tracking_seen) == 1
-                assert _tracking_seen[0] is not None
-                assert _tracking_seen[0] == id(_db_conn.get())
+                [wrapper] = wrappers
+                assert _tracking_seen == [id(wrapper)]
 
 
 class TestAsyncViewConnectionLifecycle:

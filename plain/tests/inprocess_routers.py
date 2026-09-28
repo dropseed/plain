@@ -2,7 +2,13 @@
 
 import contextvars
 
-from plain.http import AsyncStreamingResponse, Response, StreamingResponse
+from plain.http import (
+    AsyncStreamingResponse,
+    HttpMiddleware,
+    Request,
+    Response,
+    StreamingResponse,
+)
 from plain.urls import Router, path
 from plain.views import View
 
@@ -10,6 +16,38 @@ from plain.views import View
 caller_value: contextvars.ContextVar[str] = contextvars.ContextVar(
     "caller_value", default="unset"
 )
+
+# Set by a view, read by the after-middleware and the body of its request.
+view_value: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "view_value", default="unset"
+)
+
+
+class ViewValueMiddleware(HttpMiddleware):
+    """Puts what the view set in a header, as after-middleware sees it."""
+
+    def after_response(self, request: Request, response: Response) -> Response:
+        response.headers["X-View-Value"] = view_value.get()
+        return response
+
+
+def _view_value_stream() -> StreamingResponse:
+    def chunks():
+        yield view_value.get().encode()
+
+    return StreamingResponse(chunks(), content_type="text/plain")
+
+
+class SetsViewValueView(View):
+    def get(self):
+        view_value.set("set by the view")
+        return _view_value_stream()
+
+
+class AsyncSetsViewValueView(View):
+    async def get(self) -> Response:  # ty: ignore[invalid-method-override]
+        view_value.set("set by the async view")
+        return _view_value_stream()
 
 
 class NoContentWithLengthView(View):
@@ -78,4 +116,10 @@ class InProcessRouter(Router):
         path("async", AsyncView, name="async"),
         path("async-raises", AsyncRaisingView, name="async_raises"),
         path("async-stream", AsyncStreamView, name="async_stream"),
+        path("sets-view-value", SetsViewValueView, name="sets_view_value"),
+        path(
+            "async-sets-view-value",
+            AsyncSetsViewValueView,
+            name="async_sets_view_value",
+        ),
     )

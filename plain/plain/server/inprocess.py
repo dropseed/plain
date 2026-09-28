@@ -150,6 +150,7 @@ class InProcessServer:
 
     def __init__(self) -> None:
         self._handler = BaseHandler()
+        self._middleware_loaded = False
 
     def handle(self, request: Request) -> HandledRequest:
         """Run `request` through middleware and the view.
@@ -157,4 +158,9 @@ class InProcessServer:
         An exception the app raises becomes its error response, as it does
         under a server, with the exception on `response.exception`.
         """
+        if not self._middleware_loaded:
+            # Not in `__init__`: a server can be created before settings
+            # are final (a test's client, before its `override_settings`).
+            self._handler.load_middleware()
+            self._middleware_loaded = True
         return HandledRequest(self._handler.handle_in_process(request))

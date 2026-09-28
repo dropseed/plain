@@ -319,56 +319,63 @@ class BaseHandler:
         response as a `ResponseLifecycle`, not yet read or closed. The
         caller reads it with `read()`, or runs a websocket from it.
 
+        As in `handle()`, one context is built for the request and every
+        phase runs in it: before-middleware and the view, an async view's
+        coroutine, after-middleware, and then the body the
+        `ResponseLifecycle` sends. What one phase sets, the next sees.
+
         `handle()` needs an event loop and a thread pool, and the caller
         here has neither — it is a test, or a command, on an ordinary
         thread. So three things differ, and nothing else:
 
-        - The pipeline runs on the calling thread, in the caller's own
-          context rather than a fresh one. What the caller set up (a
-          test's database transaction) is what the view sees. The context
-          the body is read in is a copy taken after the pipeline, with the
-          request span current, so the body sees the same and its queries
-          land in the request's trace.
-        - An async view is awaited on an event loop of its own. A sync
-          view uses no loop at all, which is what lets an async caller
-          (where `asyncio.run()` would raise) make a request to a sync
-          view.
+        - The request's context starts as a copy of the caller's rather
+          than empty. What the caller set up (a test's database
+          transaction) is what the view sees. What the request sets stays
+          in the request, as it does under a server.
+        - Each phase runs on the calling thread rather than in the
+          executor, and an async view is awaited on an event loop of its
+          own. A sync view uses no loop at all, which is what lets an
+          async caller (where a second loop can't run) make a request to
+          a sync view.
         - There is no executor. The `ResponseLifecycle` runs a sync body
           on the thread that reads it.
-
-        Middleware loads at the first request rather than up front, so
-        the handler can be created before settings are final.
         """
-        if self._middleware_chain is None:
-            self.load_middleware()
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before handle_in_process()"
+        )
 
         span = self._start_request_span(request)
         started = time.perf_counter()
-        token = context.attach(trace.set_span_in_context(span))
+        request_ctx = contextvars.copy_context()
+        # Make the SERVER span current inside `request_ctx`, as `handle()`
+        # does, so every phase and the body nest under it.
+        request_ctx.run(context.attach, trace.set_span_in_context(span))
+
         try:
-            result = self._run_sync_pipeline(request)
+            result = request_ctx.run(self._run_sync_pipeline, request)
 
             if isinstance(result, _AsyncViewPending):
-                response = asyncio.run(
-                    self._await_async_view(request, result, result.coroutine)
+                # Drive the coroutine in request_ctx so any ContextVars the
+                # view sets are visible to after_response below.
+                with asyncio.Runner() as runner:
+                    response = runner.run(
+                        self._await_async_view(request, result, result.coroutine),
+                        context=request_ctx,
+                    )
+
+                response = request_ctx.run(
+                    self._finish_pipeline, request, response, result.ran_before
                 )
-                # After-middleware runs on the calling thread, where
-                # before-middleware ran.
-                response = self._finish_pipeline(request, response, result.ran_before)
             else:
                 response = result
-
-            request_context = contextvars.copy_context()
         except BaseException as exc:
             self._fail_request_span(span, exc)
             raise
-        finally:
-            context.detach(token)
 
         return self._response_lifecycle(
             response,
             request=request,
-            request_context=request_context,
+            request_context=request_ctx,
             span=span,
             started=started,
             executor=None,

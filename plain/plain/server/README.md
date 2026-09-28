@@ -242,7 +242,7 @@ Handling is two steps, as it is in the server. `handle()` runs the request throu
 
 An exception in a view or a middleware becomes the app's error response, as it does under a server, and is kept on `response.exception`.
 
-The request runs in the caller's context. A value the caller set in a `ContextVar`, like an open database transaction, is what the view and the response body see.
+A request has a context of its own, as it does under a server, and every part of it runs there: middleware, the view, and the response body. That context starts as a copy of the caller's, so a value the caller set in a `ContextVar`, like an open database transaction, is what the request sees. What the request sets stays in the request.
 
 A server loads the app's middleware at its first request and keeps it. Create a new `InProcessServer` to pick up a changed `MIDDLEWARE` setting.
 

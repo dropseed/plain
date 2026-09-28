@@ -6,10 +6,10 @@ import socket
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from inprocess_routers import caller_value
+from inprocess_routers import caller_value, view_value
 from plain.http import Request, Response
 from plain.server.inprocess import HandledRequest, InProcessServer, SentResponse
-from plain.test import override_settings, raises
+from plain.test import case, cases, override_settings, raises
 from plain.urls.resolvers import _get_cached_resolver
 
 
@@ -147,6 +147,30 @@ def test_the_body_runs_in_the_callers_context():
     # Read after the caller's value is gone: the body runs in the context
     # the pipeline ran in, not the one `send()` is called from.
     assert handled.send().body == b"set by the caller"
+
+
+@cases(
+    case("/sets-view-value", b"set by the view", id="sync view"),
+    case("/async-sets-view-value", b"set by the async view", id="async view"),
+)
+def test_what_the_view_sets_is_seen_by_the_rest_of_its_request(path, expected):
+    # One context for the whole request, as under a server: after-middleware
+    # and the body both run after the view, and both see what it set.
+    with (
+        in_process_router(),
+        override_settings(MIDDLEWARE=["inprocess_routers.ViewValueMiddleware"]),
+    ):
+        sent = InProcessServer().handle(get(path)).send()
+
+    assert sent.response.headers["X-View-Value"] == expected.decode()
+    assert sent.body == expected
+
+
+def test_what_the_view_sets_stays_in_its_request():
+    with in_process_router():
+        InProcessServer().handle(get("/sets-view-value")).send()
+
+    assert view_value.get() == "unset"
 
 
 def test_a_sync_view_can_be_requested_from_inside_an_event_loop():
