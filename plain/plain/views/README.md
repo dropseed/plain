@@ -273,7 +273,7 @@ Session cookies ride along on a websocket handshake the same way they do on a PO
 
 The ORM is synchronous, so a query inside `websocket()` blocks the event loop for every connection on that worker. Move it to a thread with `await asyncio.to_thread(fn)`, which copies the request context — `loop.run_in_executor(None, fn)` does not, and a query run without it escapes the per-request connection handling entirely.
 
-**Testing** uses `Client().websocket()`, which runs the handshake through the same pipeline as any test-client request and then drives the view's coroutine in-process — see [WebSockets in the test docs](../test/README.md#websockets).
+**Testing** uses `Client().websocket()`, which runs the handshake through the same pipeline as any test-client request and then drives the view's coroutine in-process — see [WebSockets in the test docs](../../../plain-test/plain/test/README.md#websockets).
 
 ## Lifecycle hooks
 

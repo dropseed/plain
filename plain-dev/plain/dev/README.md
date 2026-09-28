@@ -128,7 +128,7 @@ $ plain request /admin/ --user 1
 
 You can set the method and body (`--method`, `--data`, `--header`, `--content-type`), make it a user's request by id or email (`--user`, which needs [plain.auth](../../../plain-auth/plain/auth/README.md)), and assert on the result (`--status`, `--contains`, `--not-contains`) so it works as a quick check in a script. Redirects are followed unless you pass `--no-follow`.
 
-It makes its requests with the same [client](../../../plain/plain/test/README.md) your tests use. What's different is the database: this is your dev database, so what a `POST` writes stays written. The command only runs when `DEBUG` is on.
+It makes its requests with the same [client](../../../plain-test/plain/test/README.md) your tests use. What's different is the database: this is your dev database, so what a `POST` writes stays written. The command only runs when `DEBUG` is on.
 
 Every response also prints a **trace**: duration, span and query counts, and each distinct statement with how many times it ran and the call sites that issued it, which is usually where an N+1 turns out to live. It reports what ran and leaves the diagnosis to you. A followed redirect chain is several requests, so it prints one block per hop rather than one merged summary.
 

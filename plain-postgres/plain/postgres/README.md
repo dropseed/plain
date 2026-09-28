@@ -2369,7 +2369,7 @@ Two things happen around your tests:
 - **A test database for the run.** When the run starts, a database named `test_<your database>` is created on the same server, then migrated and converged. It's dropped when the run ends. One left over from an interrupted run is replaced.
 - **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
 
-The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
+The package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
 
 ### Tests that can't run in a transaction
 
@@ -2424,7 +2424,7 @@ def test_lookup_is_one_query():
     assert "'a@example.com'" in queries[0].sql_with_params
 ```
 
-`queries` is a [capture](../../../plain/plain/test/README.md#capturing-what-happened) like the ones `plain.test` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
+`queries` is a [capture](../../../plain-test/plain/test/README.md#capturing-what-happened) like the ones `plain.test` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
 
 | Attribute         | The SQL you get                           | Looks like                 |
 | ----------------- | ----------------------------------------- | -------------------------- |

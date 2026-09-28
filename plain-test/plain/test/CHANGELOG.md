@@ -1,12 +1,13 @@
-# plain-testing changelog
+# plain-test changelog
 
-## [0.1.0](https://github.com/dropseed/plain/releases/plain-testing@0.1.0) (unreleased)
+## [0.1.0](https://github.com/dropseed/plain/releases/plain-test@0.1.0) (unreleased)
 
 ### What's changed
 
+- `plain.test` is this package now, a dev dependency, and no longer part of Plain itself. It holds what a test file imports (`Client`, `raises`, `@cases`, the captures) and the runner behind `plain test`. `from plain.test import ...` reads the same as before.
 - Initial working engine: collection (`test_*` functions, `Test*` classes, async tests), assertion rewriting for bare `assert` with left/right values on failure, `@cases` expansion, `@skip`, `@tag` selection (`--tag`/`--exclude-tag`), `-k`/`-x`/`-v`, and failure output ending in a re-run command.
 - `plain test` CLI, contributed through the `plain.cli` entry point group so it is available without `plain.runtime.setup()` (and therefore outside an app). Because nothing has set the runtime up by the time it runs, the runner makes the app-vs-library decision itself. `.env.test` loads via plain.dev's ladder when installed, with a minimal fallback otherwise.
-- Test lifecycle extension point: packages register a `TestLifecycle` under the `plain.testing` entry point group. plain.postgres provides the automatic test database with per-test rolled-back transactions and `@isolated_db`; plain.email routes to the locmem backend and clears the outbox per test.
+- Test lifecycle extension point: packages register a `TestLifecycle` under the `plain.test` entry point group. plain.postgres provides the automatic test database with per-test rolled-back transactions and `@isolated_db`; plain.email routes to the locmem backend and clears the outbox per test.
 - A project declares its own lifecycle in `tests/lifecycle.py`: one `TestLifecycle` subclass, found by its path, entered after the packages' lifecycles so it wraps closest to the test. A file that is there but doesn't hold exactly one usable lifecycle stops the run before any test.
 - Tests that can't run as written are rejected at collection, all of a file's at once: a test with parameters nothing passes in (there are no fixtures), a case with the wrong number of values, a second `@cases` on one test, a bare `@skip` or `@tag`.
 - A `conftest.py` anywhere under the tests is a collection error that lists the fixtures it defines and says where each kind goes.
@@ -15,7 +16,7 @@
 - `plain test --help` lists the flags and the forms a target takes.
 - The re-run command a failure prints is quoted for the shell, so a case id with spaces, brackets or `$` can be pasted.
 - A failed assertion shows the expression as the test wrote it. It was regenerated from the syntax tree, which dropped parentheses.
-- `CollectedTest`, what a lifecycle's `around_test(test)` receives, is in `plain.test`. Nothing in `plain.testing` is an importable API.
+- `CollectedTest`, what a lifecycle's `around_test(test)` receives, is in `plain.test`. Nothing in `plain.test.runner` is an importable API.
 - `capture_spans`, `capture_metrics`, `capture_logs` and `plain.postgres.test.capture_queries` hand back one shape: a read-only sequence of what was captured, read after the block ends. Reading one inside its block raises. `spans.filter(name=, kind=)`, `metrics.number_points()` / `metrics.histogram_points()`, `logs.messages` and `queries.sql_statements()` are the finders. Captures can be nested.
 - `capture_queries` records the statement as it was sent (`query.sql`) beside the one with its values filled in (`query.sql_with_params`), and sees queries that run with tracing suppressed.
 - `skip_test(reason)` skips from inside a running test. Skipped tests are listed with their reasons and counted in the summary.
@@ -25,7 +26,8 @@
 
 Replace the dev dependency and move the tests off pytest. Assertions don't change. What changes is how a test gets what it needs.
 
-- In `pyproject.toml`, replace `plain.pytest` (and `pytest`, `pytest-*` plugins) with `plain.testing`. Delete any `[tool.pytest.ini_options]` section and `pytest.ini`.
+- In `pyproject.toml`, replace `plain.pytest` (and `pytest`, `pytest-*` plugins) with `plain.test` in your dev dependencies. Delete any `[tool.pytest.ini_options]` section and `pytest.ini`.
+- `plain.test` used to come with Plain, so a project could import it with nothing installed. It doesn't any more. If anything outside your tests imports `plain.test`, add `plain.test` wherever that code's dependencies are declared.
 - Run `plain test`. A half-migrated suite says what is left: each `conftest.py` is reported with the fixtures it defines, and a test that still asks for a fixture is rejected when its file is collected, with the test and its parameters named.
 - Move what each `conftest.py` holds, then delete the file. Fixtures tests ask for become functions in a helper module such as `tests/helpers.py`. Autouse fixtures that protected every test become `tests/lifecycle.py`.
 - Import helper modules by their bare names: `from helpers import create_user`, not `from tests.helpers import ...` or `from .helpers import ...`.
@@ -129,6 +131,6 @@ Plugins with no replacement yet:
 - `pytest-timeout`: no equivalent.
 - `pytest-playwright` and the `testbrowser` fixture: no equivalent. Browser tests can't be migrated yet.
 - `pytest-mock`: use `unittest.mock` directly, or `patch` from `plain.test`.
-- `pytest-cov`: `coverage run -m plain.testing`, then `coverage report`.
+- `pytest-cov`: `coverage run -m plain.test`, then `coverage report`.
 - `freezegun`, `time-machine`, `hypothesis`: these are libraries, not plugins. They keep working.
 - Editor test explorers speak pytest's protocol and won't find these tests.
