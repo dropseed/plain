@@ -57,14 +57,16 @@ def main(
     Quote a target that names a case. A failure prints the command that
     runs it again, already quoted.
     """
-    # Tests run with PLAIN_ENV=test so the dotenv ladder picks `.env.test*`
-    # and skips `.env.local` for determinism.
+    # Tests run with PLAIN_ENV=test. The runner reads no `.env` files itself:
+    # plain.dev does, for every command, from the hook it registers with
+    # `plain.runtime.setup()`. With this set first, that hook picks
+    # `.env.test*` and skips `.env.local`, so a run doesn't depend on what
+    # one machine has in it.
     os.environ.setdefault("PLAIN_ENV", "test")
     # Marks the process as a test run for code that behaves differently under
     # one — CLI color, for instance, which would otherwise add escape codes to
     # output a test is asserting on.
     os.environ["PLAIN_TEST_RUNNING"] = "1"
-    _load_dotenv()
 
     import plain.runtime
 
@@ -147,28 +149,3 @@ def main(
     reporter.summary(run, collection_error_count=len(collection_errors))
 
     sys.exit(0 if run.ok and not collection_errors else 1)
-
-
-def _load_dotenv() -> None:
-    """
-    Load `.env.test*` files. Prefer plain.dev's loader (the full precedence
-    ladder); fall back to a minimal `.env.test` parse so tests behave the
-    same in environments without plain.dev installed.
-    """
-    try:
-        from plain.dev.dotenv import load_dotenv_files
-    except ModuleNotFoundError:
-        _load_dotenv_file(Path.cwd() / ".env.test")
-    else:
-        load_dotenv_files()
-
-
-def _load_dotenv_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip("'\""))

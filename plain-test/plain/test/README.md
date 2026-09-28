@@ -601,7 +601,7 @@ Targets, `-k` and the tag flags combine: a test runs when it's inside a target a
 
 ### Environment
 
-`plain test` sets `PLAIN_ENV=test` unless you've set it yourself, then loads `.env.test`. With [plain.dev](../../../plain-dev/plain/dev/README.md#env-files) installed you get its whole ladder of `.env` files, where `.env.local` is left out under `PLAIN_ENV=test` so personal credentials don't reach the suite.
+`plain test` sets `PLAIN_ENV=test` unless you've set it yourself. It reads no `.env` files of its own. [plain.dev](../../../plain-dev/plain/dev/README.md#env-files) loads them, as it does for every command, and under `PLAIN_ENV=test` that means `.env.test` and `.env`, with `.env.local` left out so personal credentials don't reach the suite. Without plain.dev installed, no `.env` file is loaded.
 
 It also sets `PLAIN_TEST_RUNNING=1`. Plain's own command output reads that to leave out color codes, so a test asserting on the output of a command sees plain text.
 
@@ -923,6 +923,7 @@ A project declares its own lifecycle in `tests/lifecycle.py`, with nothing to re
 - [`tests/lifecycle.py`](#project-lifecycle) is still loaded.
 - Packages' protection is not. There's no test database and no outbox.
 - `Client` and `override_settings` need an app, and fail without one.
+- `.env.test` is loaded if plain.dev is installed, and not otherwise.
 
 There's nothing to configure. Whether there's an app is decided the way every `plain` command decides it.
 
@@ -1034,4 +1035,4 @@ Then run your tests:
 plain test
 ```
 
-There's no configuration file. `.env.test` is loaded, installed packages add their protection, and `tests/lifecycle.py` adds yours.
+There's no configuration file. plain.dev loads `.env.test`, installed packages add their protection, and `tests/lifecycle.py` adds yours.

@@ -179,6 +179,24 @@ def test_a_bare_skip_says_which_line():
     assert "Traceback" not in result.output
 
 
+def test_the_runner_reads_no_env_files_itself():
+    # plain.dev loads `.env.test` for every command, from its setup hook.
+    # This suite runs without plain.dev installed, so nothing loads it.
+    result = run_in_project(
+        {
+            ".env.test": "RUNNER_DOTENV_PROBE=loaded\n",
+            "tests/test_env.py": (
+                "import os\n"
+                "\n"
+                "def test_env():\n"
+                "    assert os.environ['PLAIN_ENV'] == 'test'\n"
+                "    assert 'RUNNER_DOTENV_PROBE' not in os.environ\n"
+            ),
+        }
+    )
+    assert result.exit_code == 0, result.output
+
+
 def test_a_test_that_asks_for_fixtures_is_told_what_to_do():
     result = run_in_project(
         {
