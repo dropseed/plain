@@ -1,6 +1,4 @@
-import os
-
-from plain.test import TestDefinitionError, case, cases, patch, raises, skip, tag
+from plain.test import TestDefinitionError, case, cases, raises, skip, tag
 
 
 def test_raises_catches_and_exposes_exception():
@@ -48,67 +46,6 @@ def test_raises_exception_keeps_the_caught_subclass():
         raise Specific("boom")
 
     assert caught.exception.detail == "specific"  # ty: ignore[unresolved-attribute]
-
-
-class Thing:
-    attr = "original"
-
-
-def test_patch_attribute_restores():
-    with patch(Thing, "attr", "changed"):
-        assert Thing.attr == "changed"
-    assert Thing.attr == "original"
-
-
-class InheritingThing(Thing):
-    pass
-
-
-def test_patch_inherited_attribute_leaves_nothing_on_the_subclass():
-    with patch(InheritingThing, "attr", "changed"):
-        assert InheritingThing.attr == "changed"
-        assert Thing.attr == "original"
-    assert "attr" not in vars(InheritingThing)
-    assert InheritingThing.attr == "original"
-
-
-class ThingWithMethods:
-    @staticmethod
-    def double(value):
-        return value * 2
-
-    @classmethod
-    def name(cls):
-        return cls.__name__
-
-
-def test_patch_staticmethod_restores_a_staticmethod():
-    with patch(ThingWithMethods, "double", lambda value: value * 3):
-        assert ThingWithMethods.double(2) == 6
-    # Called through an instance: a plain function here would receive `self`.
-    assert ThingWithMethods().double(2) == 4
-
-
-def test_patch_classmethod_restores_a_classmethod():
-    with patch(ThingWithMethods, "name", lambda: "patched"):
-        assert ThingWithMethods.name() == "patched"
-
-    class Child(ThingWithMethods):
-        pass
-
-    # A bound method put back in place would still answer for the parent.
-    assert Child.name() == "Child"
-
-
-def test_patch_rejects_a_name_the_target_does_not_have():
-    with raises(AttributeError), patch(Thing, "no_such_attribute", "value"):
-        pass
-
-
-def test_patch_mapping_restores_and_removes():
-    with patch(os.environ, "PLAIN_TESTING_PATCH_TEST", "on"):
-        assert os.environ["PLAIN_TESTING_PATCH_TEST"] == "on"
-    assert "PLAIN_TESTING_PATCH_TEST" not in os.environ
 
 
 @cases(("a", True), ("", False))

@@ -354,7 +354,11 @@ def test_external_call():
 - [`override_settings`](./overrides.py#override_settings) — set Plain settings for the block, restored on exit
 - [`patch`](./overrides.py#patch) — replace an attribute (or a mapping key, e.g. `os.environ`) for the block
 
-`patch` takes the object and the attribute name, not a dotted string. On exit a class gets back exactly what it held: a `staticmethod` is still one, and an attribute the class only inherited is inherited again.
+`patch` takes the object and the attribute name, not a dotted string. On exit the target holds what it held before, which isn't always what reading the attribute finds:
+
+- A class or an instance that only inherited the attribute inherits it again. Nothing is left behind on it.
+- A class gets back the `staticmethod` or `classmethod` it held, not the function that reading it returns.
+- A property, a slot, a setting on `plain.runtime.settings` and a key of a mapping get back the value they had.
 
 ## Capturing what happened
 
