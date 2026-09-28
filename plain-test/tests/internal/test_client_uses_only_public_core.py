@@ -14,7 +14,8 @@ import plain.test
 
 def plain_test_modules() -> list[Path]:
     (package_directory,) = plain.test.__path__
-    modules = sorted(Path(package_directory).glob("*.py"))
+    # Recursive, so the runner's modules are held to the same rule.
+    modules = sorted(Path(package_directory).rglob("*.py"))
     assert modules
     return modules
 

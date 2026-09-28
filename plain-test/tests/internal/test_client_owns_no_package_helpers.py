@@ -1,6 +1,6 @@
 """Auth and sessions are separate packages, and their test helpers ship with
-them: `plain.auth.test`, `plain.sessions.test`. Core's test package imports
-neither, and its client carries no method that would need to."""
+them: `plain.auth.test`, `plain.sessions.test`. `plain.test` imports neither,
+and its client carries no method that would need to."""
 
 import ast
 from pathlib import Path
@@ -22,7 +22,7 @@ def imported_module_names(source: str) -> list[str]:
 
 def test_plain_test_imports_no_optional_package() -> None:
     (package_directory,) = plain.test.__path__
-    modules = sorted(Path(package_directory).glob("*.py"))
+    modules = sorted(Path(package_directory).rglob("*.py"))
     assert modules
 
     for module in modules:
