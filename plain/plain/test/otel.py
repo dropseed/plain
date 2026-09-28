@@ -9,8 +9,6 @@ The OpenTelemetry SDK imports are deferred into the install helpers so that
 importing `plain.test` (e.g. for `Client`) doesn't pay the SDK import cost.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any

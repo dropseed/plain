@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 from functools import cached_property
 from io import UnsupportedOperation
@@ -43,7 +41,7 @@ class File(FileProxyMixin):
         if hasattr(self.file, "name"):
             try:
                 return os.path.getsize(self.file.name)
-            except (OSError, TypeError):
+            except OSError, TypeError:
                 pass
         if hasattr(self.file, "tell") and hasattr(self.file, "seek"):
             pos = self.file.tell()
@@ -61,7 +59,7 @@ class File(FileProxyMixin):
         chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
         try:
             self.seek(0)
-        except (AttributeError, UnsupportedOperation):
+        except AttributeError, UnsupportedOperation:
             pass
 
         while True:

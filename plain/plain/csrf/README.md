@@ -75,6 +75,8 @@ Each origin should be a full URL with scheme (e.g., `https://example.com`). Incl
 
 **Warning**: Trusted origins bypass all CSRF protection. Only add origins you completely control or trust, as they can make requests that appear to come from your users.
 
+The same decision guards WebSocket upgrades: a cross-origin handshake to a view with a `websocket()` handler is refused with a 403, and `CSRF_TRUSTED_ORIGINS` is how to allow one (`CSRF_EXEMPT_PATHS` does not apply to upgrades). See [WebSockets in the views docs](../views/README.md#websockets).
+
 ## FAQs
 
 #### Why does Plain use Sec-Fetch-Site instead of CSRF tokens?

@@ -7,8 +7,6 @@ loggers you name (by default the whole `plain` and `app` trees) and takes them
 down again on exit.
 """
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Generator, Iterator, Sequence
 from contextlib import contextmanager

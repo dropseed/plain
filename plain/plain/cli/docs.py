@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import importlib.machinery
 import importlib.util
 import re
@@ -78,7 +76,7 @@ def _is_installed(module: str) -> bool:
     """Check if a dotted module name is installed."""
     try:
         return importlib.util.find_spec(module) is not None
-    except (ModuleNotFoundError, ValueError):
+    except ModuleNotFoundError, ValueError:
         return False
 
 

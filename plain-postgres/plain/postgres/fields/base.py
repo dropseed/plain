@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import collections.abc
 import copy
 import enum
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -16,7 +14,8 @@ from typing import (
 from plain.postgres.constants import LOOKUP_SEP
 from plain.postgres.dialect import quote_name
 from plain.postgres.enums import ChoicesMeta
-from plain.postgres.query_utils import RegisterLookupMixin
+from plain.postgres.query_utils import Q, RegisterLookupMixin
+from plain.postgres.selectable import Selectable
 from plain.preflight import PreflightResult
 from plain.utils.datastructures import DictWrapper
 from plain.utils.functional import Promise
@@ -29,13 +28,9 @@ from ..registry import models_registry
 if TYPE_CHECKING:
     from plain.postgres.base import Model
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.expressions import Col, Func
+    from plain.postgres.expressions import Col, Combinable, Func
     from plain.postgres.fields.reverse_related import ForeignObjectRel
     from plain.postgres.sql.compiler import SQLCompiler
-
-
-class Empty:
-    pass
 
 
 class NOT_PROVIDED:
@@ -91,13 +86,24 @@ def _load_field(
 #                except for ForeignKeys, where the "_id" suffix is appended.
 
 
-def _empty(of_cls: type) -> Empty:
-    new = Empty()
-    new.__class__ = of_cls
-    return new
+def _empty(of_cls: type) -> Any:
+    """Build an initialized-but-unpopulated instance of `of_cls`.
+
+    Module-level (not a lambda or a method) because `__reduce__` names it as
+    the pickle reconstructor.
+    """
+    return object.__new__(of_cls)
 
 
-class Field[T](RegisterLookupMixin):
+# Ordering conditions: the ones a None operand is meaningless for.
+_ORDERING_SUFFIXES = frozenset({"gt", "gte", "lt", "lte"})
+
+# The two lookups `.is_in()` can build: `any_of` for a collection of values,
+# `in` for a queryset. Both take a collection, so both need the string guard.
+_IS_IN_SUFFIXES = frozenset({"in", "any_of"})
+
+
+class Field[T](Selectable[T], RegisterLookupMixin):
     """Base class for all field types"""
 
     # SQL type for this field (e.g. "text", "integer", "boolean").
@@ -143,6 +149,8 @@ class Field[T](RegisterLookupMixin):
         Return "package_label.model_label.field_name" for fields attached to
         models.
         """
+        if self.is_lookup_reference:
+            return f"{self.name} (lookup reference)"
         if not hasattr(self, "model"):
             return super().__str__()
         model = self.model
@@ -152,9 +160,271 @@ class Field[T](RegisterLookupMixin):
         """Display the module, class, and name of the field."""
         path = f"{self.__class__.__module__}.{self.__class__.__qualname__}"
         name = getattr(self, "name", "")
+        if self.is_lookup_reference:
+            return f"<{path} lookup reference: {name}>"
         if name:
             return f"<{path}: {name}>"
         return f"<{path}>"
+
+    # Typed query conditions. Available on every field; subclasses extend
+    # with type-specific lookups (comparison on numeric, string ops on text).
+    # The names are listed once in CONDITION_METHODS below -- anything that
+    # needs the set (traversal advice, tests) imports it rather than retyping.
+    # The comparisons take a value, another column of the same value type, or
+    # an expression. `Field[T]` is what makes `retry_attempt.lt(retries)` the
+    # typed spelling of `filter(retry_attempt__lt=F("retries"))` -- and, being
+    # parameterized by the same `T`, it rejects a column of another type.
+    #
+    # `Field[T | None]` is the second arm because `Field` is invariant in `T`,
+    # so a nullable column is a different type to the checker and a non-null
+    # one wouldn't otherwise accept it. Only that direction is expressible:
+    # from a nullable left there is no way to name `T` without its `None`, so
+    # `note.equals(name)` is rejected while `name.equals(note)` is accepted.
+    #
+    # `Combinable` is deliberately unconstrained: an expression's output type
+    # isn't tracked, so `priority.lt(F("name"))` type-checks. `F()` is the
+    # untyped escape hatch here exactly as it is in `filter()`, and narrowing
+    # it would mean typing expressions first.
+    def equals(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return self._build_q("equals", "", value)
+
+    def not_equal(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return ~self._build_q("not_equal", "", value)
+
+    def gt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return self._build_q("gt", "gt", value)
+
+    def gte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return self._build_q("gte", "gte", value)
+
+    def lt(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return self._build_q("lt", "lt", value)
+
+    def lte(self, value: T | Field[T] | Field[T | None] | Combinable) -> Q:
+        return self._build_q("lte", "lte", value)
+
+    def is_null(self, value: bool = True) -> Q:
+        return self._build_q("is_null", "isnull", value)
+
+    def is_in(self, values: Iterable[T]) -> Q:
+        """Match rows whose value is one of `values`.
+
+        A plain collection binds as a single array parameter --
+        `"col" = ANY(%s::text[])` -- so the statement has the same shape for
+        any number of values, an empty list included. A queryset stays a
+        subquery: `"col" IN (SELECT ...)`.
+
+        A None in the collection raises `ValueError`: NULL is not a value a
+        comparison can match, so it belongs in `is_null()`, not here.
+        """
+        from plain.postgres.query import QuerySet
+        from plain.postgres.sql.query import Query
+
+        if isinstance(values, QuerySet | Query):
+            return self._build_q("is_in", "in", values)
+        return self._build_q("is_in", "any_of", values)
+
+    # Pattern conditions. They live on Field, like every other condition, so
+    # they survive the `Field[T]` annotation models carry -- a field's declared
+    # type is `Field[str]`, not `TextField[str]`, so the checker only ever sees
+    # what `Field` offers. The `self` annotation is the restriction: a
+    # `Field[int]` rejects `.startswith(...)` statically, and `_build_q`
+    # rejects it at runtime for anything that doesn't register the lookup.
+    #
+    # (`JSONField` does register a jsonb `contains`, so `Field[dict].contains`
+    # is rejected by the `self` type rather than at runtime -- the same
+    # type-first guard the encrypted fields use.)
+    def contains(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("contains", "contains", value)
+
+    def icontains(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("icontains", "icontains", value)
+
+    def startswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("startswith", "startswith", value)
+
+    def endswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("endswith", "endswith", value)
+
+    # The case-insensitive halves. `iequals` is named for the condition it is
+    # (`equals`, ignoring case) rather than for the `iexact` lookup it builds --
+    # there is no `exact` condition method for it to pair with.
+    def iequals(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iequals", "iexact", value)
+
+    def istartswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("istartswith", "istartswith", value)
+
+    def iendswith(self: Field[str] | Field[str | None], value: str) -> Q:
+        return self._build_q("iendswith", "iendswith", value)
+
+    def _build_q(self, method: str, suffix: str, value: Any) -> Q:
+        """Build a Q from a lookup suffix + value. Uses Q's positional-tuple
+        constructor to bypass its reserved `_connector`/`_negated` kwargs that
+        confuse the type checker on `**{name: value}` expansion.
+
+        `method` is the condition method's own name, used only for error
+        messages -- it's what the caller wrote, so it's what an error should
+        name.
+        """
+        assert self.name, (
+            "Field name must be set before building a query condition; "
+            "the field must be attached to a model."
+        )
+        if value is None and suffix in _ORDERING_SUFFIXES:
+            # On a nullable field `T` includes None, so `age.gte(None)` gets
+            # past the type checker -- there is no way to subtract None from a
+            # TypeVar, so `self: Field[X | None], value: X` still solves X as
+            # `int | None` under both ty and pyright. Refuse here instead, at
+            # the call site, rather than letting it reach the compiler as a
+            # "Cannot use None as a query value" ValueError with no field in it.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r}: .{method}() has no "
+                f"meaning for None -- a SQL comparison against NULL is never "
+                f"true. Use .is_null() instead."
+            )
+        if suffix in _IS_IN_SUFFIXES and isinstance(value, str | bytes):
+            # `Iterable[T]` is satisfied by `str` when T is `str`, and `str` is
+            # a `Sequence[str]`, so there is no way to exclude it statically.
+            # Left alone it iterates characters and silently matches the wrong
+            # rows.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r}: .is_in() takes a "
+                f"collection of values, not a single {type(value).__name__}. "
+                f"Pass a list -- .is_in([{value!r}])."
+            )
+        if suffix == "any_of":
+            # Materialise once, here. A set or a generator is handed straight
+            # to `Q`, which is copied, hashed and repr'd on its way to the
+            # compiler -- a generator would be exhausted by the first of those
+            # and bind an empty array.
+            value = list(value)
+            if any(item is None for item in value):
+                # Neither of the two things a None could mean is honest.
+                # Matching it means comparing against NULL, which is never
+                # true; dropping it silently changes what the caller asked
+                # for, and the negation is worse -- `NOT (col = ANY(ARRAY[1,
+                # NULL]))` is unknown for every row, so `~is_in([1, None])`
+                # would match nothing at all. Say so instead.
+                raise ValueError(
+                    f"{type(self).__name__} {self.name!r}: .is_in() does not "
+                    f"accept None -- a SQL comparison against NULL is never "
+                    f"true, so a None in the list matches nothing and, "
+                    f"negated, excludes every row. Use .is_null() instead, or "
+                    f"combine the two for both: "
+                    f"field.is_in([...]) | field.is_null()."
+                )
+        if suffix and not self.get_lookup(suffix):
+            # The type checker rejects most of these already (a `Field[int]`
+            # has no `.startswith`); this catches what it can't see.
+            raise TypeError(
+                f"{type(self).__name__} {self.name!r} does not support "
+                f".{method}() -- no {suffix!r} lookup is registered for it."
+            )
+        other_column = value if isinstance(value, Field) else None
+        if other_column is not None:
+            # Comparing against another column. Everything above guards the
+            # left-hand field; the right-hand one gets its own say here.
+            other_column.check_usable_as_comparison_column(method)
+            # `F(name)` is the reference the ORM already understands, and a
+            # traversed field's `name` carries its relation prefix, so this is
+            # the whole conversion.
+            from plain.postgres.expressions import F
+
+            value = F(other_column.name)
+        name = f"{self.name}{LOOKUP_SEP}{suffix}" if suffix else self.name
+        q = Q((name, value))
+        # Which model's where() this condition belongs to, and the field that
+        # built it. See `Q._condition_origins`. A column comparison records
+        # both sides, so a right-hand column from another model is caught the
+        # same way a left-hand one is.
+        origins = set()
+        if source := self.source_model:
+            origins.add((source, self.name))
+        if other_column is not None and (source := other_column.source_model):
+            origins.add((source, other_column.name))
+        if origins:
+            q._condition_origins = frozenset(origins)
+        return q
+
+    def check_usable_as_comparison_column(self, method: str) -> None:
+        """Hook for a field used as the *right-hand* column of a comparison.
+
+        A no-op for an ordinary column. `EncryptedField` overrides it to
+        refuse: its own block lives in `_build_q`, which only ever runs on the
+        field the condition was built *from*, and the type checker can't help
+        either -- `EncryptedField[str]` is a `Field[str]`, so it satisfies
+        `equals`'s `Field[T]` arm like any other string column.
+
+        `method` is the condition the caller wrote on the left-hand field, so
+        a refusal can name it.
+        """
+
+    def with_lookup_prefix(self, prefix: str, source_model: type[Model]) -> Self:
+        """Return a detached copy of this field whose name carries `prefix`.
+
+        This is all where() traversal needs: `Child.parent.name` hands back the
+        related model's own `name` field renamed to `parent__name`, so the
+        field's own condition methods build `Q(parent__name=...)`. Nothing has
+        to re-implement or rewrite the field's surface, which is why a
+        traversed field offers exactly what direct access offers -- including
+        an encrypted field's blocks, whose error message names the full path.
+
+        The copy is genuinely detached: it keeps only what building a Q needs
+        (its class, for the lookup registry, and its name). The attachment
+        state a real field carries is dropped, so it can't pass itself off as
+        a column on the related model -- `str()` would otherwise report
+        `examples.DeleteParent.parent__name`, and `__reduce__` would try to
+        look up an attribute that doesn't exist.
+
+        `source_model` is the model the traversal *started* from, which is the
+        one a condition built here belongs to: `Order.user.email` is a
+        condition for `Order.query.where()`, not `User.query.where()`. It is
+        kept separately from `model` precisely because `model` is dropped.
+        """
+        prefixed = copy.copy(self)
+        for attached in ("model", "column", "cached_col"):
+            prefixed.__dict__.pop(attached, None)
+        prefixed.name = f"{prefix}{LOOKUP_SEP}{self.name}"
+        prefixed.__dict__["_is_lookup_reference"] = True
+        prefixed.__dict__["_source_model"] = source_model
+        return prefixed
+
+    @property
+    def source_model(self) -> type[Model] | None:
+        """The model a condition built from this field belongs to.
+
+        For an attached field that is the model it was declared on. For a
+        traversed copy it is the root the traversal started from, not the
+        related model the column lives on. A detached field (one built for an
+        aggregate, never attached) has neither, and conditions from it go
+        unchecked.
+        """
+        if source := self.__dict__.get("_source_model"):
+            return source
+        return self.__dict__.get("model")
+
+    @property
+    def is_lookup_reference(self) -> bool:
+        """True for a field handed back by `with_lookup_prefix` -- a reference
+        to a column reached through a relation, not a column on a model."""
+        return bool(self.__dict__.get("_is_lookup_reference"))
+
+    @property
+    def lookup_path(self) -> str:
+        """The path this field is reached by in a lookup -- the part before the
+        suffix in `Q(**{f"{field.lookup_path}__icontains": value})`.
+
+        `"email"` for a column on the model, `"user__email"` for one reached by
+        traversal (`Order.user.email`), which is why generic code that has to
+        build a string lookup, an `order_by()` term or a `values()` key from a
+        field reference reads this rather than assembling a path itself.
+
+        It is the field's `name`: `with_lookup_prefix` renames a traversed copy
+        to its full path precisely so the field's own condition methods build
+        the right `Q`. This is the sanctioned spelling of that fact.
+        """
+        return self.name
 
     def preflight(self, **kwargs: Any) -> list[PreflightResult]:
         return [*self._check_field_name()]
@@ -276,12 +546,11 @@ class Field[T](RegisterLookupMixin):
         return obj
 
     def __copy__(self) -> Self:
-        # We need to avoid hitting __reduce__, so define this
-        # slightly weird copy construct.
-        obj = Empty()
-        obj.__class__ = self.__class__
+        # Build the instance directly rather than calling the constructor,
+        # which would hit __reduce__.
+        obj = object.__new__(self.__class__)
         obj.__dict__ = self.__dict__.copy()
-        return cast(Self, obj)
+        return obj
 
     def __reduce__(
         self,
@@ -393,6 +662,19 @@ class Field[T](RegisterLookupMixin):
             setattr(cls, self.name, self)
 
     # Descriptor protocol implementation
+    #
+    # The first overload is class access on a *model-valued* field -- a foreign
+    # key, nullable or not. It yields `type[T]` rather than the descriptor so
+    # the related model's own typed field surface is reachable for where()
+    # traversal (`Child.parent.name.equals(...)`), matching the traversal
+    # `ForwardForeignKeyDescriptor.__getattr__` serves at runtime. It comes
+    # first so it wins over the plain `Self` overload for FK fields; a
+    # non-model T never matches it.
+    @overload
+    def __get__[M: Model](
+        self: Field[M] | Field[M | None], instance: None, owner: type[Model]
+    ) -> type[M]: ...
+
     @overload
     def __get__(self, instance: None, owner: type[Model]) -> Self: ...
 
@@ -512,8 +794,24 @@ class Field[T](RegisterLookupMixin):
     # construction). BinaryField overrides with b"".
     _default_empty_value: Any = ""
 
+    # Set to True by validate_none_only_default for the fields that accept
+    # `default=None` without storing it (UUIDField, DateTimeField,
+    # ForeignKeyField, EncryptedJSONField).
+    _declared_default_none: bool = False
+
     def has_default(self) -> bool:
         return False
+
+    def has_declared_default(self) -> bool:
+        """Whether the declaration passed ``default=`` at the call site.
+
+        Different question from ``has_default()``, which asks whether a default
+        *value* is stored: the fields validated by ``validate_none_only_default``
+        accept ``default=None`` and store nothing. PEP 681 reads the call site,
+        so both spellings make the field optional in the synthesized
+        constructor.
+        """
+        return self.has_default() or self._declared_default_none
 
     def has_persistent_literal_default(self) -> bool:
         return False
@@ -538,6 +836,38 @@ class Field[T](RegisterLookupMixin):
     def value_from_object(self, obj: Model) -> T | None:
         """Return the value of this field in the given model instance."""
         return getattr(obj, self.name)
+
+
+# The condition methods `Field` exposes, named once. Anything that needs the
+# set rather than the methods themselves -- the relation-traversal advice in
+# related_typed.py, the tests that sweep the surface -- imports from here
+# instead of keeping its own copy in sync.
+#
+# The string conditions come paired with the lookup each one builds. Almost
+# every one is named for its lookup; `iequals` is the exception -- there is no
+# `exact` condition method for an `iexact` to pair with -- so the pairing is
+# written down rather than assumed by whatever needs it.
+STRING_CONDITION_LOOKUPS = {
+    "contains": "contains",
+    "icontains": "icontains",
+    "startswith": "startswith",
+    "endswith": "endswith",
+    "iequals": "iexact",
+    "istartswith": "istartswith",
+    "iendswith": "iendswith",
+}
+STRING_CONDITION_METHODS = tuple(STRING_CONDITION_LOOKUPS)
+CONDITION_METHODS = (
+    "equals",
+    "not_equal",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "is_null",
+    "is_in",
+    *STRING_CONDITION_METHODS,
+)
 
 
 def validate_none_only_default(
@@ -567,6 +897,10 @@ def validate_none_only_default(
         )
     if not allow_null:
         raise TypeError(f"{name}(default=None) requires allow_null=True.")
+    # Nothing stores the value, so record that the call site declared it --
+    # that's what `has_declared_default()` (and the preflight check that uses
+    # it) needs to know.
+    field._declared_default_none = True
 
 
 class ColumnField[T](Field[T]):
@@ -840,7 +1174,7 @@ class ChoicesField[T](DefaultableField[T]):
         for choices_group in self.choices:
             try:
                 group_name, group_choices = choices_group
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 # Containing non-pairs
                 break
             try:
@@ -860,7 +1194,7 @@ class ChoicesField[T](DefaultableField[T]):
                             ),
                         ]
                     )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 # No groups, choices in the form [value, display]
                 value, human_name = group_name, group_choices
                 if not self._choices_is_value(value) or not self._choices_is_value(

@@ -6,8 +6,6 @@ plain core needs: a plain `View` that raises a 500 so OTel exception
 recording can be exercised without depending on the templates package.
 """
 
-from __future__ import annotations
-
 from plain.http import NotFoundError404
 from plain.urls import Router, path
 from plain.views import View

@@ -11,8 +11,6 @@ is what makes that safe — and this test is what enforces it, rather than
 convention.
 """
 
-from __future__ import annotations
-
 import ast
 from collections import deque
 from pathlib import Path

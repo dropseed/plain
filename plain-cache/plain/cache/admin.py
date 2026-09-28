@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.admin.views import (
     AdminModelDetailView,
     AdminModelListView,

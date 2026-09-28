@@ -12,8 +12,6 @@ Use Signer for signing without expiration:
     Signer(salt="my-salt").unsign_object(token)
 """
 
-from __future__ import annotations
-
 import base64
 import datetime
 import hmac

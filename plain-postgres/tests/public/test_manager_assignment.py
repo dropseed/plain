@@ -4,8 +4,7 @@ from app.examples.models.querysets import (
     CustomSpecialQuerySetModel,
     DefaultQuerySetModel,
 )
-from plain.postgres.query import QuerySet
-from plain.test import raises
+from plain.postgres import QuerySet
 
 
 def test_model_has_default_query_queryset():
@@ -96,6 +95,7 @@ def test_query_validation():
 
 def test_instance_cannot_access_query():
     """Test that model instances don't have .query attribute (should raise AttributeError)."""
+    import pytest
 
     # Test accessing .query on class (should work)
     assert hasattr(DefaultQuerySetModel, "query")
@@ -103,7 +103,7 @@ def test_instance_cannot_access_query():
 
     # Test accessing .query on instance (should raise AttributeError)
     instance = DefaultQuerySetModel(name="test")
-    with raises(AttributeError):
+    with pytest.raises(AttributeError):
         # The descriptor's instance overload returns Never, so the checker
         # flags the access the test is asserting raises.
         _ = instance.query  # ty: ignore[invalid-attribute-access]

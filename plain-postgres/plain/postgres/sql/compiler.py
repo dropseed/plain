@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import collections
 import json
 import re
@@ -8,17 +6,18 @@ from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from plain.postgres.constants import LOOKUP_SEP
+from plain.postgres.constants import LOOKUP_SEP, OnConflict
 from plain.postgres.dialect import (
+    LOCK_MODE_SQL,
     PK_DEFAULT_VALUE,
     bulk_insert_sql,
     distinct_sql,
     explain_query_prefix,
-    for_update_sql,
     limit_offset_sql,
+    lock_sql,
     on_conflict_suffix_sql,
     quote_name,
-    return_insert_columns,
+    returning_columns,
 )
 from plain.postgres.exceptions import EmptyResultSet, FieldError, FullResultSet
 from plain.postgres.expressions import (
@@ -29,12 +28,12 @@ from plain.postgres.expressions import (
     ResolvableExpression,
     Value,
 )
-from plain.postgres.fields import DATABASE_DEFAULT
+from plain.postgres.fields import DATABASE_DEFAULT, Field
 from plain.postgres.fields.related import RelatedField
 from plain.postgres.functions import Cast, Random
 from plain.postgres.lookups import Lookup
 from plain.postgres.meta import Meta
-from plain.postgres.query_utils import select_related_descend
+from plain.postgres.query_utils import join_relation_descend
 from plain.postgres.sql.constants import (
     CURSOR,
     MULTI,
@@ -50,7 +49,12 @@ from plain.utils.regex_helper import _lazy_re_compile
 
 if TYPE_CHECKING:
     from plain.postgres.connection import DatabaseConnection
-    from plain.postgres.sql.query import AggregateQuery, InsertQuery
+    from plain.postgres.sql.query import (
+        AggregateQuery,
+        DeleteQuery,
+        InsertQuery,
+        UpdateQuery,
+    )
 
 # Type aliases for SQL compilation results
 SqlParams = tuple[Any, ...]
@@ -101,6 +105,21 @@ def apply_converters(
                 value = converter(value, expression, connection)
             row[pos] = value
         yield row
+
+
+def convert_returning_rows(
+    rows: Iterable, fields: list[Field], connection: DatabaseConnection
+) -> list[Sequence[Any]]:
+    """Apply each field's DB converters to the raw rows of a RETURNING clause.
+
+    The fields are given in the same order as the emitted RETURNING columns,
+    so each field lines up with its value in every row.
+    """
+    cols = [field.get_col(field.model.model_options.db_table) for field in fields]
+    converters = get_converters(cols, connection)
+    if converters:
+        return list(apply_converters(rows, converters, connection))
+    return list(rows)
 
 
 class SQLCompiler:
@@ -162,6 +181,50 @@ class SQLCompiler:
         self.has_extra_select = bool(extra_select)
         group_by = self.get_group_by(self.select + extra_select, order_by)
         return extra_select, order_by, group_by
+
+    def _compile_assignment_value(
+        self, field: Any, val: Any
+    ) -> tuple[str, Sequence[Any]]:
+        """Compile one ``SET col = <val>`` right-hand side to SQL plus params.
+
+        Shared by UPDATE ... SET and INSERT ... ON CONFLICT DO UPDATE SET so a
+        written value can be a plain value, a model instance (for a related
+        field), or an expression (e.g. F("count") + 1). Returns the RHS SQL
+        fragment; the caller prepends the target column.
+        """
+        if isinstance(val, ResolvableExpression):
+            val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
+            if val.contains_aggregate:
+                raise FieldError(
+                    "Aggregate functions are not allowed in this query "
+                    f"({field.name}={val!r})."
+                )
+            if val.contains_over_clause:
+                raise FieldError(
+                    "Window expressions are not allowed in this query "
+                    f"({field.name}={val!r})."
+                )
+        elif hasattr(val, "prepare_database_save"):
+            if isinstance(field, RelatedField):
+                val = val.prepare_database_save(field)
+            else:
+                raise TypeError(
+                    f"Tried to update field {field} with a model instance, {val!r}. "
+                    f"Use a value compatible with {field.__class__.__name__}."
+                )
+        val = field.get_db_prep_save(val, connection=self.connection)
+
+        if hasattr(field, "get_placeholder"):
+            placeholder = field.get_placeholder(val, self, self.connection)
+        else:
+            placeholder = "%s"
+        if hasattr(val, "as_sql"):
+            sql, params = self.compile(val)
+            return placeholder % sql, params
+        elif val is not None:
+            return placeholder, [val]
+        else:
+            return "NULL", []
 
     def get_group_by(
         self, select: list[Any], order_by: list[Any]
@@ -249,7 +312,7 @@ class SQLCompiler:
         for expr in expressions:
             try:
                 sql, params = self.compile(expr)
-            except (EmptyResultSet, FullResultSet):
+            except EmptyResultSet, FullResultSet:
                 continue
             # Use select index for GROUP BY when possible
             if (position := selected_expr_positions.get(expr)) is not None:
@@ -335,7 +398,7 @@ class SQLCompiler:
             select.append((annotation, alias))
             select_idx += 1
 
-        if self.query.select_related:
+        if self.query.joined_relations:
             related_klass_infos = self.get_related_selections(select, select_mask)
             if klass_info is not None:
                 klass_info["related_klass_infos"] = related_klass_infos
@@ -621,7 +684,7 @@ class SQLCompiler:
             assert result is not None  # SQLCompiler.pre_sql_setup always returns tuple
             extra_select, order_by, group_by = result
             assert self.select is not None  # Set by pre_sql_setup()
-            for_update_part = None
+            lock_part = None
             # Is a LIMIT/OFFSET clause needed?
             with_limit_offset = with_limits and self.query.is_sliced
             if self.qualify:
@@ -674,17 +737,18 @@ class SQLCompiler:
                     result += ["FROM", *from_]
                 params.extend(f_params)
 
-                if self.query.select_for_update:
+                if self.query.lock_mode:
                     if self.connection.get_autocommit():
                         raise TransactionManagementError(
-                            "select_for_update cannot be used outside of a transaction."
+                            f"{LOCK_MODE_SQL[self.query.lock_mode]} cannot be "
+                            "used outside of a transaction."
                         )
 
-                    for_update_part = for_update_sql(
-                        nowait=self.query.select_for_update_nowait,
-                        skip_locked=self.query.select_for_update_skip_locked,
-                        of=tuple(self.get_select_for_update_of_arguments()),
-                        no_key=self.query.select_for_no_key_update,
+                    lock_part = lock_sql(
+                        mode=self.query.lock_mode,
+                        nowait=self.query.lock_nowait,
+                        skip_locked=self.query.lock_skip_locked,
+                        of=tuple(self.get_lock_of_arguments()),
                     )
 
                 if where:
@@ -729,8 +793,8 @@ class SQLCompiler:
                     limit_offset_sql(self.query.low_mark, self.query.high_mark)
                 )
 
-            if for_update_part:
-                result.append(for_update_part)
+            if lock_part:
+                result.append(lock_part)
 
             if self.query.subquery and extra_select:
                 # If the query is used as a subquery, the extra selects would
@@ -776,7 +840,7 @@ class SQLCompiler:
     ) -> list[Any]:
         """
         Return Col expressions for every concrete field on the model. When
-        pulling in a related model (e.g. via select_related), the caller
+        pulling in a related model (e.g. via join()), the caller
         passes ``opts`` and ``start_alias`` to traverse from that join.
         """
         result = []
@@ -948,7 +1012,7 @@ class SQLCompiler:
         restricted: bool | None = None,
     ) -> list[dict[str, Any]]:
         """
-        Fill in the information needed for a select_related query. The current
+        Fill in the information needed for a join() query. The current
         depth is measured as the number of connections away from the root model
         (for example, cur_depth=1 means we are looking at models with direct
         connections to the root model).
@@ -963,7 +1027,7 @@ class SQLCompiler:
             return related_klass_infos
 
         if not opts:
-            assert self.query.model is not None, "select_related requires a model"
+            assert self.query.model is not None, "join() requires a model"
             opts = self.query.model._model_meta
             root_alias = self.query.get_initial_alias()
 
@@ -985,9 +1049,9 @@ class SQLCompiler:
         # included in the related selection.
         fields_found = set()
         if requested is None:
-            restricted = isinstance(self.query.select_related, dict)
+            restricted = isinstance(self.query.joined_relations, dict)
             if restricted:
-                requested = cast(dict, self.query.select_related)
+                requested = cast(dict, self.query.joined_relations)
 
         def get_related_klass_infos(
             klass_info: dict, related_klass_infos: list
@@ -1004,7 +1068,7 @@ class SQLCompiler:
                 # or if a single non-relational field is given.
                 if not isinstance(f, RelatedField) and (next or f.name in requested):
                     raise FieldError(
-                        "Non-relational field given in select_related: '{}'. "
+                        "Non-relational field given in join(): '{}'. "
                         "Choices are: {}".format(
                             f.name,
                             ", ".join(_get_field_choices()) or "(none)",
@@ -1013,7 +1077,7 @@ class SQLCompiler:
             else:
                 next = None
 
-            if not select_related_descend(f, restricted, requested, select_mask):
+            if not join_relation_descend(f, restricted, requested, select_mask):
                 continue
             related_select_mask = select_mask.get(f) or {}
             klass_info: dict[str, Any] = {
@@ -1060,7 +1124,7 @@ class SQLCompiler:
             for related_field, model in related_fields:
                 related_select_mask = select_mask.get(related_field) or {}
 
-                if not select_related_descend(
+                if not join_relation_descend(
                     related_field,
                     restricted,
                     requested,
@@ -1112,18 +1176,17 @@ class SQLCompiler:
             if fields_not_found:
                 invalid_fields = (f"'{s}'" for s in fields_not_found)
                 raise FieldError(
-                    "Invalid field name(s) given in select_related: {}. "
-                    "Choices are: {}".format(
+                    "Invalid field name(s) given in join(): {}. Choices are: {}".format(
                         ", ".join(invalid_fields),
                         ", ".join(_get_field_choices()) or "(none)",
                     )
                 )
         return related_klass_infos
 
-    def get_select_for_update_of_arguments(self) -> list[str]:
+    def get_lock_of_arguments(self) -> list[str]:
         """
-        Return a quoted list of arguments for the SELECT FOR UPDATE OF part of
-        the query.
+        Return a quoted list of arguments for the OF part of a row-level
+        locking clause (FOR UPDATE OF ..., FOR SHARE OF ..., etc.).
         """
 
         def _get_first_selected_col_from_model(klass_info: dict) -> Any | None:
@@ -1167,7 +1230,7 @@ class SQLCompiler:
             return []
         result = []
         invalid_names = []
-        for name in self.query.select_for_update_of:
+        for name in self.query.lock_of:
             klass_info = self.klass_info
             if name == "self":
                 col = _get_first_selected_col_from_model(klass_info)
@@ -1194,7 +1257,7 @@ class SQLCompiler:
                 result.append(self.quote_name_unless_alias(col.alias))
         if invalid_names:
             raise FieldError(
-                "Invalid field name(s) given in select_for_update(of=(...)): {}. "
+                "Invalid field name(s) given in the of=(...) argument: {}. "
                 "Only relational fields followed in the query are allowed. "
                 "Choices are: {}.".format(
                     ", ".join(invalid_names),
@@ -1314,7 +1377,6 @@ class SQLCompiler:
 class SQLInsertCompiler(SQLCompiler):
     query: InsertQuery
     returning_fields: list | None = None
-    returning_params: tuple = ()
 
     def field_as_sql(self, field: Any, val: Any) -> tuple[str, list]:
         """
@@ -1454,38 +1516,101 @@ class SQLInsertCompiler(SQLCompiler):
 
         placeholder_rows, param_rows = self.assemble_as_sql(fields, value_rows)
 
+        # The DO UPDATE SET assignments and their params come back in one
+        # order from one pass. Their params follow the VALUES params, since
+        # DO UPDATE SET comes after VALUES in the statement.
+        conflict_assignments, conflict_params = self._conflict_assignments()
         conflict_suffix_sql = on_conflict_suffix_sql(
-            fields,  # ty: ignore[invalid-argument-type]
             self.query.on_conflict,
-            (f.column for f in self.query.update_fields),
             (f.column for f in self.query.unique_fields),
+            conflict_assignments,
         )
         if self.returning_fields:
             # Use RETURNING clause to get inserted values
             result.append(
                 bulk_insert_sql(fields, placeholder_rows)  # ty: ignore[invalid-argument-type]
             )
-            params = param_rows
             if conflict_suffix_sql:
                 result.append(conflict_suffix_sql)
-            # Skip appending the RETURNING clause if it's an empty string.
-            r_sql, self.returning_params = return_insert_columns(self.returning_fields)
-            if r_sql:
-                result.append(r_sql)
-                params += [list(self.returning_params)]
-            return [(" ".join(result), tuple(chain.from_iterable(params)))]
+            if returning := returning_columns(
+                self.returning_fields, include_created=self.query.returning_created
+            ):
+                result.append(returning)
+            params = tuple(chain.from_iterable(param_rows)) + tuple(conflict_params)
+            return [(" ".join(result), params)]
 
         # Bulk insert without returning fields
         result.append(bulk_insert_sql(fields, placeholder_rows))  # ty: ignore[invalid-argument-type]
         if conflict_suffix_sql:
             result.append(conflict_suffix_sql)
-        return [(" ".join(result), tuple(p for ps in param_rows for p in ps))]
+        params = tuple(p for ps in param_rows for p in ps) + tuple(conflict_params)
+        return [(" ".join(result), params)]
+
+    def _conflict_assignments(self) -> tuple[list[tuple[str, str]], list[Any]]:
+        """Build the ON CONFLICT DO UPDATE SET assignments and their params.
+
+        Both come out of a single pass in a single order: a SET list ordered
+        one way and a parameter list ordered another binds each value to the
+        wrong column.
+
+        Each update column takes the value the INSERT proposed, except where
+        conflict_defaults replaces it. Those overrides go through the same
+        value-compilation as UPDATE ... SET, so one can be a plain value, a
+        model instance (for a related field), or an expression (e.g.
+        F("count") + 1, which reads the target row's existing column).
+        """
+        if self.query.on_conflict != OnConflict.UPDATE:
+            return [], []
+
+        override_by_column = {
+            field.column: (field, value)
+            for field, value in self.query.conflict_defaults.items()
+        }
+        overridden: set[str] = set()
+        assignments: list[tuple[str, str]] = []
+        params: list[Any] = []
+
+        # Excluded() reads this flag to tell a DO UPDATE SET assignment from
+        # the VALUES list of the same statement.
+        self.query.compiling_conflict_assignment = True
+        try:
+            for field in self.query.update_fields:
+                quoted = quote_name(field.column)
+                if field.column in override_by_column:
+                    overridden.add(field.column)
+                    override_field, value = override_by_column[field.column]
+                    rhs, rhs_params = self._compile_assignment_value(
+                        override_field, value
+                    )
+                    assignments.append((quoted, rhs))
+                    params.extend(rhs_params)
+                else:
+                    assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+            # An override for a column that isn't otherwise being updated -- a
+            # counter, say -- has no slot above, so it goes on the end.
+            for field, value in self.query.conflict_defaults.items():
+                if field.column in overridden:
+                    continue
+                rhs, rhs_params = self._compile_assignment_value(field, value)
+                assignments.append((quote_name(field.column), rhs))
+                params.extend(rhs_params)
+        finally:
+            self.query.compiling_conflict_assignment = False
+
+        if not assignments:
+            # Postgres still requires a SET body, and only DO UPDATE (not DO
+            # NOTHING) returns the conflicting row via RETURNING. Set a unique
+            # column to itself as a no-op.
+            quoted = quote_name(self.query.unique_fields[0].column)
+            assignments.append((quoted, f"EXCLUDED.{quoted}"))
+
+        return assignments, params
 
     def execute_sql(  # ty: ignore[invalid-method-override]
         self, returning_fields: list | None = None
     ) -> list:
         assert self.query.model is not None, "INSERT execution requires a model"
-        options = self.query.model.model_options
         self.returning_fields = returning_fields
         with self.connection.cursor() as cursor:
             for sql, params in self.as_sql():
@@ -1497,14 +1622,58 @@ class SQLInsertCompiler(SQLCompiler):
                 rows = cursor.fetchall()
             else:
                 rows = [cursor.fetchone()]
-        cols = [field.get_col(options.db_table) for field in self.returning_fields]
-        converters = get_converters(cols, self.connection)
-        if converters:
-            rows = list(apply_converters(rows, converters, self.connection))
-        return rows
+        return convert_returning_rows(rows, self.returning_fields, self.connection)
 
 
-class SQLDeleteCompiler(SQLCompiler):
+class SQLWriteCompiler(SQLCompiler):
+    """Base for the UPDATE and DELETE compilers.
+
+    Both of their queries can carry returning_fields, so both run the
+    statement the same way: a rowcount normally, the converted RETURNING
+    rows when fields were asked for.
+    """
+
+    query: UpdateQuery | DeleteQuery
+
+    def lock_only_the_target(self, inner: Query) -> None:
+        """Point the sub-select's lock at the table being written.
+
+        A bare `FOR UPDATE` locks a row from *every* table the sub-select
+        reads, so a write whose filter spans a relation would wait on -- or,
+        with SKIP LOCKED, silently skip -- rows of a table it only joined to
+        look things up in. The write only ever changes the target table, so
+        that is all it locks.
+        """
+        if inner.lock_mode and not inner.lock_of:
+            inner.lock_of = ("self",)
+
+    def execute_sql(self, result_type: str) -> Any:  # ty: ignore[invalid-method-override]
+        # A write has a rowcount or a RETURNING set, never a result set to
+        # shape, so SINGLE/MULTI have nothing to work with -- asking for one
+        # gets a psycopg "didn't produce records" error several frames from
+        # here. Say it where the mistake is. NO_RESULTS is the other honest
+        # answer: run it and keep nothing (UpdateQuery.update_batch).
+        assert result_type in (CURSOR, NO_RESULTS), (
+            f"A write is executed with CURSOR or NO_RESULTS, not "
+            f"{result_type!r} -- it has a rowcount or its RETURNING rows, "
+            "not a result set."
+        )
+        cursor = super().execute_sql(result_type)
+        if not cursor:
+            return [] if self.query.returning_fields is not None else 0
+        try:
+            if self.query.returning_fields is not None:
+                return convert_returning_rows(
+                    cursor.fetchall(), self.query.returning_fields, self.connection
+                )
+            return cursor.rowcount
+        finally:
+            cursor.close()
+
+
+class SQLDeleteCompiler(SQLWriteCompiler):
+    query: DeleteQuery
+
     @cached_property
     def single_alias(self) -> bool:
         # Ensure base table is in aliases.
@@ -1532,12 +1701,19 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query: Query) -> SqlWithParams:
-        delete = f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"  # ty: ignore[invalid-argument-type]
+        result = [f"DELETE FROM {self.quote_name_unless_alias(query.base_table)}"]  # ty: ignore[invalid-argument-type]
         try:
             where, params = self.compile(query.where)
         except FullResultSet:
-            return delete, ()
-        return f"{delete} WHERE {where}", tuple(params)
+            params = ()
+        else:
+            result.append(f"WHERE {where}")
+        # RETURNING comes off self.query, not the query argument: the
+        # multi-alias branch below passes in a freshly built outer Query that
+        # carries no returning_fields of its own.
+        if returning := returning_columns(self.query.returning_fields):
+            result.append(returning)
+        return " ".join(result), tuple(params)
 
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
@@ -1546,20 +1722,30 @@ class SQLDeleteCompiler(SQLCompiler):
         Create the SQL for this query. Return the SQL string and list of
         parameters.
         """
-        if self.single_alias and not self.contains_self_reference_subquery:
+        if (
+            self.single_alias
+            and not self.contains_self_reference_subquery
+            and not self.query.lock_mode
+        ):
             return self._as_sql(self.query)
+        # A DELETE takes no locking clause of its own, so a locked delete has
+        # to put the lock on the sub-select that picks the rows -- otherwise
+        # the lock is silently dropped and two workers claim the same rows.
         innerq = self.query.clone()
         innerq.__class__ = Query
         innerq.clear_select_clause()
         assert self.query.model is not None, "DELETE requires a model"
         id_field = self.query.model._model_meta.get_forward_field("id")
         innerq.select = (id_field.get_col(self.query.get_initial_alias()),)
+        self.lock_only_the_target(innerq)
         outerq = Query(self.query.model)
         outerq.add_filter("id__in", innerq)
         return self._as_sql(outerq)
 
 
-class SQLUpdateCompiler(SQLCompiler):
+class SQLUpdateCompiler(SQLWriteCompiler):
+    query: UpdateQuery
+
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
     ) -> SqlWithParams:
@@ -1574,45 +1760,9 @@ class SQLUpdateCompiler(SQLCompiler):
         qn = self.quote_name_unless_alias
         values, update_params = [], []
         for field, val in query_values:
-            if isinstance(val, ResolvableExpression):
-                val = val.resolve_expression(
-                    self.query, allow_joins=False, for_save=True
-                )
-                if val.contains_aggregate:
-                    raise FieldError(
-                        "Aggregate functions are not allowed in this query "
-                        f"({field.name}={val!r})."
-                    )
-                if val.contains_over_clause:
-                    raise FieldError(
-                        "Window expressions are not allowed in this query "
-                        f"({field.name}={val!r})."
-                    )
-            elif hasattr(val, "prepare_database_save"):
-                if isinstance(field, RelatedField):
-                    val = val.prepare_database_save(field)
-                else:
-                    raise TypeError(
-                        f"Tried to update field {field} with a model instance, {val!r}. "
-                        f"Use a value compatible with {field.__class__.__name__}."
-                    )
-            val = field.get_db_prep_save(val, connection=self.connection)
-
-            # Getting the placeholder for the field.
-            if hasattr(field, "get_placeholder"):
-                placeholder = field.get_placeholder(val, self, self.connection)
-            else:
-                placeholder = "%s"
-            name = field.column
-            if hasattr(val, "as_sql"):
-                sql, params = self.compile(val)
-                values.append(f"{qn(name)} = {placeholder % sql}")
-                update_params.extend(params)
-            elif val is not None:
-                values.append(f"{qn(name)} = {placeholder}")
-                update_params.append(val)
-            else:
-                values.append(f"{qn(name)} = NULL")
+            rhs, rhs_params = self._compile_assignment_value(field, val)
+            values.append(f"{qn(field.column)} = {rhs}")
+            update_params.extend(rhs_params)
         table = self.query.base_table
         result = [
             f"UPDATE {qn(table)} SET",  # ty: ignore[invalid-argument-type]
@@ -1624,35 +1774,34 @@ class SQLUpdateCompiler(SQLCompiler):
             params = []
         else:
             result.append(f"WHERE {where}")
+        if returning := returning_columns(self.query.returning_fields):
+            result.append(returning)
         return " ".join(result), tuple(update_params + list(params))
-
-    def execute_sql(self, result_type: str) -> int:  # ty: ignore[invalid-method-override]
-        """Execute the update and return the number of rows affected."""
-        cursor = super().execute_sql(result_type)
-        try:
-            return cursor.rowcount if cursor else 0
-        finally:
-            if cursor:
-                cursor.close()
 
     def pre_sql_setup(
         self, with_col_aliases: bool = False
     ) -> tuple[list[Any], list[Any], list[SqlWithParams]] | None:
         """
-        If the update depends on other tables (JOINs in the WHERE clause),
-        rewrite the query so the current table is filtered by `id IN (subquery)`.
+        If the update depends on other tables (JOINs in the WHERE clause), or
+        asks for a row lock, rewrite the query so the current table is filtered
+        by `id IN (subquery)`.
+
+        An UPDATE takes no locking clause of its own, so a locked update has to
+        put the lock on the sub-select that picks the rows -- otherwise the
+        lock is silently dropped and two workers claim the same rows.
         """
         refcounts_before = self.query.alias_refcount.copy()
         # Ensure base table is in the query
         self.query.get_initial_alias()
         count = self.query.count_active_tables()
-        if count == 1:
+        if count == 1 and not self.query.lock_mode:
             return
         query = self.query.chain(klass=Query)
-        query.select_related = False
+        query.joined_relations = False
         query.clear_ordering(force=True)
         query.select = ()
         query.add_fields(["id"])
+        self.lock_only_the_target(query)
         super().pre_sql_setup()
 
         # Reset the where clause and drop the tables we no longer need (they

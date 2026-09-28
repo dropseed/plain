@@ -1,7 +1,6 @@
 """Derive JSON Schema from a Tool's `__init__` signature + type hints."""
 
-from __future__ import annotations
-
+import annotationlib
 import inspect
 import types
 import typing
@@ -25,10 +24,10 @@ def build_input_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     `Literal[...]`, and falls back to a permissive empty schema (accepts any
     JSON value) for anything else.
     """
-    sig = inspect.signature(fn)
+    sig = inspect.signature(fn, annotation_format=annotationlib.Format.FORWARDREF)
     try:
         hints = get_type_hints(fn)
-    except (NameError, TypeError):
+    except NameError, TypeError:
         # Unresolvable forward refs or un-inspectable signatures: fall back to
         # no hints so every param defaults to the permissive empty schema —
         # never a strict type we'd then wrongly reject valid arguments against.

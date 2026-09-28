@@ -1,5 +1,6 @@
 from app.users.models import User
 from plain.auth import login, logout
+from plain.auth.sessions import _USER_ID_SESSION_KEY
 from plain.auth.views import AuthView
 from plain.http import Response
 from plain.sessions import get_request_session
@@ -26,6 +27,21 @@ class SessionLoginView(View):
     def post(self):
         user = User.query.get(id=self.request.form_data["user_id"])
         login(self.request, user)
+        return Response("logged in")
+
+
+class LegacySessionIdView(View):
+    """Log in, then rewrite the stored id the way an older release wrote it.
+
+    `login()` stores `user.id`, an int. Sessions written when it was stored
+    as a string are still out there, and they have to keep resolving.
+    """
+
+    def post(self):
+        user = User.query.get(id=self.request.form_data["user_id"])
+        login(self.request, user)
+        session = get_request_session(self.request)
+        session[_USER_ID_SESSION_KEY] = self.request.form_data["stored_id"]
         return Response("logged in")
 
 
@@ -80,6 +96,7 @@ class AppRouter(Router):
         path("login", LoginView, name="login"),
         path("visit", VisitView, name="visit"),
         path("session-login", SessionLoginView, name="session_login"),
+        path("legacy-session-id", LegacySessionIdView, name="legacy_session_id"),
         path("session-logout", SessionLogoutView, name="session_logout"),
         path("whoami", WhoView, name="whoami"),
         path("protected", ProtectedView, name="protected"),

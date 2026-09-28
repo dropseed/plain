@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import re
 from importlib import import_module
@@ -233,7 +231,7 @@ class MigrationWriter:
             missing_dirs.insert(0, existing_dirs.pop(-1))
             try:
                 base_module = import_module(".".join(existing_dirs))
-            except (ImportError, ValueError):
+            except ImportError, ValueError:
                 continue
             else:
                 try:

@@ -7,6 +7,7 @@
     - [Middleware](#middleware)
     - [Bypassing a connection pooler for management operations](#bypassing-a-connection-pooler-for-management-operations)
 - [Querying](#querying)
+- [Returning affected rows](#returning-affected-rows)
 - [Schema management](#schema-management)
     - [Syncing](#syncing)
     - [Structural migrations](#structural-migrations)
@@ -47,12 +48,24 @@ class User(postgres.Model):
 
 Annotate each field with `Field[T]` (the value type) — that's what gives the
 model a type-checked constructor: `User(email="a@b.com")` flags wrong value
-types, unknown field names, and missing required fields. A field is optional in
-that constructor only when its definition passes `default=` (this is general,
-not nullable-specific — a `required=False` field with no `default=` is still a
-required constructor arg), so nullable fields use `Field[T | None]` with
-`default=None`. DB-owned fields (`id`, `create_now`, generated values) are
-auto-excluded from the constructor.
+types, unknown field names, and missing required fields.
+
+Annotating is not per-model opt-in. `postgres.Model` carries the transform, so
+the checker synthesizes every subclass's constructor from its annotated
+attributes and nothing else. Drop the annotation from `email` above and it stops
+being a constructor argument at all — `User(email="a@b.com")` is then rejected as
+an unknown argument. The runtime doesn't care either way, but if you run a type
+checker, every model has to be annotated.
+
+A field is optional in that constructor only when its definition passes
+`default=` (this is general, not nullable-specific — a `required=False` field
+with no `default=` is still a required constructor arg), so nullable fields use
+`Field[T | None]` with `default=None`. The runtime already treats a nullable
+field as optional — constructing without it yields `None` — so `default=None`
+exists for the checker; it persists nothing and changes no schema.
+`plain preflight` lists the nullable fields still missing one
+(`postgres.nullable_field_without_default`). DB-owned fields (`id`,
+`create_now`, generated values) are auto-excluded from the constructor.
 
 Field types declared outside `plain.postgres.types` — `PasswordField`, or one of
 your own — are the exception: their stub still types the value, but they are
@@ -136,7 +149,7 @@ MIDDLEWARE = [
 
 Place it near the top so downstream middleware can use the database inside `before_request` / `after_response` and still have the connection returned cleanly at the end.
 
-For `StreamingResponse` / `AsyncStreamingResponse`, the connection is returned after the body is fully drained (not when the view returns), so generators that lazily query the database — for example `Model.query.iterator()` or raw cursor loops — keep their cursor alive until the last chunk is sent.
+For `StreamingResponse` / `AsyncStreamingResponse`, the connection is returned after the body is fully drained (not when the view returns), so generators that lazily query the database — for example `Model.query.iterator()` or raw cursor loops — keep their cursor alive until the last chunk is sent. The server runs the body in the request's context, so the generator uses the same connection as the view.
 
 Without the middleware, connections keep living on their thread until something explicitly calls `plain.postgres.db.return_database_connection()` (or the process exits). That's fine for short-lived scripts but wastes a connection per thread in long-running servers.
 
@@ -198,6 +211,245 @@ first_10_users = User.query.all()[:10]
 
 For more advanced querying options, see the [`QuerySet`](./query.py#QuerySet) class.
 
+### Typed conditions with where()
+
+`where()` is a typed alternative to `filter()`. Instead of string keyword lookups, you build each condition from a field, so a type checker catches a misspelled field or a wrong value type at the call site:
+
+```python
+from datetime import datetime
+
+from plain import postgres
+from plain.postgres import Field, types
+
+
+@postgres.register_model
+class User(postgres.Model):
+    email: Field[str] = types.EmailField()
+    role: Field[str] = types.TextField(max_length=20)
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+    created_at: Field[datetime] = types.DateTimeField(create_now=True)
+    updated_at: Field[datetime] = types.DateTimeField(update_now=True)
+
+
+# Each argument is a condition; multiple arguments are ANDed together.
+admins = User.query.where(
+    User.role.equals("admin"),
+    User.age.gte(18),
+)
+```
+
+Every field exposes `equals`, `not_equal`, `gt`, `gte`, `lt`, `lte`, `is_null`, and `is_in`. Text fields add `contains`, `startswith`, and `endswith`, plus their case-insensitive forms `icontains`, `istartswith`, `iendswith`, and `iequals` (the typed spelling of `filter(field__iexact=...)`). Each returns a `Q`, so you can combine them with `|` and `&` or negate with `~`:
+
+```python
+# Membership, negation, and OR
+User.query.where(User.role.is_in(["admin", "staff"]))
+User.query.where(~User.role.equals("guest"))
+User.query.where(User.email.endswith("@example.com") | User.role.equals("admin"))
+```
+
+`is_in` binds the whole collection as one array parameter -- `WHERE "role" = ANY(%s::text[])` rather than `IN (%s, %s)` -- so one statement text covers any number of values. Two things follow: `pg_stat_statements` groups every call into a single entry instead of one per list length, and an empty list is no longer a special case (it matches nothing by running a real query, where before it ran none at all). Pass a queryset instead of a collection and it stays a subquery: `WHERE "id" IN (SELECT ...)`.
+
+A `None` in the collection raises `ValueError`. NULL is not a value a comparison can match -- it would match nothing, and negated it would exclude every row -- so it belongs in `is_null()`. Combine them when you want both:
+
+```python
+User.query.where(User.role.is_in(["admin"]) | User.role.is_null())
+```
+
+`~` negates whatever it wraps, which is what you want for a composite condition but not for a null check. `is_null()` takes a flag, and the two compile differently:
+
+```python
+User.query.where(~User.age.is_null())  # WHERE NOT ("age" IS NULL)
+User.query.where(User.age.is_null(False))  # WHERE "age" IS NOT NULL
+```
+
+Both match the same rows. `is_null(False)` is the conversion for `filter(age__isnull=False)` and emits the SQL you would write by hand, so reach for it and keep `~` for negating a condition that isn't a null check.
+
+A comparison can also take another column of the same value type, instead of a value:
+
+```python
+# Q(updated_at__gt=F("created_at"))
+User.query.where(User.updated_at.gt(User.created_at))
+```
+
+`equals`, `not_equal`, `gt`, `gte`, `lt`, and `lte` all accept one. The column has to belong to the same model, which `where()` checks on both sides, and it has to be the same value type — comparing an `int` column against a `str` one is a type error.
+
+A **nullable column is a different value type** to the checker — `Field[int | None]` is not a `Field[int]` — so the two directions aren't the same. A non-null column accepts a nullable one on the right; a nullable one on the left won't accept a non-null column, because there's no way to name its value type without the `None`. Compare the other way round, or drop to `filter(age__lt=F("other"))`.
+
+An `F()` expression works too, but that arm is untyped: an expression's output type isn't tracked, so nothing checks it against the column. `F()` is the same escape hatch here that it is in `filter()`.
+
+**A condition _is_ a `Q`**, so these replace `Q` everywhere, not just in `filter()`. Anything that takes a `Q` takes one unchanged — `When()`, including the ones inside a `Case()`, and an aggregate's `filter=`:
+
+```python
+from plain.postgres.aggregates import Count
+from plain.postgres.expressions import Case, Value, When
+
+User.query.annotate(
+    tier=Case(When(User.age.gte(18), then=Value("adult")), default=Value("minor"))
+)
+User.query.values("role").annotate(adults=Count("id", filter=User.age.gte(18)))
+```
+
+```sql
+-- the Case annotation
+CASE WHEN "age" >= %s THEN %s ELSE %s END AS "tier"
+-- the Count annotation
+COUNT("id") FILTER (WHERE "age" >= %s) AS "adults"
+```
+
+Conditions traverse foreign keys — accessing a field through a relation builds the joined lookup:
+
+```python
+# Q(author__email="a@example.com")
+Post.query.where(Post.author.email.equals("a@example.com"))
+```
+
+A relation is a path to traverse, not a field, so it carries no conditions of its own. To match on the relation itself, traverse to the key it points at — that's the typed spelling of `filter(author=author)`, and it compiles to the same SQL:
+
+```python
+Post.query.where(Post.author.id.equals(author.id))
+Post.query.where(Post.author.id.is_in([a.id for a in authors]))
+Post.query.where(Post.author.id.is_null())  # nullable relation
+```
+
+(`is_in` is the one that reads differently: it binds an array, as above, where `filter(author__in=[...])` writes out a placeholder per value. Same rows, same column.)
+
+`Post.author.equals(author)` raises `AttributeError` naming this spelling (an `AttributeError`, so `hasattr` and `getattr(..., default)` keep behaving). It isn't an oversight: to the type checker `Post.author` is `type[Author]`, which is what makes `Post.author.email.equals(...)` type-check, and a condition method there would be a runtime method the checker rejects.
+
+Traversal starts from a **forward foreign key**. Once inside one, every relation you pass through is another hop, many-to-many included — `WidgetTag.widget.tags.name.equals("metal")` builds `Q(widget__tags__name="metal")` — and the same rule applies to the relation itself: `WidgetTag.widget.tags.equals(tag)` points you at `WidgetTag.widget.tags.id.equals(tag.id)`.
+
+A class-level many-to-many (`Widget.tags`) is _not_ an entry point: it has no traversal wiring, and it is typed `ManyToManyManager[Tag]`, so it could not be typed as one either. Use the string path there — `Widget.query.filter(tags__name="metal")`. Reverse relations aren't traversable for the same reason (a reverse accessor is a `ClassVar`, so there is nothing for the related model to offer the checker), and the error says so.
+
+A traversed field _is_ the related field, carrying the relation path as its name — so it offers exactly the conditions that field offers, including an encrypted field's refusals.
+
+`field.lookup_path` is that path — `"email"` for a column on the model, `"user__email"` for a traversed one — so generic code handed a field reference can build a string lookup (`Q(**{f"{field.lookup_path}__icontains": term})`), an `order_by()` term, or a `values()` key without assembling the path itself.
+
+**`where()` preserves the order you wrote; `filter()` sorted its kwargs alphabetically.** Converting a multi-condition `filter()` can change the WHERE clause text and the parameter order, though not which rows it matches:
+
+```sql
+-- filter(role="admin", email="a@example.com")
+WHERE ("email" = %s AND "role" = %s)  -- params: ('a@example.com', 'admin')
+-- where(User.role.equals("admin"), User.email.equals("a@example.com"))
+WHERE ("role" = %s AND "email" = %s)  -- params: ('admin', 'a@example.com')
+```
+
+Kwargs you already wrote alphabetically convert unchanged. Where the source order wasn't alphabetical, preserving it changes the predicate structure — a test asserting on generated SQL notices, and so can `pg_stat_statements`, which groups by structure rather than literal text and files the reordered statement as a new entry.
+
+**Conditions are strict where `filter()` was lenient — to the type checker.** `equals` takes the field's value type, so `User.age.equals("18")` and a `Field[UUID]`'s `.equals("3f2504e0-4f89-11d3-9a0c-0305e82c3301")` are type errors where `filter(age="18")` and `filter(uuid="3f2504e0-4f89-11d3-9a0c-0305e82c3301")` were not. Runtime coercion is unchanged: `User.age.equals("18")` still coerces the string and runs, exactly as the kwarg did.
+
+So the strictness lands on the caller. Code holding a string from a CLI argument, URL segment, or session parses it first — `int(raw)`, `uuid.UUID(raw)` — and an invalid value raises `ValueError` there, before the ORM is involved, next to the input that was wrong.
+
+**A condition belongs to the model whose field built it.** `Order.query.where(User.email.equals("x"))` raises `TypeError` naming both models. A type checker can't catch this — `Field[str]` is `Field[str]` whichever model declared it — and without the check the lookup name `"email"` just resolves against `Order`, which is silently the wrong column when both models have one. A traversed condition belongs to the model the traversal _started_ from, so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not `User`'s. A hand-written `Q(email="x")` names no model and isn't checked — it's `filter()`'s untyped spelling and behaves like it.
+
+**The terminals take conditions too, and `get()` takes a key.** Looking a row up by its primary key is the most common query there is, and spelling it `where(Model.id.equals(5)).get()` is a long way round, so `get()` has three entry points:
+
+```python
+User.query.get(5)  # by key
+User.query.get(User.email.equals(x))  # by condition
+User.query.where(...).get()  # exactly one row of a built query
+```
+
+The contract never moves: exactly one row, or `DoesNotExist`/`MultipleObjectsReturned`. `get_or_none()` takes the same three entry points and returns `None` instead of raising when nothing matches. `first()` and `last()` take conditions but no key, since `first(5)` would read as "the first 5".
+
+Each one is sugar for `where(...)` plus the terminal, so the SQL is identical — `get(5)`, `where(User.id.equals(5)).get()` and `get(id=5)` all compile to the same statement. Multiple conditions AND together in the order written, exactly as `where()` does.
+
+The key is the key's own type, so a value from a URL segment, session, or CLI argument is parsed first:
+
+```python
+User.query.get(int(raw_id))  # get("5") is a type error, and raises at runtime
+```
+
+Mixing a key with conditions is refused, and so is the key form on a `select()` queryset — a row has no key of its own, and `rows[5]` already means the sixth row.
+
+[Encrypted fields](#encrypted-fields) reject value comparisons because their ciphertext is non-deterministic — only `is_null()` is available, and any other condition method (`equals`, `is_in`, …) raises `TypeError`. That holds on either side of a comparison: an encrypted column can't be the column another column is compared _against_ either, since that would match plaintext against ciphertext.
+
+### Selecting columns with select()
+
+`select()` pulls back specific columns as typed rows instead of model instances. You pass typed field references, and a type checker knows the exact shape of each row:
+
+```python
+from plain.postgres import Field, types
+
+
+@postgres.register_model
+class User(postgres.Model):
+    email: Field[str] = types.EmailField()
+    age: Field[int | None] = types.IntegerField(allow_null=True, default=None)
+
+
+# list-like of tuple[str, int | None], precisely typed
+rows = User.query.where(User.age.gte(18)).select(User.email, User.age)
+for email, age in rows:
+    ...
+```
+
+There are three modes:
+
+- **Tuples** (default) — one tuple per row, typed per column: `select(User.email, User.age)` yields `tuple[str, int | None]`.
+- **Flat scalars** — a single column unwrapped, with `flat=True`: `select(User.email, flat=True)` yields `str`. `flat=True` accepts exactly one column.
+- **Dataclasses** — map each column onto a dataclass with `result_type=`: `select(User.email, User.age, result_type=UserStats)` yields `UserStats`. Columns map to dataclass fields **positionally**, so the selection order must match the dataclass field order, and each selected field's name must match the dataclass field at the same position.
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class UserStats:
+    email: str
+    age: int | None
+
+
+stats = User.query.select(User.email, User.age, result_type=UserStats)
+```
+
+The return value is a [`RowQuerySet`](./query.py#RowQuerySet) — that is the name to reach for when you need to annotate one:
+
+```python
+from plain.postgres import RowQuerySet
+
+
+def adults() -> RowQuerySet[tuple[str, int | None]]:
+    return User.query.where(User.age.gte(18)).select(User.email, User.age)
+```
+
+You can select expression columns too — `select(User.id, Sum("amount"))`, or an `F()` — but an expression column types as `Any` (its output type isn't tracked yet). The fields around it stay precise, so `select(User.id, Sum("amount"))` types as `tuple[int, Any]`.
+
+Per-column typing runs to **ten columns**. An eleventh is still selected and still returns rows, but the row type degrades to `tuple[Any, ...]` — reach for `result_type=` when a row is that wide.
+
+`select()` goes last in a chain: `annotate()` must come before it, because an annotation appends a column and would change the row shape out from under the type `select()` declared. `annotate()` after `select()` raises `TypeError` saying so. `prefetch()` is refused in both orders — a prefetch attaches related objects to a model instance's attributes, and a row has nowhere to put them; select the columns you need from the related model instead.
+
+Re-selecting replaces the **column list**, not the joins: an expression that reached through a relation (`select(Upper("tags__name"))`) leaves its join in place, so a later `select(Widget.name)` still returns one row per joined row — and `count()`/`exists()` count those. This is `annotate(...)` followed by `values_list(...)` behaving as it always has; trimming joins no queryset needs any more is out of scope here.
+
+`distinct()` with an `order_by()` on a column you didn't select returns duplicates: the ordering column has to go into the `SELECT` list for Postgres to sort by it, so `SELECT DISTINCT` deduplicates on that column too. Order by something you selected, or drop the ordering. This is `values_list()`'s behavior as well, not new to `select()`.
+
+Columns annotated `Field[Any]` are rejected by `select()`, because `Any` satisfies the model-valued `__get__` overload and class access resolves as `type[Any]` rather than a field. That's the same reason the field-annotation guidance says never to annotate a field `Field[Any]` — use the concrete type, or `Field[object]` when the column really does hold arbitrary JSON, which `select()` types as `object`.
+
+**`select()` returns rows, not partial model instances.** This is deliberate: a model instance with only some columns loaded is a type-level lie — the type checker thinks every field is present, so touching an unselected column looks fine but fails or fires a hidden query at runtime. Honest tuples/dataclasses keep the types truthful. As a result, iteration, `first()`, `get()`, `iterator()`, and slicing all return rows (`get()` still takes conditions; only its primary key form is refused), and anything that would read or write model rows, or change the selected columns — `update()`, `delete()`, `get_or_create()`, `values()`, `values_list()`, `annotate()`, `prefetch()` — raises `TypeError`. `update()` and `delete()` refuse a queryset in row mode however it got there, `values()` and `values_list()` included.
+
+`select()` takes typed references only — a bare string like `select("email")` raises `TypeError` (use `User.email`).
+
+**A column belongs to the model whose field built it**, the same as [a condition does](#querying-with-typed-conditions): `Order.query.select(User.email)` raises `TypeError` naming both models. A type checker can't catch it — `Field[str]` is `Field[str]` whichever model declared it — and without the check the name `"email"` just resolves against `Order`, silently the wrong column when both models have one. Expressions are unaffected: `F("email")` and `Upper("email")` take a string resolved against whatever query they land in, like `filter()`'s kwargs.
+
+**A foreign key's own key column is selectable; the relation and anything past it are not.** `select(Post.author.id)` reads `"post"."author_id"` — a local column of the table being selected, with no join — so it is accepted, and it compiles to exactly what `values_list("author", flat=True)` always has. The rule is narrow: one hop, ending at the related model's primary key.
+
+```python
+author_ids = Post.query.select(Post.author.id, flat=True)
+authors = Author.query.where(Author.id.is_in(author_ids))
+```
+
+With `result_type=`, the dataclass field is named for the column it holds — `author_id`, not the relation and not the `author__id` lookup path.
+
+Everything else still raises `TypeError`:
+
+- `select(Post.author)` — a relation is not a column. The message names the key column that is one.
+- `select(Post.author.city)` — one hop, but the column lives on the other table.
+- `select(Post.author.organization.id)`, or any hop through a many-to-many — the key column isn't local to the selecting table either.
+
+The reason is nullability: a column reached over a join comes back as `None` when the relation doesn't match, and the traversed field's type says it can't. `values_list()` with the lookup path remains the spelling for those, and the error message names it. The key column has no such problem — its nullability is the foreign key's own `allow_null`.
+
+One caveat on that: a nullable foreign key's key column types as `int`, not `int | None`. `Post.author` resolves to `type[Author]` at class access whether or not the foreign key is nullable — that is what makes traversal type-check at all — so `.id` is `Author`'s own `Field[int]` either way, and the nullability is lost before `select()` sees it. The value really can be `None`, so narrow it when the foreign key is nullable.
+
+**`select()` hands back a plain `RowQuerySet`, not your custom QuerySet subclass.** Chain your own methods before `select()`, not after — `User.query.active().select(...)` works, `User.query.select(...).active()` raises `AttributeError`.
+
 ### Custom QuerySets
 
 You can customize [`QuerySet`](./query.py#QuerySet) classes to provide specialized query methods. Define a custom QuerySet and assign it to your model's `query` attribute as a `ClassVar` (so it isn't treated as a constructor field):
@@ -246,9 +498,180 @@ redeclare `query` just to type it; the base provides `QuerySet[Self]`. Declare
 `query` only when attaching a **custom** QuerySet, and then as a `ClassVar`
 (see [Custom QuerySets](#custom-querysets) above).
 
+### Written queries with sql()
+
+A query is either **built** or **written**. The ORM builds one when the code assembles it at runtime — `where()`, `order_by()`, a paginator, a filter that's only sometimes applied. You write one when the whole query is known as you type it, however complex: a grouped count, a three-table join, a CTE, an `UPDATE ... RETURNING`. **If you can write the query, write it; if the code has to build it, build it.**
+
+`Model.query.sql()` is the written half. The statement is a **t-string** ([PEP 750](https://peps.python.org/pep-0750/)) — the `t` prefix, not `f` — so models, columns and values are interpolated directly:
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass
+class QueueStats:
+    queue: str
+    n: int
+    oldest: datetime | None
+
+
+queues = ["default", "high"]
+
+stats = JobRequest.query.sql(
+    t"""
+    SELECT {JobRequest.queue} AS queue,
+           count(*) AS "n!",
+           min({JobRequest.created_at}) AS "oldest?"
+    FROM {JobRequest}
+    WHERE {JobRequest.queue} = ANY({queues})
+    GROUP BY 1
+    """,
+    result_type=QueueStats,
+)
+
+for row in stats:
+    print(row.queue, row.n)
+```
+
+A t-string is not a string. Python evaluates each `{...}` and hands `sql()` the literal text and the interpolated **objects**, separately — so `JobRequest.queue` arrives as the field it is and becomes a quoted column, while `queues` arrives as a list and binds as a parameter.
+
+That is the guarantee, stated exactly: **the SQL is the literal halves of the t-string, written in your source; every interpolated object is dispatched on its type, and a value always binds as a parameter**. A `str` can't be passed to `sql()` at all — a literal, an f-string and a runtime-built string are all refused by the type checker, because none of them is a `Template`.
+
+The one way to put runtime text into a statement is to build a `Template` out of a string yourself — `Template(text)`, or concatenating one onto a t-string. It type-checks and it runs, because a `Template` is what `sql()` asked for. It is the escape hatch, and **it is exactly what you must never do with anything that came from outside the program.**
+
+The call renders the statement; iterating it runs it. `all()`, `get()`, `first()`, `count()`, `exists()` and `execute()` are the other ways to run one — `get()` raises the model's `DoesNotExist`/`MultipleObjectsReturned` when the statement returns instances, and a plain `ValueError` when it returns `result_type` rows — and it runs on the same connection and transaction as every other query. A statement runs **once**: its rows are cached, the way a queryset caches results, so iterating twice can't repeat a write. Call `sql()` again to run it again.
+
+`sql()` starts from `Model.query`. A queryset narrowed past that — `where()`, `order_by()`, a slice — raises, because a written statement can't carry the narrowing and quietly dropping it would drop whatever the filter was enforcing. Interpolate the queryset into the statement as a subquery instead. A model whose _default_ queryset filters can still write SQL, but that scope is **not** applied either: write the predicate into the statement, or interpolate `Model.query`.
+
+#### Interpolation
+
+What an interpolation renders as is decided by **what the object is**, never by how it was spelled:
+
+| Interpolation                                          | Renders as                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `{Model}`                                              | the table, quoted                                                                                      |
+| `{Model:*}`                                            | every column of the model; rows are **model instances**, or fill a model-annotated `result_type` field |
+| `{Model.field}`                                        | the qualified column, `"table"."column"` (a foreign key gives its `_id` column)                        |
+| `{Model.field:name}`                                   | just the column, for an `INSERT` column list or an `UPDATE SET` target                                 |
+| `{value}` where the value is a queryset                | `(SELECT ...)` — the built query as a subquery, its parameters merged                                  |
+| `{value}` where the value is another `sql()` statement | the same, rendered without running                                                                     |
+| `{value}` where the value is another t-string          | rendered inline, recursively, into the same statement                                                  |
+| `{value}` otherwise                                    | a bound parameter, always                                                                              |
+
+A value interpolated twice binds twice. **A list binds as an array, never as an `IN` list**, so membership is written `= ANY(...)`:
+
+```python
+ids = [1, 2, 3]
+
+Widget.query.sql(t"SELECT {Widget:*} FROM {Widget} WHERE {Widget.id} = ANY({ids})")
+```
+
+A dict binds as `jsonb`, ready for `@>`, `->` and the rest.
+
+A `{` that isn't an interpolation — a regex quantifier like `\d{2}`, a jsonb or array literal — is written `{{`, and `}` is written `}}`, the same as any f-string. Forget it and Python reads the braces as an interpolation, so `'^\d{2}$'` would quietly bind the number 2. `sql()` catches the shapes a forgotten brace makes — a bare number, and a comma-separated run of literals like `{1,2,3}` or `{2,5}` — and says to double them. (A jsonb literal trips the format-spec error instead, because `{"a": 1}` splits into an expression and a spec; that message says to double them too.) Any other literal is a value: `{None}` binds NULL, `{"active"}` and `{True}` bind as themselves.
+
+`!r` and `!s` are refused — there is nothing to convert — and the only format specs are the two in the table: `:*` on a model and `:name` on a column. Anything else raises, quoting what you wrote between the braces. So does a model **instance** or a relation accessor: `{job}` and `{Widget.tags}` are not columns, and the message says what to write instead.
+
+A queryset goes in as a subquery, which is the seam between the two halves — the built query decides the rows, the written one does what the ORM can't say:
+
+```python
+ready = JobRequest.query.ready_to_run()
+
+JobRequest.query.sql(
+    t"""
+    SELECT ready.queue AS queue, count(*) AS "n!"
+    FROM {ready} ready
+    GROUP BY 1
+    """,
+    result_type=QueueCount,
+)
+```
+
+A t-string interpolated into another t-string is rendered inline, which is how a predicate is shared — it is an ordinary value, so it can live at module level and be passed around:
+
+```python
+ACTIVE = t"{Job.status} = 'active' AND {Job.deleted_at} IS NULL"
+
+Job.query.sql(t"SELECT {Job:*} FROM {Job} WHERE {ACTIVE} ORDER BY {Job.created_at}")
+```
+
+Don't end a shared template with a `--` line comment. It is inlined mid-line, so the comment would swallow whatever the outer statement wrote after it — the `ORDER BY` above, for instance. (An embedded queryset or `sql()` statement is put on its own lines, so only a nested t-string has this edge.)
+
+An unknown model or field is a Python `NameError` or `AttributeError` where you wrote it, before `sql()` is called at all. A format spec on something that doesn't take one raises when the statement is rendered, which is still at the `sql()` call. So does a second statement: whenever the statement binds a parameter Postgres enforces one command per statement (that's the protocol a written query goes over), and a template with nothing to bind is checked for a `;` here instead. A trailing `;` is dropped either way.
+
+#### Results
+
+**A query has a shape, and the shape is a type.** `{Model:*}` on its own is the one shape you don't have to declare: rows are live model instances, with encrypted and JSON fields decrypted and parsed like any other read, built from the columns that expansion put in the statement so a self-join or a UNION can't shift them. An instance is always complete and carries only its own columns — nothing is ever attached to it after the fact — so the moment a statement selects anything beyond the expansion, the row has a shape of its own and you declare it:
+
+```python
+@dataclass
+class WidgetRow:
+    widget: Widget
+    tag_count: int
+
+
+rows = Widget.query.sql(
+    t"""
+    SELECT {Widget:*}, count(wt.id) AS tag_count
+    FROM {Widget}
+    LEFT JOIN {WidgetTag} wt ON wt.widget_id = {Widget.id}
+    GROUP BY {Widget.id}
+    """,
+    result_type=WidgetRow,
+)
+for row in rows:
+    print(row.widget.name, row.tag_count)
+```
+
+A field annotated with a **model class** is filled from that model's `{Model:*}` expansion, hydrated exactly as an instance row is; the other columns map onto the other fields by name. The two find each other by model class, so one model fills one field, from one run of columns — a self-join needs aliases an expansion can't give, and there you select the columns yourself. `Widget | None` is what the outer side of a `LEFT JOIN` wants: an expansion that came back all NULL is `None` rather than a hollow instance, and without the `| None` it raises and says to add it. `prefetch()` works on an **instance** statement only — a declared row is not an instance, so join the related table into the statement or query it yourself.
+
+`result_type=` has to be a dataclass — no dicts, no bare tuples. Columns map to its fields **by name**, so the order you select in doesn't matter. A field the statement doesn't select is an error unless it has a default; a column no field matches always is.
+
+Which `{Model:*}` a model field takes is decided by **where it was written**: an expansion in the statement's own select list (each branch of a `UNION` included) is a row's worth of columns, and a deeper one — inside a subquery, a CTE, an `EXISTS` — is just columns, which the outer statement names as it likes. So a model field needs its `{Model:*}` in the outer select list, and a subquery's expansion whose columns pass straight through (`SELECT * FROM (SELECT {Widget:*} ...) sub`) maps onto same-named fields like any other columns. An outer expansion that no model field claims does too — and when some of its columns have no field at all, the statement says to declare a model-annotated one rather than naming them one by one.
+
+The shape is checked when the rows are fetched, on the first execution — so `count()` and `exists()`, which ask Postgres about rows instead of building any, answer even for a statement that `all()` would refuse.
+
+The sqlx alias convention says in the statement what the SQL itself leaves ambiguous: `AS "n!"` for "this is never null" and `AS "oldest?"` for "this can be". The marker is stripped before the column maps onto a field, so `count(*) AS "n!"` fills `n`. Today it is documentation — nothing enforces it — and nullability comes from the annotation.
+
+#### Writes
+
+`INSERT`, `UPDATE` and `DELETE` are the same call. With a `RETURNING` clause the rows come back like any other result; without one, iterating yields nothing and `execute()` returns how many rows were affected:
+
+```python
+size = "large"
+
+updated = Widget.query.sql(
+    t"""
+    UPDATE {Widget} SET {Widget.size:name} = {size}
+    WHERE {Widget.id} = {widget.id}
+    RETURNING {Widget:*}
+    """
+).get()
+
+tiny = "tiny"
+
+gone = Widget.query.sql(t"DELETE FROM {Widget} WHERE {Widget.size} = {tiny}").execute()
+```
+
+`execute()` never shapes rows, so a write that returns columns you don't want to map is still runnable that way. A write runs exactly once however it's asked — `count()` and `first()` on one read what that single execution returned rather than running it again, and adding a `prefetch()` afterwards doesn't re-run it. Asking a write with no `RETURNING` clause how many rows it _returns_ raises: 0 would read like "the UPDATE matched nothing", and `execute()` is the question with an answer.
+
+A violated check, unique or foreign key constraint raises the same `ValidationError` a model write raises, looked up by the constraint name across every model — a written statement can write any table. Where the ORM's message would name the offending value, a written one can't: it has rows, not instances.
+
+#### What Postgres checks, and when
+
+The first execution of each statement reads `cursor.description`, which carries every result column's name, type OID, and source table and column. That is enough to do two things, and the result is cached per set of result columns — so the cost is one extra catalog query the first time a shape is seen, and nothing after:
+
+- **Attach field converters.** A column that traces back to a model column — through table aliases, column aliases, joins, derived tables and CTEs — is decrypted, parsed, or converted exactly as the ORM would. An expression, an aggregate and a UNION branch drop that trace, and a column with no trace comes back as Postgres sent it. A text-shaped one is watched: any value that arrives still encrypted is refused rather than handed back as ciphertext, since nothing can decrypt it. (Checked on every row of every execution, so a plain column holding a string that looks encrypted is refused too — which is the safe way to be wrong.)
+- **Check `result_type`.** A model-annotated field takes its model's whole expansion; of what's left, every column needs a field of that name, every field a column, and the column's Python type has to match the annotation with `None` stripped. A mismatch raises `TypeError` printing the dataclass it expected.
+
+The cached plan is only reused when the statement comes back with exactly the columns it was built from, so the same statement with a different embedded queryset is checked again rather than hydrated from the wrong plan.
+
+What it does **not** check: **nullability** — the annotation is the declaration, and `!`/`?` documents it. And the check runs at first execution, not before deploy, so a statement no test and no code path ever runs is unverified.
+
 ### Raw SQL
 
-For complex queries that can't be expressed with the ORM, you can use raw SQL.
+For complex queries that can't be expressed with the ORM, you can use raw SQL. Reach for [`sql()`](#written-queries-with-sql) first — it takes a t-string, interpolates models and columns, binds every value as a parameter, and checks the results against what you declared. `raw()` is the unchecked version of the same idea.
 
 Use `Model.query.raw()` to execute raw SQL and get model instances back:
 
@@ -266,11 +689,11 @@ for user in users:
     print(user.email)  # Full model instance with all fields
 ```
 
-Raw querysets support `prefetch_related()` for loading related objects:
+Raw querysets support `prefetch()` for loading related objects:
 
 ```python
 users = User.query.raw("SELECT * FROM users WHERE is_admin = %s", [True])
-users = users.prefetch_related("posts")
+users = users.prefetch("posts")
 ```
 
 For queries that don't map to a model, use the database cursor directly:
@@ -294,9 +717,9 @@ users = User.query.filter(Q(is_admin=True) | Q(is_staff=True))
 
 ### Avoiding N+1 queries
 
-#### Use `select_related` for ForeignKey access in loops
+#### Use `join()` for ForeignKey access in loops
 
-Accessing a FK in a loop without `select_related()` fires one query per row.
+Accessing a FK in a loop without `join()` fires one query per row.
 
 ```python
 # Bad — N+1 queries
@@ -304,11 +727,11 @@ for post in Post.query.all():
     print(post.author.name)
 
 # Good — single JOIN
-for post in Post.query.select_related("author").all():
+for post in Post.query.join("author").all():
     print(post.author.name)
 ```
 
-#### Use `prefetch_related` for reverse/M2N access in loops
+#### Use `prefetch()` for reverse/M2N access in loops
 
 Reverse ForeignKey and ManyToMany relations need a separate prefetch query.
 
@@ -318,7 +741,7 @@ for author in Author.query.all():
     print(author.posts.count())
 
 # Good — one extra query
-for author in Author.query.prefetch_related("posts").all():
+for author in Author.query.prefetch("posts").all():
     print(author.posts.count())
 ```
 
@@ -350,7 +773,7 @@ def get_template_context(self):
 
 # Good — eagerly load everything
 def get_template_context(self):
-    return {"posts": Post.query.select_related("author").prefetch_related("tags").all()}
+    return {"posts": Post.query.join("author").prefetch("tags").all()}
 ```
 
 ### Query efficiency
@@ -404,6 +827,176 @@ for name in names:
 Tag.query.bulk_create([Tag(name=name) for name in names])
 ```
 
+`bulk_create` is insert-only. To insert new rows and update the ones that
+already exist in a single statement, use `bulk_upsert` (below).
+
+#### Use `bulk_upsert` to insert-or-update in one statement
+
+`bulk_upsert(objs, *, update_fields, unique_fields, batch_size=None)` issues one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` per batch.
+Rows that don't exist yet are inserted; rows that collide on `unique_fields` have
+their `update_fields` overwritten. You get back the objects you passed in, in the
+order you passed them (a new list — `objs` itself is never reordered), each with
+its DB-generated fields (primary key, DB defaults) populated.
+
+```python
+# Insert new items, refresh `value`/`expires_at` on any existing key.
+CachedItem.query.bulk_upsert(
+    [CachedItem(key=k, value=v, expires_at=exp) for k, v in items],
+    update_fields=[CachedItem.value, CachedItem.expires_at],
+    unique_fields=[CachedItem.key],
+)
+```
+
+- `update_fields` and `unique_fields` take field references (`Model.field`), not
+  strings. A foreign key is named by the relation itself — `Model.tenant`, which
+  resolves to the `tenant_id` column. (This is the one write API that takes
+  `Model.fk`. `returning()` refuses it, because there it would be ambiguous with
+  asking for the whole related object; here a column list can only mean the
+  column.)
+- `unique_fields` must name the **primary key** or a `UniqueConstraint` declared
+  on the model (no condition, no expressions) — this is the conflict target. A
+  unique `Index` is not enough; declare a `UniqueConstraint`.
+- `update_fields` must be concrete, non-primary-key, must not name the same
+  column twice (Postgres assigns each column once per statement), and must not
+  overlap `unique_fields`. A column the database fills in (`create_now`,
+  `generate=True`, `RandomStringField`) can't be named either — the update would
+  overwrite the stored value with a freshly evaluated default.
+- Every object must have a non-null value for every unique field. `NULL` never
+  conflicts in Postgres, so it can't be upserted. A database-generated column
+  (`create_now`, `generate=True`, `RandomStringField`) can't be a unique field
+  either — your objects never hold its value, so it could never conflict. Nor
+  can an `update_now=True` column, which is stamped again on every write.
+- **Two objects with the same unique key in one batch raise `ValueError`.**
+  Postgres won't touch a row twice in one statement. Split across batches it's
+  allowed — the first inserts, the second updates, and the later write wins.
+- **`update_now=True` columns are refreshed on a conflict automatically.** You
+  don't name them in `update_fields`; a row that gets updated gets a fresh
+  stamp, and the object handed back carries the same one.
+- **An `id` you set is kept on the insert path; on a conflict the stored row
+  wins.** A new row is written with the `id` you gave it. A conflicting one
+  already has an `id`, and that is the one hydrated back onto your object — the
+  row in the table is the truth. An `id` that collides with a _different_ row
+  raises `psycopg.errors.UniqueViolation`, like any set-based write.
+- Every object is sorted by its conflict key before anything is sent, so
+  concurrent `bulk_upsert` calls over overlapping keys lock rows in the same
+  order and can't deadlock each other. Returned rows are mapped onto the objects
+  by position, exactly as `bulk_create` does.
+- Like `bulk_create`, the write is against the table: a filter on the queryset
+  you call it from doesn't narrow or exclude anything.
+
+For a single row, reach for `upsert` (below) instead — it returns the object and
+a `created` flag rather than a list.
+
+#### Use `upsert` for a single insert-or-update
+
+`upsert(*, unique_fields, defaults=None, create_defaults=None, conflict_defaults=None, **kwargs)`
+is the single-row counterpart to `bulk_upsert`. It runs one
+`INSERT ... ON CONFLICT (unique_fields) DO UPDATE SET ... RETURNING` statement and
+returns `(obj, created)` — `created` is `True` when a new row was inserted,
+`False` when the conflicting row was updated. The object is hydrated from the
+post-write row, so there's no second query.
+
+```python
+# Insert the flag, or refresh used_at on the existing one.
+flag, created = Flag.query.upsert(
+    name="beta-dashboard",
+    defaults={"used_at": timezone.now()},
+    unique_fields=[Flag.name],
+)
+```
+
+`unique_fields` takes field references (`Model.field`), like `bulk_upsert`. The
+value sources below stay string-keyed — they follow the `kwargs` idiom.
+
+Value sources, lowest precedence first — where the same key appears in two of
+them, `create_defaults` loses to `defaults`, which loses to `**kwargs`:
+
+- `create_defaults` is applied on **insert only** — extras that must not change
+  when the row already exists.
+- `defaults` and `**kwargs` are applied on **both** insert and conflict-update.
+  `kwargs` carries the identifying values (including the unique fields).
+- `conflict_defaults` applies to the `DO UPDATE SET` **only** — it never changes
+  the inserted row. A value can be a plain value or an expression, so
+  `{"count": F("count") + 1}` is an atomic counter that reads the existing row:
+
+```python
+view, created = PageView.query.upsert(
+    path="/home",
+    conflict_defaults={"count": F("count") + 1},
+    unique_fields=[PageView.path],
+)
+```
+
+Two expressions reach two different rows inside a conflict update. `F("count")`
+reads the row already **stored**; `Excluded("count")` reads the row the INSERT
+**proposed**, compiling to `EXCLUDED."count"`. Combine them to accumulate the
+incoming value instead of overwriting it — the whole statement is one atomic
+`UPDATE`, so concurrent callers each add their own delta:
+
+```python
+from plain.postgres import Excluded, F
+
+# Add this batch's 7 views to whatever is already stored.
+view, created = PageView.query.upsert(
+    path="/home",
+    count=7,
+    conflict_defaults={"count": F("count") + Excluded("count")},
+    unique_fields=[PageView.path],
+)
+```
+
+`Excluded()` is only meaningful while the conflict update's assignments are
+being built. Anywhere else raises a `FieldError` — including as an inserted
+value in `kwargs`/`defaults`/`create_defaults` of the very same call, where it
+would be naming the row being written, and in `filter()`, `update()` or
+`annotate()`.
+
+On conflict the `SET` clause covers:
+
+- every non-unique, non-PK column from `kwargs`/`defaults`, each taking the value
+  the INSERT proposed;
+- every `DateTimeField(update_now=True)` column, whose fresh `pre_save()`
+  timestamp rides along in the INSERT and would otherwise go stale (a
+  `create_now`-only column is _not_ in the `SET`, so it keeps its original
+  value);
+- every column `conflict_defaults` names — replacing the proposed value when the
+  column is already in the `SET`, adding it when it isn't.
+
+Columns nobody wrote are left alone, and `create_defaults` never take part in the
+update. Naming a **database-owned** column (`create_now`, `generate=True`,
+`RandomStringField`) in `kwargs`/`defaults` is an error rather than a silent
+reset: `EXCLUDED` carries a freshly evaluated default, so the conflict update
+would overwrite the stored creation timestamp every time. A column that's also
+`update_now` is exempt — refreshing it is the point. Unlike `bulk_upsert`, `upsert` derives its `SET` columns rather than
+taking them, so a `conflict_defaults` key may not name a unique field — that's
+the conflict target.
+
+Every value source resolves callables, and every key must name a **column** — a
+settable property is refused, since the `SET` clause is derived from columns and
+a property could only ever be written on the insert half.
+
+`unique_fields` must name a `UniqueConstraint` declared on the model (no
+condition, no expressions) and every unique field must be non-null. It can't be
+the primary key: Postgres generates the identity value, so a caller has nothing
+to conflict on.
+
+Three things to keep in mind:
+
+- **`kwargs` are values, not filters.** A keyword that isn't part of the conflict
+  key doesn't narrow which row is matched — `unique_fields` alone decides that —
+  it's just another column written to whichever row conflicts.
+- **The queryset's filters don't scope it either.** `qs.filter(...).upsert(...)`
+  writes the conflicting row whether or not it matches the filter — the conflict
+  constraint decides which row is touched. It isn't refused because the
+  related-manager wrappers call through a filtered queryset. To scope an upsert,
+  fold the scoping column into `unique_fields` (and into the constraint), or do a
+  locked read and write instead.
+- **The merged row isn't validated**, and a constraint violation surfaces as a raw
+  `psycopg.IntegrityError`, not a `ValidationError`. `upsert` looks single-row
+  like `create()`, but it's a set-based write like `bulk_upsert` (see
+  [Validation](#validation)).
+
 #### Use queryset `.update()` / `.delete()` for mass operations
 
 ```python
@@ -443,6 +1036,44 @@ for row in HugeTable.query.all():
 for row in HugeTable.query.iterator(chunk_size=2000):
     process(row)
 ```
+
+## Returning affected rows
+
+`QuerySet.update()` and `QuerySet.delete()` return an `int` rowcount. Chain `returning()` before the write to get the affected rows back instead — Postgres' `RETURNING` clause fetches them in the same statement, so there's no second query.
+
+```python
+# No arguments: rows come back as model instances.
+running = Job.query.filter(status="pending").returning().update(status="running")
+for job in running:
+    print(job.id, job.status)  # reflects the post-update values
+
+# Field references: rows come back as dicts of just those columns.
+deleted = (
+    Event.query.filter(created_at__lt=cutoff)
+    .returning(Event.id, Event.payload)
+    .delete()
+)
+for row in deleted:
+    print(row["id"], row["payload"])  # the rows as they were deleted
+```
+
+- **`returning()`** returns full model instances. For `update()` they hold the new values and stay live. For `delete()` they are **read-only snapshots**: every value is there to read, the id included, but the row is gone, so `create()`, `update()` and `delete()` on them raise.
+    - That is the opposite of `Model.delete()`, which clears the instance's id and leaves it re-creatable — that instance is a row you still hold and may want to put back, while a snapshot is a record of one that was removed, and its id is the point.
+- **`returning(Model.field, ...)`** returns a list of dicts with only those columns. Pass field references (`Model.field`), not strings; a many-to-many field or one from another model raises an error at the `returning()` call.
+- **A foreign key can't be named here.** At class level `Model.fk` is the relation — that is what lets `where()` traverse it, as in `Child.parent.name.equals(...)` — not its column, so `returning(Child.parent)` raises `FieldError`. Foreign key columns come back through no-argument `returning()`, which hands you whole instances.
+- Without `returning()`, `update()`/`delete()` return an `int` as before.
+- `returning()` only applies to `update()` and `delete()`. Any other write on the same queryset — `create()`, `bulk_create()`, `bulk_upsert()`, `bulk_update()`, `get_or_create()`, `upsert()` — raises `TypeError` rather than quietly dropping it.
+- `returning()` keeps the queryset's own class, so a custom `QuerySet` and its methods survive it. Chain your own methods before `returning()` — a type checker sees the returning shape after it, not your subclass.
+
+A row lock belongs on the read side of the write, and it composes in either order. The write then needs an open `transaction.atomic()`, and is emitted as a locking sub-select so the lock has somewhere to live — see [Locking a set-based write](#locking-a-set-based-write).
+
+`returning()` is inert for reads. It describes what the next `update()` or `delete()` hands back, so iterating, `count()`, `first()` and `values()` on the same queryset behave exactly as they would without it — which is what lets you inspect a chain before writing it.
+
+The values you get back are whatever the statement wrote, exactly as Postgres holds them. A set-based `update()` doesn't run Python-side field hooks, so an `update_now=True` timestamp comes back unchanged unless the `update()` set it.
+
+`RETURNING` only reports rows of the statement's own target table. Rows removed by a cascading `ON DELETE` are never included — a `delete()` with `returning()` gives you the parent rows you deleted, not the children Postgres cascaded.
+
+Every affected row is fetched and built into memory at once, so `returning()` belongs on writes you've already bounded by a filter. For a write that spans a whole table, take the rowcount and page through the rows separately.
 
 ## Transactions
 
@@ -502,6 +1133,81 @@ with read_only():
         pass
     User.query.count()  # still works — outer txn is healthy
 ```
+
+### Row-level locking
+
+Lock the rows a query selects so concurrent transactions can't change them until yours commits. Postgres offers four lock strengths, from strongest to weakest, each with its own QuerySet method:
+
+```python
+with transaction.atomic():
+    account = Account.query.for_update().get(id=1)  # FOR UPDATE
+    account.balance -= 100
+    account.update(fields=["balance"])
+```
+
+| Method                | SQL clause          | Use it when                                                                |
+| --------------------- | ------------------- | -------------------------------------------------------------------------- |
+| `for_update()`        | `FOR UPDATE`        | You intend to update or delete the row.                                    |
+| `for_no_key_update()` | `FOR NO KEY UPDATE` | Same, but you won't touch the primary key — lets key-share locks proceed.  |
+| `for_share()`         | `FOR SHARE`         | You need the row to stay put while you read it, but others may also share. |
+| `for_key_share()`     | `FOR KEY SHARE`     | Weakest — only blocks changes to the row's key.                            |
+
+Locking requires an open transaction. The method itself just builds the queryset — evaluating a locked queryset outside `transaction.atomic()` is what raises `TransactionManagementError`.
+
+All four accept the same options:
+
+- `nowait=True` — raise instead of waiting if a row is already locked.
+- `skip_locked=True` — skip already-locked rows instead of waiting (can't be combined with `nowait`).
+- `of=("self", "related")` — lock only the named tables in a join rather than every selected row.
+
+```python
+# Claim the next available job without blocking on rows another worker holds
+job = Job.query.for_update(skip_locked=True).filter(status="pending").first()
+```
+
+Chaining more than one lock method keeps only the last one, options included.
+
+Postgres can only lock rows that map one-to-one onto table rows, so a lock can't be combined with `distinct()`, an aggregate annotation, or a window annotation. Either order raises `psycopg.NotSupportedError` when the queryset is built, naming the lock method:
+
+```python
+Widget.query.distinct().for_update()  # NotSupportedError
+Widget.query.for_update().distinct()  # same error, either way round
+```
+
+`count()` and `aggregate()` are the exception — they compile to an aggregate query of their own, so they drop the lock rather than reject it.
+
+#### Locking a set-based write
+
+A lock also applies to `update()` and `delete()` on the same queryset. Neither statement takes a locking clause of its own, so the write is emitted as a locking sub-select:
+
+```python
+# Claim *all* pending rows matching the filter, in one statement
+with transaction.atomic():
+    claimed = (
+        Job.query.filter(status="pending")
+        .for_update(skip_locked=True)
+        .returning()
+        .update(status="running")
+    )
+```
+
+```sql
+UPDATE "jobs" SET "status" = 'running'
+WHERE "id" IN (
+    SELECT U0."id" FROM "jobs" U0 WHERE U0."status" = 'pending' FOR UPDATE OF U0 SKIP LOCKED
+)
+RETURNING ...
+```
+
+It is still one statement. A second worker running the same write skips the rows the first one holds instead of blocking on them, so each row is claimed once.
+
+Note what this is and isn't: it takes **every** row the filter matches, so it suits draining a batch, not handing one unit of work to one worker. A bounded claim would need a sliced write (`[:1]`), and `update()`/`delete()` reject a sliced queryset — so for a per-worker claim, take one row with the locked read above (`for_update(skip_locked=True)` + `first()`) and write it separately.
+
+The `transaction.atomic()` is required, same as for a locked read: a locked write outside a transaction raises `TransactionManagementError`. Nothing else honors the lock — without a transaction there is nothing for it to be held until.
+
+**A locked write locks only the target table's rows.** When the filter spans a relation, the sub-select joins the other tables to look values up, and a bare `FOR UPDATE` would lock a row in each of them — so a write whose filter reads a parent would wait on (or, with `skip_locked=True`, silently skip) rows it never touches. The clause is emitted as `FOR UPDATE OF <target>` so that can't happen. To lock related rows as well, take them with a separate locked read.
+
+That is also why `of=` can only name `"self"` on a write: the sub-select reads one column — this table's id — so a related name has nothing to point at, and `update()`/`delete()` raise `TypeError` rather than let it fail deeper down. Dropping `of=` is the same thing; the write locks its own rows either way.
 
 ## Schema management
 
@@ -991,28 +1697,44 @@ This is **not** for passwords or tokens you issue — those should be hashed (on
 
 ```python
 from plain import postgres
-from plain.postgres import Field, types
+from plain.postgres import EncryptedField, Field, types
 
 
 @postgres.register_model
 class Integration(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
-    api_key: Field[str] = types.EncryptedTextField(max_length=200)
-    credentials: Field[dict | None] = types.EncryptedJSONField(
+    api_key: EncryptedField[str] = types.EncryptedTextField(max_length=200)
+    credentials: EncryptedField[dict | None] = types.EncryptedJSONField(
         required=False, allow_null=True, default=None
     )
 ```
+
+Annotate encrypted fields `EncryptedField[T]`, not `Field[T]`. The annotation is
+what the type checker reads, and `EncryptedField[T]` is the `Field[T]` subclass
+that declares the blocked conditions — with a plain `Field[T]`,
+`Integration.api_key.equals("x")` type-checks its way to a runtime `TypeError`
+instead of being rejected at the call site. It types the constructor exactly as
+`Field[T]` does.
 
 Values are encrypted using Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from `SECRET_KEY`. The `cryptography` package is required — install it with `pip install cryptography`.
 
 **Available fields:**
 
+- `EncryptedField[T]` — the annotation type; also the shared base the two fields below derive from.
 - `EncryptedTextField` — encrypts text, stored as `text` in the database regardless of `max_length` (ciphertext is longer than plaintext). `max_length` is enforced on the plaintext value during validation.
 - `EncryptedJSONField` — serializes to JSON, encrypts, and stores as `text`. Supports custom `encoder` and `decoder` parameters (same as `JSONField`).
 
 **Limitations:**
 
-- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported.
+- **No lookups** — encrypted values are non-deterministic (same plaintext produces different ciphertext each time), so filtering on encrypted fields doesn't work. Only `isnull` lookups are supported. Comparing against a value raises `TypeError` rather than silently matching nothing — both `filter(api_key="x")` and the typed [condition methods](#typed-conditions-with-where) (`equals`, `contains`, …), which are also rejected at the call site when the field is annotated `EncryptedField[T]`. `filter(api_key=None)` still rewrites to `IS NULL`.
+- **`get_or_create()` must not look up an encrypted field.** `get_or_create(api_key="k")` raises, and the error says to move the value into `defaults=`. This is a deliberate break: it previously "worked" by creating a new row on every call, because the lookup could never match existing ciphertext. An encrypted value can be written, just not looked up:
+
+    ```python
+    Integration.query.get_or_create(name="acme", defaults={"api_key": "k"})
+    ```
+
+    The same applies to `upsert()`, and to an expression right-hand side like `filter(api_key=F("name"))` — the column is still ciphertext.
+
 - **No indexes or constraints** — encrypted fields cannot be used in indexes or unique constraints. Preflight checks will catch this.
 - **Only `default=""`** — on `EncryptedTextField` (paired with `required=False`), the empty string is stored as plaintext `''`, so it's the one value expressible as a column `DEFAULT` (declare it to add the field to a populated table). Any other default would need ciphertext, which is non-deterministic. `EncryptedJSONField` has no persistent default at all — even `{}` serializes to text that would need ciphertext — so pair `allow_null=True` with `default=None`, which stores nothing and just marks the field optional in the constructor.
 
@@ -1036,9 +1758,60 @@ from plain.postgres import Field, types
 @postgres.register_model
 class Book(postgres.Model):
     title: Field[str] = types.TextField(max_length=200)
-    author: Author = types.ForeignKeyField("Author", on_delete=postgres.CASCADE)
+    author: Field[Author] = types.ForeignKeyField(Author, on_delete=postgres.CASCADE)
     tags = types.ManyToManyField("Tag")
 ```
+
+### Referring to a model by name
+
+`ForeignKeyField` also takes a `"package.Model"` string (or `"self"`) instead of
+the class. That is a **runtime** device, for the cases where the class isn't
+importable at the point of declaration: a circular reference between two models,
+a self-reference, or a framework package pointing at the app's own `User`.
+
+The annotation is unaffected — a string-referenced foreign key is annotated
+`Field[Related]` exactly like a class-referenced one, and gets the same typed
+surface: `Model.user.email.equals(...)` traversal, `Model.user.id.equals(...)`
+conditions, and a typed `Model(user=...)` constructor. The string says nothing
+to the checker, so the annotation is where `Related` comes from; import it under
+`TYPE_CHECKING` when importing it for real would be the cycle you were avoiding:
+
+```python
+from typing import TYPE_CHECKING
+
+from plain import postgres
+from plain.postgres import Field, types
+
+if TYPE_CHECKING:
+    from app.users.models import User
+
+
+@postgres.register_model
+class PinnedNavItem(postgres.Model):
+    # Cross-package: plain.admin can't import the app's User at runtime.
+    user: Field[User] = types.ForeignKeyField("users.User", on_delete=postgres.CASCADE)
+
+
+@postgres.register_model
+class TreeNode(postgres.Model):
+    name: Field[str] = types.TextField(max_length=100)
+    # Self-reference, nullable: `Field[T | None]` plus `default=None`.
+    parent: Field[TreeNode | None] = types.ForeignKeyField(
+        "self", on_delete=postgres.CASCADE, allow_null=True, default=None
+    )
+```
+
+What does _not_ work is annotating the field with the related model itself
+(`user: User = types.ForeignKeyField("users.User", ...)`). That names a model
+instance rather than a field, so the checker never sees a descriptor: class
+access is a `User` rather than `type[User]`, `Model.user.id` is an `int`, and
+the condition methods are gone. `plain preflight`'s
+`postgres.foreign_key_annotated_as_value` finds these: it reports a foreign key
+whose annotation — on the model or on any of its base classes — names the
+related model. It asks for positive evidence, so it stays quiet when it can't
+establish that: an unannotated foreign key (no constructor argument at all), a
+`ClassVar[...]` one, and any spelling whose meaning it can't read. Treat a clean
+run as "nothing found", not "nothing to find".
 
 ### Foreign key access
 
@@ -1051,7 +1824,9 @@ book.author.id  # no query — the foreign key value
 book.author.name  # one query — loads the rest of the row
 ```
 
-The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `select_related()` to load related rows up front and avoid a query per row.
+The first access to any non-key field loads the whole row in a single query. There is no separate `author_id` attribute — `book.author.id` is the foreign key value, and it is type-checked because `book.author` is an `Author`. In loops, use `join()` to load related rows up front and avoid a query per row.
+
+A foreign key with no value raises `RelatedObjectDoesNotExist` on access. That attribute still lives on the descriptor at runtime, but class-level access is now typed as the related model (that is what makes `Book.author.name.equals(...)` work), so `Book.author.RelatedObjectDoesNotExist` is a type error. Catch it as `Author.DoesNotExist` — the exception subclasses both that and `AttributeError` — or as `AttributeError`.
 
 The partial-instance shortcut is safe because Plain always creates a database foreign-key constraint, so the referenced row is guaranteed to exist.
 
@@ -1193,11 +1968,11 @@ This applies to instance writes only. Set-based writes — `QuerySet.update()` a
 ```python
 try:
     obj.create()
-except (psycopg.IntegrityError, ValidationError):
+except psycopg.IntegrityError, ValidationError:
     ...  # lost a race — reload and retry, or report it
 ```
 
-For a plain insert-or-update with no per-row logic, `bulk_create(..., update_conflicts=True, unique_fields=[...])` is an atomic upsert with no race to catch.
+For a plain insert-or-update with no per-row logic there's no race to catch in the first place: `upsert(**values, unique_fields=[...])` for one row and `bulk_upsert(objs, update_fields=[...], unique_fields=[...])` for many are each a single atomic statement.
 
 ### Indexes and constraints
 
@@ -1320,12 +2095,12 @@ CASCADE for owned children, RESTRICT for referenced data, SET_NULL for optional 
 
 ```python
 # Bad — blindly using CASCADE everywhere
-company: Company = types.ForeignKeyField(
-    "Company", on_delete=postgres.CASCADE
+company: Field[Company] = types.ForeignKeyField(
+    Company, on_delete=postgres.CASCADE
 )  # deleting company deletes invoices!
 
 # Good — block the delete while invoices reference the company
-company: Company = types.ForeignKeyField("Company", on_delete=postgres.RESTRICT)
+company: Field[Company] = types.ForeignKeyField(Company, on_delete=postgres.RESTRICT)
 ```
 
 #### No `allow_null` on string fields

@@ -1,11 +1,11 @@
 [project]
 name = "plain.assets"
-version = "0.4.3"
+version = "0.5.0"
 description = "Serve static assets (CSS, JS, images, etc.) directly or from a CDN."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 readme = "README.md"
 license = "BSD-3-Clause"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = ["plain<1.0.0"]
 
 [dependency-groups]

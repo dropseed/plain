@@ -21,11 +21,11 @@ class CheckUnusedFlags(PreflightCheck):
 
         errors = []
 
-        flag_names = Flag.query.all().values_list("name", flat=True)
+        flag_names = Flag.query.all().select(Flag.name, flat=True)
 
         try:
             flag_names = set(flag_names)
-        except (psycopg.ProgrammingError, psycopg.OperationalError):
+        except psycopg.ProgrammingError, psycopg.OperationalError:
             # The table doesn't exist yet
             # (migrations probably haven't run yet),
             # so we can't check it.

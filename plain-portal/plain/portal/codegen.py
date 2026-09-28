@@ -8,8 +8,6 @@ entropy — enough to prevent casual guessing while SPAKE2 protects
 against brute-force by eavesdroppers.
 """
 
-from __future__ import annotations
-
 import secrets
 
 # ~200 words: common, easy to spell, easy to pronounce, no homophones.

@@ -4,12 +4,11 @@
 out.
 """
 
-from __future__ import annotations
-
+import pytest
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import get_connection
 from plain.postgres.migrations.operations.special import RunSQL
-from plain.test import override_settings
+from plain.runtime import settings as plain_settings
 
 
 def _collect(callback, *, atomic: bool = True) -> list[str]:
@@ -19,7 +18,7 @@ def _collect(callback, *, atomic: bool = True) -> list[str]:
     return editor.executed_sql
 
 
-def test_execute_prepends_set_local_timeouts():
+def test_execute_prepends_set_local_timeouts(db):
     sql_list = _collect(
         lambda editor: editor.execute(
             "ALTER TABLE examples_defaultsexample ADD COLUMN tmp_col integer"
@@ -32,7 +31,7 @@ def test_execute_prepends_set_local_timeouts():
     assert stmt.rstrip().endswith("ADD COLUMN tmp_col integer")
 
 
-def test_set_timeouts_false_emits_no_prelude():
+def test_set_timeouts_false_emits_no_prelude(db):
     sql_list = _collect(
         lambda editor: editor.execute(
             "ALTER TABLE examples_defaultsexample ADD COLUMN tmp_col integer",
@@ -43,22 +42,21 @@ def test_set_timeouts_false_emits_no_prelude():
     assert "SET LOCAL" not in sql_list[0]
 
 
-def test_timeout_values_propagate_from_settings():
-    with override_settings(
-        POSTGRES_MIGRATION_LOCK_TIMEOUT="750ms",
-        POSTGRES_MIGRATION_STATEMENT_TIMEOUT="5s",
-    ):
-        sql_list = _collect(
-            lambda editor: editor.execute(
-                "ALTER TABLE examples_defaultsexample ADD COLUMN tmp_col integer"
-            )
+def test_timeout_values_propagate_from_settings(db, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(plain_settings, "POSTGRES_MIGRATION_LOCK_TIMEOUT", "750ms")
+    monkeypatch.setattr(plain_settings, "POSTGRES_MIGRATION_STATEMENT_TIMEOUT", "5s")
+
+    sql_list = _collect(
+        lambda editor: editor.execute(
+            "ALTER TABLE examples_defaultsexample ADD COLUMN tmp_col integer"
         )
+    )
     stmt = sql_list[0]
     assert "lock_timeout = '750ms'" in stmt
     assert "statement_timeout = '5s'" in stmt
 
 
-def test_create_model_wraps_each_statement():
+def test_create_model_wraps_each_statement(db):
     sql_list = _collect(lambda editor: editor.create_model(DefaultsExample))
     assert sql_list  # not empty
     for stmt in sql_list:
@@ -66,7 +64,7 @@ def test_create_model_wraps_each_statement():
         assert "SET LOCAL statement_timeout = '3s';" in stmt
 
 
-def test_non_atomic_migration_skips_set_local():
+def test_non_atomic_migration_skips_set_local(db):
     """SET LOCAL is a no-op with WARNING outside a transaction block, so the
     schema editor must skip the prelude when opened with atomic=False
     (e.g. a migration that uses RunSQL to issue CONCURRENTLY). Without this
@@ -81,7 +79,7 @@ def test_non_atomic_migration_skips_set_local():
     assert "SET LOCAL" not in sql_list[0]
 
 
-def test_runsql_no_timeout_opts_out():
+def test_runsql_no_timeout_opts_out(db):
     """`RunSQL(no_timeout=True)` disables the SET LOCAL prelude entirely so a
     long-running data migration can run without a statement_timeout."""
     connection = get_connection()
@@ -97,7 +95,7 @@ def test_runsql_no_timeout_opts_out():
     assert "SET LOCAL" not in editor.executed_sql[0]
 
 
-def test_runsql_default_applies_timeouts():
+def test_runsql_default_applies_timeouts(db):
     """Without `no_timeout=True`, RunSQL DDL gets the migration timeouts."""
     connection = get_connection()
     op = RunSQL("UPDATE examples_defaultsexample SET role = role")

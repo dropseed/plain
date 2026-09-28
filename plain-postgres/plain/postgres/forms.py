@@ -3,8 +3,6 @@ Helper functions for creating Form classes from Plain models
 and database field objects.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, cast
@@ -441,8 +439,8 @@ class ModelChoiceIterator:
         if self.field.empty_label is not None:
             yield ("", self.field.empty_label)
         queryset = self.queryset
-        # Can't use iterator() when queryset uses prefetch_related()
-        if not queryset._prefetch_related_lookups:
+        # Can't use iterator() when queryset uses prefetch()
+        if not queryset._prefetch_lookups:
             queryset = queryset.iterator()
         for obj in queryset:
             yield self.choice(obj)
@@ -542,7 +540,7 @@ class ModelChoiceField(ChoiceField):
             if isinstance(value, self.queryset.model):
                 value = getattr(value, key)
             value = self.queryset.get(**{key: value})
-        except (ValueError, TypeError, self.queryset.model.DoesNotExist):
+        except ValueError, TypeError, self.queryset.model.DoesNotExist:
             raise ValidationError(
                 self.error_messages["invalid_choice"],
                 code="invalid_choice",
@@ -612,7 +610,7 @@ class ModelMultipleChoiceField(ModelChoiceField):
         for id_val in value:
             try:
                 self.queryset.filter(id=id_val)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 raise ValidationError(
                     self.error_messages["invalid_id_value"],
                     code="invalid_id_value",

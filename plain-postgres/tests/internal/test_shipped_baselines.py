@@ -6,8 +6,6 @@ when the package is released; this test is what makes forgetting fail CI.
 any other cross-package minimum - see the release skill.)
 """
 
-from __future__ import annotations
-
 import ast
 from pathlib import Path
 

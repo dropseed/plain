@@ -10,8 +10,6 @@ The loader (`plain.dev.dotenv`) and the `plain env` commands both come here to
 turn "what the files name" and "what the environment supplied" into one key.
 """
 
-from __future__ import annotations
-
 import hashlib
 import os
 import re
@@ -68,7 +66,7 @@ def is_valid_env_key(env_key: str) -> bool:
 
     try:
         Fernet(env_key.encode("ascii"))
-    except (ValueError, UnicodeEncodeError):
+    except ValueError, UnicodeEncodeError:
         return False
     return True
 

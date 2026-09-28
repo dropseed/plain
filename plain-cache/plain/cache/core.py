@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
@@ -76,7 +74,8 @@ class Cache:
 
     def get(self, key: str, default: Any = None) -> Any:
         """Return the value for `key`, or `default` if it's absent or expired."""
-        item = self._model.query.live().filter(key=key).first()
+        model = self._model
+        item = model.query.live().first(model.key.equals(key))
         return item.value if item is not None else default
 
     def get_many(self, keys: Iterable[str]) -> dict[str, Any]:
@@ -84,7 +83,8 @@ class Cache:
 
         Missing/expired keys are omitted. One query regardless of how many keys.
         """
-        items = self._model.query.live().filter(key__in=list(keys))
+        model = self._model
+        items = model.query.live().where(model.key.is_in(list(keys)))
         return {item.key: item.value for item in items}
 
     # Writing -----------------------------------------------------------------
@@ -106,12 +106,12 @@ class Cache:
         if not mapping:
             return
 
-        # bulk_create fires pre_save, so updated_at's update_now stamps a fresh
-        # now() at write time on its own. created_at (no update_now) would
-        # otherwise fall to its DB default, evaluated a hair later -- leaving a
-        # brand-new row with updated_at < created_at. Stamp created_at from an
-        # up-front `now` so created_at <= updated_at; it's omitted from
-        # update_fields, so it's preserved on conflict.
+        # bulk_upsert fires pre_save and refreshes update_now columns on the
+        # conflict path, so updated_at looks after itself. created_at (no
+        # update_now) would otherwise fall to its DB default, evaluated a hair
+        # later -- leaving a brand-new row with updated_at < created_at. Stamp
+        # created_at from an up-front `now` so created_at <= updated_at; being
+        # DB-owned it can't be named in update_fields, so it survives conflicts.
         now = timezone.now()
         expires_at = _coerce_expiration(expiration, now=now)
         items = []
@@ -122,11 +122,11 @@ class Cache:
             # construction so created_at <= updated_at (see comment above).
             item.created_at = now
             items.append(item)
-        self._model.query.bulk_create(
+        model = self._model
+        model.query.bulk_upsert(
             items,
-            update_conflicts=True,
-            update_fields=["value", "expires_at", "updated_at"],
-            unique_fields=["key"],
+            update_fields=[model.value, model.expires_at],
+            unique_fields=[model.key],
         )
 
     def get_or_set(
@@ -142,7 +142,8 @@ class Cache:
         invoked on a miss (so a callable can't be cached *as* the value). A
         stored `None` counts as a hit (it won't recompute).
         """
-        item = self._model.query.live().filter(key=key).first()
+        model = self._model
+        item = model.query.live().first(model.key.equals(key))
         if item is not None:
             return item.value
 
@@ -241,11 +242,12 @@ class Cache:
         """
         # QuerySet.update() issues a direct SQL UPDATE and does NOT fire pre_save,
         # so updated_at's update_now won't bump on its own -- stamp it by hand.
-        # (set_many() relies on pre_save instead, since bulk_create does fire it.)
+        # (set_many() relies on pre_save instead, since bulk_upsert does fire it.)
         now = timezone.now()
+        model = self._model
         updated = (
-            self._model.query.live()
-            .filter(key=key)
+            model.query.live()
+            .where(model.key.equals(key))
             .update(expires_at=_coerce_expiration(expiration, now=now), updated_at=now)
         )
         return updated > 0
@@ -254,11 +256,13 @@ class Cache:
 
     def delete(self, key: str) -> bool:
         """Delete `key`. Returns `True` if it existed, `False` otherwise."""
-        return self._model.query.filter(key=key).delete() > 0
+        model = self._model
+        return model.query.where(model.key.equals(key)).delete() > 0
 
     def delete_many(self, keys: Iterable[str]) -> int:
         """Delete every key in `keys`. Returns the number of rows deleted."""
-        return self._model.query.filter(key__in=list(keys)).delete()
+        model = self._model
+        return model.query.where(model.key.is_in(list(keys))).delete()
 
     def clear(self) -> int:
         """Delete every entry in the cache. Returns the number of rows deleted."""

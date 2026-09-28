@@ -7,8 +7,6 @@ bearer-token auth, API versioning, full CRUD with `links`, and components
 in-memory dict store so the fixture runs with zero environment setup.
 """
 
-from __future__ import annotations
-
 import uuid
 from itertools import count
 from typing import Any, ClassVar
@@ -209,7 +207,7 @@ class NoteListAPIView(APIView):
         limit_raw = self.request.query_params.get("limit", "25")
         try:
             limit = max(1, min(int(limit_raw), 100))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise BadRequestError400("Invalid `limit`")
 
         return {"results": notes[:limit]}

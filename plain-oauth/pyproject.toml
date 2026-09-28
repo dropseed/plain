@@ -1,22 +1,22 @@
 [project]
 name = "plain.oauth"
-version = "0.50.4"
+version = "0.51.0"
 description = "Let users log in with OAuth providers."
 authors = [{ name = "Dave Gaeddert", email = "dave.gaeddert@dropseed.dev" }]
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
   "plain>=0.145.0,<1.0.0",
   "plain.auth>=0.29.0,<1.0.0",
-  "plain.postgres>=0.113.0,<1.0.0",
+  "plain.postgres>=0.121.0,<1.0.0",
   "plain.templates>=0.6.0,<1.0.0",
   "cryptography>=41.0",
 ]
 
 
 [dependency-groups]
-dev = ["plain.testing<1.0.0", "httpx>=0.27"]
+dev = ["plain.testing<1.0.0", "httpx>=0.27", "plain.admin<1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

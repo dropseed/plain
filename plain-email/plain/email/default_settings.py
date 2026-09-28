@@ -20,7 +20,9 @@ EMAIL_PORT: int = 587
 EMAIL_USE_LOCALTIME: bool = False
 
 # Optional SMTP authentication information for EMAIL_HOST.
-EMAIL_HOST_USER: str = ""
+# The username is secret too: several providers (Postmark, Mailgun, SES) use the
+# API token itself as the SMTP username, so it must never be printed.
+EMAIL_HOST_USER: Secret[str] = ""
 EMAIL_HOST_PASSWORD: Secret[str] = ""
 EMAIL_USE_TLS: bool = True
 EMAIL_USE_SSL: bool = False

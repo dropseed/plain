@@ -6,8 +6,6 @@ point group; the runner discovers and drives them. This entry point group is
 the entire extension API.
 """
 
-from __future__ import annotations
-
 from importlib.metadata import entry_points
 
 from plain.test.lifecycle import TestLifecycle

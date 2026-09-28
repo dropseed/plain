@@ -1,7 +1,5 @@
 """Shared helpers for tests that write migration files on disk."""
 
-from __future__ import annotations
-
 import sys
 import tempfile
 from collections.abc import Generator

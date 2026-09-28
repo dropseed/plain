@@ -5,12 +5,15 @@ from .logs import CapturedLogs, capture_logs
 from .otel import capture_metrics, capture_spans
 from .overrides import override_settings, patch
 from .raises import raises
+from .websocket import WebSocketRejected, WebSocketTestConnection
 
 __all__ = [
     "CapturedLogs",
     "Client",
     "RequestFactory",
     "TestLifecycle",
+    "WebSocketRejected",
+    "WebSocketTestConnection",
     "capture_logs",
     "capture_metrics",
     "capture_spans",

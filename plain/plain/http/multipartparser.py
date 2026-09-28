@@ -5,8 +5,6 @@ Exposes one class, ``MultiPartParser``, which feeds chunks of uploaded data to
 file upload handlers for processing.
 """
 
-from __future__ import annotations
-
 import base64
 import binascii
 import collections
@@ -205,7 +203,7 @@ class MultiPartParser:
                 try:
                     disposition = meta_data["content-disposition"][1]
                     field_name = disposition["name"].strip()
-                except (KeyError, IndexError, AttributeError):
+                except KeyError, IndexError, AttributeError:
                     continue
 
                 transfer_encoding = meta_data.get("content-transfer-encoding")
@@ -279,7 +277,7 @@ class MultiPartParser:
                             if content_length_value
                             else None
                         )
-                    except (IndexError, TypeError, ValueError):
+                    except IndexError, TypeError, ValueError:
                         content_length = None
 
                     counters = [0] * len(handlers)

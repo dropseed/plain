@@ -5,8 +5,6 @@ Analyzes Python files to determine the percentage of functions/methods
 that have complete type annotations (parameters and return types).
 """
 
-from __future__ import annotations
-
 import ast
 import os
 import re
@@ -212,7 +210,7 @@ def analyze_file(file_path: Path) -> FileStats | None:
         )
         return stats
 
-    except (SyntaxError, UnicodeDecodeError):
+    except SyntaxError, UnicodeDecodeError:
         return None
 
 

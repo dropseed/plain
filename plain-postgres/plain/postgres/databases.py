@@ -16,8 +16,6 @@ clobbering, how to name databases, what to store in a comment, when to fork
 via `TEMPLATE` versus `pg_dump` — belongs to the caller.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass

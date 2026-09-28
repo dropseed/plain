@@ -1,7 +1,5 @@
 """Shared test isolation for plain-cloud: fake keyring + isolated $HOME."""
 
-from __future__ import annotations
-
 import contextlib
 import os
 import tempfile

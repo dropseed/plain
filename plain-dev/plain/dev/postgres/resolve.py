@@ -24,8 +24,6 @@ sync`, which inherits our `DATABASE_URL`, sees a URL already configured, and
 skips all of this. Only the outermost process does any real work.
 """
 
-from __future__ import annotations
-
 import os
 import sys
 from enum import Enum, auto
@@ -295,7 +293,7 @@ def ensure_database(cluster: Cluster, *, project_root: Path, db_name: str) -> No
             cluster.create_database(db_name)
             mechanism = "empty"
             click.secho(f"Created database {db_name!r}.", fg="green", err=True)
-    except (errors.DuplicateDatabase, errors.UniqueViolation):
+    except errors.DuplicateDatabase, errors.UniqueViolation:
         return
 
     cluster.record_created(

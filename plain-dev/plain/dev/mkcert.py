@@ -27,7 +27,8 @@ class MkcertManager:
         # mkcert not found system-wide, download to the machine-level cache
         install_path = PLAIN_CACHE_PATH / "mkcert"
         install_path.mkdir(parents=True, exist_ok=True)
-        binary_path = install_path / "mkcert"
+        binary_name = "mkcert.exe" if platform.system() == "Windows" else "mkcert"
+        binary_path = install_path / binary_name
 
         if force_reinstall and binary_path.exists():
             click.secho("Removing existing mkcert binary...", bold=True)

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 from .hashers import check_password, hash_password

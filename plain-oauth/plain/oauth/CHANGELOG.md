@@ -1,5 +1,38 @@
 # plain-oauth changelog
 
+## [0.51.0](https://github.com/dropseed/plain/releases/plain-oauth@0.51.0) (2026-09-21)
+
+### What's changed
+
+- The providers chart card counts connections per provider with a written query (`sql(t"...")`); the SQL it runs is the same grouped count as before ([ca91eec03c](https://github.com/dropseed/plain/commit/ca91eec03c)) ([5bcf431297](https://github.com/dropseed/plain/commit/5bcf431297))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.50.6](https://github.com/dropseed/plain/releases/plain-oauth@0.50.6) (2026-09-21)
+
+### What's changed
+
+- The connection lookups use typed `where()` conditions and the provider-key preflight uses `select()`; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f)) ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+- `OAuthConnection.user` is annotated `Field[User]`, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
+## [0.50.5](https://github.com/dropseed/plain/releases/plain-oauth@0.50.5) (2026-09-20)
+
+### What's changed
+
+- `OAuthConnection` uses the typed annotations from plain-postgres 0.119 — `Field[T]` for its columns and `EncryptedField[str]` for the access and refresh tokens ([acae922618](https://github.com/dropseed/plain/commit/acae922618)) ([f37ab1014b](https://github.com/dropseed/plain/commit/f37ab1014b))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.50.4](https://github.com/dropseed/plain/releases/plain-oauth@0.50.4) (2026-08-21)
 
 ### What's changed

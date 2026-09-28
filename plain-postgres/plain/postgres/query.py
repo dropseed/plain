@@ -2,15 +2,19 @@
 The main QuerySet implementation. This provides the public API for the ORM.
 """
 
-from __future__ import annotations
-
+import annotationlib
 import copy
+import dataclasses
+import datetime
+import inspect
+import json
 import operator
 import warnings
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from decimal import Decimal
 from functools import cached_property
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Never, Self, overload
+from typing import TYPE_CHECKING, Any, Literal, Never, Self, cast, overload
 
 import plain.runtime
 import psycopg
@@ -21,24 +25,36 @@ from plain.postgres.db import (
     PLAIN_VERSION_PICKLE_KEY,
     get_connection,
 )
+from plain.postgres.dialect import get_json_dumps
 from plain.postgres.exceptions import (
     FieldDoesNotExist,
     FieldError,
     ObjectDoesNotExist,
 )
-from plain.postgres.expressions import Case, F, ResolvableExpression, Value, When
+from plain.postgres.expressions import (
+    Case,
+    F,
+    ResolvableExpression,
+    Value,
+    When,
+    is_query_expression,
+)
 from plain.postgres.fields import (
     Field,
     PrimaryKeyField,
 )
+from plain.postgres.fields.base import ColumnField
+from plain.postgres.fields.json import JSONField
 from plain.postgres.functions import Cast
-from plain.postgres.query_utils import Q
+from plain.postgres.query_utils import Q, condition_origins_of
+from plain.postgres.selectable import Selectable
 from plain.postgres.sql import (
     AND,
     CURSOR,
     OR,
     DeleteQuery,
     InsertQuery,
+    LockMode,
     Query,
     RawQuery,
     UpdateQuery,
@@ -47,16 +63,119 @@ from plain.postgres.utils import resolve_callables
 from plain.utils.functional import partition
 
 # Re-exports for public API
-__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet"]
+__all__ = ["F", "Prefetch", "Q", "QuerySet", "RawQuerySet", "RowQuerySet"]
 
 if TYPE_CHECKING:
+    from string.templatelib import Template
+
+    from _typeshed import DataclassInstance
     from plain.postgres import Model
+    from plain.postgres.written import Written
+
+
+def conflict_sort_value(field: Field, value: Any) -> str:
+    """One component of the order bulk_upsert() sends its batches in.
+
+    Concurrent callers only have to agree on an order, not on a meaningful
+    one, so the requirement is narrow: two callers holding the same logical
+    key must render it the same way, and comparing the results must never
+    raise. Everything here serves that.
+
+    The value arrives already through `get_prep_value`, which settles most of
+    it -- a TimeZoneField's ZoneInfo is its name by then, a UUID string is a
+    UUID, a naive datetime is aware. What is left is the spellings Postgres
+    holds equal that `str()` would not: a str subclass that renders itself
+    some other way, a bytea handed back as a memoryview, the same instant
+    written at two offsets, a signed zero, a decimal's scale.
+    """
+    if isinstance(field, JSONField):
+        # Encode with the field's own encoder, which stringifies non-string
+        # object keys, and only then re-parse and dump with the keys sorted --
+        # sorting them first would compare an int key against a str one and
+        # raise. Two equal objects written with their keys in either order
+        # then render the same.
+        return json.dumps(
+            json.loads(get_json_dumps(field.encoder)(value)), sort_keys=True
+        )
+    if isinstance(value, str):
+        # A StrEnum member or a SafeString compares equal to the plain string,
+        # which is all the column holds, but renders itself differently.
+        # str.__str__ goes around the override.
+        return str.__str__(value)
+    if isinstance(value, memoryview | bytearray):
+        # psycopg hands a bytea column back as a memoryview, whose str() is
+        # where it happens to sit in memory.
+        return str(bytes(value))
+    if isinstance(value, datetime.datetime) and value.tzinfo is not None:
+        # timestamptz stores the instant, not the offset it was written at.
+        return str(value.astimezone(datetime.UTC))
+    if isinstance(value, float):
+        # Postgres holds -0.0 and 0.0 equal; adding zero folds the sign.
+        return repr(value + 0.0)
+    if isinstance(value, Decimal):
+        # numeric holds Decimal("1.0") and Decimal("1.00") equal. normalize()
+        # gives them one spelling, and abs() folds the negative zero it keeps.
+        # An exponent too large to normalize is left as it is -- Postgres
+        # rejects it on write, with the better error.
+        try:
+            value = value.normalize()
+            if value == 0:
+                value = abs(value)
+        except ArithmeticError:
+            pass
+    return str(value)
+
 
 # The maximum number of results to fetch in a get() query.
 MAX_GET_RESULTS = 21
 
 # The maximum number of items to display in a QuerySet.__repr__
 REPR_OUTPUT_SIZE = 20
+
+
+def _returning_signature(fields: list[Field]) -> list[tuple[Any, str | None]]:
+    """Identify a returning() selection by the columns it names.
+
+    Two selections that mean the same thing can hold different Field
+    objects -- deepcopy() of a queryset copies them -- so comparing the
+    lists themselves would call a queryset and its own copy a mismatch.
+    """
+    return [(field.model, field.name) for field in fields]
+
+
+def _lock_conflict_clause(query: Query) -> str | None:
+    """
+    Name the thing in `query` that Postgres refuses to combine with a row lock,
+    or None when the query is lockable.
+
+    Postgres rejects a locking clause whenever the returned rows don't map
+    one-to-one onto table rows, which is DISTINCT, GROUP BY, aggregates, and
+    window functions. It only says so at execution time, a long way from where
+    the queryset was built, so QuerySet checks both orders up front.
+    """
+    if query.distinct:
+        return "distinct()"
+    if query.group_by:
+        return "an aggregate annotation"
+    for annotation in query.annotations.values():
+        if annotation.contains_aggregate:
+            return "an aggregate annotation"
+        if annotation.contains_over_clause:
+            return "a window annotation"
+    return None
+
+
+def _lock_conflict(mode: LockMode, clause: str) -> psycopg.NotSupportedError:
+    """
+    Build the error for a row lock combined with an unlockable query shape.
+
+    The lock method's name is recoverable from the mode token -- "share" came
+    from for_share() -- so there is no second mode-to-name table to keep in sync.
+    """
+    return psycopg.NotSupportedError(
+        f"for_{mode}() cannot be combined with {clause}. Postgres can only lock "
+        "rows that map one-to-one onto table rows."
+    )
 
 
 class BaseIterable:
@@ -118,7 +237,7 @@ class ModelIterable(BaseIterable):
 
             # Add the known related objects to the model.
             for field, rel_objs, rel_getter in known_related_objects:
-                # Avoid overwriting objects loaded by, e.g., select_related().
+                # Avoid overwriting objects loaded by, e.g., join().
                 if field.is_cached(obj):
                     continue
                 rel_obj_id = rel_getter(obj)
@@ -250,6 +369,41 @@ class FlatValuesListIterable(BaseIterable):
             yield row[0]
 
 
+class SelectDataclassIterable(BaseIterable):
+    """
+    Iterable returned by QuerySet.select(result_type=...) that builds one
+    dataclass instance per row. Columns map to dataclass fields positionally,
+    so the tuple rows from ValuesListIterable are zipped onto the dataclass
+    field names in order.
+    """
+
+    def __iter__(self) -> Iterator[Any]:
+        queryset = self.queryset
+        result_type = queryset._select_result_type
+        assert result_type is not None
+        tuple_rows = ValuesListIterable(queryset, chunked_fetch=self.chunked_fetch)
+
+        # Work out how to call the constructor once, not once per row.
+        # Parameter kind decides how each value has to be passed: a
+        # keyword-only one can't be filled positionally, and a positional-only
+        # one can't be filled by name. A signature always orders positionals
+        # before keyword-onlys, so the row splits at a single point.
+        parameters = _result_type_parameters(result_type)
+        keyword_names = tuple(
+            p.name for p in parameters if p.kind is inspect.Parameter.KEYWORD_ONLY
+        )
+        if not keyword_names:
+            for row in tuple_rows:
+                yield result_type(*row)
+            return
+
+        split = len(parameters) - len(keyword_names)
+        for row in tuple_rows:
+            yield result_type(
+                *row[:split], **dict(zip(keyword_names, row[split:], strict=True))
+            )
+
+
 class QuerySet[T: "Model"]:
     """
     Represent a lazy database lookup for a set of objects.
@@ -278,13 +432,22 @@ class QuerySet[T: "Model"]:
     _query: Query
     _result_cache: list[T] | None
     _sticky_filter: bool
-    _prefetch_related_lookups: tuple[Any, ...]
+    _prefetch_lookups: tuple[Any, ...]
     _prefetch_done: bool
     _known_related_objects: dict[Any, dict[Any, Any]]
     _iterable_class: type[BaseIterable]
     _fields: tuple[str, ...] | None
+    # Set by select(result_type=...); drives SelectDataclassIterable.
+    _select_result_type: type[DataclassInstance] | None
     _defer_next_filter: bool
     _deferred_filter: tuple[bool, tuple[Any, ...], dict[str, Any]] | None
+    # The columns to RETURN from the next update()/delete(), or None for a
+    # plain write that returns an int rowcount. Resolved once by returning()
+    # so the write doesn't recompute them at execute time.
+    _returning_fields: list[Field] | None
+    # True when returning() was called with no arguments: hydrate the rows
+    # into model instances rather than dicts.
+    _returning_instances: bool
 
     def __init__(self):
         """Minimal init for descriptor mode. Use from_model() to create instances."""
@@ -297,13 +460,16 @@ class QuerySet[T: "Model"]:
         instance._query = query or Query(model)
         instance._result_cache = None
         instance._sticky_filter = False
-        instance._prefetch_related_lookups = ()
+        instance._prefetch_lookups = ()
         instance._prefetch_done = False
         instance._known_related_objects = {}
         instance._iterable_class = ModelIterable
         instance._fields = None
+        instance._select_result_type = None
         instance._defer_next_filter = False
         instance._deferred_filter = None
+        instance._returning_fields = None
+        instance._returning_instances = False
         return instance
 
     @overload
@@ -339,7 +505,7 @@ class QuerySet[T: "Model"]:
     # PYTHON MAGIC METHODS #
     ########################
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> QuerySet[T]:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Don't populate the QuerySet's cache."""
         obj = self.__class__.from_model(self.model)
         for k, v in self.__dict__.items():
@@ -416,9 +582,9 @@ class QuerySet[T: "Model"]:
     def __getitem__(self, k: int) -> T: ...
 
     @overload
-    def __getitem__(self, k: slice) -> QuerySet[T]: ...
+    def __getitem__(self, k: slice) -> Self: ...
 
-    def __getitem__(self, k: int | slice) -> T | QuerySet[T]:
+    def __getitem__(self, k: int | slice) -> T | Self:
         """Retrieve an item or slice from the set of results.
 
         Slicing always returns a QuerySet, even when the results are
@@ -467,36 +633,81 @@ class QuerySet[T: "Model"]:
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> type[QuerySet[Any]]:
         return cls
 
-    def __and__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __and__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __and__(self, other: QuerySet[T]) -> Self: ...
+
+    def __and__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(other, EmptyQuerySet):
-            return other
-        if isinstance(self, EmptyQuerySet):
-            return self
-        combined = self._chain()
-        combined._merge_known_related_objects(other)
-        combined.sql_query.combine(other.sql_query, AND)
+            combined = cast("Self", other._chain())
+        elif isinstance(self, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            combined = self._chain()
+            combined._merge_known_related_objects(other)
+            combined.sql_query.combine(other.sql_query, AND)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
 
-    def __or__(self, other: QuerySet[T]) -> QuerySet[T]:
+    @overload
+    def __or__[R](self, other: ReturningQuerySet[T, R]) -> ReturningQuerySet[T, R]: ...
+
+    @overload
+    def __or__(self, other: QuerySet[T]) -> Self: ...
+
+    def __or__(self, other: QuerySet[T]) -> Any:
         self._merge_sanity_check(other)
+        returning = self._merged_returning(other)
         if isinstance(self, EmptyQuerySet):
-            return other
-        if isinstance(other, EmptyQuerySet):
-            return self
-        query = (
-            self
-            if self.sql_query.can_filter()
-            else self.model._model_meta.base_queryset.filter(id__in=self.values("id"))
-        )
-        combined = query._chain()
-        combined._merge_known_related_objects(other)
-        if not other.sql_query.can_filter():
-            other = other.model._model_meta.base_queryset.filter(
-                id__in=other.values("id")
+            combined = cast("Self", other._chain())
+        elif isinstance(other, EmptyQuerySet):
+            combined = self._chain()
+        else:
+            query = (
+                self
+                if self.sql_query.can_filter()
+                else self.model._model_meta.base_queryset.filter(
+                    id__in=self._values("id")
+                )
             )
-        combined.sql_query.combine(other.sql_query, OR)
+            combined = cast("Self", query._chain())
+            combined._merge_known_related_objects(other)
+            if not other.sql_query.can_filter():
+                other = other.model._model_meta.base_queryset.filter(
+                    # `_values`, not `values()`: these are subqueries, and the
+                    # public method is refused on a row-mode queryset.
+                    id__in=other._values("id")
+                )
+            combined.sql_query.combine(other.sql_query, OR)
+        combined._returning_fields, combined._returning_instances = returning
         return combined
+
+    def _merged_returning(self, other: QuerySet[T]) -> tuple[list[Field] | None, bool]:
+        """Combine two querysets' returning() state, or refuse to.
+
+        A returning write over a combined queryset is fine, and it doesn't
+        matter which side returning() was called on. What it can't do is
+        honor two different selections: the combined query emits one
+        RETURNING clause, not one per operand.
+        """
+        if other._returning_fields is None:
+            return self._returning_fields, self._returning_instances
+        if self._returning_fields is None:
+            return other._returning_fields, other._returning_instances
+        if (
+            _returning_signature(self._returning_fields)
+            != _returning_signature(other._returning_fields)
+            or self._returning_instances != other._returning_instances
+        ):
+            raise TypeError(
+                "Cannot combine two querysets with different returning() "
+                "selections -- the combined write emits one RETURNING clause."
+            )
+        return self._returning_fields, self._returning_instances
 
     ####################################
     # METHODS THAT DO DATABASE QUERIES #
@@ -507,13 +718,13 @@ class QuerySet[T: "Model"]:
             self,
             chunked_fetch=use_chunked_fetch,
         )
-        if not self._prefetch_related_lookups or chunk_size is None:
+        if not self._prefetch_lookups or chunk_size is None:
             yield from iterable
             return
 
         iterator = iter(iterable)
         while results := list(islice(iterator, chunk_size)):
-            prefetch_related_objects(results, *self._prefetch_related_lookups)
+            prefetch_objects(results, *self._prefetch_lookups)
             yield from results
 
     def iterator(self, chunk_size: int | None = None) -> Iterator[T]:
@@ -523,10 +734,10 @@ class QuerySet[T: "Model"]:
         related objects. Otherwise, a default chunk_size of 2000 is supplied.
         """
         if chunk_size is None:
-            if self._prefetch_related_lookups:
+            if self._prefetch_lookups:
                 raise ValueError(
                     "chunk_size must be provided when using QuerySet.iterator() after "
-                    "prefetch_related()."
+                    "prefetch()."
                 )
         elif chunk_size <= 0:
             raise ValueError("Chunk size must be strictly positive.")
@@ -552,7 +763,7 @@ class QuerySet[T: "Model"]:
             # attribute.
             try:
                 arg.default_alias  # noqa: B018 — probe; raises for complex aggregates
-            except (AttributeError, TypeError):
+            except AttributeError, TypeError:
                 raise TypeError("Complex aggregates require an alias")
             kwargs[arg.default_alias] = arg
 
@@ -571,12 +782,27 @@ class QuerySet[T: "Model"]:
 
         return self.sql_query.get_count()
 
+    @overload
+    def get(self, primary_key: int, /) -> T: ...
+
+    @overload
+    def get(self, *conditions: Q, **kwargs: Any) -> T: ...
+
     def get(self, *args: Any, **kwargs: Any) -> T:
         """
-        Perform the query and return a single object matching the given
-        keyword arguments.
+        Perform the query and return the single object it matches.
+
+        Three entry points, all ending in the same assertion -- exactly one
+        row, or `DoesNotExist`/`MultipleObjectsReturned`:
+
+            Model.query.where(Model.email.equals(x)).get()  # a built query
+            Model.query.get(Model.email.equals(x))          # conditions
+            Model.query.get(5)                              # primary key
         """
-        clone = self.filter(*args, **kwargs)
+        conditions = self._lookup_conditions(
+            "get", args, allow_primary_key=True, has_keywords=bool(kwargs)
+        )
+        clone = self.filter(*conditions, **kwargs)
         if self.sql_query.can_filter() and not self.sql_query.distinct_fields:
             clone = clone.order_by()
         limit = MAX_GET_RESULTS
@@ -596,13 +822,24 @@ class QuerySet[T: "Model"]:
             )
         )
 
+    @overload
+    def get_or_none(self, primary_key: int, /) -> T | None: ...
+
+    @overload
+    def get_or_none(self, *conditions: Q, **kwargs: Any) -> T | None: ...
+
     def get_or_none(self, *args: Any, **kwargs: Any) -> T | None:
         """
-        Perform the query and return a single object matching the given
-        keyword arguments, or None if no object is found.
+        `get()` without the missing-row exception -- return None instead.
+
+        Takes the same three entry points as `get()`, and still raises
+        `MultipleObjectsReturned` when more than one row matches.
         """
+        conditions = self._lookup_conditions(
+            "get_or_none", args, allow_primary_key=True, has_keywords=bool(kwargs)
+        )
         try:
-            return self.get(*args, **kwargs)
+            return self.get(*conditions, **kwargs)
         except self.model.DoesNotExist:
             return None
 
@@ -611,69 +848,32 @@ class QuerySet[T: "Model"]:
         Create a new object with the given kwargs, saving it to the database
         and returning the created object.
         """
+        self._reject_returning("create")
         obj = self.model(**kwargs)
         obj.create()
         return obj
 
-    def _prepare_for_bulk_create(self, objs: list[T]) -> None:
+    def _prepare_for_bulk_create(self, objs: list[T], *, operation_name: str) -> None:
         # The identity PK is the only PK type, so there's no literal Python
         # default to materialize -- obj.id stays None and the INSERT takes the
         # DB's DEFAULT path.
         for obj in objs:
-            obj._prepare_related_fields_for_save(operation_name="bulk_create")
-
-    def _check_bulk_create_options(
-        self,
-        update_conflicts: bool,
-        update_fields: list[Field] | None,
-        unique_fields: list[Field] | None,
-    ) -> OnConflict | None:
-        if update_conflicts:
-            if not update_fields:
-                raise ValueError(
-                    "Fields that will be updated when a row insertion fails "
-                    "on conflicts must be provided."
-                )
-            if not unique_fields:
-                raise ValueError(
-                    "Unique fields that can trigger the upsert must be provided."
-                )
-            # Updating primary keys and many-to-many fields is forbidden.
-            from plain.postgres.fields.related import ManyToManyField
-
-            if any(isinstance(f, ManyToManyField) for f in update_fields):
-                raise ValueError(
-                    "bulk_create() cannot be used with many-to-many fields in "
-                    "update_fields."
-                )
-            if any(f.primary_key for f in update_fields):
-                raise ValueError(
-                    "bulk_create() cannot be used with primary keys in update_fields."
-                )
-            if unique_fields:
-                from plain.postgres.fields.related import ManyToManyField
-
-                if any(isinstance(f, ManyToManyField) for f in unique_fields):
-                    raise ValueError(
-                        "bulk_create() cannot be used with many-to-many fields "
-                        "in unique_fields."
-                    )
-            return OnConflict.UPDATE
-        return None
+            obj._prepare_related_fields_for_save(operation_name=operation_name)
 
     def bulk_create(
         self,
         objs: Sequence[T],
         batch_size: int | None = None,
-        update_conflicts: bool = False,
-        update_fields: list[str] | None = None,
-        unique_fields: list[str] | None = None,
     ) -> list[T]:
         """
         Insert each of the instances into the database. Do *not* call
         save() on each of the instances. Primary keys are set on the objects
         via the PostgreSQL RETURNING clause. Multi-table models are not supported.
+
+        This is insert-only -- to insert-or-update on a conflict, use
+        bulk_upsert().
         """
+        self._reject_returning("bulk_create")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
 
@@ -681,23 +881,8 @@ class QuerySet[T: "Model"]:
         if not objs:
             return objs
         meta = self.model._model_meta
-        unique_fields_objs: list[Field] | None = None
-        update_fields_objs: list[Field] | None = None
-        if unique_fields:
-            unique_fields_objs = [
-                meta.get_forward_field(name) for name in unique_fields
-            ]
-        if update_fields:
-            update_fields_objs = [
-                meta.get_forward_field(name) for name in update_fields
-            ]
-        on_conflict = self._check_bulk_create_options(
-            update_conflicts,
-            update_fields_objs,
-            unique_fields_objs,
-        )
         fields = meta.fields
-        self._prepare_for_bulk_create(objs)
+        self._prepare_for_bulk_create(objs, operation_name="bulk_create")
         with transaction.atomic(savepoint=False):
             objs_with_id, objs_without_id = partition(lambda o: o.id is None, objs)
             if objs_with_id:
@@ -705,9 +890,6 @@ class QuerySet[T: "Model"]:
                     objs_with_id,
                     fields,
                     batch_size,
-                    on_conflict=on_conflict,
-                    update_fields=update_fields_objs,
-                    unique_fields=unique_fields_objs,
                 )
                 id_field = meta.get_forward_field("id")
                 for obj_with_id, results in zip(objs_with_id, returned_columns):
@@ -722,16 +904,266 @@ class QuerySet[T: "Model"]:
                     objs_without_id,
                     fields,
                     batch_size,
-                    on_conflict=on_conflict,
-                    update_fields=update_fields_objs,
-                    unique_fields=unique_fields_objs,
                 )
-                if on_conflict is None:
-                    assert len(returned_columns) == len(objs_without_id)
+                # Postgres emits one RETURNING row per VALUES row, in order, so
+                # the rows can be zipped straight onto the objects. bulk_upsert()
+                # relies on the same guarantee for its ON CONFLICT batches -- the
+                # two stand or fall together, and
+                # tests/internal/test_returning_order.py pins it.
+                assert len(returned_columns) == len(objs_without_id)
                 for obj_without_id, results in zip(objs_without_id, returned_columns):
                     for result, field in zip(results, meta.db_returning_fields):
                         setattr(obj_without_id, field.name, result)
                     obj_without_id._state.adding = False
+
+        return objs
+
+    def _validate_upsert_unique_columns(
+        self,
+        unique_columns: Sequence[Field],
+        *,
+        operation_name: str,
+        allow_primary_key: bool,
+    ) -> None:
+        """Require a conflict key the caller controls and the model declares.
+
+        Shared by upsert() and bulk_upsert(). allow_primary_key keeps the
+        message honest: only bulk_upsert() can conflict on the primary key,
+        because only its caller holds the value.
+        """
+        object_name = self.model.model_options.object_name
+
+        if not unique_columns:
+            raise ValueError(f"{operation_name}() requires unique_fields.")
+        # A conflict key the caller doesn't control can never actually conflict,
+        # so the upsert would silently be an insert every time.
+        for field in unique_columns:
+            if field.db_returning and not field.primary_key:
+                raise ValueError(
+                    f"{operation_name}() cannot use {object_name}.{field.name} "
+                    "in unique_fields: the database generates its value, so "
+                    "there is never one to conflict on."
+                )
+            if field.auto_fills_on_save:
+                raise ValueError(
+                    f"{operation_name}() cannot use {object_name}.{field.name} "
+                    "in unique_fields: it is stamped again on every write, so "
+                    "it can never be a stable conflict key."
+                )
+        if not self.model.model_options.unique_fields_match_constraint(
+            {f.name for f in unique_columns}
+        ):
+            names = [f.name for f in unique_columns]
+            target = (
+                "the primary key or a UniqueConstraint"
+                if allow_primary_key
+                else "a UniqueConstraint"
+            )
+            raise ValueError(
+                f"{operation_name}() unique_fields {names} on {object_name} "
+                f"must name {target} declared on the model without a condition "
+                "or expressions."
+            )
+
+    def _reject_database_owned_update(
+        self, field: Field, *, operation_name: str
+    ) -> None:
+        """Refuse to overwrite a column the database owns.
+
+        Shared by upsert() and bulk_upsert(). A database-owned value
+        (create_now, generate=True, RandomStringField) isn't the caller's to
+        overwrite: EXCLUDED carries a freshly evaluated default, so updating
+        one would reset a creation timestamp on every conflict. A column that
+        is also update_now is exempt -- rewriting it is the whole point.
+        """
+        if field.db_returning and not field.auto_fills_on_save:
+            raise ValueError(
+                f"{operation_name}() cannot update "
+                f"{self.model.model_options.object_name}.{field.name}: the "
+                "database generates its value, so the update would overwrite "
+                "the stored one with a fresh default."
+            )
+
+    def _resolve_bulk_upsert_fields(
+        self,
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
+    ) -> tuple[list[Field], list[Field]]:
+        """Check both bulk_upsert() field lists and return the columns they
+        name, with any `Model.fk` reference resolved to its foreign key
+        column."""
+        unique_columns = self._validate_field_refs(
+            unique_fields, where="bulk_upsert() unique_fields"
+        )
+        update_columns = self._validate_field_refs(
+            update_fields, where="bulk_upsert() update_fields"
+        )
+
+        self._validate_upsert_unique_columns(
+            unique_columns, operation_name="bulk_upsert", allow_primary_key=True
+        )
+
+        if not update_columns:
+            raise ValueError("bulk_upsert() requires update_fields.")
+        if any(not isinstance(f, ColumnField) for f in update_columns):
+            raise ValueError("bulk_upsert() update_fields must be database columns.")
+        if any(f.primary_key for f in update_columns):
+            raise ValueError("bulk_upsert() cannot update primary key fields.")
+        for field in update_columns:
+            self._reject_database_owned_update(field, operation_name="bulk_upsert")
+        repeated = sorted(
+            {
+                field.name
+                for field in update_columns
+                if sum(other.name == field.name for other in update_columns) > 1
+            }
+        )
+        if repeated:
+            raise ValueError(
+                f"bulk_upsert() update_fields names {repeated} more than once; "
+                "Postgres assigns each column once per statement."
+            )
+        overlap = {f.name for f in update_columns} & {f.name for f in unique_columns}
+        if overlap:
+            raise ValueError(
+                "bulk_upsert() update_fields cannot overlap unique_fields: "
+                f"{sorted(overlap)}."
+            )
+
+        return update_columns, unique_columns
+
+    def bulk_upsert(
+        self,
+        objs: Sequence[T],
+        *,
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        batch_size: int | None = None,
+    ) -> list[T]:
+        """
+        Insert each instance, updating update_fields on any row that already
+        exists for the unique_fields key. Issues one
+        INSERT ... ON CONFLICT (unique_fields) DO UPDATE ... RETURNING per batch.
+
+        Both inserted and updated objects come back with their DB-returned
+        fields (primary key, DB defaults) populated, in the order they were
+        passed in. update_fields and unique_fields take field references
+        (`Model.field`); unique_fields must name the primary key or a
+        UniqueConstraint declared on the model.
+
+        A conflicting row is written with the named update_fields plus every
+        update_now column on the model, so the stored row and the returned
+        object agree on when it was last touched.
+
+        bulk_upsert() carries its own RETURNING to populate the objects, so a
+        prior returning() has nothing to add and is refused.
+        """
+        self._reject_returning("bulk_upsert")
+        if batch_size is not None and batch_size <= 0:
+            raise ValueError("Batch size must be a positive integer.")
+
+        update_columns, unique_columns = self._resolve_bulk_upsert_fields(
+            update_fields, unique_fields
+        )
+
+        objs = list(objs)
+        if not objs:
+            return objs
+
+        meta = self.model._model_meta
+        object_name = self.model.model_options.object_name
+        self._prepare_for_bulk_create(objs, operation_name="bulk_upsert")
+
+        # A NULL conflict key never conflicts in Postgres, so the row would
+        # always insert and the upsert would quietly be an insert.
+        sort_keys = []
+        for obj in objs:
+            key = []
+            for field in unique_columns:
+                # Prepared once here and handed to the sort key, rather
+                # than prepared again inside it. A malformed value is rejected
+                # at this point, before any statement goes out.
+                value = field.get_prep_value(field.value_from_object(obj))
+                if value is None:
+                    raise ValueError(
+                        f"bulk_upsert() requires a non-null {field.name} on every "
+                        "object; NULL never conflicts in Postgres, so it cannot "
+                        "be upserted."
+                    )
+                key.append(conflict_sort_value(field, value))
+            sort_keys.append(tuple(key))
+
+        # An update_now column is stamped by pre_save on the way in, so the
+        # object already holds a fresh value whether it inserts or updates.
+        # Setting it from EXCLUDED on the conflict path too is what keeps the
+        # stored row and the returned object agreeing -- and it's what
+        # update_now means. The caller doesn't have to name it.
+        conflict_update_columns = list(update_columns)
+        for field in meta.fields:
+            if field.auto_fills_on_save and field not in conflict_update_columns:
+                conflict_update_columns.append(field)
+
+        # An object that already carries an id inserts with it; one that
+        # doesn't lets Postgres generate the identity value. bulk_create()
+        # splits the same way -- an id the caller set is theirs, not ours to
+        # throw away. When the primary key *is* the conflict target every
+        # object has one, so every row has the same shape.
+        fields = meta.fields
+        fields_without_pk = [f for f in fields if not isinstance(f, PrimaryKeyField)]
+        pk_is_unique = any(f.primary_key for f in unique_columns)
+
+        # Lock rows in conflict-key order, so two callers touching overlapping
+        # keys can't deadlock each other. sorted() is stable, so equal keys keep
+        # their input order and the objects themselves are never compared. objs
+        # is left alone -- the caller gets its own order back.
+        #
+        # The sort has to span *every* object rather than each shape on its own:
+        # two callers holding the same keys but different ids would otherwise
+        # lock them in different orders, which is the deadlock this exists to
+        # avoid. So walk the sorted objects and start a new statement only where
+        # the shape changes -- an extra statement only where ids interleave.
+        runs: list[tuple[list[T], Sequence[Field]]] = []
+        for position in sorted(range(len(objs)), key=lambda p: sort_keys[p]):
+            obj = objs[position]
+            insert_fields = (
+                fields if pk_is_unique or obj.id is not None else fields_without_pk
+            )
+            if runs and runs[-1][1] is insert_fields:
+                runs[-1][0].append(obj)
+            else:
+                runs.append(([obj], insert_fields))
+
+        with transaction.atomic(savepoint=False):
+            for sent_objs, insert_fields in runs:
+                try:
+                    returned_rows = self._batched_insert(
+                        sent_objs,
+                        insert_fields,
+                        batch_size,
+                        on_conflict=OnConflict.UPDATE,
+                        update_fields=conflict_update_columns,
+                        unique_fields=unique_columns,
+                    )
+                except psycopg.errors.CardinalityViolation as exc:
+                    names = [f.name for f in unique_columns]
+                    raise ValueError(
+                        f"bulk_upsert() sent two {object_name} objects with the "
+                        f"same {names} in one statement, which Postgres refuses "
+                        "-- it can only touch a row once per statement. Collapse "
+                        "the duplicates before calling."
+                    ) from exc
+
+                # Postgres emits one RETURNING row per VALUES row, in order, on
+                # the DO UPDATE path as much as the insert path, so the rows
+                # come back in the order the objects were sent. bulk_create()
+                # maps its rows onto objects by position for the same reason --
+                # the two stand or fall together, and
+                # tests/internal/test_returning_order.py pins it.
+                assert len(returned_rows) == len(sent_objs)
+                for obj, row in zip(sent_objs, returned_rows):
+                    for index, field in enumerate(meta.db_returning_fields):
+                        setattr(obj, field.name, row[index])
+                    obj._state.adding = False
 
         return objs
 
@@ -741,6 +1173,7 @@ class QuerySet[T: "Model"]:
         """
         Update the given fields in each of the given objects in the database.
         """
+        self._reject_returning("bulk_update")
         if batch_size is not None and batch_size <= 0:
             raise ValueError("Batch size must be a positive integer.")
         if not fields:
@@ -788,6 +1221,10 @@ class QuerySet[T: "Model"]:
             updates.append(([obj.id for obj in batch_objs], update_kwargs))
         rows_updated = 0
         queryset = self._chain()
+        # Each batch targets its rows by id, which the caller already holds,
+        # so a lock on the read side has nothing left to guard -- and keeping
+        # it would push every batch through a locking sub-select for nothing.
+        queryset.sql_query.lock_mode = None
         with transaction.atomic(savepoint=False):
             for ids, update_kwargs in updates:
                 rows_updated += queryset.filter(id__in=ids).update(**update_kwargs)
@@ -801,6 +1238,7 @@ class QuerySet[T: "Model"]:
         Return a tuple of (object, created), where created is a boolean
         specifying whether an object was created.
         """
+        self._reject_returning("get_or_create")
         # The get() needs to be targeted at the write database in order
         # to avoid potential transaction consistency problems.
         try:
@@ -812,7 +1250,7 @@ class QuerySet[T: "Model"]:
                 with transaction.atomic():
                     params = dict(resolve_callables(params))
                     return self.create(**params), True
-            except (psycopg.IntegrityError, ValidationError):
+            except psycopg.IntegrityError, ValidationError:
                 # Since create() also validates by default,
                 # we can get any kind of ValidationError here,
                 # or it can flow through and get an IntegrityError from the database.
@@ -826,52 +1264,243 @@ class QuerySet[T: "Model"]:
                     pass
                 raise
 
-    def update_or_create(
+    def upsert(
         self,
+        *_positional: Never,
         defaults: dict[str, Any] | None = None,
         create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
         **kwargs: Any,
     ) -> tuple[T, bool]:
         """
-        Look up an object with the given kwargs, updating one with defaults
-        if it exists, otherwise create a new one. Optionally, an object can
-        be created with different values than defaults by using
-        create_defaults.
-        Return a tuple (object, created), where created is a boolean
-        specifying whether an object was created.
-        """
-        if create_defaults is None:
-            update_defaults = create_defaults = defaults or {}
-        else:
-            update_defaults = defaults or {}
-        with transaction.atomic():
-            # Lock the row so that a concurrent update is blocked until
-            # update_or_create() has performed its save.
-            obj, created = self.select_for_update().get_or_create(
-                create_defaults, **kwargs
-            )
-            if created:
-                return obj, created
-            for k, v in resolve_callables(update_defaults):
-                setattr(obj, k, v)
+        Insert a row, or update the existing row that conflicts on
+        unique_fields, in a single INSERT ... ON CONFLICT DO UPDATE statement.
+        Return a tuple (object, created), where created is True when a new row
+        was inserted and False when an existing row was updated. The object is
+        hydrated from the post-write row -- no second query.
 
-            update_fields = set(update_defaults)
-            field_names = self.model._model_meta._non_pk_field_names
-            # update_fields only supports column-backed fields.
-            if field_names.issuperset(update_fields):
-                # Add fields which are set on pre_save(), e.g. update_now fields.
-                # This is to maintain backward compatibility as these fields
-                # are not updated unless explicitly specified in the
-                # update_fields list.
-                for field in self.model._model_meta.fields:
-                    if not (
-                        field.primary_key or field.__class__.pre_save is Field.pre_save
-                    ):
-                        update_fields.add(field.name)
-                obj.update(fields=update_fields)
-            else:
-                obj.update()
-        return obj, False
+        Value sources, lowest precedence first -- on any overlapping key,
+        create_defaults loses to defaults, which loses to **kwargs:
+          - create_defaults: extra values applied on insert only.
+          - defaults: applied on both insert and conflict-update.
+          - **kwargs: the identifying and inserted values (must include the
+            unique_fields). Applied on both insert and conflict-update.
+          - conflict_defaults: per-column overrides for the conflict-update SET
+            only -- they never affect the inserted row. Each value may be a
+            plain value or an expression, where F("count") reads the stored row
+            and Excluded("count") reads the row the INSERT proposed, so
+            F("count") + Excluded("count") is an accumulating counter. A column
+            named here is set on conflict whether or not it is otherwise being
+            updated, and it cannot be a unique field.
+
+        Every source resolves callables, and every key must name a column: a
+        settable property is refused, because the SET clause is derived from
+        columns and a property could only ever be written on the insert half.
+
+        On conflict the SET clause covers every non-unique, non-PK column drawn
+        from kwargs and defaults -- each taking the value the INSERT proposed --
+        plus every DateTimeField(update_now=True) column, whose fresh
+        pre_save() timestamp would otherwise go stale, plus every column
+        conflict_defaults names. A conflict_defaults entry replaces the
+        proposed value for that column. create_defaults never take part in the
+        update, and neither do columns nobody wrote (a create_now timestamp
+        keeps its original value). Naming a database-owned column (create_now,
+        generate=True, RandomStringField) in kwargs or defaults is an error --
+        the conflict-update would reset it to a freshly evaluated default. The
+        merged result is not validated -- consistent with the other bulk write
+        paths.
+
+        unique_fields takes field references (`Model.field`) and must name a
+        UniqueConstraint declared on the model without a condition or
+        expressions; every unique field must have a non-null value (NULL never
+        conflicts in Postgres). The value sources above stay string-keyed --
+        they follow the kwargs idiom, not field references.
+
+        Unlike the get/create family, this is one atomic statement: there is no
+        lookup to lose a race, but there is also no row-scoping beyond
+        unique_fields -- kwargs that aren't part of the conflict key are values
+        written to whichever row conflicts, not filters narrowing which row
+        that is. The queryset's own filters don't scope it either: the conflict
+        constraint decides which row is touched, so
+        qs.filter(...).upsert(...) writes the conflicting row whether or not it
+        matches the filter (the related-manager wrappers depend on this, which
+        is why it isn't refused).
+
+        upsert() carries its own RETURNING to hydrate the object, so a prior
+        returning() has nothing to add and is refused.
+        """
+        if _positional:  # ty: ignore[redundant-condition]
+            # update_or_create() took defaults positionally; upsert() doesn't,
+            # and a bare "takes 1 positional argument" wouldn't say which.
+            raise TypeError(
+                "upsert() takes no positional arguments. Pass the mapping as "
+                "defaults= (or create_defaults=/conflict_defaults=)."
+            )
+        self._reject_returning("upsert")
+        meta = self.model._model_meta
+
+        # A foreign key is named as Model.fk, which is the relation descriptor
+        # rather than the column -- _validate_field_refs resolves it, so work
+        # from what it hands back rather than what the caller passed.
+        unique_columns = self._validate_field_refs(
+            unique_fields, where="upsert() unique_fields"
+        )
+        self._validate_upsert_unique_columns(
+            unique_columns, operation_name="upsert", allow_primary_key=False
+        )
+        if any(f.primary_key for f in unique_columns):
+            # Postgres owns the identity primary key, so a caller can never
+            # supply the value that would conflict on it.
+            raise ValueError(
+                "upsert() cannot conflict on the primary key -- the database "
+                "generates it. Use a UniqueConstraint's fields instead."
+            )
+
+        defaults = defaults or {}
+        create_defaults = create_defaults or {}
+        conflict_defaults = conflict_defaults or {}
+
+        # The inserted row: create_defaults first, then defaults, then kwargs,
+        # so the more explicit source wins on any overlap. Merge the raw
+        # mappings first and resolve callables only for what survives -- a
+        # callable a higher-precedence source shadowed is never the value, so
+        # calling it would run a side effect nobody asked for.
+        merged: dict[str, Any] = {}
+        for source in (create_defaults, defaults, kwargs):
+            merged.update(source)
+        insert_values: dict[str, Any] = dict(resolve_callables(merged))
+
+        # Reject typo'd keys with a clean FieldError before they fail later and
+        # more confusingly, matching get_or_create()'s validation.
+        self._validate_model_field_names(insert_values)
+
+        # That check also admits settable properties, which get_or_create() can
+        # honour because it writes through the instance. upsert() derives its
+        # SET clause from columns, so a property would be written on insert and
+        # silently dropped on conflict -- refuse it rather than do half the job.
+        properties = sorted(meta._property_names & set(insert_values))
+        if properties:
+            names = ", ".join(f"{self.model.__name__}.{name}" for name in properties)
+            raise FieldError(
+                f"upsert() writes columns; {names} is a property. Pass the "
+                "column it sets instead."
+            )
+
+        # An expression is computed from a row, and the row this INSERT
+        # proposes doesn't exist yet -- Excluded() names that very row. Catch
+        # it here, after callables have resolved and before the value is
+        # assigned to a field: field coercion runs first and would either raise
+        # something unrecognizable or, on a text column, write the repr into
+        # the row.
+        for name, value in insert_values.items():
+            if is_query_expression(value):
+                raise FieldError(
+                    f"{value!r} cannot be an inserted value ({name}=...): an "
+                    "expression is computed from a row, and the insert has no "
+                    "row to compute from. Move it to conflict_defaults."
+                )
+
+        for field in unique_columns:
+            assert field.name is not None
+            if insert_values.get(field.name) is None:
+                raise ValueError(
+                    f"upsert() requires a non-null {field.name}; NULL never "
+                    "conflicts in Postgres, so it cannot be upserted."
+                )
+
+        # The conflict-update columns: everything from kwargs and defaults that
+        # isn't a unique field or the PK, plus every update_now field (pre_save
+        # already stamped a fresh value into the INSERT, so EXCLUDED carries it
+        # -- leaving it out would let the timestamp go stale on conflict).
+        # create_defaults are insert-only, so they never appear here.
+        # Built in model field order so the SET clause is stable across runs.
+        unique_field_names = {f.name for f in unique_columns}
+        written_names = {*kwargs, *defaults}
+        update_field_objs: list[Field] = [
+            field
+            for field in meta.fields
+            if field.name not in unique_field_names
+            and not field.primary_key
+            and (field.name in written_names or field.auto_fills_on_save)
+        ]
+        for field in update_field_objs:
+            self._reject_database_owned_update(field, operation_name="upsert")
+
+        # Callables resolve here too, like the other value sources -- otherwise
+        # the callable itself reaches the column and a text column stores its
+        # repr. An expression (F(), Excluded()) is an object, not a callable,
+        # so it passes through untouched.
+        conflict_defaults = dict(resolve_callables(conflict_defaults))
+
+        # conflict_defaults name columns the SET clause writes, so unlike the
+        # other sources they must be real columns -- not properties -- and they
+        # cannot rewrite the conflict target.
+        conflict_default_objs: dict[Field, Any] = {}
+        for name, value in conflict_defaults.items():
+            if name in unique_field_names:
+                raise ValueError(
+                    f"upsert() conflict_defaults cannot name the unique field "
+                    f"{name!r} -- it is the conflict target, not something the "
+                    "conflict-update may rewrite."
+                )
+            if name in meta._property_names:
+                raise FieldError(
+                    f"upsert() writes columns; {self.model.__name__}.{name} is "
+                    "a property. Pass the column it sets instead."
+                )
+            try:
+                field = meta.get_forward_field(name)
+            except FieldDoesNotExist:
+                raise FieldError(
+                    f"Invalid conflict_defaults field name for model "
+                    f"{self.model.__name__}: {name!r}."
+                ) from None
+            if not isinstance(field, ColumnField):
+                # A many-to-many field is a forward field with no column of its
+                # own, so it passes the lookup above and then fails in the
+                # compiler with a bare UndefinedColumn.
+                raise FieldError(
+                    f"Cannot use {self.model.model_options.object_name}.{name} "
+                    "in upsert() conflict_defaults: only database columns can "
+                    "be set."
+                )
+            # conflict_defaults land in the same SET clause as the derived
+            # update columns, so the same columns are off limits.
+            if field.primary_key:
+                raise ValueError("upsert() cannot update primary key fields.")
+            self._reject_database_owned_update(field, operation_name="upsert")
+            conflict_default_objs[field] = value
+
+        obj = self.model(**insert_values)
+        obj._prepare_related_fields_for_save(operation_name="upsert")
+
+        # The identity primary key is never supplied (the model constructor
+        # rejects it), so Postgres always generates it.
+        fields = meta.non_pk_fields
+
+        # One statement, so it needs no transaction of its own. RETURNING
+        # carries every column plus the trailing created flag, so the row we
+        # hydrate is the post-write row -- not the one we proposed.
+        returning_fields: list[Field] = list(meta.fields)
+        rows = self._insert(
+            [obj],
+            fields=fields,
+            returning_fields=returning_fields,
+            on_conflict=OnConflict.UPDATE,
+            update_fields=update_field_objs,
+            unique_fields=unique_columns,
+            conflict_defaults=conflict_default_objs,
+            returning_created=True,
+        )
+
+        assert rows is not None
+        row = rows[0]
+        created = bool(row[-1])
+        result = self.model.from_db(
+            (f.name for f in returning_fields), row[: len(returning_fields)]
+        )
+        return cast(T, result), created
 
     def _extract_model_params(
         self, defaults: dict[str, Any] | None, **kwargs: Any
@@ -883,9 +1512,14 @@ class QuerySet[T: "Model"]:
         defaults = defaults or {}
         params = {k: v for k, v in kwargs.items() if LOOKUP_SEP not in k}
         params.update(defaults)
+        self._validate_model_field_names(params)
+        return params
+
+    def _validate_model_field_names(self, names: Iterable[str]) -> None:
+        """Raise FieldError if any name isn't a model field or settable property."""
         property_names = self.model._model_meta._property_names
         invalid_params = []
-        for param in params:
+        for param in names:
             try:
                 self.model._model_meta.get_field(param)
             except FieldDoesNotExist:
@@ -899,20 +1533,226 @@ class QuerySet[T: "Model"]:
                     "', '".join(sorted(invalid_params)),
                 )
             )
-        return params
 
-    def first(self) -> T | None:
-        """Return the first object of a query or None if no match is found."""
-        for obj in self[:1]:
+    def first(self, *conditions: Q) -> T | None:
+        """Return the first object of a query or None if no match is found.
+
+        Conditions narrow the query first, so `first(Model.role.equals("x"))`
+        is `where(Model.role.equals("x")).first()`. There is no primary key
+        form -- `first(5)` would read as "the first 5".
+        """
+        narrowed = self._narrowed_by("first", conditions)
+        for obj in narrowed[:1]:
             return obj
         return None
 
-    def last(self) -> T | None:
-        """Return the last object of a query or None if no match is found."""
-        queryset = self.reverse()
+    def last(self, *conditions: Q) -> T | None:
+        """Return the last object of a query or None if no match is found.
+
+        Takes conditions the same way `first()` does.
+        """
+        queryset = self._narrowed_by("last", conditions).reverse()
         for obj in queryset[:1]:
             return obj
         return None
+
+    @overload
+    def returning(self) -> ReturningQuerySet[T, list[T]]: ...
+
+    @overload
+    def returning(
+        self, *fields: Field[Any]
+    ) -> ReturningQuerySet[T, list[dict[str, Any]]]: ...
+
+    def returning(self, *fields: Field[Any]) -> ReturningQuerySet[T, Any]:
+        """Capture the rows touched by the next update() or delete().
+
+        With no arguments, update()/delete() return the affected rows as
+        model instances (RETURNING every column). Given field
+        references (`Model.field`), they return a list of dicts holding just
+        those columns. Without returning(), update()/delete() return an int
+        rowcount.
+
+        Instances from delete() are snapshots: every value is there to read,
+        the id included, but the row is gone, so create()/update()/delete()
+        on them raise rather than target a row that no longer exists.
+
+        The references are validated here, so a bad one errors at the
+        returning() call rather than when the write runs.
+
+        The returned queryset keeps its own class -- a custom QuerySet
+        subclass survives returning(), and its methods still chain. What
+        returning() sets is the state below; ReturningQuerySet is only the
+        static type that pins what update()/delete() hand back.
+        """
+        clone = self._chain()
+        if fields:
+            clone._returning_fields = self._validated_returning_fields(fields)
+            clone._returning_instances = False
+        else:
+            # No references given: RETURN every column so the rows can be
+            # hydrated into full model instances.
+            clone._returning_fields = list(self.model._model_meta.fields)
+            clone._returning_instances = True
+        # The write path tells "no returning()" from "returning()" by
+        # `_returning_fields is None`, so an empty selection would emit no
+        # RETURNING clause and then try to read rows back from it. Neither
+        # branch above can produce one -- a model always has an id column.
+        assert clone._returning_fields, "returning() selected no columns"
+        return cast("ReturningQuerySet[T, Any]", clone)
+
+    def _validate_field_refs(self, fields: Sequence[Any], *, where: str) -> list[Field]:
+        """Require each item to be a Field reference on this queryset's model,
+        and return the columns those references name.
+
+        `Model.fk` is a ForwardForeignKeyDescriptor rather than a Field -- that
+        is what lets where() traverse to the related model -- so there is no
+        other way to name the foreign key column. The write APIs that take
+        column lists unwrap it here. returning() is the exception and refuses
+        it outright, which it does before calling this (see
+        _validated_returning_fields).
+
+        `where` names the call in the error (e.g. "returning()", "bulk_upsert()
+        unique_fields") so a bad argument points the user at Model.field.
+        """
+        # Local import: related_descriptors imports this module at load time.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
+        )
+
+        object_name = self.model.model_options.object_name
+        columns = []
+        for field in fields:
+            if isinstance(field, ForwardForeignKeyDescriptor):
+                field = field._field
+            if isinstance(field, str):
+                raise TypeError(
+                    f"{where} takes field references, not strings. "
+                    f"Pass {object_name}.{field} instead of {field!r}."
+                )
+            if not isinstance(field, Field):
+                raise TypeError(
+                    f"{where} takes field references like {object_name}.<field>, "
+                    f"not {field!r}."
+                )
+            if field.model is not self.model:
+                raise FieldError(
+                    f"{where} cannot use {field.model.model_options.object_name}."
+                    f"{field.name}: it belongs to a different model, not "
+                    f"{object_name}."
+                )
+            columns.append(field)
+        return columns
+
+    def _validated_returning_fields(
+        self, fields: tuple[Field[Any], ...]
+    ) -> list[Field]:
+        """Check each returning() reference and return the columns to RETURN."""
+        # Local import: these modules import this one at load time.
+        from plain.postgres.fields.related_descriptors import (
+            ForwardForeignKeyDescriptor,
+            ForwardManyToManyDescriptor,
+        )
+        from plain.postgres.fields.reverse_descriptors import BaseReverseDescriptor
+
+        def relation_name(reference: Any) -> str | None:
+            """The attribute name, when `reference` is a relation not a column.
+
+            At class level a relation attribute is its descriptor -- that is
+            what lets where() traverse it -- so none of these is a column
+            reference, and each has its name in a different place.
+            """
+            if isinstance(reference, ForwardForeignKeyDescriptor):
+                return reference._field.name
+            if isinstance(reference, ForwardManyToManyDescriptor):
+                return reference.field.name
+            if isinstance(reference, BaseReverseDescriptor):
+                return reference.name
+            return None
+
+        object_name = self.model.model_options.object_name
+        columns = []
+        for field in fields:
+            if name := relation_name(field):
+                raise FieldError(
+                    f"Cannot use {object_name}.{name} in returning(): it is "
+                    "a relation, not a column reference. RETURNING reads "
+                    f"columns of {object_name}'s own table -- use returning() "
+                    "with no arguments to get whole instances."
+                )
+            if isinstance(field, str):
+                raise TypeError(
+                    f"returning() takes field references, not strings. "
+                    f"Pass {object_name}.{field} instead of {field!r}."
+                )
+            if not isinstance(field, Field):
+                raise TypeError(
+                    f"returning() takes field references like "
+                    f"{object_name}.<field>, not {field!r}."
+                )
+            if field.model is not self.model:
+                raise FieldError(
+                    f"Cannot use {field.model.model_options.object_name}."
+                    f"{field.name} in returning() for {object_name}: it "
+                    "belongs to a different model."
+                )
+            if not isinstance(field, ColumnField):
+                raise FieldError(
+                    f"Cannot use {object_name}.{field.name} in returning(): "
+                    "only database columns can be returned."
+                )
+            columns.append(field)
+        return columns
+
+    def _hydrate_returning(
+        self, rows: list[Sequence[Any]], *, deleted: bool = False
+    ) -> list[Any]:
+        """Turn converted RETURNING rows into instances or dicts.
+
+        Instances from a delete are snapshots -- the rows are gone, so they
+        are marked to refuse the write methods rather than silently target
+        a row that no longer exists.
+        """
+        assert self._returning_fields is not None
+        field_names = [field.name for field in self._returning_fields]
+        if not self._returning_instances:
+            return [dict(zip(field_names, row)) for row in rows]
+        instances = [self.model.from_db(field_names, row) for row in rows]
+        if deleted:
+            for instance in instances:
+                instance._state.deleted = True
+        return instances
+
+    def _reject_returning(self, method_name: str) -> None:
+        """Refuse a write that RETURNING doesn't apply to.
+
+        returning() only changes what update() and delete() hand back.
+        Every other write would silently drop it, so say so instead.
+        """
+        if self._returning_fields is not None:
+            raise TypeError(
+                f"Cannot call {method_name}() on a returning() queryset. "
+                "returning() only applies to update() and delete()."
+            )
+
+    def _reject_related_lock_targets(self, method_name: str) -> None:
+        """Refuse of=(...) targets a set-based write can't lock.
+
+        A locked write runs as `WHERE id IN (SELECT id ... FOR UPDATE OF ...)`,
+        and that sub-select reads one column: this table's id. `OF` is
+        resolved against the selected columns, so it can only ever name this
+        table. A related name is meaningful on the read -- it just has
+        nothing to point at here -- and left alone it surfaces as a
+        FieldError from the compiler, a long way from the call.
+        """
+        related = tuple(name for name in self.sql_query.lock_of if name != "self")
+        if self.sql_query.lock_mode and related:
+            raise TypeError(
+                f"Cannot call {method_name}() on a queryset locked with "
+                f"of={related} -- a locked write locks only the rows it "
+                "writes. Drop of= (the write locks its own rows either way), "
+                "or lock the related rows with a separate locked read."
+            )
 
     def delete(self) -> int:
         """Delete the records in the current QuerySet.
@@ -920,6 +1760,12 @@ class QuerySet[T: "Model"]:
         Returns the number of parent rows deleted. Cascaded child rows are
         handled by Postgres via the declared `on_delete` clauses and are not
         included in the count.
+
+        After returning(), the deleted rows come back instead -- read-only
+        snapshots when returning() took no arguments, and only ever the
+        target table's rows, since a cascade never reaches the RETURNING
+        clause. The queryset is a ReturningQuerySet to a type checker by
+        then, and its delete() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot use 'limit' or 'offset' with delete().")
@@ -927,42 +1773,58 @@ class QuerySet[T: "Model"]:
             raise TypeError("Cannot call delete() after .distinct().")
         if self._fields is not None:
             raise TypeError("Cannot call delete() after .values() or .values_list()")
+        self._reject_related_lock_targets("delete")
 
         del_query = self._chain()
-        del_query.sql_query.select_for_update = False
-        del_query.sql_query.select_related = False
+        # The lock is kept: the delete compiler moves it onto the sub-select
+        # that picks the rows, which is what makes a locked claim-and-delete
+        # safe against a second worker.
+        del_query.sql_query.joined_relations = False
         del_query.sql_query.clear_ordering(force=True)
 
         # RESTRICT violations leave the DB transaction aborted. Mark the
         # connection so outer atomic() blocks see the abort state even if the
         # caller catches IntegrityError themselves.
         with transaction.mark_for_rollback_on_error():
-            count = del_query._raw_delete()
+            result = del_query._raw_delete()
 
         # Clear the result cache, in case this QuerySet gets reused.
         self._result_cache = None
-        return count
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its delete() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result, deleted=True))
+        return result
 
-    def _raw_delete(self) -> int:
+    def _raw_delete(self) -> Any:
         """
         Delete objects found from the given queryset in single direct SQL
         query. No signals are sent and there is no protection for cascades.
         """
-        query = self.sql_query.clone()
+        query = cast(DeleteQuery, self.sql_query.clone())
         query.__class__ = DeleteQuery
-        cursor = query.get_compiler().execute_sql(CURSOR)
-        if cursor:
-            with cursor:
-                return cursor.rowcount
-        return 0
+        query.returning_fields = self._returning_fields
+        return query.get_compiler().execute_sql(CURSOR)
 
     def update(self, **kwargs: Any) -> int:
         """
         Update all elements in the current QuerySet, setting all the given
         fields to the appropriate values.
+
+        Returns the rowcount -- or, after returning(), the affected rows.
+        The queryset is a ReturningQuerySet to a type checker by then, and
+        its update() is declared to return them.
         """
         if self.sql_query.is_sliced:
             raise TypeError("Cannot update a query once a slice has been taken.")
+        if self._fields is not None:
+            # Same guard delete() carries: once the queryset is in row mode
+            # (values(), values_list(), select()) it no longer describes the
+            # model rows a write would touch.
+            raise TypeError(
+                "Cannot call update() after .values(), .values_list() or .select()"
+            )
+        self._reject_related_lock_targets("update")
         query = self.sql_query.chain(UpdateQuery)
         query.add_update_values(kwargs)
 
@@ -988,10 +1850,17 @@ class QuerySet[T: "Model"]:
 
         # Clear any annotations so that they won't be present in subqueries.
         query.annotations = {}
+
+        query.returning_fields = self._returning_fields
+
         with transaction.mark_for_rollback_on_error():
-            rows = query.get_compiler().execute_sql(CURSOR)
+            result = query.get_compiler().execute_sql(CURSOR)
         self._result_cache = None
-        return rows
+        if self._returning_fields is not None:
+            # returning() makes this a ReturningQuerySet to a type checker,
+            # and its update() is declared to hand the rows back.
+            return cast("int", self._hydrate_returning(result))
+        return result
 
     def _update(self, values: Sequence[tuple[Field, Any]]) -> int:
         """
@@ -1017,10 +1886,10 @@ class QuerySet[T: "Model"]:
             return self.sql_query.has_results()
         return bool(self._result_cache)
 
-    def _prefetch_related_objects(self) -> None:
+    def _prefetch_objects(self) -> None:
         # This method can only be called once the result cache has been filled.
         assert self._result_cache is not None
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        prefetch_objects(self._result_cache, *self._prefetch_lookups)
         self._prefetch_done = True
 
     def explain(self, *, format: str | None = None, **options: Any) -> str:
@@ -1046,13 +1915,113 @@ class QuerySet[T: "Model"]:
             params=tuple(params),
             translations=translations,
         )
-        qs._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        qs._prefetch_lookups = self._prefetch_lookups[:]
         return qs
+
+    @overload
+    def sql[R: DataclassInstance](
+        self, template: Template, *, result_type: type[R]
+    ) -> Written[R]: ...
+
+    @overload
+    def sql(self, template: Template, *, result_type: None = None) -> Written[T]: ...
+
+    def sql(self, template: Template, *, result_type: Any = None) -> Any:
+        """Write the query out as a t-string, models interpolated directly.
+
+        The written half of the query API: `where()`/`order_by()` build a query
+        the code assembles, `sql()` runs one you wrote.
+
+        The template is a `Template` (PEP 750): Python interpolates it, so the
+        SQL is the literal halves the author wrote and every interpolated
+        object is dispatched on its type, a value always binding as a
+        parameter. A `str` cannot be passed at all -- literal, f-string or
+        built at runtime, it is not a `Template` and the type checker says so.
+        Building a `Template` out of a string by hand is the one way past
+        that, and never something to do with text from outside the program.
+
+        The statement is the whole query, so it starts from the bare model --
+        `Model.query.sql(...)`. A queryset that has been narrowed cannot carry
+        its narrowing into written SQL, and silently dropping it would drop
+        whatever that filter was there to enforce. Interpolate the queryset as
+        a subquery instead: `sql(t"... FROM {narrowed} r")`.
+
+        See `plain.postgres.written` and the README for the reference table.
+        """
+        self._reject_narrowed_for_sql()
+
+        from plain.postgres.written import Written
+
+        return Written(
+            model=self.model,
+            template=template,
+            result_type=result_type,
+        )
+
+    def _reject_narrowed_for_sql(self) -> None:
+        """Refuse sql() on a queryset narrowed past the model's own default.
+
+        `Model.query` is the starting point, whatever it is: a model whose
+        default queryset already filters -- a soft-delete scope, say -- can
+        still write SQL. What it can't do is *carry* that scope into the
+        statement, so the comparison is against a fresh `Model.query` and the
+        statement has to state the predicate itself.
+        """
+        if self._compiles_like_the_models_own_queryset():
+            return
+
+        query = self.sql_query
+        narrowings = {
+            "where()/filter()": query.has_filters(),
+            "order_by()": bool(query.order_by),
+            "distinct()": query.distinct,
+            "slicing": bool(query.low_mark) or query.high_mark is not None,
+            "annotate()": bool(query.annotations),
+            "values()/values_list()/select()": self._fields is not None
+            or bool(query.values_select)
+            or bool(query.select),
+            "join()": bool(query.joined_relations),
+            "prefetch()": bool(self._prefetch_lookups),
+            "only()/defer()": bool(query.deferred_loading[0]),
+            "for_update()": query.lock_mode is not None,
+            "returning()": self._returning_fields is not None
+            or self._returning_instances,
+        }
+        applied = [name for name, is_set in narrowings.items() if is_set]
+        raise TypeError(
+            f"sql() takes the whole query, so it starts from "
+            f"{self.model.__name__}.query — this one already has "
+            f"{', '.join(applied) or 'been narrowed'}, which a written "
+            "statement can't carry. Put the queryset in the statement as a "
+            'subquery instead: sql(t"... FROM {queryset} rows").'
+        )
+
+    def _compiles_like_the_models_own_queryset(self) -> bool:
+        """Whether this queryset is still exactly what `Model.query` hands out.
+
+        Compiled SQL is the comparison, so a default scope's own filter counts
+        as unnarrowed while anything added to it doesn't. `elide_empty=False`
+        keeps a queryset that can't match anything compilable instead of
+        raising out of the check.
+        """
+
+        def compiled(queryset: QuerySet[Any]) -> Any:
+            return queryset.sql_query.get_compiler(elide_empty=False).as_sql()
+
+        try:
+            return compiled(self) == compiled(self.model.query)
+        except Exception:
+            # Anything that won't compile is, by definition, not the plain
+            # queryset the model hands out.
+            return False
 
     def _values(self, *fields: str, **expressions: Any) -> QuerySet[Any]:
         clone = self._chain()
         if expressions:
-            clone = clone.annotate(**expressions)
+            # The internal mechanism, not the public method: select() aliases
+            # its expression columns through here, and RowQuerySet refuses
+            # annotate().
+            clone = clone._annotate(**expressions)
         clone._fields = fields
         clone.sql_query.set_values(list(fields))
         return clone
@@ -1064,13 +2033,35 @@ class QuerySet[T: "Model"]:
         return clone
 
     def values_list(self, *fields: str, flat: bool = False) -> QuerySet[Any]:
+        return self._values_list(fields, flat=flat)
+
+    def _values_list(
+        self, fields: tuple[str | ResolvableExpression, ...], *, flat: bool
+    ) -> QuerySet[Any]:
         if flat and len(fields) > 1:
             raise TypeError(
                 "'flat' is not valid when values_list is called with more than one "
                 "field."
             )
 
-        field_names = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        # Names an internal alias must not collide with. The newly selected
+        # columns are the obvious ones, but the counter also has to clear
+        # everything already on the query:
+        #
+        #   * `self.sql_query.annotations` -- a user's own `annotate(upper1=...)`
+        #     would otherwise be silently overwritten, quietly changing what
+        #     `order_by("upper1")` means;
+        #   * `self._fields` -- re-selecting restarts the counter, so a second
+        #     `select(Upper(...))` would regenerate the first one's alias and
+        #     collide with it.
+        taken = {f for f in fields if not isinstance(f, ResolvableExpression)}
+        taken |= set(self.sql_query.annotations)
+        # A model is free to have a column literally named `upper1` or `f1`,
+        # which an alias must not shadow even on a first select.
+        taken |= {f.name for f in self.model._model_meta.get_fields()}
+        if self._fields:
+            taken |= set(self._fields)
+
         _fields = []
         expressions = {}
         counter = 1
@@ -1082,8 +2073,9 @@ class QuerySet[T: "Model"]:
                 while True:
                     field_id = field_id_prefix + str(counter)
                     counter += 1
-                    if field_id not in field_names:
+                    if field_id not in taken:
                         break
+                taken.add(field_id)
                 expressions[field_id] = field
                 _fields.append(field_id)
             else:
@@ -1093,7 +2085,210 @@ class QuerySet[T: "Model"]:
         clone._iterable_class = FlatValuesListIterable if flat else ValuesListIterable
         return clone
 
-    def none(self) -> QuerySet[T]:
+    # ---- select(): typed column selection returning honest rows ----
+    #
+    # The ladder unwraps each Selectable[T] argument to its T and reassembles
+    # the row type. The precise row rides on RowQuerySet[R], a QuerySet flavor
+    # whose iteration yields R instead of model instances. A field binds its
+    # real value type; an expression is Selectable[Any], so it contributes Any
+    # while the fields around it stay precise.
+
+    @overload
+    def select[S](
+        self, item: Selectable[S], /, *, flat: Literal[True]
+    ) -> RowQuerySet[S]: ...
+
+    @overload
+    def select[D](
+        self, *items: Selectable[Any], result_type: type[D]
+    ) -> RowQuerySet[D]: ...
+
+    @overload
+    def select[T0](
+        self, i0: Selectable[T0], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0]]: ...
+
+    @overload
+    def select[T0, T1](
+        self, i0: Selectable[T0], i1: Selectable[T1], /, *, flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[T0, T1]]: ...
+
+    @overload
+    def select[T0, T1, T2](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8]]: ...
+
+    @overload
+    def select[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9](
+        self,
+        i0: Selectable[T0],
+        i1: Selectable[T1],
+        i2: Selectable[T2],
+        i3: Selectable[T3],
+        i4: Selectable[T4],
+        i5: Selectable[T5],
+        i6: Selectable[T6],
+        i7: Selectable[T7],
+        i8: Selectable[T8],
+        i9: Selectable[T9],
+        /,
+        *,
+        flat: Literal[False] = False,
+    ) -> RowQuerySet[tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9]]: ...
+
+    @overload
+    def select(
+        self, *items: Selectable[Any], flat: Literal[False] = False
+    ) -> RowQuerySet[tuple[Any, ...]]: ...
+
+    def select(
+        self,
+        *items: Selectable[Any],
+        flat: bool = False,
+        result_type: type | None = None,
+    ) -> Any:
+        if not items:
+            raise TypeError("select() requires at least one column to select.")
+        if flat and len(items) > 1:
+            raise TypeError(
+                f"select(flat=True) takes exactly one column, got {len(items)}."
+            )
+        if flat and result_type is not None:
+            raise TypeError("select() cannot combine flat=True with result_type=.")
+        if not isinstance(self, RowQuerySet) and self._fields is not None:
+            raise TypeError("Cannot call select() after values() or values_list().")
+        if self._returning_fields is not None or self._returning_instances:
+            raise TypeError(
+                "Cannot call select() after returning() — returning() captures "
+                "the rows a write touched, and a select() queryset cannot "
+                "write. Drop the returning() call."
+            )
+        if self._prefetch_lookups:
+            # A prefetch hangs related objects off each result's attributes,
+            # and a row -- tuple, scalar or dataclass -- has nowhere to put
+            # them. Left alone it is silently wasted work for tuples and an
+            # AttributeError for result_type=.
+            raise TypeError(
+                "Cannot call select() after prefetch() — prefetched "
+                "objects are attached to model instances, and select() returns "
+                "rows. Select the columns you need from the related model "
+                "instead."
+            )
+
+        dataclass_type: type[DataclassInstance] | None = None
+        if result_type is not None:
+            if not (
+                isinstance(result_type, type) and dataclasses.is_dataclass(result_type)
+            ):
+                raise TypeError("select(result_type=...) requires a dataclass.")
+            dataclass_type = result_type
+            _check_result_type_matches(dataclass_type, items, self.model)
+
+        for item in items:
+            self._check_column_model(item)
+        columns = [_selectable_to_column(item, self.model) for item in items]
+
+        clone = self._values_list(tuple(columns), flat=flat)
+        clone.__class__ = RowQuerySet
+        clone._select_result_type = dataclass_type
+        if dataclass_type is not None:
+            clone._iterable_class = SelectDataclassIterable
+        return clone
+
+    def none(self) -> Self:
         """Return an empty QuerySet."""
         clone = self._chain()
         clone.sql_query.set_empty()
@@ -1128,6 +2323,158 @@ class QuerySet[T: "Model"]:
         """
         return self._filter_or_exclude(True, args, kwargs)
 
+    def where(self, *conditions: Q) -> Self:
+        """
+        Return a new QuerySet narrowed by typed field conditions.
+
+        Conditions are produced by field methods like `Model.field.equals(...)`
+        and combine with `|` and `&`. Unlike `filter()`, this accepts no
+        keyword arguments -- every condition is a typed expression, so a
+        type checker can reject typos and value-type mismatches at the call
+        site.
+        """
+        for condition in conditions:
+            self._check_condition_model(condition, method="where")
+        return self.filter(*conditions)
+
+    def _check_column_model(self, item: Selectable[Any]) -> None:
+        """Reject a column built from another model's fields.
+
+        `where()`'s problem exactly, one method along: `Field[T]` carries no
+        model identity, so `Order.query.select(User.email)` type-checks and
+        the name `"email"` then resolves against `Order` -- silently the wrong
+        column when both models have one, a `FieldError` from the compiler
+        when they don't.
+
+        A traversed column reports the model its traversal started from, so
+        this fires before the traversal refusal does: being another model's
+        column is the root mistake, and "select columns on the queried model"
+        would be advice that doesn't help.
+
+        Expressions carry no origin and are left alone -- `F("email")` and
+        `Upper("email")` are strings resolved against whatever query they land
+        in, the same as `filter()`'s kwargs.
+        """
+        if not isinstance(item, Field):
+            return
+        source_model = item.source_model
+        if source_model is not None and source_model is not self.model:
+            raise TypeError(
+                f"select() got a column built from "
+                f"{source_model.__name__}.{item.name}, but this is a "
+                f"{self.model.__name__} queryset. Select "
+                f"{self.model.__name__}'s own field, or traverse to it from "
+                f"{self.model.__name__}."
+            )
+
+    def _check_condition_model(self, condition: Q, *, method: str) -> None:
+        """Reject a condition built from another model's fields.
+
+        `Field[T]` carries no model identity, so `Order.query.where(
+        User.email.equals("x"))` type-checks, and the lookup name `"email"`
+        then resolves against `Order` -- silently the wrong column when both
+        models happen to have one, a confusing `FieldError` when they don't.
+        Each condition records the model and field that built it, so the
+        mismatch can be named here instead.
+
+        A traversed condition records the model the traversal *started* from,
+        so `Order.query.where(Order.user.email.equals("x"))` is `Order`'s, not
+        `User`'s. A hand-written `Q(email="x")` records nothing and is not
+        checked -- it is `filter()`'s untyped spelling and behaves like it.
+        """
+        for source_model, field_name in sorted(
+            condition_origins_of(condition), key=lambda pair: pair[1]
+        ):
+            if source_model is not self.model:
+                raise TypeError(
+                    f"{method}() got a condition built from "
+                    f"{source_model.__name__}.{field_name}, but this is a "
+                    f"{self.model.__name__} queryset. Build the condition on "
+                    f"{self.model.__name__}'s own field, or traverse to it "
+                    f"from {self.model.__name__}."
+                )
+
+    def _lookup_conditions(
+        self,
+        method: str,
+        args: tuple[Any, ...],
+        *,
+        allow_primary_key: bool,
+        has_keywords: bool = False,
+    ) -> tuple[Q, ...]:
+        """Resolve a terminal's positional arguments into `where()` conditions.
+
+        `get()`, `get_or_none()`, `first()` and `last()` all accept the same
+        typed conditions `where()` does, so that narrowing and asserting can
+        be one call instead of two. `get()` and `get_or_none()` additionally
+        accept a bare primary key, because looking a row up by key is the most
+        common query there is and `where(Model.id.equals(5)).get()` is a long
+        way to write it.
+
+        Whatever comes back is handed straight to `filter()`, so the SQL is
+        the same either way. Conditions combine with `filter()`'s keyword
+        lookups; a primary key does not, because a key is the whole lookup.
+        """
+        if not args:
+            return ()
+
+        model_name = self.model.__name__
+
+        if all(isinstance(arg, Q) for arg in args):
+            for condition in args:
+                self._check_condition_model(condition, method=method)
+            return args
+
+        if not allow_primary_key:
+            raise TypeError(
+                f"{method}() takes typed conditions like "
+                f"{model_name}.field.equals(value). To look a row up by key, "
+                f"use get() or get_or_none()."
+            )
+
+        if len(args) > 1:
+            raise TypeError(
+                f"{method}() takes a single primary key or typed conditions, "
+                f"not a mix of the two. Write the key as a condition: "
+                f"{method}({model_name}.id.equals(...), ...)."
+            )
+
+        primary_key = args[0]
+        if not isinstance(primary_key, int) or isinstance(primary_key, bool):
+            raise TypeError(
+                f"{method}() got {primary_key!r}, which is neither a typed "
+                f"condition nor a primary key -- {model_name}.id is an int. "
+                f"Parse the value first, or pass a condition like "
+                f"{model_name}.field.equals(value)."
+            )
+
+        if has_keywords:
+            raise TypeError(
+                f"{method}({primary_key!r}, ...) also got keyword lookups. A "
+                f"primary key is the whole lookup, so narrow with conditions "
+                f"instead: {method}({model_name}.id.equals({primary_key!r}), "
+                f"...)."
+            )
+
+        self._check_primary_key_lookup(method)
+        return (self.model.id.equals(primary_key),)
+
+    def _check_primary_key_lookup(self, method: str) -> None:
+        """Hook for the `get(5)` form. A model queryset always allows it."""
+
+    def _narrowed_by(self, method: str, conditions: tuple[Q, ...]) -> Self:
+        """`self`, narrowed by `conditions` -- untouched when there are none.
+
+        Calling `filter()` with nothing would clone the queryset and AND an
+        empty `Q` onto it. Harmless, but `first()` and `last()` are the same
+        query they always were when called with no conditions, and this keeps
+        them on the same code path they were on before.
+        """
+        resolved = self._lookup_conditions(method, conditions, allow_primary_key=False)
+        if not resolved:
+            return self
+        return self.filter(*resolved)
+
     def _filter_or_exclude(
         self, negate: bool, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> Self:
@@ -1149,70 +2496,116 @@ class QuerySet[T: "Model"]:
         else:
             self._query.add_q(Q(*args, **kwargs))
 
-    def select_for_update(
+    def for_update(
         self,
         nowait: bool = False,
         skip_locked: bool = False,
         of: tuple[str, ...] = (),
-        no_key: bool = False,
-    ) -> QuerySet[T]:
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR UPDATE."""
+        return self._lock_rows("update", nowait, skip_locked, of)
+
+    def for_no_key_update(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR NO KEY UPDATE."""
+        return self._lock_rows("no_key_update", nowait, skip_locked, of)
+
+    def for_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR SHARE."""
+        return self._lock_rows("share", nowait, skip_locked, of)
+
+    def for_key_share(
+        self,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        of: tuple[str, ...] = (),
+    ) -> Self:
+        """Return a new QuerySet that locks selected rows with FOR KEY SHARE."""
+        return self._lock_rows("key_share", nowait, skip_locked, of)
+
+    def _lock_rows(
+        self,
+        mode: LockMode,
+        nowait: bool,
+        skip_locked: bool,
+        of: tuple[str, ...],
+    ) -> Self:
         """
-        Return a new QuerySet instance that will select objects with a
-        FOR UPDATE lock.
+        Build a new QuerySet carrying a row-level locking clause. Calling more
+        than one lock method on a chain keeps only the last mode.
         """
         if nowait and skip_locked:
             raise ValueError("The nowait option cannot be used with skip_locked.")
+        if clause := _lock_conflict_clause(self.sql_query):
+            raise _lock_conflict(mode, clause)
         obj = self._chain()
-        obj.sql_query.select_for_update = True
-        obj.sql_query.select_for_update_nowait = nowait
-        obj.sql_query.select_for_update_skip_locked = skip_locked
-        obj.sql_query.select_for_update_of = of
-        obj.sql_query.select_for_no_key_update = no_key
+        obj.sql_query.lock_mode = mode
+        obj.sql_query.lock_nowait = nowait
+        obj.sql_query.lock_skip_locked = skip_locked
+        obj.sql_query.lock_of = of
         return obj
 
-    def select_related(self, *fields: str | None) -> Self:
+    def join(self, *fields: str | None) -> Self:
         """
-        Return a new QuerySet instance that will select related objects.
+        Return a new QuerySet that pulls related objects into the same query
+        with a SQL join, instead of a separate query per related object.
 
         If fields are specified, they must be ForeignKeyField fields and only those
-        related objects are included in the selection.
+        related objects are joined.
 
-        If select_related(None) is called, clear the list.
+        If join(None) is called, clear the list.
         """
         if self._fields is not None:
-            raise TypeError(
-                "Cannot call select_related() after .values() or .values_list()"
-            )
+            raise TypeError("Cannot call join() after .values() or .values_list()")
 
         obj = self._chain()
         if fields == (None,):
-            obj.sql_query.select_related = False
+            obj.sql_query.joined_relations = False
         elif fields:
-            obj.sql_query.add_select_related(list(fields))  # ty: ignore[invalid-argument-type]
+            obj.sql_query.add_joined_relations(list(fields))  # ty: ignore[invalid-argument-type]
         else:
-            obj.sql_query.select_related = True
+            obj.sql_query.joined_relations = True
         return obj
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> Self:
+    def prefetch(self, *lookups: str | Prefetch | None) -> Self:
         """
         Return a new QuerySet instance that will prefetch the specified
         Many-To-One and Many-To-Many related objects when the QuerySet is
         evaluated.
 
-        When prefetch_related() is called more than once, append to the list of
-        prefetch lookups. If prefetch_related(None) is called, clear the list.
+        When prefetch() is called more than once, append to the list of
+        prefetch lookups. If prefetch(None) is called, clear the list.
         """
         clone = self._chain()
         if lookups == (None,):
-            clone._prefetch_related_lookups = ()
+            clone._prefetch_lookups = ()
         else:
-            clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
+            clone._prefetch_lookups = clone._prefetch_lookups + lookups
         return clone
 
     def annotate(self, *args: Any, **kwargs: Any) -> Self:
         """
         Return a query set in which the returned objects have been annotated
         with extra data or aggregations.
+        """
+        return self._annotate(*args, **kwargs)
+
+    def _annotate(self, *args: Any, **kwargs: Any) -> Self:
+        """The mechanism behind `annotate()`.
+
+        Separate from the public method because `_values_list` annotates
+        internally to alias expression columns, and `RowQuerySet` refuses the
+        public `annotate()` -- selecting an expression twice must not trip a
+        guard aimed at callers adding a column to a finished row.
         """
         self._validate_values_are_expressions(
             args + tuple(kwargs.values()), method_name="annotate"
@@ -1232,16 +2625,25 @@ class QuerySet[T: "Model"]:
         annotations.update(kwargs)
 
         clone = self._chain()
+        # On a row-mode queryset the selected columns are what an alias can
+        # collide with; otherwise it is the model's own fields.
         names = self._fields
+        conflicts_with = "a selected column"
         if names is None:
             names = {field.name for field in self.model._model_meta.get_fields()}
+            conflicts_with = "a field on the model"
 
         for alias, annotation in annotations.items():
             if alias in names:
                 raise ValueError(
-                    f"The annotation '{alias}' conflicts with a field on the model."
+                    f"The annotation '{alias}' conflicts with {conflicts_with}."
                 )
             clone.sql_query.add_annotation(annotation, alias)
+        if clone.sql_query.lock_mode and (
+            clause := _lock_conflict_clause(clone.sql_query)
+        ):
+            raise _lock_conflict(clone.sql_query.lock_mode, clause)
+
         for alias, annotation in clone.sql_query.annotations.items():
             if alias in annotations and annotation.contains_aggregate:
                 if clone._fields is None:
@@ -1269,11 +2671,13 @@ class QuerySet[T: "Model"]:
             raise TypeError(
                 "Cannot create distinct fields once a slice has been taken."
             )
+        if self.sql_query.lock_mode:
+            raise _lock_conflict(self.sql_query.lock_mode, "distinct()")
         obj = self._chain()
         obj.sql_query.add_distinct_fields(*field_names)
         return obj
 
-    def reverse(self) -> QuerySet[T]:
+    def reverse(self) -> Self:
         """Reverse the ordering of the QuerySet."""
         if self.sql_query.is_sliced:
             raise TypeError("Cannot reverse a query once a slice has been taken.")
@@ -1281,7 +2685,7 @@ class QuerySet[T: "Model"]:
         clone.sql_query.standard_ordering = not clone.sql_query.standard_ordering
         return clone
 
-    def defer(self, *fields: str | None) -> QuerySet[T]:
+    def defer(self, *fields: str | None) -> Self:
         """
         Defer the loading of data for certain fields until they are accessed.
         Add the set of deferred fields to any existing set of deferred fields.
@@ -1297,7 +2701,7 @@ class QuerySet[T: "Model"]:
             clone.sql_query.add_deferred_loading(frozenset(fields))  # ty: ignore[invalid-argument-type]
         return clone
 
-    def only(self, *fields: str) -> QuerySet[T]:
+    def only(self, *fields: str) -> Self:
         """
         Essentially, the opposite of defer(). Only the fields passed into this
         method and that are not already specified as deferred are loaded
@@ -1349,6 +2753,8 @@ class QuerySet[T: "Model"]:
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
+        conflict_defaults: dict[Field, Any] | None = None,
+        returning_created: bool = False,
     ) -> list[tuple[Any, ...]] | None:
         """
         Insert a new record for the given model. This provides an interface to
@@ -1359,6 +2765,8 @@ class QuerySet[T: "Model"]:
             on_conflict=on_conflict if on_conflict else None,
             update_fields=update_fields,
             unique_fields=unique_fields,
+            conflict_defaults=conflict_defaults,
+            returning_created=returning_created,
         )
         query.insert_values(fields, objs)
         # InsertQuery returns SQLInsertCompiler which has different execute_sql signature
@@ -1369,34 +2777,32 @@ class QuerySet[T: "Model"]:
         objs: list[T],
         fields: Sequence[Field],
         batch_size: int | None,
+        *,
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
     ) -> list[tuple[Any, ...]]:
         """
-        Helper method for bulk_create() to insert objs one batch at a time.
+        Helper method for bulk_create()/bulk_upsert() to insert objs one batch
+        at a time, collecting the RETURNING rows from every batch. Pass the
+        on_conflict kwargs to run each batch as ON CONFLICT DO UPDATE.
         """
+        returning_fields = self.model._model_meta.db_returning_fields
         max_batch_size = max(len(objs), 1)
         batch_size = min(batch_size, max_batch_size) if batch_size else max_batch_size
-        inserted_rows = []
+        returned_rows = []
         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
-            if on_conflict is None:
-                inserted_rows.extend(
-                    self._insert(  # ty: ignore[invalid-argument-type]
-                        item,
-                        fields=fields,
-                        returning_fields=self.model._model_meta.db_returning_fields,
-                    )
-                )
-            else:
-                self._insert(
+            returned_rows.extend(
+                self._insert(  # ty: ignore[invalid-argument-type]
                     item,
                     fields=fields,
+                    returning_fields=returning_fields,
                     on_conflict=on_conflict,
                     update_fields=update_fields,
                     unique_fields=unique_fields,
                 )
-        return inserted_rows
+            )
+        return returned_rows
 
     def _chain(self) -> Self:
         """
@@ -1419,17 +2825,20 @@ class QuerySet[T: "Model"]:
             query=self.sql_query.chain(),
         )
         c._sticky_filter = self._sticky_filter
-        c._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        c._prefetch_lookups = self._prefetch_lookups[:]
         c._known_related_objects = self._known_related_objects
         c._iterable_class = self._iterable_class
         c._fields = self._fields
+        c._select_result_type = self._select_result_type
+        c._returning_fields = self._returning_fields
+        c._returning_instances = self._returning_instances
         return c
 
     def _attach_result_cache(self, obj: Self, cache: list[T]) -> None:
         """Carry a result cache onto a chained QuerySet.
 
         Whenever a cache is moved onto a new QuerySet, the prefetch state
-        must ride along with it — otherwise prefetch_related() would re-run
+        must ride along with it — otherwise prefetch() would re-run
         (or be skipped). Keep both writes together here so callers can't
         forget the pairing.
         """
@@ -1439,10 +2848,10 @@ class QuerySet[T: "Model"]:
     def _fetch_all(self) -> None:
         if self._result_cache is None:
             self._result_cache = list(self._iterable_class(self))
-        if self._prefetch_related_lookups and not self._prefetch_done:
-            self._prefetch_related_objects()
+        if self._prefetch_lookups and not self._prefetch_done:
+            self._prefetch_objects()
 
-    def _next_is_sticky(self) -> QuerySet[T]:
+    def _next_is_sticky(self) -> Self:
         """
         Indicate that the next filter call and the one following that should
         be treated as a single filter. This is only important when it comes to
@@ -1457,14 +2866,43 @@ class QuerySet[T: "Model"]:
         return self
 
     def _merge_sanity_check(self, other: QuerySet[T]) -> None:
-        """Check that two QuerySet classes may be merged."""
-        if self._fields is not None and (
-            set(self.sql_query.values_select) != set(other.sql_query.values_select)
+        """Check that two QuerySet classes may be merged.
+
+        Either side being in row mode is enough to matter: merging a row-mode
+        queryset with a model-mode one produces a query neither side describes,
+        and left unchecked `model_qs | row_qs` recurses until the stack runs
+        out. The guard used to look only at `self`, so it caught the merge from
+        one side and not the other.
+        """
+        if self._fields is None and other._fields is None:
+            return
+
+        if (
+            self._fields != other._fields
+            or set(self.sql_query.values_select) != set(other.sql_query.values_select)
             or set(self.sql_query.annotation_select)
             != set(other.sql_query.annotation_select)
         ):
             raise TypeError(
-                f"Merging '{self.__class__.__name__}' classes must involve the same values in each case."
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must involve the same "
+                f"values in each case."
+            )
+
+        # Same columns is not the same rows: tuples, flat scalars and
+        # dataclasses all select identically and differ only in how each row
+        # is built. Merging two of them would quietly hand back whichever
+        # shape the left operand happened to carry.
+        if (
+            self._iterable_class is not other._iterable_class
+            or self._select_result_type is not other._select_result_type
+        ):
+            raise TypeError(
+                f"Merging '{self.__class__.__name__}' and "
+                f"'{other.__class__.__name__}' classes must produce the same "
+                f"row shape: these select the same columns but build rows "
+                f"differently (tuple, flat scalar and result_type= rows are "
+                f"not interchangeable)."
             )
 
     def _merge_known_related_objects(self, other: QuerySet[T]) -> None:
@@ -1506,6 +2944,354 @@ class QuerySet[T: "Model"]:
             )
 
 
+# Why deeper traversal is out: a column reached through a relation comes back
+# over a join, so a nullable relation yields None where the traversed field's
+# type says it can't. `Post.author.profile.city` is a string typed `str` that
+# arrives as None for an authorless post, and select() has no way to say so.
+#
+# A foreign key's own key column is the exception: `Post.author.id` is
+# `"post"."author_id"`, a local column of the table being selected, read with
+# no join at all. Its nullability is the foreign key's own `allow_null`, which
+# is the same promise every other local column makes. See
+# `_local_foreign_key()`.
+_NO_TRAVERSAL_IN_SELECT = (
+    "a column reached through a relation is nullable in a way its type doesn't "
+    "say, so select() refuses it for now. Use values_list() with the lookup "
+    "path instead."
+)
+
+
+def _local_foreign_key(model: type[Model], item: Field[Any]) -> Field[Any] | None:
+    """The foreign key whose own key column `item` names, or None.
+
+    `Grant.process.id` traverses one hop and lands on the related model's
+    primary key -- exactly the value the foreign key stores locally, in
+    `"grant"."process_id"`. So it is read off the selecting table with no join,
+    and its nullability is the foreign key's own `allow_null`.
+
+    Everything else really does need the join and stays refused: a deeper path
+    (`Grant.process.owner.id`), a non-key column (`Grant.process.name`), or a
+    hop that isn't a forward foreign key (a many-to-many).
+    """
+    # Local import: fields.related imports this module at load time (circular).
+    from plain.postgres.fields.related import ForeignKeyField
+
+    if not item.is_lookup_reference:
+        return None
+    relation_name, _, leaf_name = item.name.partition(LOOKUP_SEP)
+    if not leaf_name or LOOKUP_SEP in leaf_name:
+        # No hop at all, or more than one.
+        return None
+    try:
+        relation = model._model_meta.get_forward_field(relation_name)
+    except FieldDoesNotExist:
+        return None
+    if not isinstance(relation, ForeignKeyField):
+        return None
+    if leaf_name != relation.target_field.name:
+        return None
+    return relation
+
+
+def _selectable_to_column(
+    item: Selectable[Any], model: type[Model]
+) -> str | ResolvableExpression:
+    """Turn a select() argument into something the values_list plumbing accepts.
+
+    A field becomes its column name; an expression is passed through (the
+    plumbing auto-aliases it). Strings and relation traversal get their own
+    error so the message points at the real fix.
+    """
+    # Local import: these pull in fields.related, which imports this module at
+    # load time (circular).
+    from plain.postgres.fields.related_descriptors import ForwardForeignKeyDescriptor
+    from plain.postgres.fields.related_typed import RelatedFieldRef
+
+    if isinstance(item, str):
+        raise TypeError(
+            f"select() takes typed column references like User.email, not "
+            f"strings. Got {item!r}."
+        )
+    if isinstance(item, ForwardForeignKeyDescriptor):
+        # The relation itself (`Post.author`). Its key column *is* selectable,
+        # so the message names that spelling.
+        relation = item._field
+        raise TypeError(
+            f"select() takes columns, not relations. Select the key column "
+            f"instead -- {relation.model.__name__}.{relation.name}."
+            f"{relation.target_field.name}."
+        )
+    if isinstance(item, RelatedFieldRef):
+        # An intermediate hop (`Post.author.organization`). Its key column
+        # lives on the related table, so it only arrives over a join.
+        raise TypeError(
+            "select() takes columns, not relations, and this relation's key "
+            "column arrives over a join — " + _NO_TRAVERSAL_IN_SELECT
+        )
+    if isinstance(item, Field):
+        if not item.name:
+            # A field read off a mixin class rather than a model: the mixin
+            # holds the declaration, and only the model it is mixed into has
+            # an attached, named copy.
+            raise TypeError(
+                f"select() got an unattached {type(item).__name__}. Reading a "
+                f"field off a mixin class gives the declaration, which has no "
+                f"name or column yet -- read it off the model that mixes it "
+                f"in instead."
+            )
+        if relation := _local_foreign_key(model, item):
+            # The foreign key's own column. Naming the relation is what
+            # `values_list("author")` does, and it compiles to the same
+            # join-free `"post"."author_id"`.
+            return relation.name
+        if item.is_lookup_reference:
+            # A traversed leaf: `Field.with_lookup_prefix` hands back the
+            # related model's field carrying the relation path as its name.
+            raise TypeError(
+                f"select() cannot select {item.name!r}: "
+                + _NO_TRAVERSAL_IN_SELECT
+                + f' Here that is values_list("{item.name}").'
+            )
+        return item.name
+    # Matches what `_values_list` accepts, so anything values_list() can select
+    # — `F("x")` included — select() can select too.
+    if isinstance(item, ResolvableExpression):
+        return item
+    raise TypeError(
+        f"select() takes fields and expressions, got {type(item).__name__}."
+    )
+
+
+def _result_type_parameters(
+    result_type: type[DataclassInstance],
+) -> tuple[inspect.Parameter, ...]:
+    """The constructor parameters a row is built from.
+
+    Read off the signature rather than `dataclasses.fields()`, because the two
+    disagree in both directions: an `init=False` field is computed by the
+    dataclass and can't be passed, while an `InitVar` is a constructor
+    parameter that never appears in `fields()` at all. The signature is what
+    `result_type(*row)` actually has to satisfy.
+    """
+    parameters = tuple(
+        inspect.signature(
+            result_type, annotation_format=annotationlib.Format.FORWARDREF
+        ).parameters.values()
+    )
+    for parameter in parameters:
+        if parameter.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) needs a fixed "
+                f"constructor signature to map columns onto, but "
+                f"{result_type.__name__} takes {parameter!s}."
+            )
+    return parameters
+
+
+def _check_result_type_matches(
+    result_type: type[DataclassInstance],
+    items: tuple[Selectable[Any], ...],
+    model: type[Model],
+) -> None:
+    """Validate a dataclass result_type against the selected items.
+
+    Arity must match the constructor, and each selected field's name must
+    equal the parameter at the same position — expressions are anonymous and
+    only need the position to line up.
+
+    A foreign key's own key column (`Grant.process.id`) is named by the column
+    it reads, `process_id`, which is both the database column and the name a
+    dataclass field for a raw key wants.
+    """
+    parameters = _result_type_parameters(result_type)
+    if len(parameters) != len(items):
+        raise TypeError(
+            f"select(result_type={result_type.__name__}) takes "
+            f"{len(parameters)} constructor arguments but {len(items)} "
+            f"columns were selected."
+        )
+    for item, parameter in zip(items, parameters, strict=True):
+        if not isinstance(item, Field):
+            continue
+        if relation := _local_foreign_key(model, item):
+            expected = relation.column
+        else:
+            expected = item.name
+        if expected != parameter.name:
+            raise TypeError(
+                f"select(result_type={result_type.__name__}) maps columns "
+                f"positionally: field {expected!r} does not match dataclass "
+                f"field {parameter.name!r} at the same position."
+            )
+
+
+class RowQuerySet[R](QuerySet[Any]):
+    """A QuerySet in row mode, returned by `select()`.
+
+    Iteration yields the selected row type `R` — a tuple, a scalar (flat), or a
+    dataclass (result_type) — never a model instance. Everything that reads
+    rows is inherited: the parent's values_list machinery builds the SQL and
+    the rows, and `update()`/`delete()` already refuse a row-mode queryset.
+
+    All this class adds at runtime is the refusal of the methods that would
+    re-enter row mode or hand back a row where a model instance is promised.
+    The rest is the `R` that the base, typed `QuerySet[Any]`, can't carry —
+    declared for the checker only, so row iteration doesn't pay for a Python
+    frame per call.
+    """
+
+    if TYPE_CHECKING:
+
+        def __iter__(self) -> Iterator[R]: ...
+
+        def first(self, *conditions: Q) -> R | None: ...
+
+        def last(self, *conditions: Q) -> R | None: ...
+
+        # The primary key form is refused -- see _check_primary_key_lookup
+        # below. It stays in the signature because dropping it would narrow
+        # the parameter type the base declares; `Never` is what tells the
+        # checker the call doesn't come back.
+        @overload
+        def get(self, primary_key: int, /) -> Never: ...
+
+        @overload
+        def get(self, *conditions: Q, **kwargs: Any) -> R: ...
+
+        @overload
+        def get_or_none(self, primary_key: int, /) -> Never: ...
+
+        @overload
+        def get_or_none(self, *conditions: Q, **kwargs: Any) -> R | None: ...
+
+        def iterator(self, chunk_size: int | None = None) -> Iterator[R]: ...
+
+        @overload
+        def __getitem__(self, k: int) -> R: ...
+
+        @overload
+        def __getitem__(self, k: slice) -> RowQuerySet[R]: ...
+
+    # `Never` doesn't reject the call itself — the TypeError does that — but it
+    # does tell the checker control never returns, so a caller's trailing code
+    # reads as unreachable rather than as a QuerySet or a model instance.
+
+    def _check_primary_key_lookup(self, method: str) -> None:
+        # `rows[5]` already means the sixth row, so `rows.get(5)` would read
+        # as an index rather than a key -- and a row has no primary key of its
+        # own to disambiguate it. Narrow before selecting instead.
+        raise TypeError(
+            f"Cannot call {method}(primary_key) after select() -- a row is "
+            f"not a model instance, and `rows[5]` already means the sixth "
+            f"row. Narrow first: "
+            f"query.where(Model.id.equals(5)).select(...).{method}()."
+        )
+
+    def annotate(self, *args: Any, **kwargs: Any) -> Never:
+        # An annotation appends a column, so the rows would gain a member the
+        # declared R doesn't have — silently for tuples, as a confusing
+        # constructor error for result_type=, and silently dropped for flat.
+        raise TypeError(
+            "Cannot call annotate() after select() — an annotation adds a "
+            "column, which would change the row shape out from under the "
+            "selected type. Annotate first, then select()."
+        )
+
+    def prefetch(self, *lookups: str | Prefetch | None) -> Never:
+        raise TypeError(
+            "Cannot call prefetch() after select() — prefetched "
+            "objects are attached to model instances, and select() returns "
+            "rows. Select the columns you need from the related model instead."
+        )
+
+    def create(self, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call create() on a select() queryset.")
+
+    def bulk_create(self, *args: Any, **kwargs: Any) -> Never:
+        raise TypeError("Cannot call bulk_create() on a select() queryset.")
+
+    def values(self, *fields: str, **expressions: Any) -> Never:
+        raise TypeError("Cannot call values() after select().")
+
+    def values_list(self, *fields: str, flat: bool = False) -> Never:
+        raise TypeError("Cannot call values_list() after select().")
+
+    def get_or_create(
+        self, defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> Never:
+        # The base would hand back whatever get() returns on a hit — a row —
+        # and a model instance on a miss.
+        raise TypeError("Cannot call get_or_create() after select().")
+
+    def upsert(
+        self,
+        *_positional: Never,
+        defaults: dict[str, Any] | None = None,
+        create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        **kwargs: Any,
+    ) -> Never:
+        raise TypeError("Cannot call upsert() after select().")
+
+    def bulk_upsert(
+        self,
+        objs: Sequence[Any],
+        *,
+        update_fields: Sequence[Field[Any] | type[Model]],
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        batch_size: int | None = None,
+    ) -> Never:
+        raise TypeError("Cannot call bulk_upsert() after select().")
+
+    def bulk_update(
+        self, objs: Sequence[Any], fields: list[str], batch_size: int | None = None
+    ) -> Never:
+        # The base would reach the same refusal, but only from the update()
+        # inside its own `transaction.atomic(savepoint=False)` -- which leaves
+        # the enclosing transaction unusable. Refusing up front keeps the
+        # failure a plain TypeError.
+        raise TypeError("Cannot call bulk_update() on a select() queryset.")
+
+    def returning(self, *fields: Field[Any]) -> Never:
+        # returning() captures the rows a write touched, and select() has
+        # already refused every write. Accepting it would be inert at runtime
+        # and a lie statically -- the checker would believe update() hands
+        # back instances.
+        raise TypeError(
+            "Cannot call returning() after select() — returning() captures the "
+            "rows a write touched, and a select() queryset cannot write."
+        )
+
+
+if TYPE_CHECKING:
+
+    class ReturningQuerySet[T: "Model", R](QuerySet[T]):
+        """The static type returning() hands back. Never instantiated.
+
+        returning() leaves the queryset's own class alone -- a custom
+        QuerySet subclass has to survive it -- so this exists only to pin
+        what update()/delete() give back. R is the shape the returning()
+        overloads chose: a list of instances, or of dicts.
+        """
+
+        def update(self, **kwargs: Any) -> R: ...  # ty: ignore[invalid-method-override]
+
+        def delete(self) -> R: ...  # ty: ignore[invalid-method-override]
+
+else:
+    # returning()'s annotations name this, and annotations get evaluated:
+    # typing.get_type_hints() and any API-doc generator walk them, so the
+    # name has to resolve at runtime too. A type alias is what it should
+    # resolve to -- QuerySet takes one type parameter and this takes two,
+    # and unlike a placeholder class there is nothing here for someone to
+    # reach for with isinstance().
+    type ReturningQuerySet[T, R] = QuerySet[T]
+
+
 class InstanceCheckMeta(type):
     def __instancecheck__(self, instance: object) -> bool:
         return isinstance(instance, QuerySet) and instance.sql_query.is_empty()
@@ -1541,7 +3327,7 @@ class RawQuerySet:
         self.params = params
         self.translations = translations or {}
         self._result_cache: list[Model] | None = None
-        self._prefetch_related_lookups: tuple[Any, ...] = ()
+        self._prefetch_lookups: tuple[Any, ...] = ()
         self._prefetch_done = False
 
     def resolve_model_init_order(
@@ -1562,18 +3348,18 @@ class RawQuerySet:
         model_init_names = [f.name for f in model_init_fields]
         return model_init_names, model_init_order, annotation_fields
 
-    def prefetch_related(self, *lookups: str | Prefetch | None) -> RawQuerySet:
-        """Same as QuerySet.prefetch_related()"""
+    def prefetch(self, *lookups: str | Prefetch | None) -> RawQuerySet:
+        """Same as QuerySet.prefetch()"""
         clone = self._clone()
         if lookups == (None,):
-            clone._prefetch_related_lookups = ()
+            clone._prefetch_lookups = ()
         else:
-            clone._prefetch_related_lookups = clone._prefetch_related_lookups + lookups
+            clone._prefetch_lookups = clone._prefetch_lookups + lookups
         return clone
 
-    def _prefetch_related_objects(self) -> None:
+    def _prefetch_objects(self) -> None:
         assert self._result_cache is not None
-        prefetch_related_objects(self._result_cache, *self._prefetch_related_lookups)
+        prefetch_objects(self._result_cache, *self._prefetch_lookups)
         self._prefetch_done = True
 
     def _clone(self) -> RawQuerySet:
@@ -1585,14 +3371,14 @@ class RawQuerySet:
             params=self.params,
             translations=self.translations,
         )
-        c._prefetch_related_lookups = self._prefetch_related_lookups[:]
+        c._prefetch_lookups = self._prefetch_lookups[:]
         return c
 
     def _fetch_all(self) -> None:
         if self._result_cache is None:
             self._result_cache = list(self.iterator())
-        if self._prefetch_related_lookups and not self._prefetch_done:
-            self._prefetch_related_objects()
+        if self._prefetch_lookups and not self._prefetch_done:
+            self._prefetch_objects()
 
     def __len__(self) -> int:
         self._fetch_all()
@@ -1730,7 +3516,7 @@ def normalize_prefetch_lookups(
     return ret
 
 
-def prefetch_related_objects(
+def prefetch_objects(
     model_instances: Sequence[Model], *related_lookups: str | Prefetch
 ) -> None:
     """
@@ -1740,7 +3526,7 @@ def prefetch_related_objects(
     if not model_instances:
         return  # nothing to do
 
-    # We need to be able to dynamically add to the list of prefetch_related
+    # We need to be able to dynamically add to the list of prefetch()
     # lookups that we look up (see below).  So we need some book keeping to
     # ensure we don't do duplicate work.
     done_queries = {}  # dictionary of things like 'foo__bar': [results]
@@ -1785,12 +3571,12 @@ def prefetch_related_objects(
                 if not hasattr(obj, "_prefetched_objects_cache"):
                     try:
                         obj._prefetched_objects_cache = {}
-                    except (AttributeError, TypeError):
+                    except AttributeError, TypeError:
                         # Must be an immutable object from
                         # values_list(flat=True), for example (TypeError) or
                         # a QuerySet subclass that isn't returning Model
                         # instances (AttributeError), either in Plain or a 3rd
-                        # party. prefetch_related() doesn't make sense, so quit.
+                        # party. prefetch() doesn't make sense, so quit.
                         good_objects = False
                         break
             if not good_objects:
@@ -1799,7 +3585,7 @@ def prefetch_related_objects(
             # Descend down tree
 
             # We assume that objects retrieved are homogeneous (which is the premise
-            # of prefetch_related), so what applies to first object applies to all.
+            # of prefetch()), so what applies to first object applies to all.
             first_obj = obj_list[0]
             to_attr = lookup.get_current_to_attr(level)[0]
             prefetcher, descriptor, attr_found, is_fetched = get_prefetcher(
@@ -1809,7 +3595,7 @@ def prefetch_related_objects(
             if not attr_found:
                 raise AttributeError(
                     f"Cannot find '{through_attr}' on {first_obj.__class__.__name__} object, '{lookup.prefetch_through}' is an invalid "
-                    "parameter to prefetch_related()"
+                    "parameter to prefetch()"
                 )
 
             if level == len(through_attrs) - 1 and prefetcher is None:
@@ -1819,7 +3605,7 @@ def prefetch_related_objects(
                 raise ValueError(
                     f"'{lookup.prefetch_through}' does not resolve to an item that supports "
                     "prefetching - this is an invalid parameter to "
-                    "prefetch_related()."
+                    "prefetch()."
                 )
 
             obj_to_fetch = None
@@ -1852,7 +3638,7 @@ def prefetch_related_objects(
                 followed_descriptors.add(descriptor)
             else:
                 # Either a singly related object that has already been fetched
-                # (e.g. via select_related), or hopefully some other property
+                # (e.g. via join()), or hopefully some other property
                 # that doesn't support prefetching but needs to be traversed.
 
                 # We replace the current list of parent objects with the list
@@ -1886,9 +3672,9 @@ def get_prefetcher(
 ) -> tuple[Any, Any, bool, Callable[[Model], bool]]:
     """
     For the attribute 'through_attr' on the given instance, find
-    an object that has a get_prefetch_queryset().
+    an object that has a _get_prefetch_queryset().
     Return a 4 tuple containing:
-    (the object with get_prefetch_queryset (or None),
+    (the object with _get_prefetch_queryset (or None),
      the descriptor object representing this relationship (or None),
      a boolean that is False if the attribute was not found at all,
      a function that takes an instance and returns a boolean that is True if
@@ -1911,16 +3697,16 @@ def get_prefetcher(
         attr_found = True
         if rel_obj_descriptor:
             # singly related object, descriptor object has the
-            # get_prefetch_queryset() method.
-            if hasattr(rel_obj_descriptor, "get_prefetch_queryset"):
+            # _get_prefetch_queryset() method.
+            if hasattr(rel_obj_descriptor, "_get_prefetch_queryset"):
                 prefetcher = rel_obj_descriptor
-                is_fetched = rel_obj_descriptor.is_cached
+                is_fetched = rel_obj_descriptor._is_cached
             else:
                 # descriptor doesn't support prefetching, so we go ahead and get
                 # the attribute on the instance rather than the class to
                 # support many related managers
                 rel_obj = getattr(instance, through_attr)
-                if hasattr(rel_obj, "get_prefetch_queryset"):
+                if hasattr(rel_obj, "_get_prefetch_queryset"):
                     prefetcher = rel_obj
                 if through_attr != to_attr:
                     # Special case cached_property instances because hasattr
@@ -1946,15 +3732,15 @@ def prefetch_one_level(
     instances: list[Model], prefetcher: Any, lookup: Prefetch, level: int
 ) -> tuple[list[Model], list[Prefetch]]:
     """
-    Helper function for prefetch_related_objects().
+    Helper function for prefetch_objects().
 
     Run prefetches on all instances using the prefetcher object,
     assigning results to relevant caches in instance.
 
     Return the prefetched objects along with any additional prefetches that
-    must be done due to prefetch_related lookups found from default managers.
+    must be done due to prefetch() lookups found from default managers.
     """
-    # prefetcher must have a method get_prefetch_queryset() which takes a list
+    # prefetcher must have a method _get_prefetch_queryset() which takes a list
     # of instances, and returns a tuple:
 
     # (queryset of instances of self.model that are related to passed in instances,
@@ -1974,22 +3760,22 @@ def prefetch_one_level(
         single,
         cache_name,
         is_descriptor,
-    ) = prefetcher.get_prefetch_queryset(instances, lookup.get_current_queryset(level))
+    ) = prefetcher._get_prefetch_queryset(instances, lookup.get_current_queryset(level))
     # We have to handle the possibility that the QuerySet we just got back
-    # contains some prefetch_related lookups. We don't want to trigger the
-    # prefetch_related functionality by evaluating the query. Rather, we need
-    # to merge in the prefetch_related lookups.
+    # contains some prefetch() lookups. We don't want to trigger the
+    # prefetch() functionality by evaluating the query. Rather, we need
+    # to merge in the prefetch() lookups.
     # Copy the lookups in case it is a Prefetch object which could be reused
-    # later (happens in nested prefetch_related).
+    # later (happens in nested prefetch()).
     additional_lookups = [
         copy.copy(additional_lookup)
-        for additional_lookup in getattr(rel_qs, "_prefetch_related_lookups", ())
+        for additional_lookup in getattr(rel_qs, "_prefetch_lookups", ())
     ]
     if additional_lookups:
         # Don't need to clone because the queryset should have given us a fresh
         # instance, so we access an internal instead of using public interface
         # for performance reasons.
-        rel_qs._prefetch_related_lookups = ()
+        rel_qs._prefetch_lookups = ()
 
     all_related_objects = list(rel_qs)
 
@@ -2002,7 +3788,7 @@ def prefetch_one_level(
     # Make sure `to_attr` does not conflict with a field.
     if as_attr and instances:
         # We assume that objects retrieved are homogeneous (which is the premise
-        # of prefetch_related), so what applies to first object applies to all.
+        # of prefetch()), so what applies to first object applies to all.
         model = instances[0].__class__
         try:
             model._model_meta.get_field(to_attr)
@@ -2051,7 +3837,7 @@ def prefetch_one_level(
                         # The manager's query property returns a properly filtered QuerySet
                         qs = queryset.query
                 qs._result_cache = vals
-                # We don't want the individual qs doing prefetch_related now,
+                # We don't want the individual qs doing prefetch() now,
                 # since we have merged this into the current work.
                 qs._prefetch_done = True
                 obj._prefetched_objects_cache[cache_name] = qs
@@ -2060,9 +3846,9 @@ def prefetch_one_level(
 
 class RelatedPopulator:
     """
-    RelatedPopulator is used for select_related() object instantiation.
+    RelatedPopulator is used for join() object instantiation.
 
-    The idea is that each select_related() model will be populated by a
+    The idea is that each join() model will be populated by a
     different RelatedPopulator instance. The RelatedPopulator instances get
     klass_info and select (computed in SQLCompiler) plus the used db as
     input for initialization. That data is used to compute which columns
@@ -2070,7 +3856,7 @@ class RelatedPopulator:
     between the objects.
 
     The actual creation of the objects is done in populate() method. This
-    method gets row and from_obj as input and populates the select_related()
+    method gets row and from_obj as input and populates the join()
     model instance.
     """
 
@@ -2081,7 +3867,7 @@ class RelatedPopulator:
         #    - cols_start, cols_end: usually the columns in the row are
         #      in the same order model_cls.__init__ expects them, so we
         #      can instantiate by model_cls(*row[cols_start:cols_end])
-        #    - reorder_for_init: When select_related descends to a child
+        #    - reorder_for_init: When join() descends to a child
         #      class, then we want to reuse the already selected parent
         #      data. However, in this case the parent data isn't necessarily
         #      in the same order that Model.__init__ expects it to be, so
@@ -2094,7 +3880,7 @@ class RelatedPopulator:
         #    deferred models this isn't the same as all names of the
         #    model's fields.
         #  - related_populators: a list of RelatedPopulator instances if
-        #    select_related() descends to related models from this model.
+        #    join() descends to related models from this model.
         #  - local_setter, remote_setter: Methods to set cached values on
         #    the object being populated and on the remote object. Usually
         #    these are Field.set_cached_value() methods.

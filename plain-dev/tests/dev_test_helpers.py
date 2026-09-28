@@ -7,8 +7,6 @@ can't leave a real entry in the developer's own cache or leak an env var into
 the next test.
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 from collections.abc import Generator

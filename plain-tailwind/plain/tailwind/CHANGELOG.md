@@ -1,5 +1,25 @@
 # plain-tailwind changelog
 
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-tailwind@0.25.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.24.2](https://github.com/dropseed/plain/releases/plain-tailwind@0.24.2) (2026-09-20)
+
+### What's changed
+
+- On Windows, installing a downloaded Tailwind binary into the machine-wide cache tolerates the `PermissionError` raised when another process (for example `plain tailwind build --watch` in another checkout) has that binary open — if the file is already there, the install is done ([8766bb72ce](https://github.com/dropseed/plain/commit/8766bb72ce))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.24.1](https://github.com/dropseed/plain/releases/plain-tailwind@0.24.1) (2026-08-12)
 
 ### What's changed

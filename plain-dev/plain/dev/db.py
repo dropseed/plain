@@ -5,8 +5,6 @@ away, with a lifecycle that follows your work rather than your server. These
 commands are the handle on that. The logic lives in `plain.dev.postgres`.
 """
 
-from __future__ import annotations
-
 import json as json_lib
 from pathlib import Path
 

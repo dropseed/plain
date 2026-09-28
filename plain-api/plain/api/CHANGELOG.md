@@ -1,5 +1,57 @@
 # plain-api changelog
 
+## [0.37.0](https://github.com/dropseed/plain/releases/plain-api@0.37.0) (2026-09-21)
+
+### What's changed
+
+- OpenAPI generation no longer fails on Python 3.14. `schema_from_type()` probed `__origin__` and raised on anything it didn't recognize before reaching the branch that handles `X | None`; 3.14 unified `types.UnionType` with `typing.Union`, so every union suddenly had an origin and every optional field in a response schema raised `ValueError: Unknown type`. Unions are now matched first, through `typing.get_origin`/`get_args` instead of dunder probing. `X | None` generates exactly what it did on 3.13 (the member's schema plus `nullable: true`), so no existing document changes. A union of several named members — `str | int` — now generates `anyOf` (plus `nullable` when `None` is among them) instead of failing the whole document; a subscripted generic the generator doesn't model still raises ([ae347ae811](https://github.com/dropseed/plain/commit/ae347ae811))
+
+### Upgrade instructions
+
+- If an app serves a generated OpenAPI document and has moved to Python 3.14, regenerate it — a document generated before this fix is missing, not merely stale.
+
+## [0.36.0](https://github.com/dropseed/plain/releases/plain-api@0.36.0) (2026-09-21)
+
+### What's changed
+
+- The API key admin declares its `search_fields` as field references, which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.35.3](https://github.com/dropseed/plain/releases/plain-api@0.35.3) (2026-09-21)
+
+### What's changed
+
+- The API key lookup uses a typed `where()` condition; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- If plain.postgres is installed (API keys), it must be 0.119.0 or newer. plain.api still works without it.
+
+## [0.35.2](https://github.com/dropseed/plain/releases/plain-api@0.35.2) (2026-09-20)
+
+### What's changed
+
+- Removed the `plain.postgres` dependency that 0.35.1 wrongly declared. `plain.api` works without `plain.postgres` by design (API keys are only available when it's installed), and the dependency pulled `psycopg` into apps that don't use them ([6f78b8ddde](https://github.com/dropseed/plain/commit/6f78b8ddde))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.35.1](https://github.com/dropseed/plain/releases/plain-api@0.35.1) (2026-09-20)
+
+### What's changed
+
+- `APIKey` and the API request models use the typed `Field[T]` annotations from plain-postgres 0.119, and the README examples follow ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.35.0](https://github.com/dropseed/plain/releases/plain-api@0.35.0) (2026-08-21)
 
 ### What's changed

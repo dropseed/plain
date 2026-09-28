@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import string
 from collections.abc import Iterator, MutableMapping
 from datetime import timedelta
@@ -64,9 +62,10 @@ class SessionStore(MutableMapping):
 
     def _get_new_session_key(self) -> str:
         "Return session key that isn't being used."
+        model = self._model
         while True:
             session_key = get_random_string(32, string.ascii_lowercase + string.digits)
-            if not self._model.query.filter(session_key=session_key).exists():
+            if not model.query.where(model.session_key.equals(session_key)).exists():
                 return session_key
 
     def _get_session_data(self, no_load: bool = False) -> dict:
@@ -89,8 +88,12 @@ class SessionStore(MutableMapping):
             return self._session_cache
 
         try:
-            session = self._model.query.get(
-                session_key=self.session_key, expires_at__gt=timezone.now()
+            # Condition order mirrors what `filter(**kwargs)` emitted: it sorts
+            # its kwargs, typed conditions keep the order written.
+            model = self._model
+            session = model.query.get(
+                model.expires_at.gt(timezone.now()),
+                model.session_key.equals(self.session_key),
             )
             self._session_instance = session
             self._session_cache = session.session_data
@@ -126,10 +129,13 @@ class SessionStore(MutableMapping):
         key.
         """
         self.clear()
-        try:
-            self._model.query.get(session_key=self.session_key).delete()
-        except self._model.DoesNotExist:
-            pass
+        key = self.session_key
+        if key is not None:
+            try:
+                model = self._model
+                model.query.where(model.session_key.equals(key)).get().delete()
+            except self._model.DoesNotExist:
+                pass
         self.session_key = None
         self._session_instance = None
 
@@ -143,7 +149,8 @@ class SessionStore(MutableMapping):
         self._session_cache = data
         if key:
             try:
-                self._model.query.get(session_key=key).delete()
+                model = self._model
+                model.query.where(model.session_key.equals(key)).get().delete()
             except self._model.DoesNotExist:
                 pass
 
@@ -161,7 +168,7 @@ class SessionStore(MutableMapping):
 
     def save(self) -> None:
         """
-        Save the current session data to the database using update_or_create.
+        Save the current session data to the database using upsert.
         """
         data = self._get_session_data(no_load=False)
 
@@ -169,13 +176,14 @@ class SessionStore(MutableMapping):
             if self.session_key is None:
                 self.session_key = self._get_new_session_key()
 
-            self._session_instance, created = self._model.query.update_or_create(
+            self._session_instance, created = self._model.query.upsert(
                 session_key=self.session_key,
                 defaults={
                     "session_data": data,
                     "expires_at": timezone.now()
                     + timedelta(seconds=settings.SESSION_COOKIE_AGE),
                 },
+                unique_fields=[self._model.session_key],
             )
 
         if created:

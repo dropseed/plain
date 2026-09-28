@@ -1,14 +1,27 @@
 """Test middleware and view classes for test_middleware_pipeline.py."""
 
-from __future__ import annotations
-
 import asyncio
 from contextvars import ContextVar
 
 from opentelemetry import trace
-from plain.http import HttpMiddleware, Response
+from plain.http import (
+    AsyncStreamingResponse,
+    HttpMiddleware,
+    Response,
+    StreamingResponse,
+)
+from plain.test import Client
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
+
+
+def fresh_client() -> Client:
+    """A Client whose middleware chain is rebuilt from the current settings."""
+    client = Client(raise_request_exception=False)
+    client.handler._middleware_chain = None
+    client.handler.load_middleware()
+    return client
+
 
 # Shared log that tests can inspect and clear
 call_log: list[str] = []
@@ -70,6 +83,77 @@ class AsyncSpanEmittingView(View):
 class AsyncSpanRouter(Router):
     namespace = ""
     urls = (path("", AsyncSpanEmittingView, name="index"),)
+
+
+class SyncStreamSpanView(View):
+    """Sync streaming view whose body emits a child span per chunk."""
+
+    def get(self) -> Response:
+        tracer = trace.get_tracer("plain.tests")
+
+        def body():
+            for _ in range(2):
+                with tracer.start_as_current_span("body-child-span"):
+                    yield b"chunk"
+
+        return StreamingResponse(body())
+
+
+class SyncStreamSpanRouter(Router):
+    namespace = ""
+    urls = (path("", SyncStreamSpanView, name="index"),)
+
+
+class AsyncStreamSpanView(View):
+    """Async streaming view whose body emits a child span per chunk."""
+
+    def get(self) -> Response:
+        tracer = trace.get_tracer("plain.tests")
+
+        async def body():
+            for _ in range(2):
+                with tracer.start_as_current_span("body-child-span"):
+                    await asyncio.sleep(0)
+                yield b"chunk"
+
+        return AsyncStreamingResponse(body())
+
+
+class AsyncStreamSpanRouter(Router):
+    namespace = ""
+    urls = (path("", AsyncStreamSpanView, name="index"),)
+
+
+class StreamFailsView(View):
+    """Streams one chunk, then raises — a body that fails after the status."""
+
+    def get(self) -> Response:
+        def body():
+            yield b"chunk"
+            raise ValueError("export failed")
+
+        return StreamingResponse(body())
+
+
+class StreamFailsRouter(Router):
+    namespace = ""
+    urls = (path("", StreamFailsView, name="index"),)
+
+
+class StreamFailsFirstView(View):
+    """Streams nothing — the body raises before its first chunk."""
+
+    def get(self) -> Response:
+        def body():
+            raise ValueError("query failed")
+            yield b"never"
+
+        return StreamingResponse(body())
+
+
+class StreamFailsFirstRouter(Router):
+    namespace = ""
+    urls = (path("", StreamFailsFirstView, name="index"),)
 
 
 class TrackingMiddleware(HttpMiddleware):
@@ -183,3 +267,12 @@ class FiniteServerSentEventsView(ServerSentEventsView):
 class SSERouter(Router):
     namespace = ""
     urls = (path("", FiniteServerSentEventsView, name="index"),)
+
+
+class StampingMiddleware(HttpMiddleware):
+    """Marks every response in `after_response` — a header and a cookie."""
+
+    def after_response(self, request, response):
+        response.headers["X-Stamped"] = "yes"
+        response.set_cookie("stamped", "1")
+        return response

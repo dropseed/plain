@@ -1,5 +1,15 @@
 # plainx-dev changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plainx-dev@0.2.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.1.5](https://github.com/dropseed/plain/releases/plainx-dev@0.1.5) (2026-04-13)
 
 ### What's changed

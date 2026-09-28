@@ -5,8 +5,6 @@ never from a registry. The only stored state is the pointer file, and it exists
 only when a checkout has been deliberately repointed with `plain db use`.
 """
 
-from __future__ import annotations
-
 import os
 import re
 import subprocess
@@ -65,7 +63,7 @@ def _run_git(args: list[str], cwd: Path) -> str | None:
             env=env,
         ).stdout.strip()
         return out or None
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except subprocess.CalledProcessError, FileNotFoundError:
         return None
 
 

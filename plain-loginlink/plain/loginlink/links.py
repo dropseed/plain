@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from app.users.models import User
@@ -53,6 +51,11 @@ def get_link_token_user(token: str) -> User:
     email = signed_data["email"]
 
     try:
-        return User.query.get(id=user_id, email__iexact=email)
+        # Condition order mirrors the `filter(**kwargs)` this replaced: it
+        # sorted its kwargs, typed conditions keep the order written.
+        return User.query.get(
+            User.email.iequals(email),
+            User.id.equals(user_id),
+        )
     except User.DoesNotExist:
         raise LoginLinkChanged()

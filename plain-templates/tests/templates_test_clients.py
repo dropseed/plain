@@ -4,8 +4,6 @@ Each helper is a context manager: the router swap is scoped to the block, so
 scope is visible as indentation rather than hidden in shared setup.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 

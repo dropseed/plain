@@ -5,8 +5,6 @@ format it picks is part of that contract: a view under test should see the
 content type it will see in production.
 """
 
-from __future__ import annotations
-
 from io import BytesIO
 
 from plain.test import RequestFactory, raises

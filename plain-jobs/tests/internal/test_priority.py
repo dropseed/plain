@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 
 from plain.jobs.models import JobRequest
@@ -81,7 +79,7 @@ def test_worker_ordering_priority_then_created_at():
         created_at=now - datetime.timedelta(minutes=5),
     )
 
-    # Simulate the worker's query (without select_for_update for test simplicity)
+    # Simulate the worker's query (without for_update() for test simplicity)
     jobs = list(
         JobRequest.query.filter(queue__in=["default"])
         .ready_to_run()

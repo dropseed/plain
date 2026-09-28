@@ -1,5 +1,40 @@
 # plain-sessions changelog
 
+## [0.47.0](https://github.com/dropseed/plain/releases/plain-sessions@0.47.0) (2026-09-21)
+
+### What's changed
+
+- The session admin declares its search field as a field reference, which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.46.3](https://github.com/dropseed/plain/releases/plain-sessions@0.46.3) (2026-09-21)
+
+### What's changed
+
+- `SessionStore.flush()` no longer runs a lookup when the store has no session key. That lookup compiled to `WHERE session_key IS NULL`, which never matched; the keyless path now runs zero statements and ends in the same state ([0c7520d6dd](https://github.com/dropseed/plain/commit/0c7520d6dd))
+- The session lookups and the expired-session chore use typed `where()` conditions; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.46.2](https://github.com/dropseed/plain/releases/plain-sessions@0.46.2) (2026-09-20)
+
+### What's changed
+
+- Saving a session writes through `upsert()` (one `INSERT ... ON CONFLICT` statement) instead of `update_or_create()` ([49b7299275](https://github.com/dropseed/plain/commit/49b7299275))
+- `Session` uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.46.1](https://github.com/dropseed/plain/releases/plain-sessions@0.46.1) (2026-08-12)
 
 ### What's changed

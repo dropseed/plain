@@ -6,19 +6,15 @@ including ordering, short-circuiting, exception handling, and
 the interaction between builtin and user-defined middleware.
 """
 
-from __future__ import annotations
-
-from middleware_helpers import call_log
+import pytest
+from middleware_helpers import call_log, fresh_client
 from plain.runtime import settings
 from plain.test import Client
 
 
-def _fresh_client():
-    """Create a Client with a fresh middleware chain."""
-    client = Client(raise_request_exception=False)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
-    return client
+@pytest.fixture(autouse=True)
+def _clear_call_log():
+    call_log.clear()
 
 
 class TestMiddlewarePipelineBasics:
@@ -53,7 +49,7 @@ class TestHostValidationMiddleware:
         original = settings.ALLOWED_HOSTS
         try:
             settings.ALLOWED_HOSTS = ["example.com"]
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/", headers={"Host": "evil.com"})
             assert response.status_code == 400
         finally:
@@ -64,7 +60,7 @@ class TestHostValidationMiddleware:
         original = settings.ALLOWED_HOSTS
         try:
             settings.ALLOWED_HOSTS = []
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
         finally:
@@ -81,7 +77,7 @@ class TestDefaultHeadersMiddleware:
             settings.DEFAULT_RESPONSE_HEADERS = {
                 "X-Test-Header": "test-value",
             }
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.headers["X-Test-Header"] == "test-value"
         finally:
@@ -94,7 +90,7 @@ class TestDefaultHeadersMiddleware:
             settings.DEFAULT_RESPONSE_HEADERS = {
                 "Content-Type": "text/html; charset=utf-8",
             }
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             # The view sets Content-Type, so the default should not override it
             assert "Content-Type" in response.headers
@@ -121,7 +117,7 @@ class TestCsrfMiddleware:
 
     def test_cross_origin_post_blocked(self):
         """POST with cross-site Sec-Fetch-Site should return 400."""
-        client = _fresh_client()
+        client = fresh_client()
         response = client.post(
             "/",
             headers={"Sec-Fetch-Site": "cross-site"},
@@ -137,7 +133,7 @@ class TestHttpsRedirectMiddleware:
         original = settings.HTTPS_REDIRECT_ENABLED
         try:
             settings.HTTPS_REDIRECT_ENABLED = False
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
         finally:
@@ -148,9 +144,9 @@ class TestHttpsRedirectMiddleware:
         original = settings.HTTPS_REDIRECT_ENABLED
         try:
             settings.HTTPS_REDIRECT_ENABLED = True
-            client = _fresh_client()
+            client = fresh_client()
             # Must use secure=False to send an HTTP (not HTTPS) request
-            response = client.get("/", follow_redirects=False, secure=False)
+            response = client.get("/", follow=False, secure=False)
             assert response.status_code == 301
             assert response.headers["Location"].startswith("https://")
         finally:
@@ -169,7 +165,7 @@ class TestExceptionHandling:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
         finally:
@@ -183,7 +179,7 @@ class TestExceptionHandling:
             settings.MIDDLEWARE = [
                 "middleware_helpers.ExplodingMiddleware",
             ]
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
         finally:
@@ -198,14 +194,13 @@ class TestMiddlewareOrdering:
         Builtin before-middleware runs before user middleware.
         Host validation rejects before user middleware ever runs.
         """
-        call_log.clear()
         original_middleware = settings.MIDDLEWARE
         original_hosts = settings.ALLOWED_HOSTS
         try:
             settings.MIDDLEWARE = ["middleware_helpers.LoggingMiddleware"]
             settings.ALLOWED_HOSTS = ["example.com"]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/", headers={"Host": "evil.com"})
             assert response.status_code == 400
             assert "user_middleware" not in call_log
@@ -215,12 +210,11 @@ class TestMiddlewareOrdering:
 
     def test_custom_middleware_wraps_view(self):
         """User middleware should be able to wrap the view call."""
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = ["middleware_helpers.TrackingMiddleware"]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["before", "after"]
@@ -229,7 +223,6 @@ class TestMiddlewareOrdering:
 
     def test_multiple_custom_middleware_order(self):
         """Multiple user middleware should execute in defined order (outermost first)."""
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -237,7 +230,7 @@ class TestMiddlewareOrdering:
                 "middleware_helpers.SecondMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == [
@@ -251,7 +244,6 @@ class TestMiddlewareOrdering:
 
     def test_short_circuit_middleware_skips_inner(self):
         """A middleware that returns a response should prevent inner middleware from running."""
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -259,7 +251,7 @@ class TestMiddlewareOrdering:
                 "middleware_helpers.InnerMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             assert response.content == b"blocked"
@@ -284,7 +276,6 @@ class TestMiddlewareUnwinding:
         a response from before_request, outer middleware's after_response still
         runs because its before_request already completed.
         """
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -292,7 +283,7 @@ class TestMiddlewareUnwinding:
                 "middleware_helpers.BlockingMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             # Outer called get_response which returned the 403 from Blocking,
@@ -311,7 +302,6 @@ class TestMiddlewareUnwinding:
         and converted to an error response. Outer middleware's after_response
         runs normally with that error response.
         """
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -319,7 +309,7 @@ class TestMiddlewareUnwinding:
                 "middleware_helpers.InnerExplodingMiddleware",
             ]
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             # Inner raised, converted to 500 response, outer sees it
@@ -336,7 +326,6 @@ class TestMiddlewareUnwinding:
         When the view raises, the exception is converted to an error response,
         and all middleware's after_response sees that response.
         """
-        call_log.clear()
         from plain.urls.resolvers import _get_cached_resolver
 
         original_middleware = settings.MIDDLEWARE
@@ -348,7 +337,7 @@ class TestMiddlewareUnwinding:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             assert call_log == [
@@ -366,7 +355,6 @@ class TestMiddlewareUnwinding:
         whose before_request completed. Even when before_request short-circuits
         by returning a response, after_response still runs.
         """
-        call_log.clear()
         original = settings.MIDDLEWARE
         try:
             settings.MIDDLEWARE = [
@@ -374,7 +362,7 @@ class TestMiddlewareUnwinding:
             ]
 
             # Normal request — both setup and teardown run
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["setup", "teardown"]
@@ -404,7 +392,7 @@ class TestMiddlewareUnwinding:
             settings.URLS_ROUTER = "middleware_helpers.ErrorRouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 500
             assert response.headers["X-Modified-By"] == "ResponseModifyingMiddleware"
@@ -426,7 +414,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["Content-Type"]
@@ -443,7 +431,6 @@ class TestSSEViews:
 
     def test_sse_view_with_middleware_ordering(self):
         """Middleware before/after still runs correctly with SSE views."""
-        call_log.clear()
         from plain.urls.resolvers import _get_cached_resolver
 
         original_middleware = settings.MIDDLEWARE
@@ -453,7 +440,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 200
             assert call_log == ["before", "after"]
@@ -473,7 +460,7 @@ class TestSSEViews:
             settings.URLS_ROUTER = "middleware_helpers.SSERouter"
             _get_cached_resolver.cache_clear()
 
-            client = _fresh_client()
+            client = fresh_client()
             response = client.get("/")
             assert response.status_code == 403
             assert response.content == b"blocked"

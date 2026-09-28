@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import gzip
 from functools import cached_property
 from pathlib import Path

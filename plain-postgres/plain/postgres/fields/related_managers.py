@@ -5,14 +5,14 @@ These managers provide the API for working with collections of related objects
 through foreign key and many-to-many relationships.
 """
 
-from __future__ import annotations
-
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from plain.postgres.base import Model
+    from plain.postgres.fields.base import Field
     from plain.postgres.fields.related import ForeignKeyField, ManyToManyField
 
 import builtins
@@ -120,7 +120,7 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             self.instance._prefetched_objects_cache.pop(
                 self.field.remote_field.get_cache_name()
             )
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             pass  # nothing to clear from cache
 
     def get_queryset(self) -> QS:
@@ -135,11 +135,11 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
             return self.instance._prefetched_objects_cache[
                 self.field.remote_field.get_cache_name()
             ]
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 
-    def get_prefetch_queryset(
+    def _get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None
     ) -> tuple[
         QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool
@@ -203,15 +203,31 @@ class ReverseForeignKeyManager(BaseRelatedManager[T, QS]):
         kwargs[self.field.name] = self.instance
         return self.model.query.create(**kwargs)
 
-    def get_or_create(self, **kwargs: Any) -> tuple[T, bool]:
+    def get_or_create(
+        self, *, defaults: dict[str, Any] | None = None, **kwargs: Any
+    ) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.get_or_create(**kwargs)
+        return self.model.query.get_or_create(defaults=defaults, **kwargs)
 
-    def update_or_create(self, **kwargs: Any) -> tuple[T, bool]:
+    def upsert(
+        self,
+        *,
+        defaults: dict[str, Any] | None = None,
+        create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        **kwargs: Any,
+    ) -> tuple[T, bool]:
         self._check_fk_val()
         kwargs[self.field.name] = self.instance
-        return self.model.query.update_or_create(**kwargs)
+        return self.model.query.upsert(
+            defaults=defaults,
+            create_defaults=create_defaults,
+            conflict_defaults=conflict_defaults,
+            unique_fields=unique_fields,
+            **kwargs,
+        )
 
     def remove(self, *objs: T, bulk: bool = True) -> None:
         # remove() is only provided if the ForeignKeyField can have a value of null
@@ -375,17 +391,17 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
     def _remove_prefetched_objects(self) -> None:
         try:
             self.instance._prefetched_objects_cache.pop(self.prefetch_cache_name)
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             pass  # nothing to clear from cache
 
     def get_queryset(self) -> QS:
         try:
             return self.instance._prefetched_objects_cache[self.prefetch_cache_name]
-        except (AttributeError, KeyError):
+        except AttributeError, KeyError:
             queryset = self.model.query
             return cast(QS, self._apply_rel_filters(queryset))
 
-    def get_prefetch_queryset(
+    def _get_prefetch_queryset(
         self, instances: Iterable[Model], queryset: QuerySet | None = None
     ) -> tuple[
         QuerySet, Callable[[Model], Any], Callable[[Model], Any], bool, str, bool
@@ -413,7 +429,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         # each secondary row back to the primary instance that owns it.
         queryset = queryset.annotate(
             **{
-                f"_prefetch_related_val_{fk.name}": RawSQL(
+                f"_prefetch_val_{fk.name}": RawSQL(
                     f"{qn(join_table)}.{qn(fk.column)}", []
                 )
             }
@@ -422,7 +438,7 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         target_field = fk.target_field
         return (
             queryset,
-            lambda result: getattr(result, f"_prefetch_related_val_{fk.name}"),
+            lambda result: getattr(result, f"_prefetch_val_{fk.name}"),
             lambda inst: target_field.get_db_prep_value(
                 target_field.value_from_object(inst), conn
             ),
@@ -480,23 +496,40 @@ class ManyToManyManager(BaseRelatedManager[T, QS]):
         return new_obj
 
     def get_or_create(
-        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+        self,
+        *,
+        defaults: dict[str, Any] | None = None,
+        through_defaults: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> tuple[T, bool]:
-        obj, created = self.model.query.get_or_create(**kwargs)
-        # We only need to add() if created because if we got an object back
-        # from get() then the relationship already exists.
-        if created:
-            self.add(obj, through_defaults=through_defaults)
+        obj, created = self.model.query.get_or_create(defaults=defaults, **kwargs)
+        # The get() isn't scoped to this relation, so an existing object may
+        # not be related to this instance yet. add() skips through-rows that
+        # are already there, so it's safe either way.
+        self.add(obj, through_defaults=through_defaults)
         return obj, created
 
-    def update_or_create(
-        self, *, through_defaults: dict[str, Any] | None = None, **kwargs: Any
+    def upsert(
+        self,
+        *,
+        through_defaults: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
+        create_defaults: dict[str, Any] | None = None,
+        conflict_defaults: dict[str, Any] | None = None,
+        unique_fields: Sequence[Field[Any] | type[Model]],
+        **kwargs: Any,
     ) -> tuple[T, bool]:
-        obj, created = self.model.query.update_or_create(**kwargs)
-        # We only need to add() if created because if we got an object back
-        # from get() then the relationship already exists.
-        if created:
-            self.add(obj, through_defaults=through_defaults)
+        obj, created = self.model.query.upsert(
+            defaults=defaults,
+            create_defaults=create_defaults,
+            conflict_defaults=conflict_defaults,
+            unique_fields=unique_fields,
+            **kwargs,
+        )
+        # upsert() writes the target row, not the relationship, and the row may
+        # already exist without being related to this instance. add() skips
+        # through-rows that are already there, so it's safe either way.
+        self.add(obj, through_defaults=through_defaults)
         return obj, created
 
     def _get_target_ids(self, target_field_name: str, objs: Any) -> builtins.set[Any]:

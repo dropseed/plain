@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.packages import packages_registry
 
 from .core import Chore

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, NamedTuple
 
 from plain.packages import packages_registry

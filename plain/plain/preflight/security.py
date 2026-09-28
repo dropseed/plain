@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.runtime import settings
 
 from .checks import PreflightCheck

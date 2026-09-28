@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from click.testing import CliRunner
 from plain.cli.preflight import preflight_cli
 from plain.preflight import PreflightCheck, PreflightResult, unused_silenced_results

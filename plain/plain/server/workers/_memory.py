@@ -6,8 +6,6 @@ the intersection of (B-A) and (C-B) — only allocations that grew
 in BOTH halves are reported, filtering one-time init noise.
 """
 
-from __future__ import annotations
-
 import gc
 import json
 import os

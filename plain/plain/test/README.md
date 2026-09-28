@@ -10,6 +10,7 @@
     - [Following redirects](#following-redirects)
     - [Custom headers](#custom-headers)
 - [Inspecting responses](#inspecting-responses)
+    - [Streaming responses](#streaming-responses)
 - [Authentication](#authentication)
 - [Sessions](#sessions)
 - [Expected exceptions](#expected-exceptions)
@@ -17,6 +18,7 @@
 - [Overriding context](#overriding-context)
 - [Capturing OpenTelemetry signals](#capturing-opentelemetry-signals)
 - [Capturing log records](#capturing-log-records)
+- [WebSockets](#websockets)
 - [RequestFactory](#requestfactory)
 - [Test lifecycles](#test-lifecycles)
 - [FAQs](#faqs)
@@ -125,11 +127,11 @@ client = Client(headers={"Accept-Language": "en-US"})
 
 Responses are data, not assertion methods — bare `assert` is the assertion API. The [`ClientResponse`](./client.py#ClientResponse) wrapper provides:
 
-- `status_code` — HTTP status code
+- `status_code` — the status that went out
 - `headers` — response headers
-- `text` — content decoded as a string
-- `body` — raw content bytes (`content` also works)
-- `json_data` — content parsed as JSON (requires a JSON content type)
+- `body` — the bytes the response sent (`content` also works)
+- `text` — the body decoded as a string
+- `json_data` — the body parsed as JSON (requires a JSON content type)
 - `redirect_to` — the redirect target on a 3xx response, `None` otherwise
 - `request` — the request that produced this response, after middleware ran
 - `redirect_chain` — list of `(url, status_code)` pairs when following redirects
@@ -141,6 +143,19 @@ assert response.json_data["users"][0]["name"] == "Alice"
 ```
 
 By default, the client re-raises unhandled view exceptions so failures point at the real error. Pass `Client(raise_request_exception=False)` to get the 500 response instead.
+
+### Streaming responses
+
+The client reads a streaming body to the end before it returns, the way a server sends it, so `body` (and `text`, `json_data`) hold what a `StreamingResponse`, `FileResponse`, or `AsyncStreamingResponse` sent:
+
+```python
+response = client.get("/export.csv")
+assert response.body.startswith(b"id,name")
+```
+
+The response itself stays what the view returned (a `FileResponse` is still one). Because the whole body is read, a stream that never ends (an endless event feed) makes the request never return — test those views' pieces directly instead. HEAD requests and bodiless statuses (204, 304) never read the body.
+
+If a body raises partway through, the error is re-raised from the request unless the client was created with `raise_request_exception=False`, in which case `response.exception` holds it and `body` has what came before. A body that fails before producing anything is answered with a 500, as a server would, and `status_code` says so.
 
 ## Authentication
 
@@ -305,6 +320,38 @@ def test_claim_failure_log_is_correlated():
         span.context.trace_id
     )
 ```
+
+## WebSockets
+
+`Client.websocket()` runs the handshake through the same pipeline as any request (cookies and auth included), then drives the view's `websocket()` in-process:
+
+```python
+from plain.test import Client, WebSocketRejected, raises
+
+
+def test_echo():
+    with Client().websocket("/live/", subprotocols=("binary",)) as ws:
+        assert ws.subprotocol == "binary"
+        ws.send("hello")
+        assert ws.receive() == "echo: hello"
+
+
+def test_login_required():
+    with raises(WebSocketRejected) as caught:
+        Client().websocket("/live/")
+    assert caught.exception.response.status_code == 403
+```
+
+It takes `query_params=`, `headers=`, and `secure=` like `get()`, plus `subprotocols=` and `timeout=`.
+
+- `ws.send(message)` sends one message to the view; `ws.receive()` returns the next one it sends.
+- `ws.close(code=1000, reason="")` closes from the client side and waits for the view to finish. Leaving the `with` block closes it if the test didn't.
+- `ws.subprotocol` is the negotiated subprotocol and `ws.response` is the 101 itself, for asserting on its headers and cookies.
+- Every call has a timeout (5 seconds by default, `receive(timeout=...)` per call) and raises `TimeoutError` when it elapses.
+- An exception raised by the view surfaces from `receive()` and again when the `with` block exits; a view that closes the socket makes `receive()` raise `WebSocketClosed` with its code and reason.
+- A handshake that doesn't produce a socket — a 403, a redirect — raises `WebSocketRejected` carrying the response as `.response`.
+
+The view runs on the test's own thread, inside a copy of the test's context, so the test database transaction is visible to it. Because the connection steps its own event loop, `Client.websocket()` is for synchronous tests, not `async def` ones.
 
 ## RequestFactory
 

@@ -9,5 +9,5 @@ class ClearExpired(Chore):
     """Delete sessions that have expired."""
 
     def run(self) -> str:
-        count = Session.query.filter(expires_at__lt=timezone.now()).delete()
+        count = Session.query.where(Session.expires_at.lt(timezone.now())).delete()
         return f"{count} expired sessions deleted"

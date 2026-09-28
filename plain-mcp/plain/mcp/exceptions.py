@@ -1,7 +1,5 @@
 """JSON-RPC error codes, the error envelope, and the exceptions `plain.mcp` raises."""
 
-from __future__ import annotations
-
 from typing import Any
 
 PARSE_ERROR = -32700

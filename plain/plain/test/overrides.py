@@ -5,8 +5,6 @@ Scope is visible as indentation — state changes enter through `with` blocks,
 never through injection.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from typing import Any

@@ -8,8 +8,6 @@ the user's model code today. `check_unused_indexes` and
 `check_missing_index_candidates` stay in the warning tier because the
 user can act on them by editing model indexes/constraints."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import psycopg.errors

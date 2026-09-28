@@ -9,8 +9,6 @@ DDL-heavy tests (migrations, convergence) that can't run inside a
 transaction that never commits.
 """
 
-from __future__ import annotations
-
 import re
 from collections.abc import Generator
 from contextlib import contextmanager

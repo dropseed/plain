@@ -16,9 +16,11 @@ class CheckOAuthProviderKeys(PreflightCheck):
 
         try:
             keys_in_db = set(
-                OAuthConnection.query.values_list("provider_key", flat=True).distinct()
+                OAuthConnection.query.select(
+                    OAuthConnection.provider_key, flat=True
+                ).distinct()
             )
-        except (psycopg.OperationalError, psycopg.ProgrammingError):
+        except psycopg.OperationalError, psycopg.ProgrammingError:
             # Check runs on plain migrations apply, and the table may not exist yet
             # or it may not be installed on the particular database intentionally
             return errors

@@ -1,5 +1,25 @@
 # plain-email changelog
 
+## [0.22.0](https://github.com/dropseed/plain/releases/plain-email@0.22.0) (2026-09-21)
+
+### What's changed
+
+- `EMAIL_HOST_USER` is a `Secret`, so it is masked in the startup settings dump, `plain settings list` and the admin. Several providers — Postmark, Mailgun, SES — use the API token itself as the SMTP username, so the username is as sensitive as the password, and printing it put a live credential in a production log. The runtime value is unchanged; only the display is ([e7e5e7b5d8](https://github.com/dropseed/plain/commit/e7e5e7b5d8))
+
+### Upgrade instructions
+
+- No changes required. If an app has ever printed its settings with `EMAIL_HOST_USER` set to a provider token, treat that token as exposed and rotate it — masking it now does not remove it from logs already written.
+
+## [0.21.0](https://github.com/dropseed/plain/releases/plain-email@0.21.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.20.2](https://github.com/dropseed/plain/releases/plain-email@0.20.2) (2026-08-12)
 
 ### What's changed

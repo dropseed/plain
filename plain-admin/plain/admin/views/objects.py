@@ -14,6 +14,7 @@ from plain.templates.views import (
 )
 from plain.urls import reverse
 
+from ..field_refs import FieldRef, field_lookup_paths
 from .base import AdminView
 
 if TYPE_CHECKING:
@@ -57,8 +58,11 @@ def get_field_label(field: str) -> str:
 class AdminListView(HTMXView, AdminView, ListView):
     template_name = "admin/list.html"
     fields: tuple[str, ...] = ()
-    search_fields: tuple[str, ...] = ()
+    # Field references (`User.email`, `FlagResult.flag.name`) or lookup paths.
+    search_fields: tuple[FieldRef, ...] = ()
     actions: tuple[str, ...] = ()
+    # Filter *names* shown in the UI, not fields -- `filter_queryset` maps a
+    # name to whatever query it means.
     filters: tuple[str, ...] = ()
     page_size: int = 20
     allow_global_search = False
@@ -90,7 +94,7 @@ class AdminListView(HTMXView, AdminView, ListView):
         context["current_filter"] = self.filter
 
         context["search_query"] = self.request.query_params.get("search", "")
-        context["search_fields"] = self.search_fields
+        context["search_fields"] = self.get_search_fields()
 
         context["table_style"] = getattr(self, "_table_style", "default")
 
@@ -206,7 +210,7 @@ class AdminListView(HTMXView, AdminView, ListView):
                 for obj in objects
                 if any(
                     search in str(self.get_field_value(obj, f)).lower()
-                    for f in self.search_fields
+                    for f in self.get_search_fields()
                 )
             ]
         return objects
@@ -243,23 +247,22 @@ class AdminListView(HTMXView, AdminView, ListView):
     def get_filter_names(self) -> tuple[str, ...]:
         return self.filters
 
+    def get_search_fields(self) -> tuple[str, ...]:
+        """`search_fields` as lookup paths, whichever way each was declared.
+
+        Read off the instance, so a declaration replaced in `get()` or
+        computed by a `property` is normalized like a class-level one.
+        """
+        # No model to check references against: this view searches whatever
+        # objects get_objects() returns. AdminModelListView has one.
+        return field_lookup_paths(
+            self.search_fields,
+            model=None,
+            declared_as=f"{type(self).__qualname__}.search_fields",
+        )
+
     def get_object_id(self, obj: Any) -> Any:
         return self.get_field_value(obj, "id")
-
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
 
     def get_object_url(self, obj: Any) -> str:
         if url := self.get_detail_url(obj):
@@ -294,22 +297,7 @@ class AdminCreateView(AdminView, CreateView):
     template_name = None
     nav_section = None
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if list_url := self.get_list_url():
             return list_url
 
@@ -335,21 +323,6 @@ class AdminDetailView(AdminView, DetailView):
             "admin/detail.html",  # A generic detail view for rendering any object
         ]
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_fields(self) -> tuple[str, ...]:
         return self.fields
 
@@ -372,21 +345,6 @@ class AdminUpdateView(AdminView, UpdateView):
     template_name = None
     nav_section = None
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
@@ -401,7 +359,7 @@ class AdminUpdateView(AdminView, UpdateView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if detail_url := self.get_detail_url(self.object):
             return detail_url
 
@@ -418,21 +376,6 @@ class AdminDeleteView(AdminView, DeleteView):
     template_name = "admin/delete.html"
     nav_section = None
 
-    def get_list_url(self) -> str:
-        return ""
-
-    def get_create_url(self) -> str:
-        return ""
-
-    def get_detail_url(self, obj: Any) -> str:
-        return ""
-
-    def get_update_url(self, obj: Any) -> str:
-        return ""
-
-    def get_delete_url(self, obj: Any) -> str:
-        return ""
-
     def get_links(self) -> dict[str, str]:
         links = super().get_links()
 
@@ -447,7 +390,7 @@ class AdminDeleteView(AdminView, DeleteView):
 
         return links
 
-    def get_success_url(self, form: "BaseForm") -> str:
+    def get_success_url(self, form: BaseForm) -> str:
         if list_url := self.get_list_url():
             return list_url
 

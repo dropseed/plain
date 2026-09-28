@@ -11,8 +11,6 @@ the rest of the block outside its transaction, so the dead connection stays
 put and `Atomic.__exit__`'s error recovery drops it instead.
 """
 
-from __future__ import annotations
-
 import psycopg
 from plain.postgres import transaction
 from plain.postgres.db import get_connection

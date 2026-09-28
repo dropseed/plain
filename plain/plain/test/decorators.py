@@ -6,8 +6,6 @@ values or alter control flow. The test runner (plain.testing) reads the
 attributes they attach.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from typing import Any
 

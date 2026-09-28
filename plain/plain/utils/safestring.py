@@ -5,8 +5,6 @@ that the producer of the string has already turned characters that should not
 be interpreted by the HTML engine (e.g. '<') into the appropriate entities.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from functools import wraps
 from typing import Any

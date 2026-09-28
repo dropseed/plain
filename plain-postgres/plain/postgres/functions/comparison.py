@@ -1,7 +1,5 @@
 """Database functions that do comparisons or type conversions."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.expressions import Func, Value

@@ -5,8 +5,6 @@ code, waits for the local side to connect, then executes commands as
 they arrive through the encrypted tunnel.
 """
 
-from __future__ import annotations
-
 import ast
 import asyncio
 import base64
@@ -176,7 +174,7 @@ async def run_remote(
                         if json_output:
                             try:
                                 return_value = json.dumps(result)
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 return_value = repr(result)
                         else:
                             return_value = repr(result)

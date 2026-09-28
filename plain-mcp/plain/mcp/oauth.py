@@ -8,8 +8,6 @@ an unauthenticated request gets a 401 whose `WWW-Authenticate` header points
 at the protected-resource metadata, which names the authorization server.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -60,7 +58,7 @@ class OAuthResourceServer:
 
         class AppMCP(OAuthResourceServer, MCPView):
             name = "myapp"
-            tools = [...]
+            tools = (MyTool,)
 
             def authenticate_token(self, token):
                 at = validate_access_token(token, resource=self.oauth_resource)

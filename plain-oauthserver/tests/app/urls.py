@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.oauthserver.urls import OAuthServerRouter, OAuthWellKnownRouter
 from plain.urls import Router, include, path
 from plain.views import View

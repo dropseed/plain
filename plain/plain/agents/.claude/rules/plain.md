@@ -15,6 +15,7 @@ Plain is a Python web framework.
 - **Write code meant to be read** — clear names, natural flow, obvious structure. The next person reading it should understand it immediately.
 - **Simplify to the present need** — if it feels overcomplicated, it is. Get right to the heart of the issue.
 - **Declarative class attributes are tuples** — `urls` on a `Router`, `fields`/`search_fields`/`actions`/`filters`/`cards` on admin views, `fields` in a form `Meta`. They're read-once config, and the framework types them as tuples, so a list fails type checking. Write `("id",)` for a single element, not `("id")`.
+- **Admin field declarations take field references** — `search_fields`, `queryset_order`, and a `TrendCard`'s `datetime_field`/`group_field` accept `User.email` (and traversed `FlagResult.flag.name`) as well as the lookup path as a string. Prefer the reference; keep a string for a reverse or many-to-many path traversal can't reach, and for a descending ordering term (`"-created_at"`). `filters` is filter _names_, not fields.
 
 ## Settings
 
@@ -22,7 +23,7 @@ Settings live in `app/settings.py` and are accessed via `plain.runtime.settings`
 
 - Type-annotated settings can be set via `PLAIN_`-prefixed environment variables (e.g., `PLAIN_SECRET_KEY`, `PLAIN_DEBUG=true`). Env vars take highest precedence — they override `settings.py` values. When suggesting how to configure a setting, mention the env var option.
 - `uv run plain settings list` — list all settings with current values and sources
-- `uv run plain settings get <SETTING_NAME>` — get a specific setting's value
+- `uv run plain settings get <SETTING_NAME>` — get a specific setting's value (secrets print masked; `--reveal` prints the real value, so only pass it when the task needs the plaintext)
 
 - Never use `getattr(settings, "X", default)` — all known settings have defaults registered by their packages, so `settings.X` always works. Using `getattr` masks typos and missing package installs.
 
@@ -83,8 +84,8 @@ If the exception propagates out of the span context, the SDK auto-records and se
 
 **Already wired entry spans:**
 
-- HTTP requests — SERVER (`plain/internal/handlers/base.py`)
-- View 5xx attachment — `plain/views/base.py:_respond_to_exception` (records on the SERVER span via `_finalize_span`)
+- HTTP requests — SERVER, started in `plain/internal/handlers/base.py` and ended by `ResponseLifecycle` (`plain/internal/handlers/response_lifecycle.py`) once the response is closed, so it covers sending the body; a body that raises partway is recorded on it
+- View 5xx attachment — `plain/views/base.py:_respond_to_exception` (stamps `response.exception`, which `ResponseLifecycle` records on the SERVER span)
 - Job enqueue — PRODUCER (`plain-jobs/jobs/jobs.py`)
 - Job execute — CONSUMER (`plain-jobs/jobs/models.py`), plus a one-off CONSUMER span in `plain-jobs/jobs/workers.py:process_job`'s catch-all for library errors outside `run()` (row lookup, middleware setup, errors escaping `run()`)
 - Worker maintenance loop — CONSUMER (`plain-jobs/jobs/workers.py`), opened only on ticks where a maintenance task is due — fully idle ticks emit no spans at all

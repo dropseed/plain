@@ -6,8 +6,6 @@ themselves do not have to. This module has to know all about the internals of
 models in order to get the information it needs.
 """
 
-from __future__ import annotations
-
 import copy
 import difflib
 import functools
@@ -55,7 +53,7 @@ from plain.postgres.query_utils import (
     refs_expression,
 )
 from plain.postgres.sql.constants import INNER, LOUTER, ORDER_DIR, SINGLE
-from plain.postgres.sql.datastructures import BaseTable, Empty, Join, MultiJoin
+from plain.postgres.sql.datastructures import BaseTable, Join, MultiJoin
 from plain.postgres.sql.where import AND, OR, NothingNode, WhereNode
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -187,6 +185,10 @@ class TransformWrapper:
 
 QueryType = TypeVar("QueryType", bound="Query")
 
+# Row-level locking mode requested via QuerySet.for_update() and friends.
+# dialect.lock_sql() maps each token to its actual SQL keywords.
+LockMode = Literal["update", "no_key_update", "share", "key_share"]
+
 
 class Query(BaseExpression):
     """A single SQL query."""
@@ -225,14 +227,13 @@ class Query(BaseExpression):
     high_mark = None  # Used for offset/limit.
     distinct = False
     distinct_fields: tuple[str, ...] = ()
-    select_for_update = False
-    select_for_update_nowait = False
-    select_for_update_skip_locked = False
-    select_for_update_of: tuple[str, ...] = ()
-    select_for_no_key_update = False
-    select_related: bool | dict[str, Any] = False
+    lock_mode: LockMode | None = None  # See LockMode.
+    lock_nowait = False
+    lock_skip_locked = False
+    lock_of: tuple[str, ...] = ()
+    joined_relations: bool | dict[str, Any] = False
     has_select_fields = False
-    # Arbitrary limit for select_related to prevents infinite recursion.
+    # Arbitrary limit for joined_relations to prevents infinite recursion.
     max_depth = 5
     # Holds the selects defined by a call to values() or values_list()
     # excluding annotation_select.
@@ -320,9 +321,7 @@ class Query(BaseExpression):
         Return a copy of the current Query. A lightweight alternative to
         deepcopy().
         """
-        obj = Empty()
-        obj.__class__ = self.__class__
-        obj = cast(Self, obj)  # Type checker doesn't understand __class__ reassignment
+        obj = object.__new__(self.__class__)
         # Copy references to everything.
         obj.__dict__ = self.__dict__.copy()
         # Clone attributes that can't use shallow copy.
@@ -340,10 +339,10 @@ class Query(BaseExpression):
         # It will get re-populated in the cloned queryset the next time it's
         # used.
         obj._annotation_select_cache = None
-        if self.select_related is not False:
-            # Use deepcopy because select_related stores fields in nested
+        if self.joined_relations is not False:
+            # Use deepcopy because joined_relations stores fields in nested
             # dicts.
-            obj.select_related = copy.deepcopy(obj.select_related)
+            obj.joined_relations = copy.deepcopy(obj.joined_relations)
         if "subq_aliases" in self.__dict__:
             obj.subq_aliases = self.subq_aliases.copy()
         obj.used_aliases = self.used_aliases.copy()
@@ -427,8 +426,8 @@ class Query(BaseExpression):
             inner_query = self.clone()
             inner_query.subquery = True
             outer_query = AggregateQuery(self.model, inner_query)
-            inner_query.select_for_update = False
-            inner_query.select_related = False
+            inner_query.lock_mode = None
+            inner_query.joined_relations = False
             inner_query.set_annotation_mask(self.annotation_select)
             # Queries with distinct_fields need ordering and when a limit is
             # applied we must take the slice from the ordered query. Otherwise
@@ -519,8 +518,8 @@ class Query(BaseExpression):
         elide_empty = not any(result is NotImplemented for result in empty_set_result)
         outer_query.clear_ordering(force=True)
         outer_query.clear_limits()
-        outer_query.select_for_update = False
-        outer_query.select_related = False
+        outer_query.lock_mode = None
+        outer_query.joined_relations = False
         compiler = outer_query.get_compiler(elide_empty=elide_empty)
         result = compiler.execute_sql(SINGLE)
         if result is None:
@@ -687,7 +686,7 @@ class Query(BaseExpression):
         select_mask[meta.get_forward_field("id")] = {}
         # All concrete fields that are not part of the defer mask must be
         # loaded. If a relational field is encountered it gets added to the
-        # mask for it be considered if `select_related` and the cycle continues
+        # mask for it be considered if `joined_relations` and the cycle continues
         # by recursively calling this function.
         for field in meta.fields:
             field_mask = mask.pop(field.name, None)
@@ -1952,7 +1951,7 @@ class Query(BaseExpression):
         """Remove all fields from SELECT clause."""
         self.select = ()
         self.default_cols = False
-        self.select_related = False
+        self.joined_relations = False
         self.set_annotation_mask(())
 
     def clear_select_fields(self) -> None:
@@ -2075,9 +2074,7 @@ class Query(BaseExpression):
         If 'clear_default' is True, there will be no ordering in the resulting
         query (not even the model's default).
         """
-        if not force and (
-            self.is_sliced or self.distinct_fields or self.select_for_update
-        ):
+        if not force and (self.is_sliced or self.distinct_fields or self.lock_mode):
             return
         self.order_by = ()
         if clear_default:
@@ -2116,21 +2113,21 @@ class Query(BaseExpression):
                 group_by.extend(group_by_cols)
         self.group_by = tuple(group_by)
 
-    def add_select_related(self, fields: list[str]) -> None:
+    def add_joined_relations(self, fields: list[str]) -> None:
         """
-        Set up the select_related data structure so that we only select
+        Set up the joined_relations data structure so that we only select
         certain related models (as opposed to all models, when
-        self.select_related=True).
+        self.joined_relations=True).
         """
-        if isinstance(self.select_related, bool):
+        if isinstance(self.joined_relations, bool):
             field_dict: dict[str, Any] = {}
         else:
-            field_dict = self.select_related
+            field_dict = self.joined_relations
         for field in fields:
             d = field_dict
             for part in field.split(LOOKUP_SEP):
                 d = d.setdefault(part, {})
-        self.select_related = field_dict
+        self.joined_relations = field_dict
 
     def clear_deferred_loading(self) -> None:
         """Remove any fields from the deferred loading set."""
@@ -2207,7 +2204,7 @@ class Query(BaseExpression):
             self.set_annotation_mask(self.annotation_select_mask.union(names))
 
     def set_values(self, fields: list[str]) -> None:
-        self.select_related = False
+        self.joined_relations = False
         self.clear_deferred_loading()
         self.clear_select_fields()
         self.has_select_fields = True
@@ -2468,6 +2465,9 @@ class JoinPromoter:
 class DeleteQuery(Query):
     """A DELETE SQL query."""
 
+    # Concrete fields to emit in a RETURNING clause, or None for a plain DELETE.
+    returning_fields: list[Field] | None = None
+
     def get_compiler(self, *, elide_empty: bool = True) -> SQLDeleteCompiler:
         from plain.postgres.sql.compiler import SQLDeleteCompiler
 
@@ -2478,11 +2478,9 @@ class DeleteQuery(Query):
 
         self.alias_map = {table: self.alias_map[table]}
         self.where = where
-        cursor = self.get_compiler().execute_sql(CURSOR)
-        if cursor:
-            with cursor:
-                return cursor.rowcount
-        return 0
+        # The compiler returns the deleted row count directly (this query never
+        # carries returning_fields).
+        return self.get_compiler().execute_sql(CURSOR)
 
     def delete_batch(self, id_list: list[Any]) -> int:
         """
@@ -2510,6 +2508,9 @@ class DeleteQuery(Query):
 
 class UpdateQuery(Query):
     """An UPDATE SQL query."""
+
+    # Concrete fields to emit in a RETURNING clause, or None for a plain UPDATE.
+    returning_fields: list[Field] | None = None
 
     def get_compiler(self, *, elide_empty: bool = True) -> SQLUpdateCompiler:
         from plain.postgres.sql.compiler import SQLUpdateCompiler
@@ -2596,6 +2597,8 @@ class InsertQuery(Query):
         on_conflict: OnConflict | None = None,
         update_fields: list[Field] | None = None,
         unique_fields: list[Field] | None = None,
+        conflict_defaults: dict[Field, Any] | None = None,
+        returning_created: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -2604,6 +2607,13 @@ class InsertQuery(Query):
         self.on_conflict = on_conflict
         self.update_fields: list[Field] = update_fields or []
         self.unique_fields: list[Field] = unique_fields or []
+        # Per-column DO UPDATE SET overrides (upsert conflict_defaults) and the
+        # flag for the trailing "(xmax = 0)" created column in RETURNING.
+        self.conflict_defaults: dict[Field, Any] = conflict_defaults or {}
+        self.returning_created: bool = returning_created
+        # Raised by the compiler only while it compiles the DO UPDATE SET
+        # assignments, which is the one place EXCLUDED means anything.
+        self.compiling_conflict_assignment: bool = False
 
     def insert_values(self, fields: Sequence[Any], objs: list[Any]) -> None:
         self.fields = fields

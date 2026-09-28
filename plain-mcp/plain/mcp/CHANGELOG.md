@@ -1,5 +1,35 @@
 # plain-mcp changelog
 
+## [0.8.0](https://github.com/dropseed/plain/releases/plain-mcp@0.8.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.7.3](https://github.com/dropseed/plain/releases/plain-mcp@0.7.3) (2026-09-21)
+
+### What's changed
+
+- The `MCPResource` example uses the typed `Order.query.where(Order.id.equals(...)).get()` instead of the Django-ism `get(pk=...)`, names the resource `OrderResource` so it doesn't shadow the model, and declares `text/plain` since it returns `str(order)` ([10236185ea](https://github.com/dropseed/plain/commit/10236185ea))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.7.2](https://github.com/dropseed/plain/releases/plain-mcp@0.7.2) (2026-09-20)
+
+### What's changed
+
+- The docs declare `tools` and `resources` as tuples (`tools = (Greet,)`), matching how the framework types them ([95836636f3](https://github.com/dropseed/plain/commit/95836636f3))
+
+### Upgrade instructions
+
+- If `tools = [...]` or `resources = [...]` on your `MCPView` fails type checking, write them as tuples.
+
 ## [0.7.1](https://github.com/dropseed/plain/releases/plain-mcp@0.7.1) (2026-08-21)
 
 ### What's changed

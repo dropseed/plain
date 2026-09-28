@@ -12,8 +12,6 @@ During a test run, `EMAIL_BACKEND` is routed to the in-memory backend and
         assert outbox[0].to == ["a@example.com"]
 """
 
-from __future__ import annotations
-
 from plain.email.backends.locmem import outbox
 
 from .lifecycle import EmailTestLifecycle

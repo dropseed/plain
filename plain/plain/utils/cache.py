@@ -15,8 +15,6 @@ An example: i18n middleware would need to distinguish caches by the
 "Accept-language" header.
 """
 
-from __future__ import annotations
-
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any

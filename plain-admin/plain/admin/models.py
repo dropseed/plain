@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -15,7 +13,7 @@ if TYPE_CHECKING:
 class PinnedNavItem(postgres.Model):
     """A user's pinned navigation item in the admin."""
 
-    user: User = types.ForeignKeyField(
+    user: Field[User] = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )

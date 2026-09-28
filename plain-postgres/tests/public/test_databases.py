@@ -9,8 +9,6 @@ Every scratch database is named for this run (see `PREFIX`), so two suites
 sharing a cluster can't drop each other's.
 """
 
-from __future__ import annotations
-
 import secrets
 from collections.abc import Callable, Generator
 from contextlib import contextmanager

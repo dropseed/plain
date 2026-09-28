@@ -9,8 +9,6 @@ They also act as reverse fields for the purposes of the Meta API because
 they're the closest concept currently available.
 """
 
-from __future__ import annotations
-
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -161,7 +159,7 @@ class ForeignObjectRel(FieldCacheMixin):
         forward model on the reverse model.
 
         Uses the related_query_name for caching, which provides a stable name
-        for prefetch_related operations.
+        for prefetch() operations.
         """
         return self.field.related_query_name()
 

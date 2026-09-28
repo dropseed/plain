@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import psycopg
 from app.users.models import User
 from plain.exceptions import ValidationError
-from plain.postgres import Field, transaction, types
+from plain.postgres import EncryptedField, Field, transaction, types
 from plain.utils import timezone
 
 from plain import postgres
@@ -24,7 +22,7 @@ class OAuthConnection(postgres.Model):
     created_at: Field[datetime] = types.DateTimeField(create_now=True)
     updated_at: Field[datetime] = types.DateTimeField(create_now=True, update_now=True)
 
-    user: User = types.ForeignKeyField(
+    user: Field[User] = types.ForeignKeyField(
         "users.User",
         on_delete=postgres.CASCADE,
     )
@@ -36,8 +34,8 @@ class OAuthConnection(postgres.Model):
     provider_user_id: Field[str] = types.TextField(max_length=100)
 
     # Token data
-    access_token: Field[str] = types.EncryptedTextField(max_length=2000)
-    refresh_token: Field[str] = types.EncryptedTextField(
+    access_token: EncryptedField[str] = types.EncryptedTextField(max_length=2000)
+    refresh_token: EncryptedField[str] = types.EncryptedTextField(
         max_length=2000, required=False, default=""
     )
     access_token_expires_at: Field[datetime | None] = types.DateTimeField(
@@ -108,8 +106,8 @@ class OAuthConnection(postgres.Model):
     ) -> OAuthConnection:
         try:
             connection = cls.query.get(
-                provider_key=provider_key,
-                provider_user_id=oauth_user.provider_id,
+                cls.provider_key.equals(provider_key),
+                cls.provider_user_id.equals(oauth_user.provider_id),
             )
             connection.set_token_fields(oauth_token)
             connection.update()
@@ -124,7 +122,7 @@ class OAuthConnection(postgres.Model):
                             **oauth_user.user_model_fields,
                         )
                         user.create()
-                except (psycopg.IntegrityError, ValidationError):
+                except psycopg.IntegrityError, ValidationError:
                     raise OAuthUserAlreadyExistsError(
                         provider_key=provider_key,
                         user_model_fields=oauth_user.user_model_fields,
@@ -150,10 +148,12 @@ class OAuthConnection(postgres.Model):
         Connect will either create a new connection or update an existing connection
         """
         try:
+            # Conditions in the order get() sorted its kwargs, so the SQL is
+            # byte-identical to the string form this replaced.
             connection = cls.query.get(
-                user=user,
-                provider_key=provider_key,
-                provider_user_id=oauth_user.provider_id,
+                cls.provider_key.equals(provider_key),
+                cls.provider_user_id.equals(oauth_user.provider_id),
+                cls.user.id.equals(user.id),
             )
         except cls.DoesNotExist:
             # Create our own instance (not using get_or_create)

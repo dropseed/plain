@@ -22,19 +22,24 @@ real Worker object — no listener, no signals. The socket-level contract
 (SIGTERM, drain, exit code) is covered by tools/shutdown-test.
 """
 
-from __future__ import annotations
-
 import asyncio
 import socket
 import time
 from collections.abc import Callable
 from typing import Any
 
+import pytest
 from plain.http import Response
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.test import case, cases, patch
-from server_stubs import BodyLengthHandler, StubApp, h1_connect, make_worker
+from server_stubs import (
+    BodyLengthHandler,
+    StubApp,
+    h1_connect,
+    make_worker,
+    stub_lifecycle,
+)
 
 
 class _Handler:
@@ -44,13 +49,13 @@ class _Handler:
         self.on_handle: Callable[[], None] | None = None
         self.response_headers: dict[str, str] = {}
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         if self.on_handle is not None:
             self.on_handle()
         response = Response(b"ok", content_type="text/plain")
         for name, value in self.response_headers.items():
             response.headers[name] = value
-        return response
+        return stub_lifecycle(request, response, executor)
 
 
 _REQUEST = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"
@@ -67,9 +72,12 @@ _CHUNKED_POST = (
 _connect = h1_connect
 
 
-@cases(
-    case(True, id="begin_drain"),
-    case(False, id="reload"),
+@pytest.mark.parametrize(
+    "full_drain",
+    [
+        pytest.param(True, id="begin_drain"),
+        pytest.param(False, id="alive_flips_first"),
+    ],
 )
 def test_request_arriving_after_shutdown_starts_is_served_with_close(
     full_drain: bool,
@@ -274,9 +282,12 @@ def test_chunked_complete_with_binary_pipelined_tail_is_framed() -> None:
     asyncio.run(scenario())
 
 
-@cases(
-    case(_REQUEST + _REQUEST, id="two GETs"),
-    case(_POST + _REQUEST, id="POST then GET"),
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(_REQUEST + _REQUEST, id="after_bodiless"),
+        pytest.param(_POST + _REQUEST, id="after_body"),
+    ],
 )
 def test_pipelined_request_gets_connection_close(payload: bytes) -> None:
     # We deliberately do NOT serve inline-pipelined requests: re-framing
@@ -368,9 +379,15 @@ def test_request_within_shutdown_grace_window_is_served() -> None:
     asyncio.run(scenario())
 
 
-@cases(0, 1)
+@pytest.mark.parametrize(
+    "requests_before_idle",
+    [
+        pytest.param(0, id="fresh_connection"),
+        pytest.param(1, id="reused_connection"),
+    ],
+)
 def test_request_after_long_idle_is_served_keepalive(
-    requests_before_idle: int,
+    monkeypatch: pytest.MonkeyPatch, requests_before_idle: int
 ) -> None:
     # The wait for a request's first byte is SERVER_KEEPALIVE_TIMEOUT,
     # not the per-recv progress timeout — for a fresh pooled connection
@@ -380,6 +397,7 @@ def test_request_after_long_idle_is_served_keepalive(
     # response, not a socket closed out from under its request (Heroku
     # H13/H18). Shrink the per-recv timeout so a regression here fails in
     # a fraction of a second instead of this test sleeping real seconds.
+    monkeypatch.setattr(h1, "RECV_PROGRESS_TIMEOUT", 0.2)
 
     async def scenario() -> None:
         worker = make_worker(handler=_Handler())
@@ -403,8 +421,7 @@ def test_request_after_long_idle_is_served_keepalive(
         finally:
             client.teardown()
 
-    with patch(h1, "RECV_PROGRESS_TIMEOUT", 0.2):
-        asyncio.run(scenario())
+    asyncio.run(scenario())
 
 
 _BIG_POST = (

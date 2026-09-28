@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import _thread
 import warnings
 from collections import deque

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from templates_test_clients import list_client
 
 

@@ -6,8 +6,6 @@ ManyToManyField relations, allowing explicit declaration of reverse accessors
 without relying on automatic related_name generation.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from plain.postgres.exceptions import FieldDoesNotExist
@@ -142,7 +140,7 @@ class ReverseForeignKey(BaseReverseDescriptor[T, QS]):
             children: ReverseForeignKey[Child, ChildQuerySet] = ReverseForeignKey(to="Child", field="parent")
 
         class Child(Model):
-            parent: Parent = ForeignKeyField(Parent, on_delete=models.CASCADE)
+            parent: Field[Parent] = ForeignKeyField(Parent, on_delete=postgres.CASCADE)
 
     Args:
         to: The related model (string name or model class)

@@ -6,19 +6,14 @@ work instead of re-applying its stale plan (which would re-run DDL that
 already exists and crash).
 """
 
-from __future__ import annotations
-
-import contextlib
-import io
 from contextlib import contextmanager
 
 from plain.postgres.cli.migrations import apply
 from plain.postgres.db import get_connection
 from plain.postgres.migrations.recorder import MigrationRecorder
-from plain.test import patch
 
 
-def test_apply_replans_after_waiting_on_lock():
+def test_apply_replans_after_waiting_on_lock(db, monkeypatch, capsys):
     recorder = MigrationRecorder(get_connection())
 
     # Pick the latest applied migration of the test app and delete its record
@@ -42,19 +37,18 @@ def test_apply_replans_after_waiting_on_lock():
             recorder.record_applied("examples", latest)
             yield verify
 
-    with (
-        patch(migrations_cli, "cli_schema_lock", lock_with_racing_winner),
-        contextlib.redirect_stdout(io.StringIO()) as out,
-    ):
-        apply.callback(
-            package_label=None,
-            migration_name=None,
-            fake=False,
-            plan=False,
-            check_unapplied=False,
-            no_input=True,
-            atomic_batch=None,
-            quiet=False,
-        )
+    monkeypatch.setattr(migrations_cli, "cli_schema_lock", lock_with_racing_winner)
 
-    assert "another process already applied them" in out.getvalue()
+    apply.callback(
+        package_label=None,
+        migration_name=None,
+        fake=False,
+        plan=False,
+        check_unapplied=False,
+        no_input=True,
+        atomic_batch=None,
+        quiet=False,
+    )
+
+    out = capsys.readouterr().out
+    assert "another process already applied them" in out

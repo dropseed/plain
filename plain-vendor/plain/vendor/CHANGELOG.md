@@ -1,5 +1,15 @@
 # plain-vendor changelog
 
+## [0.12.0](https://github.com/dropseed/plain/releases/plain-vendor@0.12.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.11.8](https://github.com/dropseed/plain/releases/plain-vendor@0.11.8) (2026-08-12)
 
 ### What's changed

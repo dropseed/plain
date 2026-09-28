@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
@@ -73,7 +71,7 @@ class UUIDField[T: (UUID, UUID | None) = UUID](ColumnField[T]):
             input_form = "int" if isinstance(value, int) else "hex"
             try:
                 return UUID(**{input_form: value})
-            except (AttributeError, ValueError):
+            except AttributeError, ValueError:
                 raise exceptions.ValidationError(
                     '"%(value)s" is not a valid UUID.',
                     code="invalid",

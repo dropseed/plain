@@ -4,8 +4,6 @@ excluded so the check doesn't contradict `postgres.missing_fk_indexes`,
 which already treats partials as non-covering.
 """
 
-from __future__ import annotations
-
 from types import SimpleNamespace
 
 from plain.postgres import Q

@@ -6,8 +6,6 @@ PLAIN_CLOUD_TOKEN and PLAIN_CLOUD_API_URL override stored values for
 headless/CI use.
 """
 
-from __future__ import annotations
-
 import os
 import sys
 import tomllib

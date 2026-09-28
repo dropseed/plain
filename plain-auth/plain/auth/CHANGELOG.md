@@ -1,5 +1,37 @@
 # plain-auth changelog
 
+## [0.30.0](https://github.com/dropseed/plain/releases/plain-auth@0.30.0) (2026-09-21)
+
+### What's changed
+
+- The session's user id is parsed as an integer at the boundary before the lookup. A session whose stored id doesn't parse — anything other than an integer or an integer string — resolves to no user instead of raising ([62d753bbaf](https://github.com/dropseed/plain/commit/62d753bbaf))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.29.10](https://github.com/dropseed/plain/releases/plain-auth@0.29.10) (2026-09-21)
+
+### What's changed
+
+- The session user lookup uses a typed `where()` condition; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
+## [0.29.9](https://github.com/dropseed/plain/releases/plain-auth@0.29.9) (2026-09-20)
+
+### What's changed
+
+- The README's `User` model example uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.29.8](https://github.com/dropseed/plain/releases/plain-auth@0.29.8) (2026-09-04)
 
 ### What's changed

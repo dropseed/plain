@@ -1,5 +1,40 @@
 # plain-flags changelog
 
+## [0.38.0](https://github.com/dropseed/plain/releases/plain-flags@0.38.0) (2026-09-21)
+
+### What's changed
+
+- The flag admin declares its search fields as field references (`Flag.name`, `FlagResult.flag.name`), which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Uses `join()`, the renamed `select_related()`, so it needs `plain.postgres` 0.121.0 ([7c69a908c3](https://github.com/dropseed/plain/commit/7c69a908c3))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.37.4](https://github.com/dropseed/plain/releases/plain-flags@0.37.4) (2026-09-21)
+
+### What's changed
+
+- The flag-result lookup and the preflight name check use typed `where()`/`select()`; SQL is unchanged. `FlagResult.flag` references `Flag` by class (`Flag` is declared first), which is what lets the lookup traverse it ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- No changes required.
+
+## [0.37.3](https://github.com/dropseed/plain/releases/plain-flags@0.37.3) (2026-09-20)
+
+### What's changed
+
+- A flag's row is recorded with `upsert()` (one `INSERT ... ON CONFLICT` statement) instead of `update_or_create()` ([49b7299275](https://github.com/dropseed/plain/commit/49b7299275))
+- `Flag` and `FlagResult` use the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.37.2](https://github.com/dropseed/plain/releases/plain-flags@0.37.2) (2026-08-12)
 
 ### What's changed

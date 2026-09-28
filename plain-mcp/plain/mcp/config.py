@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from plain.packages import PackageConfig, packages_registry, register_config
 
 

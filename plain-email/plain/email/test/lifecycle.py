@@ -5,8 +5,6 @@ Routes EMAIL_BACKEND to the in-memory backend for the whole run — tests
 never send real email — and clears the outbox before each test.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any

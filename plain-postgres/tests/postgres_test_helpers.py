@@ -1,6 +1,4 @@
-"""Shared helpers for tests that manipulate raw connection state."""
-
-from __future__ import annotations
+"""Shared helpers for the plain-postgres tests."""
 
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -23,3 +21,20 @@ def clean_connection() -> Generator[None]:
             except Exception:
                 pass
         _db_conn.reset(token)
+
+
+def executed_sql(queries: list[dict]) -> str:
+    """Join the statements recorded by ``capture_queries`` into one string.
+
+        with capture_queries() as queries:
+            Model.query.filter(...).delete()
+        assert "FOR UPDATE" in executed_sql(queries)
+
+    Transaction control is left out -- savepoints included, which the test
+    lifecycle wraps every test in -- so a block inside ``atomic()`` reads the
+    same as one that wasn't, and what comes back is replayable SQL.
+    """
+    control = ("BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE")
+    return " ".join(
+        query["sql"] for query in queries if not query["sql"].startswith(control)
+    )

@@ -6,8 +6,6 @@ headers. test_http.py, test_oauth.py and internal/test_observability.py all
 need that envelope, so it's assembled once here.
 """
 
-from __future__ import annotations
-
 import json
 from typing import Any
 

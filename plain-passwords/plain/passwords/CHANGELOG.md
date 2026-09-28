@@ -1,5 +1,37 @@
 # plain-passwords changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-passwords@0.27.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.26.11](https://github.com/dropseed/plain/releases/plain-passwords@0.26.11) (2026-09-21)
+
+### What's changed
+
+- The case-insensitive email lookups in the login and password-reset forms use `User.email.iequals(...)`; SQL is unchanged ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8)) ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
+## [0.26.10](https://github.com/dropseed/plain/releases/plain-passwords@0.26.10) (2026-09-20)
+
+### What's changed
+
+- The `PasswordField()` stub returns the typed descriptor `Field[str]` (or `Field[str | None]` with `allow_null=True`), matching plain-postgres 0.119's core field stubs, so a model annotates it `password: Field[str] = PasswordField()` ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+- If you annotated the field as `password: str = PasswordField()`, change it to `password: Field[str] = PasswordField()` (`from plain.postgres import Field`).
+
 ## [0.26.9](https://github.com/dropseed/plain/releases/plain-passwords@0.26.9) (2026-09-04)
 
 ### What's changed

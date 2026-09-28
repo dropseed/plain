@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypeVar, overload
@@ -15,7 +13,7 @@ if TYPE_CHECKING:
     from .base import AdminView
     from .viewsets import AdminViewset
 
-T = TypeVar("T")
+T = TypeVar("T", bound="AdminView")
 VS = TypeVar("VS", bound="AdminViewset")
 
 
@@ -41,7 +39,7 @@ class AdminViewRegistry:
         self, view: type[T] | None = None
     ) -> type[T] | Callable[[type[T]], type[T]]:
         def inner(view: type[T]) -> type[T]:
-            self.registered_views.add(view)  # ty: ignore[invalid-argument-type]
+            self.registered_views.add(view)
             # Invalidate lookup caches
             self.__dict__.pop("slug_to_view", None)
             self.__dict__.pop("path_to_view", None)
@@ -194,9 +192,9 @@ class AdminViewRegistry:
 
         # Get pinned items (ordered)
         pinned_slugs = list(
-            PinnedNavItem.query.filter(user=user)
+            PinnedNavItem.query.where(PinnedNavItem.user.id.equals(user.id))
             .order_by("order", "created_at")
-            .values_list("view_slug", flat=True)[:max_pinned]
+            .select(PinnedNavItem.view_slug, flat=True)[:max_pinned]
         )
 
         # Get recent items from session

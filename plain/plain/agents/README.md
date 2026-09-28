@@ -136,7 +136,7 @@ Put rules in `<your-package>/agents/.claude/rules/<name>.md`. Keep them short (~
 A rule body should read as one-line reminders that end in a pointer, not a tutorial:
 
 ```markdown
-- Use `select_related()` for FK access in loops, `prefetch_related()` for reverse/M2N
+- Use `join()` for FK access in loops, `prefetch()` for reverse/M2N
 - Use `.exists()` not `.count() > 0`, `.count()` not `len(qs)`
 
 Run `uv run plain docs postgres` for full patterns with code examples.

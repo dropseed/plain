@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import psycopg
 from plain.postgres import get_connection
 from plain.postgres.fields import TextField

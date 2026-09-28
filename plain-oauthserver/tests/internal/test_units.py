@@ -1,7 +1,5 @@
 """Unit tests for the pieces below the HTTP contract."""
 
-from __future__ import annotations
-
 from app.users.models import User
 from oauth_helpers import generate_pkce_pair
 from plain.oauthserver.models import (

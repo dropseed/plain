@@ -1,10 +1,10 @@
 """Tests for plain.postgres.introspection.health."""
 
-from __future__ import annotations
-
+import pytest
 from plain.postgres.introspection import build_table_owners
 
 
+@pytest.mark.usefixtures("_unblock_cursor", "db")
 class TestBuildTableOwners:
     def test_populates_model_class_for_app_models(self) -> None:
         owners = build_table_owners()

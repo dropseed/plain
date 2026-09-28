@@ -1,7 +1,5 @@
 """Tests for plain.postgres.functions.uuid."""
 
-from __future__ import annotations
-
 import uuid
 
 from plain.postgres import get_connection

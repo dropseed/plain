@@ -7,8 +7,6 @@ Covers:
 - ORM: Model().create() + bulk_create() populate via RETURNING
 """
 
-from __future__ import annotations
-
 import datetime
 import uuid
 from typing import ClassVar

@@ -9,13 +9,29 @@ def settings() -> None:
 
 @settings.command()
 @click.argument("setting_name")
-def get(setting_name: str) -> None:
+@click.option(
+    "--reveal",
+    is_flag=True,
+    help="Print a secret setting's real value instead of masking it.",
+)
+def get(setting_name: str, reveal: bool) -> None:
     """Get the value of a specific setting"""
-    try:
-        value = getattr(plain.runtime.settings, setting_name)
-        click.echo(value)
-    except AttributeError:
-        click.secho(f'Setting "{setting_name}" not found', fg="red")
+    definitions = dict(plain.runtime.settings.get_settings())
+    if setting_name not in definitions:
+        click.secho(f'Setting "{setting_name}" not found', fg="red", err=True)
+        raise SystemExit(1)
+
+    definition = definitions[setting_name]
+    if definition.is_secret and not reveal:
+        click.echo(definition.display_value())
+        click.secho(
+            f"{setting_name} is a secret. Pass --reveal to print its value.",
+            dim=True,
+            err=True,
+        )
+        return
+
+    click.echo(definition.value)
 
 
 @settings.command(name="list")

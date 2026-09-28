@@ -5,20 +5,24 @@ without a listener, signals, or init_process(), and drive
 h1.handle_connection over a socketpair with H1Client/h1_connect.
 """
 
-from __future__ import annotations
-
 import asyncio
+import contextvars
+import logging
 import os
 import socket
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import Any
 
 import h2.config
 import h2.connection
 import h2.events
 import h2.exceptions
+from opentelemetry import trace
 from plain.http import ContentTooLargeError413, Response
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.runtime import settings
 from plain.server.connection import Connection
 from plain.server.http import h1
@@ -149,18 +153,56 @@ class H1Client:
         self.worker.tpool.shutdown(wait=False)
 
 
-async def h1_connect(worker: Worker) -> H1Client:
+async def socketpair_connection(
+    app: Any,
+) -> tuple[Connection, asyncio.StreamReader, asyncio.StreamWriter]:
+    """A server `Connection` over one end of a socketpair, plus the client end."""
     server_sock, client_sock = socket.socketpair()
     server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
     client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-
     conn = Connection(
-        worker.app,
+        app,
         server_reader,
         server_writer,
         ("127.0.0.1", 12345),
         ("127.0.0.1", 80),
     )
+    return conn, client_reader, client_writer
+
+
+class LogCapture(logging.Handler):
+    """Collects records from one logger; `records` is what tests assert on.
+
+    Each record is stamped with the span that was current when it was
+    made (`captured_span_id`), which is what the OTel log exporter would
+    attach in production.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        record.captured_span_id = trace.get_current_span().get_span_context().span_id
+        self.records.append(record)
+
+
+@contextmanager
+def capture_logger(name: str, *, level: int = logging.INFO) -> Iterator[LogCapture]:
+    logger = logging.getLogger(name)
+    handler = LogCapture()
+    original_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(level)
+    try:
+        yield handler
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)
+
+
+async def h1_connect(worker: Worker) -> H1Client:
+    conn, client_reader, client_writer = await socketpair_connection(worker.app)
     server_task = asyncio.get_running_loop().create_task(
         h1.handle_connection(worker, conn)
     )
@@ -209,14 +251,48 @@ async def h1_roundtrip(worker: Worker, request: bytes) -> tuple[bytes, bytes]:
         client.teardown()
 
 
+def stub_lifecycle(
+    request: Any,
+    response: Response,
+    executor: Any,
+    *,
+    context: contextvars.Context | None = None,
+) -> ResponseLifecycle:
+    """What `BaseHandler.handle()` returns, around a response a stub built:
+    no middleware and no recorded span."""
+    return ResponseLifecycle(
+        response,
+        request=request,
+        context=context if context is not None else contextvars.copy_context(),
+        span=trace.INVALID_SPAN,
+        started=time.perf_counter(),
+        executor=executor,
+    )
+
+
 class ResponseHandler:
     """Handler stub that builds a fresh response per request."""
 
     def __init__(self, make_response: Callable[[], Response]) -> None:
         self.make_response = make_response
 
-    async def handle(self, request: Any, executor: Any) -> Response:
-        return self.make_response()
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
+        return stub_lifecycle(request, self.make_response(), executor)
+
+
+class ContextHandler:
+    """Handler stub that builds the response inside a fresh request context,
+    the way `BaseHandler.handle()` does — so the server reads the body in
+    it. ContextVars `make_response` sets are what the body sees.
+    """
+
+    def __init__(self, make_response: Callable[[], Response]) -> None:
+        self.make_response = make_response
+
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
+        context = contextvars.Context()
+        response = context.run(self.make_response)
+        return stub_lifecycle(request, response, executor, context=context)
 
 
 class BodyLengthHandler:
@@ -226,7 +302,7 @@ class BodyLengthHandler:
     the way the production handler maps any HTTPException.
     """
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         loop = asyncio.get_running_loop()
 
         def read_body() -> Response:
@@ -236,7 +312,8 @@ class BodyLengthHandler:
                 return Response(b"too large", status_code=413)
             return Response(str(len(body)).encode(), content_type="text/plain")
 
-        return await loop.run_in_executor(executor, read_body)
+        response = await loop.run_in_executor(executor, read_body)
+        return stub_lifecycle(request, response, executor)
 
 
 class H2Client:

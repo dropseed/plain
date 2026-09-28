@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import codecs
 import copy
 import json
@@ -237,7 +235,7 @@ class Request:
         """Return the Content-Length header value, or 0 if not provided."""
         try:
             return int(self.headers.get("Content-Length") or 0)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return 0
 
     def get_full_path(self) -> str:

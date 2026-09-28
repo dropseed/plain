@@ -6,25 +6,20 @@ boundaries so subsequent routing changes don't silently shift what URLs
 get rendered into HTML.
 """
 
-from __future__ import annotations
-
-import sys
-from contextlib import contextmanager
-
+import pytest
 from plain.http import Response
 from plain.runtime import settings
-from plain.test import raises
 from plain.urls import Router, get_resolver, include, path, reverse
 from plain.urls.exceptions import NoReverseMatch
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import View
 
 
-@contextmanager
-def _installed_router(router_path: str):
+@pytest.fixture
+def slash_router():
     original = settings.URLS_ROUTER
     original_ts = settings.URLS_TRAILING_SLASH
-    settings.URLS_ROUTER = router_path
+    settings.URLS_ROUTER = "slash_routers.SlashRouter"
     settings.URLS_TRAILING_SLASH = True
     _get_cached_resolver.cache_clear()
     try:
@@ -35,38 +30,54 @@ def _installed_router(router_path: str):
         _get_cached_resolver.cache_clear()
 
 
-@contextmanager
-def slash_router():
-    with _installed_router("slash_routers.SlashRouter"):
-        yield
-
-
-@contextmanager
+@pytest.fixture
 def boundary_router():
-    with _installed_router("boundary_routers.BoundaryRouter"):
+    original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
+    settings.URLS_ROUTER = "boundary_routers.BoundaryRouter"
+    settings.URLS_TRAILING_SLASH = True
+    _get_cached_resolver.cache_clear()
+    try:
         yield
+    finally:
+        settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
+        _get_cached_resolver.cache_clear()
 
 
-@contextmanager
-def use_router(router_class: type[Router]):
+@pytest.fixture
+def use_router(request):
     """Install an ad-hoc Router class as `URLS_ROUTER` for a single test.
 
     Tests that need a one-off router shape (rather than the reusable
-    `slash_router`/`boundary_router` shapes) use `with use_router(MyRouter):`
-    to install it; the helper restores `URLS_ROUTER` and clears the
+    `slash_router`/`boundary_router` shapes) call `use_router(MyRouter)`
+    to install it; the fixture restores `URLS_ROUTER` and clears the
     resolver cache on teardown. Stashes the class in the test module's
     globals so `import_string` can resolve it. Sets
     `URLS_TRAILING_SLASH=True` for the duration of the test so slashed
     route strings keep their slash semantics.
     """
-    module = sys.modules[__name__]
-    attr = "_UseRouterUnderTest"
-    module.__dict__[attr] = router_class
+    original = settings.URLS_ROUTER
+    original_ts = settings.URLS_TRAILING_SLASH
+    installed_attr: str | None = None
+
+    def _install(router_class: type[Router]) -> None:
+        nonlocal installed_attr
+        attr = f"_UseRouter_{request.node.name}"
+        request.module.__dict__[attr] = router_class
+        installed_attr = attr
+        settings.URLS_ROUTER = f"{request.module.__name__}.{attr}"
+        settings.URLS_TRAILING_SLASH = True
+        _get_cached_resolver.cache_clear()
+
     try:
-        with _installed_router(f"{__name__}.{attr}"):
-            yield
+        yield _install
     finally:
-        module.__dict__.pop(attr, None)
+        settings.URLS_ROUTER = original
+        settings.URLS_TRAILING_SLASH = original_ts
+        if installed_attr is not None:
+            request.module.__dict__.pop(installed_attr, None)
+        _get_cached_resolver.cache_clear()
 
 
 class _OkView(View):
@@ -74,65 +85,58 @@ class _OkView(View):
         return Response("ok")
 
 
-def test_reverse_route_with_slash():
+def test_reverse_route_with_slash(slash_router):
     """`path("with-slash/")` → `reverse()` returns `/with-slash/`."""
-    with slash_router():
-        assert reverse("with-slash") == "/with-slash/"
+    assert reverse("with-slash") == "/with-slash/"
 
 
-def test_reverse_route_without_slash():
+def test_reverse_route_without_slash(slash_router):
     """`path("without-slash")` → `reverse()` returns `/without-slash` (no trailing slash)."""
-    with slash_router():
-        assert reverse("without-slash") == "/without-slash"
+    assert reverse("without-slash") == "/without-slash"
 
 
-def test_reverse_through_canonical_include():
+def test_reverse_through_canonical_include(boundary_router):
     """`include("admin-canonical/", ...)` + child `path("home/")` → `/admin-canonical/home/`."""
-    with boundary_router():
-        assert reverse("admin-canonical:home") == "/admin-canonical/home/"
+    assert reverse("admin-canonical:home") == "/admin-canonical/home/"
 
 
-def test_reverse_through_nested_include():
+def test_reverse_through_nested_include(boundary_router):
     """Nested include — `/admin-canonical/nested/users/` resolves through chained includes."""
-    with boundary_router():
-        assert reverse("admin-canonical:users-list") == "/admin-canonical/nested/users/"
-        assert (
-            reverse("admin-canonical:user-detail", user_id=42)
-            == "/admin-canonical/nested/users/42/"
-        )
+    assert reverse("admin-canonical:users-list") == "/admin-canonical/nested/users/"
+    assert (
+        reverse("admin-canonical:user-detail", user_id=42)
+        == "/admin-canonical/nested/users/42/"
+    )
 
 
-def test_reverse_through_boundary_include_no_slash():
+def test_reverse_through_boundary_include_no_slash(boundary_router):
     """`include("admin-boundary", ...)` has no trailing slash on its prefix,
     but the child `path("home/", ...)` has its own slash flag — so the
     rendered URL has a slash because the leaf controls its own canonical
     form. (The include's slash flag matters only for the include's index URL.)
     """
-    with boundary_router():
-        assert reverse("admin-boundary:home") == "/admin-boundary/home/"
+    assert reverse("admin-boundary:home") == "/admin-boundary/home/"
 
 
-def test_reverse_through_root_include():
+def test_reverse_through_root_include(boundary_router):
     """`include("", ...)` adds no prefix — child route is reachable at its bare path."""
-    with boundary_router():
-        assert reverse("root-include:hello") == "/root-hello/"
+    assert reverse("root-include:hello") == "/root-hello/"
 
 
-def test_reverse_through_leading_slash_include():
+def test_reverse_through_leading_slash_include(boundary_router):
     """`include("/admin-leading/", ...)` — leading slash is stripped.
 
     `reverse()` produces the same URL as `include("admin-leading/", ...)`.
     """
-    with boundary_router():
-        assert reverse("admin-leading:home") == "/admin-leading/home/"
+    assert reverse("admin-leading:home") == "/admin-leading/home/"
 
 
-def test_reverse_unknown_name_raises():
-    with slash_router(), raises(NoReverseMatch):
+def test_reverse_unknown_name_raises(slash_router):
+    with pytest.raises(NoReverseMatch):
         reverse("not-a-real-name")
 
 
-def test_reverse_coerces_non_string_value_for_str_converter():
+def test_reverse_coerces_non_string_value_for_str_converter(use_router):
     """Default `str` converter must accept stringifiable values — the old
     `%s` formatting did this implicitly; the new resolver does it via
     `to_url=str`. Regression test for the silent TypeError that bit when
@@ -143,14 +147,14 @@ def test_reverse_coerces_non_string_value_for_str_converter():
         namespace = ""
         urls = (path("user/<name>/", _OkView, name="user"),)
 
-    with use_router(_Router):
-        # int gets stringified
-        assert reverse("user", name=42) == "/user/42/"
+    use_router(_Router)
+    # int gets stringified
+    assert reverse("user", name=42) == "/user/42/"
 
 
-def test_reverse_included_index_follows_global_setting():
+def test_reverse_included_index_follows_global_setting(use_router):
     """`path("")` inside `include("admin", AdminRouter)` reverses to
-    `/admin/` when `URLS_TRAILING_SLASH=True` (the helper default).
+    `/admin/` when `URLS_TRAILING_SLASH=True` (the fixture default).
     The include's slash flag isn't part of the routing model — the
     setting (plus any `force_trailing_slash` on the endpoint) is."""
 
@@ -162,11 +166,11 @@ def test_reverse_included_index_follows_global_setting():
         namespace = ""
         urls = (include("admin", _AdminRouter),)
 
-    with use_router(_Root):
-        assert reverse("admin:index") == "/admin/"
+    use_router(_Root)
+    assert reverse("admin:index") == "/admin/"
 
 
-def test_reverse_included_index_force_trailing_slash_false():
+def test_reverse_included_index_force_trailing_slash_false(use_router):
     """`force_trailing_slash=False` on the included index suppresses the
     slash even under `URLS_TRAILING_SLASH=True`."""
 
@@ -178,11 +182,11 @@ def test_reverse_included_index_force_trailing_slash_false():
         namespace = ""
         urls = (include("admin", _AdminRouter),)
 
-    with use_router(_Root):
-        assert reverse("admin:index") == "/admin"
+    use_router(_Root)
+    assert reverse("admin:index") == "/admin"
 
 
-def test_reverse_unnamespaced_included_index_follows_global_setting():
+def test_reverse_unnamespaced_included_index_follows_global_setting(use_router):
     """Same as above but for an un-namespaced include — exercises the
     un-namespaced merge path in `_collect_resolver`."""
 
@@ -194,11 +198,11 @@ def test_reverse_unnamespaced_included_index_follows_global_setting():
         namespace = ""
         urls = (include("admin", _AdminRouter),)
 
-    with use_router(_Root):
-        assert reverse("dashboard") == "/admin/"
+    use_router(_Root)
+    assert reverse("dashboard") == "/admin/"
 
 
-def test_reverse_suffix_capture_round_trips():
+def test_reverse_suffix_capture_round_trips(use_router):
     """`path("form/<slug:slug>.js", ...)` — capture with literal suffix.
     Reverse should interpolate the slug into the segment, and resolve
     should match the rendered URL back. Regression test for the codex
@@ -216,14 +220,14 @@ def test_reverse_suffix_capture_round_trips():
             ),
         )
 
-    with use_router(_Router):
-        assert reverse("form-js", slug="contact") == "/form/contact.js"
-        match = get_resolver().resolve("/form/contact.js")
-        assert match.kwargs == {"slug": "contact"}
-        assert match.url_name == "form-js"
+    use_router(_Router)
+    assert reverse("form-js", slug="contact") == "/form/contact.js"
+    match = get_resolver().resolve("/form/contact.js")
+    assert match.kwargs == {"slug": "contact"}
+    assert match.url_name == "form-js"
 
 
-def test_reverse_kwarg_can_be_named_prefix_segments():
+def test_reverse_kwarg_can_be_named_prefix_segments(use_router):
     """A URL whose capture is named `prefix_segments` must still be
     reversible — the internal `URLResolver.reverse()` parameter of the
     same name is positional-only specifically so this doesn't collide.
@@ -233,11 +237,11 @@ def test_reverse_kwarg_can_be_named_prefix_segments():
         namespace = ""
         urls = (path("items/<str:prefix_segments>/", _OkView, name="item"),)
 
-    with use_router(_Router):
-        assert reverse("item", prefix_segments="hello") == "/items/hello/"
+    use_router(_Router)
+    assert reverse("item", prefix_segments="hello") == "/items/hello/"
 
 
-def test_reverse_nested_unnamespaced_include_keeps_outer_slash():
+def test_reverse_nested_unnamespaced_include_keeps_outer_slash(use_router):
     """`include("api/", ApiRouter(ns=""))` → `include("", AdminRouter(ns="admin"))`
     → `path("")` should give `reverse("admin:index") == "/api/"`.
 
@@ -259,11 +263,11 @@ def test_reverse_nested_unnamespaced_include_keeps_outer_slash():
         namespace = ""
         urls = (include("api/", _ApiRouter),)
 
-    with use_router(_Root):
-        assert reverse("admin:index") == "/api/"
+    use_router(_Root)
+    assert reverse("admin:index") == "/api/"
 
 
-def test_reverse_does_not_normalize_caller_supplied_values():
+def test_reverse_does_not_normalize_caller_supplied_values(use_router):
     """`reverse()` interpolates kwargs verbatim — it does not validate or
     normalize them. Passing `".."` as a `<str:name>` value or `"a//b"` as
     a `<path:rest>` value produces a URL that 308s elsewhere on resolution,
@@ -294,13 +298,13 @@ def test_reverse_does_not_normalize_caller_supplied_values():
             ),
         )
 
-    with use_router(_Router):
-        assert reverse("file", name="..") == "/file/../"
-        assert reverse("doc", rest="a//b") == "/doc/a//b"
-        assert reverse("doc", rest="a/../b") == "/doc/a/../b"
+    use_router(_Router)
+    assert reverse("file", name="..") == "/file/../"
+    assert reverse("doc", rest="a//b") == "/doc/a//b"
+    assert reverse("doc", rest="a/../b") == "/doc/a/../b"
 
 
-def test_reverse_escapes_leading_slash_from_path_converter():
+def test_reverse_escapes_leading_slash_from_path_converter(use_router):
     """When a `<path:...>` capture is the entire URL body and its value
     starts with `/`, the rendered URL would begin with `//` — which
     browsers interpret as a scheme-relative URL (open-redirect hazard).
@@ -317,6 +321,6 @@ def test_reverse_escapes_leading_slash_from_path_converter():
         namespace = ""
         urls = (path("<path:rest>", _OkView, name="catch"),)
 
-    with use_router(_Router):
-        assert reverse("catch", rest="/evil.com") == "/%2Fevil.com"
-        assert reverse("catch", rest="hello/world") == "/hello/world"
+    use_router(_Router)
+    assert reverse("catch", rest="/evil.com") == "/%2Fevil.com"
+    assert reverse("catch", rest="hello/world") == "/hello/world"

@@ -6,8 +6,6 @@ lifecycle routes ``EMAIL_BACKEND`` here and clears ``outbox`` around each
 test — import it via ``plain.email.test``.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from .base import BaseEmailBackend

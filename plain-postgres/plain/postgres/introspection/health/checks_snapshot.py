@@ -2,8 +2,6 @@
 right now, not at accumulated counters. Fire on live incidents
 (blocker sessions, long-running idle-in-transaction, stuck queries)."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import psycopg.errors

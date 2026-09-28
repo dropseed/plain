@@ -116,3 +116,28 @@ def test_missing_target_raises():
     root = write_tests({"test_x.py": "def test_ok():\n    assert True\n"})
     with raises(FileNotFoundError):
         collect_tests(["test_nope.py"], root=root)
+
+
+def test_objects_that_refuse_attribute_access_are_left_alone():
+    # A test module can hold anything at module level — here a namespace
+    # whose PEP 562 `__getattr__` raises for every name. Collection only
+    # looks at functions and classes, so it never asks.
+    root = write_tests(
+        {
+            "test_hostile.py": (
+                "from types import ModuleType\n"
+                "\n"
+                "def _refuse(name):\n"
+                "    raise RuntimeError(f'probed for {name!r}')\n"
+                "\n"
+                "hostile = ModuleType('hostile_namespace')\n"
+                "hostile.__dict__['__getattr__'] = _refuse\n"
+                "\n"
+                "def test_one():\n"
+                "    assert True\n"
+            )
+        }
+    )
+    tests, errors = collect_tests(["."], root=root)
+    assert [t.id for t in tests] == ["test_hostile.py::test_one"]
+    assert errors == []

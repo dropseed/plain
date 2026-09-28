@@ -70,7 +70,7 @@ class Supervisor:
         """Return the PID recorded in the pidfile (or ``None``)."""
         try:
             return int(cls.pidfile_path().read_text())
-        except (ValueError, OSError):
+        except ValueError, OSError:
             # Missing, empty (released), or partial – treat as absent.
             return None
 

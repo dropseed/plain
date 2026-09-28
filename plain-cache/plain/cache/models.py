@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import ClassVar, Self
 
 from plain.postgres import Field, types
 from plain.runtime import settings
@@ -20,25 +18,30 @@ class CachedItemQuerySet(postgres.QuerySet["CachedItem"]):
         reads as absent. (Contrast `unexpired()`, which matches only rows with a
         *future* expiry.)
         """
-        return self.filter(
-            postgres.Q(expires_at__isnull=True)
-            | postgres.Q(expires_at__gte=timezone.now())
+        return self.where(
+            CachedItem.expires_at.is_null() | CachedItem.expires_at.gte(timezone.now())
         )
 
     def expired(self) -> Self:
-        return self.filter(expires_at__lt=timezone.now())
+        return self.where(CachedItem.expires_at.lt(timezone.now()))
 
     def unexpired(self) -> Self:
-        return self.filter(expires_at__gte=timezone.now())
+        return self.where(CachedItem.expires_at.gte(timezone.now()))
 
     def forever(self) -> Self:
-        return self.filter(expires_at=None)
+        return self.where(CachedItem.expires_at.is_null())
 
 
 @postgres.register_model
 class CachedItem(postgres.Model):
     key: Field[str] = types.TextField(max_length=255)
-    value: Field[Any] = types.JSONField(required=False, allow_null=True, default=None)
+    # `object`, not `Any`: the cache stores any JSON-serializable value, and
+    # `Field[Any]` would make `Any` satisfy the model-valued `__get__` overload,
+    # so `CachedItem.value` would type as `type[Any]` and lose the field surface
+    # entirely.
+    value: Field[object] = types.JSONField(
+        required=False, allow_null=True, default=None
+    )
     expires_at: Field[datetime | None] = types.DateTimeField(
         required=False, allow_null=True, default=None
     )

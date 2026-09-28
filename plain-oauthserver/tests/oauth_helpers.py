@@ -4,8 +4,6 @@ A uniquely-named module (rather than `conftest`) so type-checking resolves it
 unambiguously across the workspace's shared test path.
 """
 
-from __future__ import annotations
-
 import base64
 import hashlib
 import secrets

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 import warnings
 from collections.abc import Collection, Iterable, Iterator, Sequence
@@ -177,6 +175,11 @@ class ModelState:
     # message, and related-manager unsaved checks.
     adding = True
 
+    # True on the instances QuerySet.returning().delete() hands back. They are
+    # snapshots of rows that are gone: every value is there to read, but the
+    # write methods would target a row that no longer exists, so they refuse.
+    deleted = False
+
     def __init__(self) -> None:
         self.fields_cache: dict[str, Any] = {}
 
@@ -223,8 +226,6 @@ class Model(metaclass=ModelBase):
 
         # Process all fields from kwargs or use defaults
         for field in meta.fields:
-            from plain.postgres.fields.related import RelatedField
-
             is_related_object = False
             if isinstance(field, RelatedField) and isinstance(
                 field.remote_field, ForeignObjectRel
@@ -455,6 +456,12 @@ class Model(metaclass=ModelBase):
         the ValidationError a pre-check would raise. A hand-set id is inserted
         as given -- a collision raises IntegrityError.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot create() this {self.__class__.__name__}: it is a "
+                "snapshot of a row that returning().delete() removed, not a "
+                "live instance."
+            )
         if not self._state.adding:
             raise ValueError(
                 f"Cannot create() a {self.__class__.__name__} that is already "
@@ -481,6 +488,12 @@ class Model(metaclass=ModelBase):
         loaded field is written (deferred fields are skipped). Raises if no row
         matched -- the row was deleted out from under us.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot update() this {self.__class__.__name__}: it is a "
+                "snapshot of a row that returning().delete() removed, not a "
+                "live instance."
+            )
         if self._state.adding:
             raise ValueError(
                 f"Cannot update() a {self.__class__.__name__} that hasn't been "
@@ -571,10 +584,7 @@ class Model(metaclass=ModelBase):
         fields from RETURNING. Omits id from the INSERT when unset so Postgres
         generates the identity value."""
         meta = self._model_meta
-        fields = list(meta.fields)
-        if self.id is None:
-            id_field = meta.get_forward_field("id")
-            fields = [f for f in fields if f is not id_field]
+        fields = list(meta.fields) if self.id is not None else meta.non_pk_fields
         returning_fields = list(meta.db_returning_fields)
         results = meta.base_queryset._insert(
             [self], fields=fields, returning_fields=returning_fields or None
@@ -648,6 +658,12 @@ class Model(metaclass=ModelBase):
         Cascades are handled entirely by Postgres via the `on_delete`
         clauses declared on related foreign keys.
         """
+        if self._state.deleted:
+            raise ValueError(
+                f"Cannot delete() this {self.model_options.object_name}: it is "
+                "a snapshot of a row that returning().delete() already "
+                "removed, not a live instance."
+            )
         if self.id is None:
             raise ValueError(
                 f"{self.model_options.object_name} object can't be deleted because its id attribute is set "
@@ -1145,7 +1161,7 @@ class Model(metaclass=ModelBase):
                         _cls = fld.path_infos[-1].to_meta.model
                     else:
                         _cls = None
-                except (FieldDoesNotExist, AttributeError):
+                except FieldDoesNotExist, AttributeError:
                     if fld is None or (
                         not isinstance(fld, Field)
                         or (

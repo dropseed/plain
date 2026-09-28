@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import annotationlib
 import functools
 import inspect
 from collections.abc import Callable
@@ -10,7 +9,11 @@ from typing import Any
 def _get_func_parameters(
     func: Callable[..., Any], remove_first: bool
 ) -> tuple[inspect.Parameter, ...]:
-    parameters = tuple(inspect.signature(func).parameters.values())
+    parameters = tuple(
+        inspect.signature(
+            func, annotation_format=annotationlib.Format.FORWARDREF
+        ).parameters.values()
+    )
     if remove_first:
         parameters = parameters[1:]
     return parameters

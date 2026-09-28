@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from app.users.models import User
@@ -25,7 +23,7 @@ class LoginLinkForm(forms.Form):
         expires_in = self.link_expires_in
         email = self.cleaned_data["email"]
         try:
-            user = User.query.get(email__iexact=email)
+            user = User.query.get(User.email.iequals(email))
         except User.DoesNotExist:
             user = None
 

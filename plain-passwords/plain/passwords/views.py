@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hmac
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -76,8 +74,8 @@ class PasswordResetView(AuthView, FormView[PasswordSetForm]):
             return None
 
         try:
-            user = User.query.get(id=data["id"])
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = User.query.get(data["id"])
+        except TypeError, ValueError, OverflowError, User.DoesNotExist:
             return None
 
         # If the password has changed since the token was generated, the token is invalid.

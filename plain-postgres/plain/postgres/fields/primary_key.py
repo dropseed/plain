@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, cast
 
 from plain.preflight import PreflightResult
@@ -58,7 +56,7 @@ class PrimaryKeyField(ColumnField[int]):
             return value
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise exceptions.ValidationError(
                 '"%(value)s" value must be an integer.',
                 code="invalid",

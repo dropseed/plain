@@ -51,10 +51,12 @@ def schema_from_type(
     components: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Translate a Python type to an OpenAPI schema. With `components`, register TypedDicts there and return `$ref`s; without, inline them."""
-    if get_origin(t) in (NotRequired, Required):
+    origin = get_origin(t)
+
+    if origin in (NotRequired, Required):
         return schema_from_type(get_args(t)[0], components=components)
 
-    if get_origin(t) is Literal:
+    if origin is Literal:
         values = list(get_args(t))
         value_types = {type(v) for v in values}
         if value_types == {str}:
@@ -76,32 +78,63 @@ def schema_from_type(
             return {"$ref": f"#/components/schemas/{name}"}
         return _typed_dict_body(t, components=None)
 
-    if hasattr(t, "__origin__"):
-        if t.__origin__ is list:
-            return {
-                "type": "array",
-                "items": schema_from_type(t.__args__[0], components=components),
-            }
-        elif t.__origin__ is dict:
-            return {
-                "type": "object",
-                "additionalProperties": schema_from_type(
-                    t.__args__[1], components=components
-                ),
-            }
-        else:
-            raise ValueError(f"Unknown type: {t}")
+    # Unions are matched before the subscripted-generic branches below. Python
+    # 3.14 unified `types.UnionType` with `typing.Union`, so `str | None` now
+    # reports an origin (`typing.Union`) just like `list[str]` reports `list`.
+    # An origin check that ran first and rejected what it didn't recognize
+    # would turn every optional field into "Unknown type".
+    if origin in (Union, UnionType):
+        return _union_schema(t, components=components)
 
-    if hasattr(t, "__args__") and len(t.__args__) == 2 and type(None) in t.__args__:
+    if origin is list:
         return {
-            **schema_from_type(t.__args__[0], components=components),
-            "nullable": True,
+            "type": "array",
+            "items": schema_from_type(get_args(t)[0], components=components),
         }
+
+    if origin is dict:
+        return {
+            "type": "object",
+            "additionalProperties": schema_from_type(
+                get_args(t)[1], components=components
+            ),
+        }
+
+    if origin is not None:
+        raise ValueError(f"Unknown type: {t}")
 
     schema = _PRIMITIVE_SCHEMAS.get(t) or _PRIMITIVE_SCHEMAS.get(t.__class__)
     if schema is None:
         raise ValueError(f"Unknown type: {t}")
     return dict(schema)
+
+
+def _union_schema(
+    t: Any,
+    *,
+    components: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Translate a union — `X | None`, `Optional[X]`, `Union[X, Y]` — to an OpenAPI 3.0 schema.
+
+    One named member (the `X | None` case) keeps that member's schema and adds
+    `"nullable": True`. Several named members become an `anyOf`, since OpenAPI
+    3.0 has no sum type of its own. `None` is always carried by `nullable`,
+    which is what 3.0 has in place of a `null` type.
+    """
+    args = get_args(t)
+    named = [arg for arg in args if arg is not NoneType]
+
+    if len(named) == 1:
+        schema = schema_from_type(named[0], components=components)
+    else:
+        schema = {
+            "anyOf": [schema_from_type(arg, components=components) for arg in named]
+        }
+
+    if len(named) < len(args):
+        schema["nullable"] = True
+
+    return schema
 
 
 def _typed_dict_body(

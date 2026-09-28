@@ -2,8 +2,6 @@
 Email message and email sending related helper functions.
 """
 
-from __future__ import annotations
-
 import socket
 
 from plain.utils.encoding import punycode

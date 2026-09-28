@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 SECRET_KEY = "conformance"
 URLS_ROUTER = "app.urls.AppRouter"
 INSTALLED_PACKAGES: list[str] = [

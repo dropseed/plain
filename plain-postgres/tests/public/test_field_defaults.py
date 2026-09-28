@@ -3,8 +3,6 @@
 Style: system-level — exercise real inserts and introspect the real schema.
 """
 
-from __future__ import annotations
-
 import psycopg
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import get_connection

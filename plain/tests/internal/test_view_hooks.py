@@ -2,8 +2,6 @@
 handle_exception logging semantics.
 """
 
-from __future__ import annotations
-
 import logging
 from contextlib import contextmanager
 

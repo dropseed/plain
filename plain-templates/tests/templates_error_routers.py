@@ -1,7 +1,5 @@
 """Views and routers for test_error_responses.py."""
 
-from __future__ import annotations
-
 from plain.http import ForbiddenError403, HTTPException, NotFoundError404
 from plain.templates.views import NotFoundView, TemplateView
 from plain.urls import Router, path

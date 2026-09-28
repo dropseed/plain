@@ -2,8 +2,6 @@
 Email backend that writes messages to console instead of sending them.
 """
 
-from __future__ import annotations
-
 import sys
 import threading
 from typing import TYPE_CHECKING, Any

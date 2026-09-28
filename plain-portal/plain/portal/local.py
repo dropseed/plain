@@ -5,8 +5,6 @@ tunnel through the relay and listens on a Unix socket. Subsequent
 commands (exec, pull, push) talk to the connect process over the socket.
 """
 
-from __future__ import annotations
-
 import asyncio
 import fcntl
 import functools
@@ -288,7 +286,7 @@ async def send_command(request: dict) -> dict:
     """
     try:
         reader, writer = await asyncio.open_unix_connection(_socket_path())
-    except (FileNotFoundError, ConnectionRefusedError):
+    except FileNotFoundError, ConnectionRefusedError:
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
             file=sys.stderr,
@@ -315,7 +313,7 @@ async def send_exec_streaming(
     """
     try:
         reader, writer = await asyncio.open_unix_connection(_socket_path())
-    except (FileNotFoundError, ConnectionRefusedError):
+    except FileNotFoundError, ConnectionRefusedError:
         print(
             "No active portal session. Run 'plain portal connect <code>' first.",
             file=sys.stderr,

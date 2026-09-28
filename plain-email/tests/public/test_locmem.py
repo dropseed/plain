@@ -1,7 +1,5 @@
 """Tests for the in-memory email backend and the ``outbox`` list."""
 
-from __future__ import annotations
-
 from plain.email import send_mail
 from plain.email.test import outbox
 

@@ -18,8 +18,6 @@ re-rendering the matched route — so that opaque captured values (e.g.
 `<int:id>` matching `001`) round-trip unchanged.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 

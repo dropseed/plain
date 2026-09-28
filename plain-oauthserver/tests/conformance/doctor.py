@@ -9,8 +9,6 @@ resource metadata → authorization server metadata → dynamic registration —
 prints which step breaks. Standard library only, so it runs anywhere.
 """
 
-from __future__ import annotations
-
 import json
 import re
 import sys

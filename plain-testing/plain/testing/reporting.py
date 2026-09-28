@@ -4,8 +4,6 @@ Test output: answers "what do I do next", not just "what happened".
 Every failure block ends with the exact re-run command for that test.
 """
 
-from __future__ import annotations
-
 import textwrap
 
 import click

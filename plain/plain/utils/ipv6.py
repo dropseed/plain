@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import ipaddress
 
 from plain.exceptions import ValidationError

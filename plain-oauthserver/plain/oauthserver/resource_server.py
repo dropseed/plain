@@ -4,8 +4,6 @@ Kept separate from the authorization-server views so a resource server (e.g. a
 `plain.mcp` endpoint) can validate tokens without importing the view layer.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,9 +24,7 @@ def validate_access_token(
     from .models import AccessToken, _hash_token
 
     try:
-        access_token = AccessToken.query.select_related("user").get(
-            token_hash=_hash_token(token)
-        )
+        access_token = AccessToken.query.join("user").get(token_hash=_hash_token(token))
     except AccessToken.DoesNotExist:
         return None
 

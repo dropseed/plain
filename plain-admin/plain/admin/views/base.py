@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from plain.auth.views import AuthView
@@ -68,6 +66,23 @@ class AdminView(AuthView, TemplateView):
     # Set dynamically by AdminViewset.get_views()
     viewset: type[AdminViewset] | None = None
 
+    # Set dynamically by AdminViewset.get_views() to the sibling view's
+    # get_view_url, when that sibling view exists on the viewset.
+    def get_list_url(self) -> str:
+        return ""
+
+    def get_create_url(self) -> str:
+        return ""
+
+    def get_detail_url(self, obj: Any) -> str:
+        return ""
+
+    def get_update_url(self, obj: Any) -> str:
+        return ""
+
+    def get_delete_url(self, obj: Any) -> str:
+        return ""
+
     template_name = "admin/page.html"
     cards: tuple[Card, ...] = ()
 
@@ -113,9 +128,9 @@ class AdminView(AuthView, TemplateView):
 
         context["nav_tabs"] = registry.get_nav_tabs(self.request)
         context["pinned_slugs"] = set(
-            PinnedNavItem.query.filter(user=self.user).values_list(
-                "view_slug", flat=True
-            )
+            PinnedNavItem.query.where(
+                PinnedNavItem.user.id.equals(self.user.id)
+            ).select(PinnedNavItem.view_slug, flat=True)
         )
         context["preflight_counts"] = get_check_counts()
         context["admin_url"] = registry.get_url
@@ -225,7 +240,7 @@ class AdminView(AuthView, TemplateView):
             field_obj = obj._model_meta.get_field(field)
             field_type = type(field_obj).__name__
             templates.append(f"admin/values/{field_type}.html")
-        except (AttributeError, FieldDoesNotExist):
+        except AttributeError, FieldDoesNotExist:
             # Not a model instance, or not a database field on it.
             pass
 

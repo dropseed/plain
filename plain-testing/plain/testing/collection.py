@@ -7,8 +7,6 @@ methods (a fresh instance per test). Test modules get assertion rewriting
 when imported; helper modules do not.
 """
 
-from __future__ import annotations
-
 import ast
 import functools
 import inspect
@@ -138,7 +136,12 @@ def _collect_file(path: Path, *, root: Path) -> list[CollectedTest]:
 
     tests: list[CollectedTest] = []
     for name, obj in vars(module).items():
-        if getattr(obj, "__module__", None) != module.__name__:
+        # Only functions and classes are ever tests. Anything else in the
+        # module's namespace is left alone entirely — a test module can hold
+        # objects that object to being probed for attributes.
+        if not (inspect.isfunction(obj) or inspect.isclass(obj)):
+            continue
+        if obj.__module__ != module.__name__:
             continue  # imported, not defined here
 
         if inspect.isfunction(obj) and name.startswith("test_"):
@@ -235,10 +238,10 @@ def _import_test_module(path: Path, *, root: Path) -> types.ModuleType:
         source = path.read_text()
         tree = ast.parse(source, filename=str(path))
         tree = rewrite_asserts(tree)
-        # dont_inherit: the test module must NOT inherit this file's own
-        # __future__ flags (inheriting `annotations` would silently turn the
-        # test module's annotations into strings). Its own __future__
-        # statements in the tree still apply.
+        # dont_inherit: a test module is compiled with its own __future__
+        # statements and nothing else. Without it, compile() would also apply
+        # whatever compiler flags are in effect in this file — none today,
+        # but a test module's semantics shouldn't depend on that staying true.
         code = compile(tree, str(path), "exec", dont_inherit=True)
 
         module = types.ModuleType(module_name)

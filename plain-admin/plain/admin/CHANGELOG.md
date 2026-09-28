@@ -1,5 +1,42 @@
 # plain-admin changelog
 
+## [0.87.0](https://github.com/dropseed/plain/releases/plain-admin@0.87.0) (2026-09-21)
+
+### What's changed
+
+- `search_fields`, `queryset_order`, and a `TrendCard`'s `datetime_field` and `group_field` take field references — `User.email`, the traversed `FlagResult.flag.name` — as well as the lookup path as a string. Both spellings normalize to the same path, so the query the admin runs is unchanged; what changes is that a reference to a field of the wrong model is a `TypeError` at class definition, with the traceback on the declaration, instead of a silently wrong column at render. A string stays the spelling for a path traversal can't reach (a reverse or many-to-many hop, `"memberships__team__name"`) and for a descending order term (`"-created_at"`). Declarations set on an instance or through a `property` are respected; the normalized values are read through `get_search_fields()`, `get_queryset_order()`, `get_datetime_field()` and `get_group_field()`. `filters` is filter _names_, not fields, and its comment now says so ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Impersonation start takes `start/<int:id>` and parses the session's impersonated user id at the boundary; a session holding something that isn't an integer id simply ends the impersonation instead of raising ([62d753bbaf](https://github.com/dropseed/plain/commit/62d753bbaf))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- No changes required — string declarations keep working. Prefer the field reference where the path starts at the view's model or a forward foreign key.
+- A hand-built impersonation URL must carry an integer id; `reverse("admin:impersonate:start", id=user.id)` is unchanged.
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.86.4](https://github.com/dropseed/plain/releases/plain-admin@0.86.4) (2026-09-21)
+
+### What's changed
+
+- The model views' `id` lookups, the bulk-action `id__in` filter and the pinned-nav reads use typed `where()`/`select()`; SQL is unchanged. The bulk-action filter takes its primary key from the queryset's model, so a subclass returning another model's queryset from `get_initial_queryset()` keeps working ([c7d83a8d3d](https://github.com/dropseed/plain/commit/c7d83a8d3d))
+- `PinnedNavItem.user` is annotated `Field[User]` and its seven `filter(user=...)` sites are typed conditions, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
+## [0.86.3](https://github.com/dropseed/plain/releases/plain-admin@0.86.3) (2026-09-20)
+
+### What's changed
+
+- The `get_list_url`/`get_create_url`/`get_detail_url`/`get_update_url`/`get_delete_url` methods that a viewset stamps onto its views are declared once on `AdminView` instead of repeated on every view class, and `AdminViewset.get_views()` returns `list[type[AdminView]]` ([d25edd6992](https://github.com/dropseed/plain/commit/d25edd6992))
+- `PinnedNavItem` uses the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.86.2](https://github.com/dropseed/plain/releases/plain-admin@0.86.2) (2026-09-04)
 
 ### What's changed

@@ -1,5 +1,39 @@
 # plain-oauthserver changelog
 
+## [0.2.0](https://github.com/dropseed/plain/releases/plain-oauthserver@0.2.0) (2026-09-21)
+
+### What's changed
+
+- Uses `join()`, the renamed `select_related()`, and `select(RefreshToken.access_token.id, flat=True)` for the live access-token subquery in the cleanup chore (same query as the `values_list` it replaces), so it needs `plain.postgres` 0.121.0 ([7c69a908c3](https://github.com/dropseed/plain/commit/7c69a908c3)) ([2101653583](https://github.com/dropseed/plain/commit/2101653583))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.1.6](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.6) (2026-09-21)
+
+### What's changed
+
+- The token endpoint's code, refresh-token and application lookups, the revocation updates and the cleanup chores use typed `where()` conditions; SQL is unchanged ([8f4a537f1f](https://github.com/dropseed/plain/commit/8f4a537f1f))
+- The `user` foreign keys on `AuthorizationCode`, `AccessToken` and `RefreshToken` are annotated `Field[User]`, following plain-postgres 0.120's rule for string-referenced foreign keys ([b072153088](https://github.com/dropseed/plain/commit/b072153088))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
+## [0.1.5](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.5) (2026-09-20)
+
+### What's changed
+
+- The token endpoint locks authorization codes and refresh tokens with `for_update()`, the new name for `select_for_update()` ([97f18f0699](https://github.com/dropseed/plain/commit/97f18f0699))
+- The application, authorization code, access token and refresh token models use the typed `Field[T]` annotations from plain-postgres 0.119 ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.1.4](https://github.com/dropseed/plain/releases/plain-oauthserver@0.1.4) (2026-08-12)
 
 ### What's changed

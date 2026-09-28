@@ -5,16 +5,14 @@ result is persisted, and later lookups return that stored value. Unkeyed
 flags recompute every time. Disabled flags short-circuit.
 """
 
-from __future__ import annotations
-
+import pytest
 from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled
 from plain.flags.models import Flag as FlagModel
 from plain.flags.models import FlagResult
-from plain.test import override_settings, raises
 
 
-def test_keyed_flag_computes_once_then_caches():
+def test_keyed_flag_computes_once_then_caches(db):
     class CountingFlag(Flag):
         calls = 0
 
@@ -36,7 +34,7 @@ def test_keyed_flag_computes_once_then_caches():
     assert FlagResult.query.filter(key="user-1").count() == 1
 
 
-def test_distinct_keys_cache_independently():
+def test_distinct_keys_cache_independently(db):
     class PerKeyFlag(Flag):
         def __init__(self, key, value):
             self._key = key
@@ -56,7 +54,7 @@ def test_distinct_keys_cache_independently():
     assert PerKeyFlag("a", "DIFFERENT").value == "AAA"
 
 
-def test_unkeyed_flag_recomputes_every_time():
+def test_unkeyed_flag_recomputes_every_time(db):
     class UnkeyedFlag(Flag):
         calls = 0
 
@@ -75,43 +73,43 @@ def test_unkeyed_flag_recomputes_every_time():
     assert FlagResult.query.count() == 0
 
 
-def test_disabled_flag_returns_none_when_not_debug():
-    with override_settings(DEBUG=False):
+def test_disabled_flag_returns_none_when_not_debug(db, settings):
+    settings.DEBUG = False
 
-        class MaybeFlag(Flag):
-            def get_key(self):
-                return "k"
+    class MaybeFlag(Flag):
+        def get_key(self):
+            return "k"
 
-            def get_value(self):
-                return "on"
+        def get_value(self):
+            return "on"
 
-        # First evaluation creates the backing Flag row (enabled by default).
-        assert MaybeFlag().value == "on"
+    # First evaluation creates the backing Flag row (enabled by default).
+    assert MaybeFlag().value == "on"
 
-        FlagModel.query.filter(name="MaybeFlag").update(enabled=False)
+    FlagModel.query.filter(name="MaybeFlag").update(enabled=False)
 
-        # Disabled + not DEBUG: degrade gracefully to None rather than crash.
-        assert MaybeFlag().value is None
-
-
-def test_disabled_flag_raises_when_debug():
-    with override_settings(DEBUG=True):
-
-        class StrictFlag(Flag):
-            def get_key(self):
-                return "k"
-
-            def get_value(self):
-                return "on"
-
-        assert StrictFlag().value == "on"
-        FlagModel.query.filter(name="StrictFlag").update(enabled=False)
-
-        with raises(FlagDisabled):
-            StrictFlag().value  # noqa: B018 — the property access is the assertion
+    # Disabled + not DEBUG: degrade gracefully to None rather than crash.
+    assert MaybeFlag().value is None
 
 
-def test_flag_is_truthy_and_supports_membership():
+def test_disabled_flag_raises_when_debug(db, settings):
+    settings.DEBUG = True
+
+    class StrictFlag(Flag):
+        def get_key(self):
+            return "k"
+
+        def get_value(self):
+            return "on"
+
+    assert StrictFlag().value == "on"
+    FlagModel.query.filter(name="StrictFlag").update(enabled=False)
+
+    with pytest.raises(FlagDisabled):
+        StrictFlag().value  # noqa: B018 — the property access is the assertion
+
+
+def test_flag_is_truthy_and_supports_membership(db):
     class ListFlag(Flag):
         def get_key(self):
             return None
@@ -132,3 +130,32 @@ def test_flag_is_truthy_and_supports_membership():
             return False
 
     assert bool(OffFlag()) is False
+
+
+def test_reused_flag_refreshes_its_timestamps(db):
+    """Evaluating a flag again refreshes the row rather than duplicating it.
+
+    ``used_at`` is written explicitly; ``updated_at`` is an
+    ``update_now=True`` column the upsert refreshes on its own.
+    """
+
+    class TimestampFlag(Flag):
+        def get_key(self):
+            return None
+
+        def get_value(self):
+            return True
+
+    assert TimestampFlag().value is True
+    row = FlagModel.query.get(name="TimestampFlag")
+    first_used_at, first_updated_at = row.used_at, row.updated_at
+    assert first_used_at is not None
+
+    assert TimestampFlag().value is True
+
+    assert FlagModel.query.filter(name="TimestampFlag").count() == 1
+    row = FlagModel.query.get(name="TimestampFlag")
+    assert row.used_at is not None
+    assert row.used_at > first_used_at
+    assert row.updated_at > first_updated_at
+    assert row.enabled is True

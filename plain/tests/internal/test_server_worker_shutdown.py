@@ -14,8 +14,6 @@ anything at ERROR. The socket-level contract (drain, exit code, log
 output) is covered by tools/shutdown-test.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import signal

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import copy
 import inspect
 from collections import defaultdict
@@ -492,6 +490,14 @@ class Meta:
             if not field.primary_key:
                 names.append(field.name)
         return frozenset(names)
+
+    @cached_property
+    def non_pk_fields(self) -> list[Field]:
+        """
+        The model's concrete fields minus the primary key -- the INSERT column
+        list when Postgres is generating the identity value.
+        """
+        return [field for field in self.fields if not field.primary_key]
 
     @cached_property
     def db_returning_fields(self) -> list[Field]:

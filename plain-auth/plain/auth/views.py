@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse

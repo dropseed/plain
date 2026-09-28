@@ -3,8 +3,6 @@ A class for storing a tree graph. Primarily used for filter constructs in the
 ORM.
 """
 
-from __future__ import annotations
-
 import copy
 from typing import TYPE_CHECKING, Any
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import click
 from click.testing import CliRunner
 from plain.cli.options import SettingOption

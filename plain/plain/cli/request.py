@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import sys
@@ -377,13 +375,15 @@ def request(
 
             user = None
             try:
-                user = User.query.get(id=user_id)
-            except (User.DoesNotExist, ValueError):
+                # int() up front: get() takes the key's own type, and a
+                # non-numeric --user still raises ValueError, same as before.
+                user = User.query.get(int(user_id))
+            except User.DoesNotExist, ValueError:
                 pass
 
             if user is None:
                 try:
-                    user = User.query.get(email=user_id)
+                    user = User.query.get(User.email.equals(user_id))
                 except User.DoesNotExist:
                     pass
 
@@ -459,24 +459,23 @@ def request(
         elif response.status_code >= 500:
             failed.append(f"Server error: {response.status_code}")
 
-        # Streaming/file responses (e.g. assets) have no readable `.content` —
-        # the underlying file is already closed by the time we get here, so only
-        # metadata is available. Skip body assertions, but flag them so a
-        # `--contains` isn't silently treated as passing.
-        if response.streaming:
-            body_text = None
-            if assert_contains or assert_not_contains:
-                failed.append("Cannot check body assertions on a streaming response")
+        # The test client reads a streaming body the way a server sends it,
+        # so a streamed body (e.g. an asset or export) is here to check too.
+        body_bytes = response.content
+        # A streamed body is only summarized below, so it's decoded just
+        # for assertions — a large binary download never is.
+        if response.streaming and not (assert_contains or assert_not_contains):
+            body_text = ""
         else:
-            body_text = response.content.decode("utf-8", errors="replace")
+            body_text = body_bytes.decode("utf-8", errors="replace")
 
-            for text in assert_contains:
-                if text not in body_text:
-                    failed.append(f"Response body does not contain: {text}")
+        for text in assert_contains:
+            if text not in body_text:
+                failed.append(f"Response body does not contain: {text}")
 
-            for text in assert_not_contains:
-                if text in body_text:
-                    failed.append(f"Response body contains: {text}")
+        for text in assert_not_contains:
+            if text in body_text:
+                failed.append(f"Response body contains: {text}")
 
         if output_json:
             response_data: dict[str, Any] = {
@@ -565,12 +564,17 @@ def request(
         if no_body:
             pass
         elif response.streaming:
-            # Streaming/file responses (e.g. assets): the body isn't readable
-            # here, so summarize from headers instead of dumping it.
+            # Streaming/file responses (e.g. assets, exports): summarize
+            # instead of dumping what may be a large or binary body.
             click.secho("Response Body:", fg="yellow", bold=True)
             content_type = response.headers.get("Content-Type", "") or "unknown"
-            length = response.headers.get("Content-Length")
-            size = f"{length} bytes" if length else "unknown size"
+            if body_bytes:
+                size = f"{len(body_bytes)} bytes"
+            elif length := response.headers.get("Content-Length"):
+                # A HEAD request: nothing was read, but the header says.
+                size = f"{length} bytes"
+            else:
+                size = "no body"
             click.echo(f"  (streaming response: {content_type}, {size})")
         elif body_text:
             content_type = response.headers.get("Content-Type", "").lower()

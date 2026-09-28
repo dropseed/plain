@@ -1,5 +1,15 @@
 # plain-tunnel changelog
 
+## [0.13.0](https://github.com/dropseed/plain/releases/plain-tunnel@0.13.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.12.9](https://github.com/dropseed/plain/releases/plain-tunnel@0.12.9) (2026-08-12)
 
 ### What's changed

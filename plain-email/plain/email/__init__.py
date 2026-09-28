@@ -2,8 +2,6 @@
 Tools for sending email.
 """
 
-from __future__ import annotations
-
 from importlib.metadata import version
 from typing import TYPE_CHECKING, Any
 

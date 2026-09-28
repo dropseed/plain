@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import builtins
 import copy
 from collections.abc import Callable, Iterable, Iterator, Mapping

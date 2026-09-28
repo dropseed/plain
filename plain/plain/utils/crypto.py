@@ -2,8 +2,6 @@
 Plain's standard crypto functions and utilities.
 """
 
-from __future__ import annotations
-
 import hashlib
 import hmac
 import secrets

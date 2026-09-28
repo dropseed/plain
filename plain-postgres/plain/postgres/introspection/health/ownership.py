@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .types import Source, TableOwner
 
 
@@ -13,7 +11,7 @@ def build_table_owners() -> dict[str, TableOwner]:
     def _source_file(cls: type) -> str:
         try:
             path = inspect.getsourcefile(cls)
-        except (TypeError, OSError):
+        except TypeError, OSError:
             return ""
         return path or ""
 

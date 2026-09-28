@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime
 from itertools import islice
 from typing import Any
@@ -30,7 +28,7 @@ def pluralize_filter(value: Any, singular: str = "", plural: str = "s") -> str:
     """
     try:
         count = int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return singular
 
     if count == 1:

@@ -19,7 +19,7 @@ class UserAdmin(AdminViewset):
         nav_icon = "person"
         title = "Users"
         fields = ("id", "email", "is_admin", "created_at")
-        search_fields = ("email",)
+        search_fields = (User.email,)
         actions = ("Make admin", "Remove admin", "Export emails")
         allow_global_search = True
         queryset_order = ("-created_at",)

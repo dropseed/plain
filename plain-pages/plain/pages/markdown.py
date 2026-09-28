@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any, cast

@@ -11,15 +11,14 @@ with a real client-side h2 state machine — no TLS, no worker process.
 The TLS/ALPN socket-level contract is covered by tools/h2-shutdown-test.
 """
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any
 
 import h2.errors
 import h2.events
 from plain.http import Response
-from server_stubs import h2_connect
+from plain.internal.handlers.response_lifecycle import ResponseLifecycle
+from server_stubs import h2_connect, stub_lifecycle
 
 
 class _Handler:
@@ -29,9 +28,11 @@ class _Handler:
         self.release = asyncio.Event()
         self.release.set()
 
-    async def handle(self, request: Any, executor: Any) -> Response:
+    async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         await self.release.wait()
-        return Response(b"ok", content_type="text/plain")
+        return stub_lifecycle(
+            request, Response(b"ok", content_type="text/plain"), executor
+        )
 
 
 # The h2 socketpair harness (H2Client / h2_connect) lives in server_stubs

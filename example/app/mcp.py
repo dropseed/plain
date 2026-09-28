@@ -8,8 +8,6 @@ beyond localhost.
 Auto-discovered by `plain.mcp` on startup. Mounted in `app/urls.py`.
 """
 
-from __future__ import annotations
-
 import datetime
 import hmac
 from functools import cached_property

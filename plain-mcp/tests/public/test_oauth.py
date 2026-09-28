@@ -5,8 +5,6 @@ Requests go through the shared `mcp_post` builder (tests/helpers.py), which
 builds the `_meta` envelope and mirrored headers every request must carry.
 """
 
-from __future__ import annotations
-
 import json
 
 from mcp_test_helpers import mcp_post

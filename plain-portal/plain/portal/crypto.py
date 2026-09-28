@@ -12,8 +12,6 @@ of the code is used as the channel ID for pairing. The raw code is
 only used locally for the SPAKE2 exchange.
 """
 
-from __future__ import annotations
-
 import base64
 import hashlib
 import json

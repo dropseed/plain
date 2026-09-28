@@ -6,8 +6,6 @@ as `loader.baseline_status`; the planner, preflight, and plain-dev all read
 that. Nothing here writes.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 

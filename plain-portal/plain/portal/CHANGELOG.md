@@ -1,5 +1,15 @@
 # plain-portal changelog
 
+## [0.4.0](https://github.com/dropseed/plain/releases/plain-portal@0.4.0) (2026-09-21)
+
+### What's changed
+
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
 ## [0.3.0](https://github.com/dropseed/plain/releases/plain-portal@0.3.0) (2026-09-02)
 
 ### What's changed

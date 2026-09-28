@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 #
 #
 # This file is part of gunicorn released under the MIT license.
@@ -188,7 +186,7 @@ class Arbiter:
             try:
                 if now - info.heartbeat.last_update() <= self.timeout:
                     continue
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 continue
 
             if not info.aborted:
@@ -343,7 +341,7 @@ class Arbiter:
                     info = self._workers.pop(pid)
                     info.heartbeat.close()
                     info.process.close()
-                except (KeyError, OSError):
+                except KeyError, OSError:
                     pass
                 return
             raise

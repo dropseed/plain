@@ -9,8 +9,6 @@ Two directions, and they mean very different things:
   migration on one branch, switched away, and the table is still there.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -13,7 +13,7 @@ from .constraints import CheckConstraint, UniqueConstraint
 from .db import get_connection, use_management_connection
 from .middleware import DatabaseConnectionMiddleware
 from .deletion import CASCADE, RESTRICT, SET_NULL
-from .expressions import F
+from .expressions import Excluded, F
 from .enums import TextChoices
 from .fields import (
     BigIntegerField,
@@ -36,6 +36,7 @@ from .fields import (
     URLField,
     UUIDField,
 )
+from .fields.encrypted import EncryptedField
 from .fields.json import JSONField
 from .fields.timezones import TimeZoneField
 from .fields.related import (
@@ -48,8 +49,9 @@ from .fields.reverse_descriptors import (
 )
 from .indexes import Index
 from .options import Options
-from .query import QuerySet
+from .query import QuerySet, RowQuerySet
 from .query_utils import Q
+from .written import Written
 from . import types
 
 # This module exports the user-facing API for defining model classes,
@@ -70,6 +72,11 @@ __all__ = [
     "DecimalField",
     "DurationField",
     "EmailField",
+    # The typed descriptor base for encrypted fields, for annotating them:
+    #   api_key: EncryptedField[str] = types.EncryptedTextField()
+    # It blocks the value-comparison conditions a plain Field[T] would allow.
+    "EncryptedField",
+    "Excluded",
     "F",
     # The typed descriptor base, for annotating model fields:
     #   name: Field[str] = types.TextField()
@@ -92,6 +99,7 @@ __all__ = [
     "RandomStringField",
     "ReverseForeignKey",
     "ReverseManyToMany",
+    "RowQuerySet",
     "SmallIntegerField",
     "TextChoices",
     "TextField",
@@ -100,6 +108,7 @@ __all__ = [
     "URLField",
     "UUIDField",
     "UniqueConstraint",
+    "Written",
     "get_connection",
     "models_registry",
     "register_model",

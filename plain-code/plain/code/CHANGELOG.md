@@ -1,5 +1,39 @@
 # plain-code changelog
 
+## [0.27.0](https://github.com/dropseed/plain/releases/plain-code@0.27.0) (2026-09-21)
+
+### What's changed
+
+- Requires ty 0.0.82. plain-code pinned ruff to a floor but ty only to `<1.0.0`, so an app's `uv lock` never moved the type checker when Plain was upgraded — four apps were found sitting on ty 0.0.11 through 0.0.69, versions that can't check the typed query API (nullable foreign-key traversal, `LiteralString`, t-string templates) and were silently checking almost nothing ([3d44ca7bb1](https://github.com/dropseed/plain/commit/3d44ca7bb1))
+
+### Upgrade instructions
+
+- Run `uv lock` after upgrading; ty moves with it. Expect the newer checker to report real errors an older one missed, particularly in code that traverses nullable foreign keys.
+
+## [0.26.0](https://github.com/dropseed/plain/releases/plain-code@0.26.0) (2026-09-21)
+
+### What's changed
+
+- The bundled ruff defaults target Python 3.14 (`target-version = "py314"`). `plain fix` now writes 3.14 syntax: `except (A, B):` becomes `except A, B:` (PEP 758), and a quoted forward reference that deferred annotations make unnecessary loses its quotes. Expect a one-time mechanical reformat on the first run ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Run `plain fix` once after upgrading and commit the reformat on its own.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.25.0](https://github.com/dropseed/plain/releases/plain-code@0.25.0) (2026-09-20)
+
+### What's changed
+
+- `plain fix --skip-oxc` skips oxlint and oxfmt, for environments that can't reach GitHub to download them ([327bf597bb](https://github.com/dropseed/plain/commit/327bf597bb))
+- A failure to look up or download the oxlint/oxfmt release from github.com is reported as a clear error that names the fix (pin a version under `[tool.plain.code.oxc]` or pass `--skip-oxc`) instead of a raw `httpx` traceback ([327bf597bb](https://github.com/dropseed/plain/commit/327bf597bb))
+- On Windows, installing a downloaded binary into the machine-wide cache tolerates the `PermissionError` raised when another process (another checkout sharing the cache) has that binary open — if the file is already there, the install is done ([8766bb72ce](https://github.com/dropseed/plain/commit/8766bb72ce))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.24.0](https://github.com/dropseed/plain/releases/plain-code@0.24.0) (2026-08-12)
 
 ### What's changed

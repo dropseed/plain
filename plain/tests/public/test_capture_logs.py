@@ -1,7 +1,5 @@
 """`capture_logs` — the contract tests for the log-capture vocabulary."""
 
-from __future__ import annotations
-
 import logging
 
 from opentelemetry import trace

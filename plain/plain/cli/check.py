@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import subprocess
@@ -70,7 +68,7 @@ def check_preflight() -> None:
             for issue in check["issues"]
             if issue["warning"]
         )
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError, KeyError:
         warning_count = 0
 
     if warning_count:

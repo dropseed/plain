@@ -203,6 +203,8 @@ def generate_data():
 return StreamingResponse(generate_data(), content_type="text/plain")
 ```
 
+The generator runs where the view ran — on the thread pool, in the request's context — so it can query the database like the view can, and the request's trace covers it. The server pulls one chunk per trip to the thread pool, so yield chunks of a few KB rather than many tiny ones (a generator yielding 100,000 short lines spends seconds on the trips alone). Consecutive chunks can run on different pool threads, so don't hold a thread-bound resource (a `threading.local`, an sqlite connection) across a `yield`. A file-like object is read as its data arrives. The headers go out with the first chunk, so a body that fails before producing one is answered with a 500 — and a slow export can `yield b""` first to get its headers out before a proxy's first-byte timeout. For output that arrives a piece at a time — progress, events, log tailing — use `AsyncStreamingResponse`.
+
 **Async streaming responses:**
 
 ```python
@@ -220,6 +222,10 @@ return AsyncStreamingResponse(generate_data(), content_type="text/plain")
 `AsyncStreamingResponse` streams data without occupying a thread pool slot. For Server-Sent Events, use [`ServerSentEventsView`](../views/README.md#serversenteventsview) which builds on this. You can also use `AsyncStreamingResponse` directly for other async streaming patterns like chunked JSON or log tailing.
 
 Other response types include [`NotModifiedResponse`](./response.py#NotModifiedResponse) (304) and [`NotAllowedResponse`](./response.py#NotAllowedResponse) (405).
+
+### WebSocket responses
+
+A view with an `async def websocket(self, ws)` handler answers an RFC 6455 upgrade with a [`WebSocketResponse`](./websocket.py#WebSocketResponse), a bodiless 101 the framework constructs; application code never builds one. The view then holds a [`WebSocket`](./websocket.py#WebSocket) for the life of the socket (`async for`, `send`, `close`, `subprotocol`), and `send` on a closed socket raises [`WebSocketClosed`](./websocket.py#WebSocketClosed). See [WebSockets in the views docs](../views/README.md#websockets).
 
 ### Access log control
 

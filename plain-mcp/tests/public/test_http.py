@@ -7,8 +7,6 @@ answer once there's a real request with real headers and a real status code.
 `mcp_post` / `mcp_post_raw` (tests/helpers.py) build the body and headers.
 """
 
-from __future__ import annotations
-
 import base64
 
 from mcp_test_helpers import mcp_post, mcp_post_raw

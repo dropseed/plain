@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import subprocess
 import sys
@@ -282,8 +280,13 @@ def _print_annotations_json(result: AnnotationResult) -> None:
 @click.argument("paths", nargs=-1)
 @click.option("--unsafe-fixes", is_flag=True, help="Apply ruff unsafe fixes")
 @click.option("--add-noqa", is_flag=True, help="Add noqa comments to suppress errors")
+@click.option("--skip-oxc", is_flag=True, help="Skip oxlint and oxfmt")
 def fix(
-    ctx: click.Context, paths: tuple[str, ...], unsafe_fixes: bool, add_noqa: bool
+    ctx: click.Context,
+    paths: tuple[str, ...],
+    unsafe_fixes: bool,
+    add_noqa: bool,
+    skip_oxc: bool,
 ) -> None:
     """Fix formatting and linting issues"""
     if not paths:
@@ -327,7 +330,7 @@ def fix(
         if result.returncode != 0:
             sys.exit(result.returncode)
 
-    if other_paths and config.get("oxc", {}).get("enabled", True):
+    if not skip_oxc and other_paths and config.get("oxc", {}).get("enabled", True):
         oxlint = OxcTool("oxlint")
         oxfmt = OxcTool("oxfmt")
 

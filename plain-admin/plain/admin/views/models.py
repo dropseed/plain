@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any
 
 from plain.exceptions import ValidationError
@@ -9,6 +7,7 @@ from plain.postgres.fields.related_managers import BaseRelatedManager
 
 from plain import postgres
 
+from ..field_refs import FieldRef, converge_declared_tuple, field_lookup_paths
 from ..utils import camelcase_to_title
 from .objects import (
     AdminCreateView,
@@ -48,12 +47,27 @@ class AdminModelListView(AdminListView):
     model: type[postgres.Model]
 
     fields: tuple[str, ...] = ("id",)
-    queryset_order: tuple[str, ...] = ()
-    search_fields: tuple[str, ...] = ("id",)
+    # Field references (`User.email`, `FlagResult.flag.name`) or lookup paths.
+    # A reference has to belong to `model`; a path that traversal can't reach
+    # -- a reverse or many-to-many hop -- is spelled as a string.
+    queryset_order: tuple[FieldRef, ...] = ()
+    search_fields: tuple[FieldRef, ...] = ("id",)
 
-    # Filters can also be a dict mapping a filter name to a Q object,
-    # which filters the queryset automatically.
+    # Filter *names* shown in the UI, not fields. Can also be a dict mapping a
+    # filter name to a Q object, which filters the queryset automatically.
     filters: tuple[str, ...] | dict[str, Q] = ()
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Normalize the declared field references now, so a reference to
+        # another model's field is a TypeError at class definition rather than
+        # when the page is first rendered, and so no `Field` is left sitting
+        # on the class as a live descriptor. An intermediate subclass with no
+        # model yet is still normalized -- only the cross-model check needs
+        # the model.
+        model = getattr(cls, "model", None)
+        converge_declared_tuple(cls, "search_fields", model=model)
+        converge_declared_tuple(cls, "queryset_order", model=model)
 
     def get_title(self) -> str:
         if title := super().get_title():
@@ -92,6 +106,26 @@ class AdminModelListView(AdminListView):
             return tuple(filters.keys())
         return super().get_filter_names()
 
+    def get_search_fields(self) -> tuple[str, ...]:
+        """`search_fields` as lookup paths, checked against the view's model."""
+        return field_lookup_paths(
+            self.search_fields,
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.search_fields",
+        )
+
+    def get_queryset_order(self) -> tuple[str, ...]:
+        """`queryset_order` as lookup paths, checked against the view's model.
+
+        A descending term stays a string -- a field reference has no direction
+        to carry, so `"-created_at"` is the only way to write one.
+        """
+        return field_lookup_paths(
+            self.queryset_order,
+            model=self.model,
+            declared_as=f"{type(self).__qualname__}.queryset_order",
+        )
+
     def filter_objects(
         self, objects: postgres.QuerySet | list[Any]
     ) -> postgres.QuerySet | list[Any]:
@@ -108,6 +142,9 @@ class AdminModelListView(AdminListView):
         if isinstance(self.filters, dict) and self.filter:
             q = self.filters.get(self.filter)
             if q is not None:
+                # filter(), not where(): this Q comes from user configuration,
+                # so it names no model for where()'s check to test, and
+                # `queryset` is untyped here anyway.
                 return queryset.filter(q)
         return queryset
 
@@ -122,7 +159,7 @@ class AdminModelListView(AdminListView):
         """Override this to customize search behavior."""
         if search := self.request.query_params.get("search"):
             filters = Q()
-            for field in self.search_fields:
+            for field in self.get_search_fields():
                 filters |= Q(**{f"{field}__icontains": search})  # ty: ignore[invalid-argument-type]
             return queryset.filter(filters)
         return queryset
@@ -136,14 +173,24 @@ class AdminModelListView(AdminListView):
         # the queryset lazy. Coerce each id through the pk field and drop the
         # ones it rejects, so a stale or malformed id is ignored (per the base
         # contract) rather than raising.
-        pk_field = self.model._model_meta.get_forward_field("id")
-        valid_ids = []
+        #
+        # Everything reads the pk field off `objects.model` rather than
+        # `self.model`: a subclass is free to return another model's queryset
+        # from get_initial_queryset(), and where() rejects a condition built
+        # from a model the queryset isn't querying.
+        pk_field = objects.model.id
+        valid_ids: list[int] = []
         for raw_id in ids:
             try:
-                valid_ids.append(pk_field.to_python(raw_id))
+                coerced = pk_field.to_python(raw_id)
             except ValidationError:
                 continue
-        return objects.filter(id__in=valid_ids)
+            # to_python is typed `int | None` but only returns None for a None
+            # input, which form data can't produce -- this narrows the type,
+            # it doesn't drop anything.
+            if coerced is not None:
+                valid_ids.append(coerced)
+        return objects.where(pk_field.is_in(valid_ids))
 
     def order_objects(
         self, objects: postgres.QuerySet | list[Any]
@@ -178,8 +225,8 @@ class AdminModelListView(AdminListView):
                     )
                 return super().order_objects(records)
 
-        if self.queryset_order:
-            return queryset.order_by(*self.queryset_order)
+        if queryset_order := self.get_queryset_order():
+            return queryset.order_by(*queryset_order)
 
         return queryset
 
@@ -196,14 +243,14 @@ class AdminModelListView(AdminListView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except (FieldDoesNotExist, ObjectDoesNotExist):
+                except FieldDoesNotExist, ObjectDoesNotExist:
                     # ObjectDoesNotExist: get_field_display can refresh a
                     # deferred field, racing a concurrent delete — fall back
                     # to the raw value.
                     pass
 
             return value
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return get_model_field(obj, field)
 
 
@@ -249,18 +296,18 @@ class AdminModelDetailView(AdminDetailView):
                     field_obj = obj._model_meta.get_field(field)
                     if hasattr(field_obj, "flatchoices") and field_obj.flatchoices:
                         return obj.get_field_display(field)
-                except (FieldDoesNotExist, ObjectDoesNotExist):
+                except FieldDoesNotExist, ObjectDoesNotExist:
                     # ObjectDoesNotExist: get_field_display can refresh a
                     # deferred field, racing a concurrent delete — fall back
                     # to the raw value.
                     pass
 
             return value
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return get_model_field(obj, field)
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.get(self.url_kwargs["id"])
 
 
 class AdminModelCreateView(AdminCreateView):
@@ -300,7 +347,7 @@ class AdminModelUpdateView(AdminUpdateView):
         return f"{cls.model.model_options.model_name}/<int:id>/edit/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.get(self.url_kwargs["id"])
 
 
 class AdminModelDeleteView(AdminDeleteView):
@@ -317,4 +364,4 @@ class AdminModelDeleteView(AdminDeleteView):
         return f"{cls.model.model_options.model_name}/<int:id>/delete/"
 
     def get_object(self) -> postgres.Model:
-        return self.model.query.get(id=self.url_kwargs["id"])
+        return self.model.query.get(self.url_kwargs["id"])

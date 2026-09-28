@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from app.examples.models.delete import ChildSetNull
 from app.examples.models.nullability import NullabilityExample
 from app.examples.models.trees import TreeNode

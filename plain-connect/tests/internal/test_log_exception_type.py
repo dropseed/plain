@@ -3,8 +3,6 @@ the span SDK uses: `record_exception` writes module-qualified names, so the
 handler's `exception.type` attribute must match — otherwise one exception
 class shows up under two names depending on which signal reported it."""
 
-from __future__ import annotations
-
 import logging
 
 from opentelemetry.sdk._logs import LoggerProvider

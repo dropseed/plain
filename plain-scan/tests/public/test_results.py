@@ -1,7 +1,5 @@
 """Tests for the result dataclasses' pass/fail logic and serialization."""
 
-from __future__ import annotations
-
 from plain.scan.results import AuditResult, CheckResult, ScanResult
 
 PASS = CheckResult(name="c", passed=True, message="ok")

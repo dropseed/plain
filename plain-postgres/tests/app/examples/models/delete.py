@@ -1,7 +1,5 @@
 """Test fixtures for delete / on_delete behavior."""
 
-from __future__ import annotations
-
 from typing import ClassVar
 
 from plain.postgres import Field, types
@@ -128,7 +126,7 @@ class DiamondChild(postgres.Model):
 @postgres.register_model
 class CircA(postgres.Model):
     name: Field[str] = types.TextField(max_length=100)
-    partner: CircB | None = types.ForeignKeyField(
+    partner: Field[CircB | None] = types.ForeignKeyField(
         "CircB",
         on_delete=postgres.CASCADE,
         allow_null=True,

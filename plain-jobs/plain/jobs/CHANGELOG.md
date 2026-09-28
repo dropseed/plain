@@ -1,5 +1,40 @@
 # plain-jobs changelog
 
+## [0.58.0](https://github.com/dropseed/plain/releases/plain-jobs@0.58.0) (2026-09-21)
+
+### What's changed
+
+- The worker's per-queue gauges — the count of ready and running jobs and the age of the oldest ready request — are written queries (`sql(t"...")`), with the ready-to-run queryset embedded as the subquery it already is. The SQL and parameters they run are identical to before; this is the first written query in a shipped package ([ca91eec03c](https://github.com/dropseed/plain/commit/ca91eec03c)) ([5bcf431297](https://github.com/dropseed/plain/commit/5bcf431297))
+- The job and worker admin views declare their search fields and the trend card's fields as field references, which needs `plain.admin` 0.87.0 when the admin is installed ([37257b6788](https://github.com/dropseed/plain/commit/37257b6788))
+- Requires Python 3.14 ([3f1590d33b](https://github.com/dropseed/plain/commit/3f1590d33b))
+
+### Upgrade instructions
+
+- Requires plain.postgres 0.121.0.
+- If `plain.admin` is installed, upgrade it to 0.87.0 alongside this.
+- Requires Python 3.14 — see the plain 0.165.0 upgrade instructions.
+
+## [0.57.5](https://github.com/dropseed/plain/releases/plain-jobs@0.57.5) (2026-09-21)
+
+### What's changed
+
+- The worker, queryset, admin, chores, CLI and gauge queries use typed `where()` conditions; SQL is unchanged. `JobResultQuerySet.retryable()` compares `retry_attempt` against the `retries` column with the new typed column comparison. Job-process uuids are parsed with `uuid.UUID(...)` before the typed lookup ([d87b0e7580](https://github.com/dropseed/plain/commit/d87b0e7580)) ([26c35167d8](https://github.com/dropseed/plain/commit/26c35167d8))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.120.0 or newer, which this release pins.
+
+## [0.57.4](https://github.com/dropseed/plain/releases/plain-jobs@0.57.4) (2026-09-20)
+
+### What's changed
+
+- The worker claims jobs with `for_update(skip_locked=True)`, the new name for `select_for_update()` ([97f18f0699](https://github.com/dropseed/plain/commit/97f18f0699))
+- `JobRequest`, `Job` and `JobResult` use the typed `Field[T]` annotations from plain-postgres 0.119, with their custom querysets declared as `ClassVar` ([acae922618](https://github.com/dropseed/plain/commit/acae922618))
+
+### Upgrade instructions
+
+- Requires plain-postgres 0.119.0 or newer, which this release pins.
+
 ## [0.57.3](https://github.com/dropseed/plain/releases/plain-jobs@0.57.3) (2026-08-21)
 
 ### What's changed

@@ -14,8 +14,6 @@ come out, so the spool only ever holds clean body content and chunked
 and declared-length bodies are indistinguishable downstream.
 """
 
-from __future__ import annotations
-
 import io
 import tempfile
 from typing import TYPE_CHECKING, cast

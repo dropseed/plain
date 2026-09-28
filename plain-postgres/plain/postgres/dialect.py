@@ -5,8 +5,6 @@ All functions in this module are stateless — they don't depend on connection s
 Higher-level SQL builders that need connections live in ddl.py.
 """
 
-from __future__ import annotations
-
 import datetime
 import ipaddress
 import json
@@ -23,6 +21,7 @@ from psycopg.types.json import Jsonb
 
 if TYPE_CHECKING:
     from plain.postgres.fields import Field
+    from plain.postgres.sql.query import LockMode
 
 # Start and end points for window expressions.
 PRECEDING: str = "PRECEDING"
@@ -308,15 +307,26 @@ def distinct_sql(
         return ["DISTINCT"], []
 
 
-def for_update_sql(
+# Every LockMode token and the clause it becomes. The LockMode key type rejects
+# a token that isn't in the Literal; tests/internal/test_lock_mode_sql.py is
+# what catches a token in the Literal that's missing here.
+LOCK_MODE_SQL: dict[LockMode, str] = {
+    "update": "FOR UPDATE",
+    "no_key_update": "FOR NO KEY UPDATE",
+    "share": "FOR SHARE",
+    "key_share": "FOR KEY SHARE",
+}
+
+
+def lock_sql(
+    mode: LockMode,
     nowait: bool = False,
     skip_locked: bool = False,
     of: tuple[str, ...] = (),
-    no_key: bool = False,
 ) -> str:
-    """Return the FOR UPDATE SQL clause to lock rows for an update operation."""
-    return "FOR{} UPDATE{}{}{}".format(
-        " NO KEY" if no_key else "",
+    """Return a row-level locking clause (FOR UPDATE, FOR SHARE, etc.)."""
+    return "{}{}{}{}".format(
+        LOCK_MODE_SQL[mode],
         " OF {}".format(", ".join(of)) if of else "",
         " NOWAIT" if nowait else "",
         " SKIP LOCKED" if skip_locked else "",
@@ -376,15 +386,24 @@ def lookup_cast(lookup_type: str, field: Field | None = None) -> str:
     return lookup
 
 
-def return_insert_columns(fields: list[Field]) -> tuple[str, tuple[Any, ...]]:
-    """Return the RETURNING clause SQL and params to append to an INSERT query."""
+def returning_columns(
+    fields: list[Field] | None, *, include_created: bool = False
+) -> str:
+    """Return the RETURNING clause SQL for the given fields, or "" when there are none.
+
+    With include_created, a trailing boolean column reports whether the row was
+    freshly inserted: a new tuple's xmax is 0, while a tuple an
+    ON CONFLICT DO UPDATE touched carries the updating transaction's id.
+    """
     if not fields:
-        return "", ()
+        return ""
     columns = [
         f"{quote_name(field.model.model_options.db_table)}.{quote_name(field.column)}"
         for field in fields
     ]
-    return "RETURNING {}".format(", ".join(columns)), ()
+    if include_created:
+        columns.append("(xmax = 0)")
+    return "RETURNING {}".format(", ".join(columns))
 
 
 def bulk_insert_sql(fields: list[Field], placeholder_rows: list[list[str]]) -> str:
@@ -575,21 +594,21 @@ def explain_query_prefix(format: str | None = None, **options: Any) -> str:
 
 
 def on_conflict_suffix_sql(
-    fields: list[Field],
     on_conflict: OnConflict | None,
-    update_fields: Iterable[str],
     unique_fields: Iterable[str],
+    assignments: Iterable[tuple[str, str]],
 ) -> str:
-    if on_conflict == OnConflict.IGNORE:
-        return "ON CONFLICT DO NOTHING"
-    if on_conflict == OnConflict.UPDATE:
-        return "ON CONFLICT({}) DO UPDATE SET {}".format(
-            ", ".join(map(quote_name, unique_fields)),
-            ", ".join(
-                [
-                    f"{field} = EXCLUDED.{field}"
-                    for field in map(quote_name, update_fields)
-                ]
-            ),
-        )
-    return ""
+    """Format the ON CONFLICT ... DO UPDATE SET clause.
+
+    `assignments` are already-ordered (quoted column, value SQL) pairs, built
+    by the insert compiler alongside their parameters so the two cannot drift
+    apart -- a SET list ordered one way and a parameter list ordered another
+    binds values to the wrong columns.
+    """
+    if on_conflict != OnConflict.UPDATE:
+        return ""
+
+    return "ON CONFLICT({}) DO UPDATE SET {}".format(
+        ", ".join(map(quote_name, unique_fields)),
+        ", ".join(f"{column} = {value}" for column, value in assignments),
+    )

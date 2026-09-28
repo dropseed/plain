@@ -10,8 +10,6 @@ under the `plain.testing` entry point group:
 The runner discovers and drives lifecycles; packages never import the runner.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING

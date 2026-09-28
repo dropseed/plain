@@ -8,8 +8,6 @@ traceback, keeps the heartbeat fresh, and returns once the reloader
 reports a file change so the process can recycle with fresh code.
 """
 
-from __future__ import annotations
-
 import os
 import signal
 import socket

@@ -17,8 +17,6 @@ Example Usage::
     ...     f.write('Plain')
 """
 
-from __future__ import annotations
-
 import os
 from typing import TYPE_CHECKING
 
@@ -107,7 +105,7 @@ else:
         LOCK_SH = fcntl.LOCK_SH  # shared lock
         LOCK_NB = fcntl.LOCK_NB  # non-blocking
         LOCK_EX = fcntl.LOCK_EX
-    except (ImportError, AttributeError):
+    except ImportError, AttributeError:
         # File locking is not supported.
         LOCK_EX = LOCK_SH = LOCK_NB = 0
 

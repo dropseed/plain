@@ -6,8 +6,6 @@ a string), parses it into segments, and returns a ResolverMatch object
 which provides access to all attributes of the resolved URL match.
 """
 
-from __future__ import annotations
-
 import functools
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
@@ -379,7 +377,7 @@ class URLResolver:
         """Convert + validate one captured value for reverse()."""
         try:
             url_value = cap.converter.to_url(kwargs[cap.name])
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
         if not _segment_value_matches(cap.converter, url_value):
             return None

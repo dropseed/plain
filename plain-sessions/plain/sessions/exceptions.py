@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 class SessionNotAvailable(Exception):
     """
     Raised when attempting to access a session that hasn't been set up.

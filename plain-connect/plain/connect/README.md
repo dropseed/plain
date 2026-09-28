@@ -27,17 +27,17 @@ If `CONNECT_EXPORT_TOKEN` is not set, the package is a no-op — safe to install
 
 ## Settings
 
-| Setting                     | Default                               | Description                                                                                                |
-| --------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `CONNECT_EXPORT_URL`        | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
-| `CONNECT_CLOUD_URL`         | `"https://plainframework.com"`        | Plain Cloud web app base URL — builds toolbar trace links and support form URLs                            |
-| `CONNECT_EXPORT_TOKEN`      | `""`                                  | Auth token for the export endpoint                                                                         |
-| `CONNECT_TRACE_SAMPLE_RATE` | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
-| `CONNECT_EXPORT_LOGS`       | `True`                                | Set to `False` to disable OTLP log export                                                                  |
-| `CONNECT_LOG_LEVEL`         | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)                                                |
-| `CONNECT_SECRET_KEY`        | `""`                                  | Shared secret with Plain Cloud (from the App settings page). Encrypts identity tokens, signs render tokens |
-| `CONNECT_PAGEVIEWS_TOKEN`   | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag                                  |
-| `CONNECT_PAGEVIEWS_URL`     | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                                                   |
+| Setting                          | Default                               | Description                                                                                                |
+| -------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `CONNECT_EXPORT_URL`             | `"https://ingest.plainframework.com"` | OTLP ingest endpoint (override to use a custom endpoint)                                                   |
+| `CONNECT_CLOUD_URL`              | `"https://plainframework.com"`        | Plain Cloud web app base URL — builds toolbar trace links and support form URLs                            |
+| `CONNECT_EXPORT_TOKEN`           | `""`                                  | Auth token for the export endpoint                                                                         |
+| `CONNECT_TRACE_SAMPLE_RATE`      | `1.0`                                 | Probability of exporting a trace (0.0–1.0)                                                                 |
+| `CONNECT_EXPORT_LOGS`            | `True`                                | Set to `False` to disable OTLP log export                                                                  |
+| `CONNECT_LOG_LEVEL`              | `"INFO"`                              | Minimum severity exported via OTLP logs (level name or int)                                                |
+| `CONNECT_SECRET_KEY`             | `""`                                  | Shared secret with Plain Cloud (from the App settings page). Encrypts identity tokens, signs render tokens |
+| `CONNECT_PAGEVIEWS_PUBLIC_TOKEN` | `""`                                  | Public pageview-endpoint token; enables the `{% connect_pageviews %}` tag                                  |
+| `CONNECT_PAGEVIEWS_URL`          | `"https://beacon.plainframework.com"` | Pageview ingest endpoint                                                                                   |
 
 All settings can be set via `PLAIN_`-prefixed environment variables or in `app/settings.py`.
 
@@ -76,7 +76,7 @@ Add the tag to your base template, just before `</body>`:
 Then set the public endpoint token:
 
 ```
-PLAIN_CONNECT_PAGEVIEWS_TOKEN=plain_pv_...
+PLAIN_CONNECT_PAGEVIEWS_PUBLIC_TOKEN=plain_pv_...
 ```
 
 The tag renders nothing until the token is set. Once enabled, it reports the URL, title, referrer, and a first-party anonymous id on each page load and SPA navigation (History `pushState` / back-forward).

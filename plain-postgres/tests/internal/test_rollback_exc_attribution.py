@@ -11,8 +11,6 @@ is recorded when a savepoint-less nested block marks the transaction for
 rollback.
 """
 
-from __future__ import annotations
-
 import psycopg
 from plain.postgres import transaction
 from plain.postgres.db import get_connection

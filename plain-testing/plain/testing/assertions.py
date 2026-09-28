@@ -10,8 +10,6 @@ output; everything else falls back to showing the asserted expression source.
 Each operand is evaluated exactly once, preserving the original semantics.
 """
 
-from __future__ import annotations
-
 import ast
 import reprlib
 from typing import Any

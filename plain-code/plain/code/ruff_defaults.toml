@@ -1,4 +1,4 @@
-target-version = "py313"
+target-version = "py314"
 
 # Ruff's default rules are deliberately in play — when a new ruff version
 # expands them, we address what it finds rather than freezing the set.

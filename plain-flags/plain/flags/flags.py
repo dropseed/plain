@@ -79,9 +79,10 @@ class Flag(ABC):
 
             # Create an associated DB Flag that we can use to enable/disable
             # and tie the results to
-            flag_obj, _ = Flag.query.update_or_create(
+            flag_obj, _ = Flag.query.upsert(
                 name=flag_name,
                 defaults={"used_at": timezone.now()},
+                unique_fields=[Flag.name],
             )
 
             if not flag_obj.enabled:
@@ -111,7 +112,10 @@ class Flag(ABC):
                 return value
 
             try:
-                flag_result = FlagResult.query.get(flag=flag_obj, key=key)
+                flag_result = FlagResult.query.get(
+                    FlagResult.flag.id.equals(flag_obj.id),
+                    FlagResult.key.equals(key),
+                )
 
                 span.set_attribute(
                     FEATURE_FLAG_RESULT_REASON,

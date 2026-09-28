@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}WebSocket demo — echo{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 py-12">
+    <h1 class="text-2xl font-semibold">WebSocket echo</h1>
+    <p class="mt-2 text-sm text-gray-600">
+        One <code>View</code> serves this page on <code>GET</code> and the socket on
+        the same URL through <code>async def websocket(self, ws)</code>. Type
+        something and the server sends it straight back.
+    </p>
+
+    <form id="echo-form" class="mt-6 flex gap-2">
+        <input id="echo-input" class="flex-1 rounded border px-3 py-2" autocomplete="off" placeholder="Say something" />
+        <button class="rounded bg-gray-900 px-4 py-2 text-white" type="submit">Send</button>
+    </form>
+
+    <p class="mt-4 text-xs text-gray-500">Status: <span id="echo-status">connecting…</span></p>
+    <ul id="echo-log" class="mt-4 space-y-1 font-mono text-sm"></ul>
+</div>
+
+<script nonce="{{ request.csp_nonce }}">
+    const status = document.getElementById("echo-status");
+    const log = document.getElementById("echo-log");
+    const form = document.getElementById("echo-form");
+    const input = document.getElementById("echo-input");
+
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    const socket = new WebSocket(`${scheme}://${location.host}${location.pathname}`, ["echo"]);
+
+    function line(text, cls) {
+        const li = document.createElement("li");
+        li.textContent = text;
+        li.className = cls;
+        log.prepend(li);
+    }
+
+    socket.addEventListener("open", () => {
+        status.textContent = `open (subprotocol: ${socket.protocol || "none"})`;
+    });
+    socket.addEventListener("message", (event) => line(`← ${event.data}`, "text-green-700"));
+    socket.addEventListener("close", (event) => {
+        status.textContent = `closed (${event.code}${event.reason ? " " + event.reason : ""})`;
+    });
+    socket.addEventListener("error", () => {
+        status.textContent = "error";
+    });
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!input.value || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(input.value);
+        line(`→ ${input.value}`, "text-gray-700");
+        input.value = "";
+    });
+</script>
+{% endblock %}

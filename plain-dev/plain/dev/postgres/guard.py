@@ -14,8 +14,6 @@ shared database is always a deliberate two-command act (`plain db use <name>`
 then `plain postgres sync`), never something that happens by default.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import click

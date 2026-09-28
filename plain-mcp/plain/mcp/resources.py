@@ -1,7 +1,5 @@
 """The `MCPResource` base class. Subclass, set `uri` (or `uri_template`), and implement `read()`."""
 
-from __future__ import annotations
-
 import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, get_type_hints
@@ -40,17 +38,18 @@ class MCPResource(ABC):
     set `uri_template` instead of `uri` and accept the template params on
     `__init__`:
 
-        class Order(MCPResource):
+        class OrderResource(MCPResource):
             '''An order by ID.'''
 
             uri_template = "orders://{order_id}"
-            mime_type = "application/json"
+            mime_type = "text/plain"
 
             def __init__(self, order_id: int):
                 self.order_id = order_id
 
             def read(self) -> str:
-                return str(Order.query.get(pk=self.order_id))
+                order = Order.query.where(Order.id.equals(self.order_id)).get()
+                return str(order)
 
     Templates match RFC 6570 level 1 — `{name}` placeholders match a
     single path segment (no slashes). Extracted params are coerced to the
@@ -124,7 +123,7 @@ class MCPResource(ABC):
             cls._uri_pattern = _compile_uri_template(cls.uri_template)
             try:
                 cls._init_hints = get_type_hints(cls.__init__)
-            except (NameError, TypeError):
+            except NameError, TypeError:
                 # Unresolvable forward refs: skip coercion, pass raw strings.
                 cls._init_hints = {}
 

@@ -15,5 +15,5 @@ class ClearCompleted(Chore):
         cutoff = timezone.now() - datetime.timedelta(
             seconds=settings.JOBS_RESULTS_RETENTION
         )
-        count = JobResult.query.filter(created_at__lt=cutoff).delete()
+        count = JobResult.query.where(JobResult.created_at.lt(cutoff)).delete()
         return f"{count} jobs deleted"

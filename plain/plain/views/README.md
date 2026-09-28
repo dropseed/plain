@@ -8,6 +8,7 @@
 - [RedirectView](#redirectview)
 - [Async views](#async-views)
 - [ServerSentEventsView](#serversenteventsview)
+- [WebSockets](#websockets)
 - [Lifecycle hooks](#lifecycle-hooks)
 - [ResponseException](#responseexception)
 - [Error views](#error-views)
@@ -121,7 +122,7 @@ Common mistakes:
 - `time.sleep(1)` — use `await asyncio.sleep(1)` instead
 - `requests.get(...)` — use an async HTTP client instead
 
-To wrap a blocking call safely: `await asyncio.get_running_loop().run_in_executor(None, blocking_fn)`
+To wrap a blocking call safely: `await asyncio.to_thread(blocking_fn)`. Use `asyncio.to_thread` rather than `loop.run_in_executor(None, blocking_fn)` — it copies the request context, so context-local state like the per-request database connection follows the call into the thread.
 
 Use async views only for true async I/O (SSE, async HTTP clients). For standard request/response views that use the ORM, use regular sync views — they run in the thread pool and don't block other connections.
 
@@ -176,9 +177,103 @@ source.addEventListener("status", (event) => {
 
 Send `ServerSentEvent.comment()` periodically as a keepalive to prevent proxies and browsers from closing idle connections.
 
-ServerSentEventsView only accepts GET requests. The `stream()` method runs on the event loop — use `await` for any I/O and avoid blocking calls. Use `await asyncio.sleep()` instead of `time.sleep()`, and `await loop.run_in_executor()` to wrap blocking operations.
+ServerSentEventsView only accepts GET requests. The `stream()` method runs on the event loop — use `await` for any I/O and avoid blocking calls. Use `await asyncio.sleep()` instead of `time.sleep()`, and `await asyncio.to_thread()` to wrap blocking operations.
 
 Note: browsers limit HTTP/1.1 to 6 SSE connections per domain. Use HTTP/2 to avoid this limit.
+
+## WebSockets
+
+A view handles a WebSocket by defining `async def websocket(self, ws)`. The same URL keeps serving its page from `get()` — the browser opens the socket against the URL it is already on — and the handshake runs through the normal pipeline (middleware, `before_request`, URL kwargs), so the socket is authenticated exactly like the page is.
+
+```python
+from plain.http import WebSocket
+from plain.templates.views import TemplateView
+
+
+class LiveView(TemplateView):
+    template_name = "live.html"
+
+    async def websocket(self, ws: WebSocket) -> None:
+        async for message in ws:
+            await ws.send(f"echo: {message}")
+```
+
+```javascript
+const socket = new WebSocket(`wss://${location.host}${location.pathname}`);
+socket.addEventListener("message", (event) => console.log(event.data));
+```
+
+A plain GET to `LiveView` renders the template as usual. A view that defines only `websocket()` answers a plain GET with 405 — `websocket` is not an HTTP method and never appears in `Allow` — and an upgrade request to a view that doesn't define `websocket()` is served as an ordinary GET.
+
+Only a complete [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455) opening handshake is treated as an upgrade: a GET with `Upgrade: websocket`, a `Connection` header carrying the `upgrade` token, `Sec-WebSocket-Version: 13`, and a `Sec-WebSocket-Key` that decodes to 16 bytes. Anything short of that — including a different version — is served as a normal GET.
+
+**The `ws` object** ([`WebSocket`](../http/websocket.py#WebSocket)) is the entire surface a view gets:
+
+- `async for message in ws` — complete messages, `str` for text frames and `bytes` for binary ones. Fragments are reassembled and control frames (ping, pong, close) are answered for you.
+- `await ws.send(message)` — a `str` goes out as a text frame, `bytes` as a binary one. Outbound messages have no size limit.
+- `await ws.close(code=1000, reason="")` — send the close frame, wait for the peer's, then drop the connection. It's idempotent, and safe to call from another task while something else is iterating.
+- `ws.subprotocol` — the negotiated subprotocol, or `None`.
+- `ws.closed` — whether the socket is over; `ws.close_code` and `ws.close_reason` say how (1006 when the peer vanished without a close frame).
+
+Returning from `websocket()` closes the socket.
+
+**A peer going away is a normal ending, not an error.** The most common way a socket ends is the browser leaving. When that happens the iteration simply stops, and `ws.send()` raises [`WebSocketClosed`](../http/websocket.py#WebSocketClosed) (carrying `.code` and `.reason`) — a raw socket error never reaches the view. The server logs nothing for either.
+
+```python
+import asyncio
+from datetime import datetime
+
+from plain.http import WebSocket, WebSocketClosed
+from plain.views import View
+
+
+class ClockView(View):
+    async def websocket(self, ws: WebSocket) -> None:
+        try:
+            while True:
+                await ws.send(datetime.now().isoformat())
+                await asyncio.sleep(1)
+        except WebSocketClosed:
+            return  # The browser left — nothing to report.
+```
+
+Any _other_ exception out of `websocket()` is a real failure: it's logged like a 500 and the socket is closed with 1011.
+
+**Subprotocols** are declared on the view and matched case-sensitively against what the client offers, in the client's preference order. The first offered name the view supports is echoed back in `Sec-WebSocket-Protocol` and exposed as `ws.subprotocol`; if nothing matches, no subprotocol is echoed (a browser then fails the connection itself, per spec).
+
+```python
+class LiveView(TemplateView):
+    template_name = "live.html"
+    websocket_subprotocols = ("binary",)
+```
+
+**Inbound messages are capped** by `websocket_max_message_size` (1 MiB by default). A frame that declares more than the cap is refused before its payload is read, and a reassembled message over the cap closes the socket with 1009. The cap applies to what the client sends, not to what the view sends.
+
+```python
+class LiveView(TemplateView):
+    template_name = "live.html"
+    websocket_max_message_size = 16 * 1024 * 1024
+```
+
+**Auth works through the normal hooks.** `before_request` runs before the upgrade is accepted, so an `AuthViewMixin`-style check rejects the handshake with its usual 403 or redirect and `websocket()` never runs.
+
+Session cookies ride along on a websocket handshake the same way they do on a POST, so a cross-origin handshake is refused with 403 by the same decision the CSRF middleware makes: `CSRF_TRUSTED_ORIGINS` first, then `Sec-Fetch-Site` (browsers send `same-origin` on a same-origin handshake), then `Origin` against `Host` for requests with no fetch metadata. A request with neither `Origin` nor `Sec-Fetch-Site` — a non-browser client — is allowed. To accept handshakes from another origin, add it to `CSRF_TRUSTED_ORIGINS`; there is no websocket-specific setting.
+
+**Middleware sees the handshake as a response.** The accepted upgrade is a bodiless 101 that flows through every middleware's `after_response`, so cookies and headers set there land on it, and resource closers registered on it run when the socket ends.
+
+**Keepalive is automatic.** The server sends a ping every 20 seconds and closes the socket with 1001 if no pong comes back within 20 seconds of it. A `send` that the peer does not drain within 20 seconds ends the socket the same way. Nothing to configure, and it keeps proxies that drop idle connections from cutting a quiet socket.
+
+**A view that stops reading gets closed.** Inbound messages are buffered for a view that is not iterating (16 of them), and once that buffer is full nothing more is read from the peer, pongs included. If the peer keeps sending to a view that never comes back to `async for`, the socket is closed with 1008 at the next ping. A push-only view whose peer never sends is unaffected.
+
+**When the socket ends, the view ends.** If the peer leaves or keepalive fails while `websocket()` is awaiting something other than `ws`, the coroutine is cancelled a moment later; a view that returns to `ws` first sees the iteration end or `send` raise.
+
+**Worker shutdown is cooperative.** When a worker starts draining — SIGTERM, a deploy, or recycling at `SERVER_MAX_REQUESTS` — every open socket is sent a 1001 close and its `websocket()` coroutine is cancelled, rather than being cut off mid-frame at the end of the graceful timeout. Clients should reconnect when they see 1001; a draining worker refuses new upgrades with a 503.
+
+**Databases.** The connection the handshake used is returned to the pool before the socket starts, so a socket that only pumps bytes holds no database connection however long it stays open. The first query inside `websocket()` checks a connection out again, and that one is held until the socket ends.
+
+The ORM is synchronous, so a query inside `websocket()` blocks the event loop for every connection on that worker. Move it to a thread with `await asyncio.to_thread(fn)`, which copies the request context — `loop.run_in_executor(None, fn)` does not, and a query run without it escapes the per-request connection handling entirely.
+
+**Testing** uses `Client().websocket()`, which runs the handshake through the same pipeline as any test-client request and then drives the view's coroutine in-process — see [WebSockets in the test docs](../test/README.md#websockets).
 
 ## Lifecycle hooks
 

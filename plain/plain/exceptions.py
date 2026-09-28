@@ -2,8 +2,6 @@
 Global Plain exception and warning classes.
 """
 
-from __future__ import annotations
-
 import operator
 from collections.abc import Iterator
 from itertools import chain

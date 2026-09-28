@@ -1,7 +1,5 @@
 """OTel-related helpers shared across Plain packages."""
 
-from __future__ import annotations
-
 
 def format_exception_type(exc: BaseException) -> str:
     """Format an exception's class name per OTel semantic conventions.

@@ -7,16 +7,13 @@ this being populated correctly for both direct and nested patterns under a
 namespaced router.
 """
 
-from __future__ import annotations
-
-from contextlib import contextmanager
-
+import pytest
 from plain.runtime import settings
 from plain.urls import get_resolver
 from plain.urls.resolvers import _get_cached_resolver
 
 
-@contextmanager
+@pytest.fixture
 def boundary_resolver():
     original = settings.URLS_ROUTER
     original_ts = settings.URLS_TRAILING_SLASH
@@ -31,27 +28,25 @@ def boundary_resolver():
         _get_cached_resolver.cache_clear()
 
 
-def test_direct_route_under_namespaced_include_carries_namespace():
+def test_direct_route_under_namespaced_include_carries_namespace(boundary_resolver):
     """`include("admin-canonical/", AdminCanonicalRouter)` where AdminCanonicalRouter
     has `namespace="admin-canonical"` and a direct `path("home/", ..., name="home")`.
     The match must report `namespaced_url_name == "admin-canonical:home"`.
     """
-    with boundary_resolver() as resolver:
-        match = resolver.resolve("/admin-canonical/home/")
-        assert match.namespace == "admin-canonical"
-        assert match.url_name == "home"
-        assert match.namespaced_url_name == "admin-canonical:home"
+    match = boundary_resolver.resolve("/admin-canonical/home/")
+    assert match.namespace == "admin-canonical"
+    assert match.url_name == "home"
+    assert match.namespaced_url_name == "admin-canonical:home"
 
 
-def test_nested_include_under_namespace_carries_namespace():
+def test_nested_include_under_namespace_carries_namespace(boundary_resolver):
     """Through a chained include — namespace still surfaces."""
-    with boundary_resolver() as resolver:
-        match = resolver.resolve("/admin-canonical/nested/users/")
-        assert match.namespace == "admin-canonical"
-        assert match.namespaced_url_name == "admin-canonical:users-list"
+    match = boundary_resolver.resolve("/admin-canonical/nested/users/")
+    assert match.namespace == "admin-canonical"
+    assert match.namespaced_url_name == "admin-canonical:users-list"
 
 
-def test_unnamespaced_match_has_clean_namespaced_url_name():
+def test_unnamespaced_match_has_clean_namespaced_url_name(boundary_resolver):
     """A route directly under the root router (`namespace = ""`) must
     surface as a clean `namespaced_url_name` — just the name, no leading
     colon. The root's empty namespace, and any un-namespaced ancestor
@@ -62,9 +57,8 @@ def test_unnamespaced_match_has_clean_namespaced_url_name():
     directly at the top level — no include in between — so the chain is
     exactly `root(ns="") → endpoint`.
     """
-    with boundary_resolver() as resolver:
-        match = resolver.resolve("/leading-slash/")
-        assert match.namespace == ""
-        assert match.namespaces == []
-        assert match.url_name == "leading-slash"
-        assert match.namespaced_url_name == "leading-slash"
+    match = boundary_resolver.resolve("/leading-slash/")
+    assert match.namespace == ""
+    assert match.namespaces == []
+    assert match.url_name == "leading-slash"
+    assert match.namespaced_url_name == "leading-slash"
