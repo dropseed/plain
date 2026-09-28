@@ -5,11 +5,13 @@
         assert ws.receive() == "hello"
 
 The handshake runs through the same pipeline as any test-client request.
-On acceptance the view's coroutine is served by the same code the server
-uses, over a socketpair, on an event loop this object owns and steps from
-the test's own thread whenever it is asked to send, receive, or close.
-No background thread: the view runs on the test thread, inside a copy of
-the test's context, so the test database transaction is visible to it.
+On acceptance the socket is served by the server's own code
+(`HandledRequest.serve_websocket()`), over one end of a socketpair, on an
+event loop this object owns and steps from the test's own thread whenever
+it is asked to send, receive, or close. This object is the other end: the
+client's side of the protocol. No background thread: the view runs on the
+test thread, inside a copy of the test's context, so the test database
+transaction is visible to it.
 """
 
 import asyncio
@@ -19,7 +21,7 @@ import socket
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
-from plain.http import Request, WebSocketClosed, WebSocketResponse
+from plain.http import WebSocketClosed, WebSocketResponse
 from plain.http.websocket_frames import (
     OP_BINARY,
     OP_CLOSE,
@@ -33,11 +35,10 @@ from plain.http.websocket_frames import (
     parse_close_payload,
     read_frame,
 )
-from plain.internal.handlers.response_lifecycle import ResponseLifecycle
-from plain.server.connection import Connection
-from plain.server.http.websocket import run_websocket
 
 if TYPE_CHECKING:
+    from plain.server.inprocess import HandledRequest
+
     from .client import ClientResponse
 
 DEFAULT_TIMEOUT = 5.0
@@ -87,66 +88,43 @@ class WebSocketTestConnection:
 
     def __init__(
         self,
-        lifecycle: ResponseLifecycle,
+        handled: HandledRequest,
         *,
-        request: Request,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
-        response = lifecycle.response
+        response = handled.response
         assert isinstance(response, WebSocketResponse)
         # The handshake: the request that asked for the socket, and the 101
         # that granted it.
-        self.request = request
+        self.request = handled.request
         self.response = response
         self.subprotocol = response.subprotocol
         self._timeout = timeout
         self._closed = False
 
         self._loop = asyncio.new_event_loop()
+        server_sock, client_sock = socket.socketpair()
         try:
-            server_sock, client_sock = socket.socketpair()
-            self._reader, self._writer, conn = self._loop.run_until_complete(
-                self._open_pair(server_sock, client_sock)
+            self._reader, self._writer = self._loop.run_until_complete(
+                asyncio.open_connection(sock=client_sock)
             )
         except BaseException:
-            self._loop.run_until_complete(self._settle_transports())
+            server_sock.close()
+            client_sock.close()
             self._loop.close()
             raise
-        # `lifecycle.context` is the copy of the test's context that
-        # `ClientHandler.run_pipeline()` took after the handshake: the view
-        # sees what the test set up (the `db` fixture's transaction
-        # included), with the handshake's request span current.
-        self._server_task = self._loop.create_task(
-            run_websocket(
-                lifecycle,
-                conn,
-                shutdown_wait=self._loop.create_future(),
-                close_timeout=lambda: 1.0,
-            )
-        )
+        # The view runs in the context the handshake ran in, a copy of the
+        # test's: it sees what the test set up (the test's database
+        # transaction included), with the handshake's request span current.
+        self._server_task = self._loop.create_task(handled.serve_websocket(server_sock))
 
     async def _settle_transports(self) -> None:
         """Let asyncio finish closing both ends before the loop goes away."""
         try:
             await asyncio.wait_for(self._writer.wait_closed(), 1)
-        except TimeoutError, OSError, AttributeError:
+        except TimeoutError, OSError:
             pass
         await asyncio.sleep(0)
-
-    @staticmethod
-    async def _open_pair(
-        server_sock: socket.socket, client_sock: socket.socket
-    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, Connection]:
-        server_reader, server_writer = await asyncio.open_connection(sock=server_sock)
-        client_reader, client_writer = await asyncio.open_connection(sock=client_sock)
-        conn = Connection(
-            None,  # ty: ignore[invalid-argument-type]
-            server_reader,
-            server_writer,
-            ("127.0.0.1", 0),
-            ("testserver", 443),
-        )
-        return client_reader, client_writer, conn
 
     # ------------------------------------------------------------------
 

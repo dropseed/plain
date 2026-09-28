@@ -4,6 +4,7 @@ import contextvars
 import dataclasses
 import inspect
 import time
+from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
@@ -283,14 +284,10 @@ class BaseHandler:
                 # any ContextVars the view sets (e.g. a DB wrapper via
                 # `get_connection()`) land on request_ctx and are visible
                 # to after_response below.
-                try:
-                    task = asyncio.get_running_loop().create_task(
-                        result.coroutine, context=request_ctx
-                    )
-                    response = await task
-                    self._check_response(response, result.view_class)
-                except Exception as exc:
-                    response = response_for_exception(request, exc)
+                task = asyncio.get_running_loop().create_task(
+                    result.coroutine, context=request_ctx
+                )
+                response = await self._await_async_view(request, result, task)
 
                 response = await self._run_in_executor(
                     executor,
@@ -314,6 +311,86 @@ class BaseHandler:
             started=started,
             executor=executor,
         )
+
+    def handle_in_process(self, request: Request) -> ResponseLifecycle:
+        """Handle a request on the calling thread, with no server.
+
+        The same pipeline as `handle()`, returning the same thing: the
+        response as a `ResponseLifecycle`, not yet read or closed. The
+        caller reads it with `read()`, or runs a websocket from it.
+
+        `handle()` needs an event loop and a thread pool, and the caller
+        here has neither — it is a test, or a command, on an ordinary
+        thread. So three things differ, and nothing else:
+
+        - The pipeline runs on the calling thread, in the caller's own
+          context rather than a fresh one. What the caller set up (a
+          test's database transaction) is what the view sees. The context
+          the body is read in is a copy taken after the pipeline, with the
+          request span current, so the body sees the same and its queries
+          land in the request's trace.
+        - An async view is awaited on an event loop of its own. A sync
+          view uses no loop at all, which is what lets an async caller
+          (where `asyncio.run()` would raise) make a request to a sync
+          view.
+        - There is no executor. The `ResponseLifecycle` runs a sync body
+          on the thread that reads it.
+
+        Middleware loads at the first request rather than up front, so
+        the handler can be created before settings are final.
+        """
+        if self._middleware_chain is None:
+            self.load_middleware()
+
+        span = self._start_request_span(request)
+        started = time.perf_counter()
+        token = context.attach(trace.set_span_in_context(span))
+        try:
+            result = self._run_sync_pipeline(request)
+
+            if isinstance(result, _AsyncViewPending):
+                response = asyncio.run(
+                    self._await_async_view(request, result, result.coroutine)
+                )
+                # After-middleware runs on the calling thread, where
+                # before-middleware ran.
+                response = self._finish_pipeline(request, response, result.ran_before)
+            else:
+                response = result
+
+            request_context = contextvars.copy_context()
+        except BaseException as exc:
+            self._fail_request_span(span, exc)
+            raise
+        finally:
+            context.detach(token)
+
+        return self._response_lifecycle(
+            response,
+            request=request,
+            request_context=request_context,
+            span=span,
+            started=started,
+            executor=None,
+        )
+
+    async def _await_async_view(
+        self,
+        request: Request,
+        pending: _AsyncViewPending,
+        view_result: Awaitable[Response],
+    ) -> Response:
+        """Await an async view's response, turning what it raises into the
+        error response, as `_run_sync_pipeline` does for a sync view.
+
+        `view_result` is the view's coroutine, or the task driving it.
+        """
+        try:
+            response = await view_result
+            self._check_response(response, pending.view_class)
+        except Exception as exc:
+            response = response_for_exception(request, exc)
+        return response
 
     def _run_sync_pipeline(self, request: Request) -> Response | _AsyncViewPending:
         """Run the entire sync request pipeline on a single thread.

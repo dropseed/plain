@@ -1,25 +1,15 @@
-import asyncio
-import contextvars
 import json
-import time
+import re
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
-from opentelemetry import context as otel_context
-from opentelemetry import trace
-from plain.http import (
-    Request,
-    WebSocketResponse,
-    content_length_forbidden,
-)
-from plain.internal.handlers.base import BaseHandler
-from plain.internal.handlers.response_lifecycle import ResponseLifecycle
+from plain.http import Request, WebSocketResponse
 from plain.json import PlainJSONEncoder
+from plain.server.inprocess import InProcessServer, SentResponse
 from plain.urls import get_resolver
 from plain.utils.http import urlencode
-from plain.utils.regex_helper import _lazy_re_compile
 
 from .encoding import encode_multipart
 from .exceptions import RedirectCycleError, require_app
@@ -41,8 +31,8 @@ __all__ = [
 _BOUNDARY = "BoUnDaRyStRiNg"
 _MULTIPART_CONTENT = f"multipart/form-data; boundary={_BOUNDARY}"
 # Structured suffix spec: https://tools.ietf.org/html/rfc6838#section-4.2.8
-_JSON_CONTENT_TYPE_RE = _lazy_re_compile(r"^application\/(.+\+)?json")
-_CHARSET_RE = _lazy_re_compile(r".*; charset=([\w-]+);?")
+_JSON_CONTENT_TYPE_RE = re.compile(r"^application\/(.+\+)?json")
+_CHARSET_RE = re.compile(r".*; charset=([\w-]+);?")
 
 _REDIRECT_STATUS_CODES = (
     HTTPStatus.MOVED_PERMANENTLY,
@@ -82,18 +72,11 @@ class ClientResponse:
         "returned_response",
     )
 
-    def __init__(
-        self,
-        *,
-        returned_response: Response,
-        request: Request,
-        status_code: int,
-        body: bytes,
-    ):
-        self._returned_response = returned_response
-        self._request = request
-        self._status_code = status_code
-        self._body = body
+    def __init__(self, sent: SentResponse):
+        self._returned_response = sent.response
+        self._request = sent.request
+        self._status_code = sent.status_code
+        self._body = sent.body
         self._redirect_chain: list[tuple[str, int]] = []
         self._json_data: Any = _UNSET
         self._resolver_match: ResolverMatch | None = _UNSET
@@ -201,98 +184,6 @@ class ClientResponse:
             f"<ClientResponse status_code={self._status_code}"
             f" of {self._returned_response!r}>"
         )
-
-
-def _strip_forbidden_content_length(response: Response) -> None:
-    """A status that can't carry Content-Length (1xx, 204) loses it, as the
-    server writers strip it too. HEAD and 304 keep theirs — it describes the
-    body a GET would have had."""
-    if content_length_forbidden(response.status_code):
-        del response.headers["Content-Length"]
-
-
-class ClientHandler(BaseHandler):
-    """
-    An HTTP Handler that can be used for testing purposes. Takes a Request
-    object directly and returns the response's lifecycle and the body it sent.
-    """
-
-    def __call__(self, request: Request) -> tuple[ResponseLifecycle, bytes]:
-        lifecycle = self.run_pipeline(request)
-
-        # Read the body and close, the way a server sends a response — the
-        # same ResponseLifecycle the server drives, read on this thread.
-        # Bodiless responses (HEAD, 204/304) never read their body.
-        body = lifecycle.read()
-
-        _strip_forbidden_content_length(lifecycle.response)
-        return lifecycle, body
-
-    def run_pipeline(self, request: Request) -> ResponseLifecycle:
-        """Run the request through middleware and the view.
-
-        Returns what `handle()` returns to the server: the response as a
-        `ResponseLifecycle`, not yet read or closed. `__call__` reads it;
-        `Client.websocket()` runs the socket from it.
-        """
-        # Set up middleware if needed. We couldn't do this earlier, because
-        # settings weren't available.
-        if self._middleware_chain is None:
-            self.load_middleware()
-
-        from plain.internal.handlers.base import _AsyncViewPending
-
-        span = self._start_request_span(request)
-        started = time.perf_counter()
-        token = otel_context.attach(trace.set_span_in_context(span))
-        try:
-            # Call the sync pipeline directly — no event loop needed for sync
-            # views. This keeps the test client usable from both sync tests and
-            # async tests (where asyncio.run() would raise).
-            result = self._run_sync_pipeline(request)
-
-            if isinstance(result, _AsyncViewPending):
-                response = self._handle_async_view(request, result)
-            else:
-                response = result
-
-            # The context the body is read in — copied from the ambient
-            # context the pipeline ran in (so the body sees the test's
-            # database transaction), with the request span current so the
-            # body's queries land in the request's trace.
-            request_context = contextvars.copy_context()
-        except BaseException as exc:
-            self._fail_request_span(span, exc)
-            raise
-        finally:
-            otel_context.detach(token)
-
-        return self._response_lifecycle(
-            response,
-            request=request,
-            request_context=request_context,
-            span=span,
-            started=started,
-            executor=None,
-        )
-
-    def _handle_async_view(self, request: Request, pending: Any) -> Response:
-        """Await an async view coroutine and run after-middleware."""
-        from plain.internal.handlers.exception import response_for_exception
-
-        async def _run() -> Response:
-            try:
-                resp = await pending.coroutine
-                self._check_response(resp, pending.view_class)
-            except Exception as exc:
-                resp = response_for_exception(request, exc)
-
-            return resp
-
-        response = asyncio.run(_run())
-
-        # Run after-middleware on the calling thread (same as before-middleware)
-        return self._finish_pipeline(request, response, pending.ran_before)
 
 
 def _encode_request_body(
@@ -667,7 +558,7 @@ class Client:
     ) -> None:
         require_app("Client")
         self._request_factory = RequestFactory(headers=headers)
-        self._handler = ClientHandler()
+        self._server = InProcessServer()
         self.raise_request_exception = raise_request_exception
 
     @property
@@ -719,18 +610,7 @@ class Client:
 
     def _send(self, request: Request) -> ClientResponse:
         """Run a Request through the app and wrap what came back."""
-        lifecycle, body = self._handler(request)
-        # read() always settles a status (None is for a server whose client
-        # left before anything went out).
-        status_code = lifecycle.sent_status_code
-        assert status_code is not None
-
-        response = ClientResponse(
-            returned_response=lifecycle.response,
-            request=request,
-            status_code=status_code,
-            body=body,
-        )
+        response = ClientResponse(self._server.handle(request).send())
 
         # Only 5xx errors have an exception.
         if response.exception and self.raise_request_exception:
@@ -947,23 +827,12 @@ class Client:
         request = self._request_factory.get(
             path, query_params=query_params, headers=handshake, secure=secure
         )
-        lifecycle = self._handler.run_pipeline(request)
-        returned_response = lifecycle.response
-        if returned_response.cookies:
-            self.cookies.update(returned_response.cookies)
-        if not isinstance(returned_response, WebSocketResponse):
-            body = lifecycle.read()
-            status_code = lifecycle.sent_status_code
-            assert status_code is not None
-            raise WebSocketRejected(
-                ClientResponse(
-                    returned_response=returned_response,
-                    request=request,
-                    status_code=status_code,
-                    body=body,
-                )
-            )
-        return WebSocketTestConnection(lifecycle, request=request, timeout=timeout)
+        handled = self._server.handle(request)
+        if handled.response.cookies:
+            self.cookies.update(handled.response.cookies)
+        if not isinstance(handled.response, WebSocketResponse):
+            raise WebSocketRejected(ClientResponse(handled.send()))
+        return WebSocketTestConnection(handled, timeout=timeout)
 
     def _follow_redirects(
         self,

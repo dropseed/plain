@@ -41,7 +41,9 @@ def is_client_socket_noise(exc: OSError) -> bool:
 class Connection:
     def __init__(
         self,
-        app: ServerApplication,
+        # None for a connection with no server behind it: the in-process
+        # end of a socket pair (see `plain.server.inprocess`).
+        app: ServerApplication | None,
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
         client: tuple[str, int],

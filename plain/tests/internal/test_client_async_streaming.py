@@ -10,7 +10,8 @@ from collections.abc import AsyncIterator
 from opentelemetry import trace
 from plain.http import AsyncStreamingResponse
 from plain.internal.handlers.response_lifecycle import ResponseLifecycle
-from plain.test import RequestFactory, raises
+from plain.server.inprocess import SentResponse
+from plain.test import ClientResponse, RequestFactory, raises
 
 
 async def _stream() -> AsyncIterator[bytes]:
@@ -64,15 +65,15 @@ def test_head_never_reads_the_stream() -> None:
 
 
 def test_client_response_status_is_read_only() -> None:
-    from plain.test.client import ClientResponse
-
     response = ClientResponse(
-        returned_response=AsyncStreamingResponse(
-            _stream(), content_type="text/event-stream"
-        ),
-        request=RequestFactory().get("/"),
-        status_code=200,
-        body=b"",
+        SentResponse(
+            request=RequestFactory().get("/"),
+            response=AsyncStreamingResponse(
+                _stream(), content_type="text/event-stream"
+            ),
+            status_code=200,
+            body=b"",
+        )
     )
     with raises(AttributeError):
         response.status_code = 204  # ty: ignore[invalid-assignment]
