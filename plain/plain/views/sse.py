@@ -32,8 +32,16 @@ class ServerSentEventsView(View):
         yield
 
     async def _format_events(self) -> AsyncIterator[str]:
-        async for event in self.stream():
-            yield event.format()
+        events = self.stream()
+        try:
+            async for event in events:
+                yield event.format()
+        finally:
+            # Closing this generator doesn't close the one it iterates, so
+            # without this a client that leaves mid-stream would leave
+            # stream()'s cleanup to the GC.
+            if aclose := getattr(events, "aclose", None):
+                await aclose()
 
 
 class ServerSentEvent:
