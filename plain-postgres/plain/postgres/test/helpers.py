@@ -2,12 +2,17 @@
 Database test helpers.
 """
 
+from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import partial
+from typing import Any
+from weakref import WeakKeyDictionary
 
-from plain.test import Captured
+from plain.test import Captured, CaptureSource
 
+from ..connection import DatabaseConnection
 from ..db import get_connection
 
 __all__ = ["CapturedQueries", "CapturedQuery", "capture_queries", "max_queries"]
@@ -83,20 +88,43 @@ def capture_queries() -> Generator[CapturedQueries]:
     conn = get_connection()
     previous = conn.force_debug_cursor
     conn.force_debug_cursor = True
-    conn.queries_log.clear()
     captured = CapturedQueries()
     try:
-        yield captured
+        with _query_source_of(conn).capturing_into(captured):
+            yield captured
     finally:
-        captured._finish(
-            CapturedQuery(
-                sql=entry.get("sql_as_sent", entry["sql"]),
-                sql_with_params=entry["sql"],
-                is_statement="sql_as_sent" in entry,
-            )
-            for entry in conn.queries_log
-        )
         conn.force_debug_cursor = previous
+
+
+# Every capture on a connection reads that connection's query log, so each
+# connection has one source, kept for as long as the connection is.
+_query_sources: WeakKeyDictionary[DatabaseConnection, CaptureSource[CapturedQuery]] = (
+    WeakKeyDictionary()
+)
+
+
+def _query_source_of(conn: DatabaseConnection) -> CaptureSource[CapturedQuery]:
+    source = _query_sources.get(conn)
+    if source is None:
+        # The source holds the connection's log, not the connection, so it
+        # doesn't keep a closed connection from being let go.
+        source = CaptureSource(
+            read=partial(_queries_in, conn.queries_log),
+            clear=conn.queries_log.clear,
+        )
+        _query_sources[conn] = source
+    return source
+
+
+def _queries_in(queries_log: deque[dict[str, Any]]) -> list[CapturedQuery]:
+    return [
+        CapturedQuery(
+            sql=entry.get("sql_as_sent", entry["sql"]),
+            sql_with_params=entry["sql"],
+            is_statement="sql_as_sent" in entry,
+        )
+        for entry in queries_log
+    ]
 
 
 @contextmanager

@@ -2,79 +2,88 @@
 Capture the OpenTelemetry spans and metrics emitted during a block.
 
 The global tracer/meter providers are install-once per process, so the two
-install helpers are idempotent — repeated calls return the same
-exporter/reader, and every capture reads from that one.
+install helpers are idempotent — repeated calls return the same source, and
+every capture reads from that one.
 
 The OpenTelemetry SDK imports are deferred into the install helpers so that
 importing `plain.test` (e.g. for `Client`) doesn't pay the SDK import cost.
 """
 
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, cast
 
-from .captured import Captured
+from .captured import Captured, CaptureSource
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.metrics.export import (
         DataPointT,
         HistogramDataPoint,
-        InMemoryMetricReader,
         Metric,
         NumberDataPoint,
     )
     from opentelemetry.sdk.trace import ReadableSpan
-    from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-        InMemorySpanExporter,
-    )
+    from opentelemetry.sdk.trace.export import SpanExportResult
     from opentelemetry.trace import SpanKind
     from opentelemetry.util.types import AttributeValue
 
 __all__ = ["CapturedMetrics", "CapturedSpans", "capture_metrics", "capture_spans"]
 
-_span_exporter: InMemorySpanExporter | None = None
-_metric_reader: InMemoryMetricReader | None = None
-
-# Captures can be nested (a project lifecycle around every test, and the
-# test's own inside it), and they all read the one exporter and the one
-# reader. So an inner capture must not empty them: each capture remembers
-# where it started, and they're only emptied when nothing is capturing.
-_open_span_captures = 0
-_open_metric_captures = 0
-_collected_metrics: list[Metric] = []
+# Where every capture of each kind reads from. Made the first time one is
+# asked for, along with the provider that feeds it.
+_span_source: CaptureSource[ReadableSpan] | None = None
+_metric_source: CaptureSource[Metric] | None = None
 
 
-def _install_test_tracer() -> InMemorySpanExporter:
-    global _span_exporter
-    if _span_exporter is None:
+def _install_test_tracer() -> CaptureSource[ReadableSpan]:
+    global _span_source
+    if _span_source is None:
         from opentelemetry import trace
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export import (
+            SimpleSpanProcessor,
+            SpanExportResult,
+        )
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
             InMemorySpanExporter,
         )
 
-        _span_exporter = InMemorySpanExporter()
+        class SpanExporterForCaptures(InMemorySpanExporter):
+            """
+            Keeps the spans that end while a capture is open. Once installed,
+            the provider hands this every span for the rest of the run, and
+            the ones nobody is capturing would otherwise be kept until the
+            next capture emptied them.
+            """
+
+            def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+                if not source.capturing:
+                    return SpanExportResult.SUCCESS
+                return super().export(spans)
+
+        exporter = SpanExporterForCaptures()
+        source = CaptureSource(read=exporter.get_finished_spans, clear=exporter.clear)
+
         provider = TracerProvider()
-        provider.add_span_processor(SimpleSpanProcessor(_span_exporter))
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
         trace.set_tracer_provider(provider)
         if trace.get_tracer_provider() is not provider:
             # set_tracer_provider is one-shot: if another provider was
             # installed first (e.g. plain.connect exporting for real), the
             # call is silently ignored and every capture would come up empty
             # — while test traffic exports to the real backend. Fail loudly.
-            _span_exporter = None
             raise RuntimeError(
                 "A global tracer provider is already installed — disable it "
                 "for tests (e.g. PLAIN_CONNECT_EXPORT_ENABLED=false) so spans "
                 "can be captured."
             )
-    return _span_exporter
+        _span_source = source
+    return _span_source
 
 
-def _install_test_meter() -> InMemoryMetricReader:
-    global _metric_reader
-    if _metric_reader is None:
+def _install_test_meter() -> CaptureSource[Metric]:
+    global _metric_source
+    if _metric_source is None:
         from opentelemetry import metrics
         from opentelemetry.sdk.metrics import (
             Counter,
@@ -91,22 +100,38 @@ def _install_test_meter() -> InMemoryMetricReader:
         # since the last one — that's what makes the drain-on-entry in
         # capture_metrics() actually isolate one test's metrics from the
         # counters accumulated by everything that ran before it.
-        _metric_reader = InMemoryMetricReader(
+        reader = InMemoryMetricReader(
             preferred_temporality={
                 Counter: AggregationTemporality.DELTA,
                 UpDownCounter: AggregationTemporality.DELTA,
                 Histogram: AggregationTemporality.DELTA,
             }
         )
-        provider = MeterProvider(metric_readers=[_metric_reader])
+        provider = MeterProvider(metric_readers=[reader])
         metrics.set_meter_provider(provider)
         if metrics.get_meter_provider() is not provider:
-            _metric_reader = None
             raise RuntimeError(
                 "A global meter provider is already installed — disable it "
                 "for tests so metrics can be captured."
             )
-    return _metric_reader
+
+        # The reader hands over what was recorded since it was last asked,
+        # and then no longer has it. So what it hands over is kept here, for
+        # every open capture to read.
+        collected: list[Metric] = []
+
+        def collect() -> list[Metric]:
+            """Collect what the reader holds — which also asks every
+            observable instrument for its current value — and keep it."""
+            data = reader.get_metrics_data()
+            if data is not None:
+                for resource_metrics in data.resource_metrics:
+                    for scope_metrics in resource_metrics.scope_metrics:
+                        collected.extend(scope_metrics.metrics)
+            return collected
+
+        _metric_source = CaptureSource(read=collect, clear=collected.clear)
+    return _metric_source
 
 
 class CapturedSpans(Captured["ReadableSpan"]):
@@ -230,31 +255,10 @@ def capture_spans() -> Generator[CapturedSpans]:
 
         [server_span] = spans.filter(kind=SpanKind.SERVER)
     """
-    global _open_span_captures
-
-    exporter = _install_test_tracer()
-    if _open_span_captures == 0:
-        exporter.clear()
-    start = len(exporter.get_finished_spans())
-
+    source = _install_test_tracer()
     captured = CapturedSpans()
-    _open_span_captures += 1
-    try:
+    with source.capturing_into(captured):
         yield captured
-    finally:
-        _open_span_captures -= 1
-        captured._finish(exporter.get_finished_spans()[start:])
-
-
-def _collect_metrics(reader: InMemoryMetricReader) -> None:
-    """Collect what the reader holds — which also asks every observable
-    instrument for its current value — and keep it."""
-    data = reader.get_metrics_data()
-    if data is None:
-        return
-    for resource_metrics in data.resource_metrics:
-        for scope_metrics in resource_metrics.scope_metrics:
-            _collected_metrics.extend(scope_metrics.metrics)
 
 
 @contextmanager
@@ -272,20 +276,9 @@ def capture_metrics() -> Generator[CapturedMetrics]:
     for its value. So whatever it observes has to still be there: open the
     capture inside the block that keeps it alive, not around it.
     """
-    global _open_metric_captures
-
-    reader = _install_test_meter()
-    # What was recorded before the block belongs to whatever came before.
-    _collect_metrics(reader)
-    if _open_metric_captures == 0:
-        _collected_metrics.clear()
-    start = len(_collected_metrics)
-
+    source = _install_test_meter()
     captured = CapturedMetrics()
-    _open_metric_captures += 1
-    try:
+    # What was recorded before the block is collected as the capture starts,
+    # so it lands before the point this capture reads from.
+    with source.capturing_into(captured):
         yield captured
-    finally:
-        _open_metric_captures -= 1
-        _collect_metrics(reader)
-        captured._finish(_collected_metrics[start:])

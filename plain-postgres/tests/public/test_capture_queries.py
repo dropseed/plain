@@ -140,6 +140,36 @@ def test_begin_and_commit_are_queries_but_not_statements():
     assert queries.sql_statements() == [TAG_BY_NAME]
 
 
+def test_a_capture_inside_another_leaves_the_outer_one_whole():
+    with capture_queries() as outer:
+        Tag.query.filter(name="red").first()
+        with capture_queries() as inner:
+            Widget.query.filter(name="small").first()
+        Tag.query.filter(name="red").first()
+
+    assert inner.sql_statements() == [WIDGET_BY_NAME]
+    assert outer.sql_statements() == [TAG_BY_NAME, WIDGET_BY_NAME, TAG_BY_NAME]
+
+
+def test_max_queries_inside_a_capture_leaves_the_capture_whole():
+    with capture_queries() as queries:
+        Tag.query.filter(name="red").first()
+        with max_queries(1):
+            Widget.query.filter(name="small").first()
+
+    assert queries.sql_statements() == [TAG_BY_NAME, WIDGET_BY_NAME]
+
+
+def test_an_earlier_capture_keeps_what_it_captured():
+    with capture_queries() as first:
+        Tag.query.filter(name="red").first()
+    with capture_queries() as second:
+        Widget.query.filter(name="small").first()
+
+    assert first.sql_statements() == [TAG_BY_NAME]
+    assert second.sql_statements() == [WIDGET_BY_NAME]
+
+
 def test_max_queries_passes_within_the_budget():
     with max_queries(1):
         Tag.query.filter(name="red").first()

@@ -1,4 +1,4 @@
-from .captured import Captured
+from .captured import Captured, CaptureSource
 from .client import Client, ClientResponse
 from .decorators import case, cases, skip, tag
 from .definition import TestDefinitionError
@@ -14,6 +14,7 @@ from .websocket import WebSocketRejected, WebSocketTestConnection
 
 __all__ = [
     "AppRequiredError",
+    "CaptureSource",
     "Captured",
     "CapturedLogs",
     "CapturedMetrics",

@@ -498,6 +498,27 @@ def route_of(spans: CapturedSpans) -> str:
 
 All three are a [`Captured`](./captured.py#Captured), and a package that ships its own capture helper builds on the same class so it reads the same way. [`capture_queries`](../../../plain-postgres/plain/postgres/README.md#testing) in `plain.postgres.test` is one.
 
+A helper makes a `Captured` and calls its `finish(items)` when the block ends. When every capture of a kind reads from one list that grows as things happen, a [`CaptureSource`](./captured.py#CaptureSource) does that for you, and is what makes the captures nest:
+
+```python
+from contextlib import contextmanager
+
+from plain.test import Captured, CaptureSource
+
+from .registry import registry
+
+registered = CaptureSource(read=registry.log_entries, clear=registry.clear_log)
+
+
+@contextmanager
+def capture_registrations():
+    captured = Captured(helper="capture_registrations")
+    with registered.capturing_into(captured):
+        yield captured
+```
+
+Each capture gets what was added to the list during its own block. The list is emptied when the outermost capture ends, so nothing captured is kept for the rest of the run.
+
 ## WebSockets
 
 `Client.websocket()` runs the handshake through the same pipeline as any request (cookies and auth included), then drives the view's `websocket()` in-process:

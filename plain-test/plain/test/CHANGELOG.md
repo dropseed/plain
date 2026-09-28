@@ -19,6 +19,7 @@
 - A failed assertion shows the expression as the test wrote it. It was regenerated from the syntax tree, which dropped parentheses.
 - `CollectedTest`, what a lifecycle's `around_test(test)` receives, is in `plain.test`. Nothing in `plain.test.runner` is an importable API.
 - `capture_spans`, `capture_metrics`, `capture_logs` and `plain.postgres.test.capture_queries` hand back one shape: a read-only sequence of what was captured, read after the block ends. Reading one inside its block raises. `spans.filter(name=, kind=)`, `metrics.number_points()` / `metrics.histogram_points()`, `logs.messages` and `queries.sql_statements()` are the finders. Captures can be nested.
+- Captures nest, `capture_queries` and `max_queries` included: one opened inside another leaves the outer one whole. `CaptureSource` in `plain.test` is what a package's own capture helper is built on. Spans and metrics that nobody is capturing are dropped, not kept until the next capture.
 - `patch` leaves the target holding what it held before: an instance or a class that only inherited the attribute inherits it again, a `staticmethod` is still one, and a property, a slot or a setting gets its value back.
 - `capture_queries` records the statement as it was sent (`query.sql`) beside the one with its values filled in (`query.sql_with_params`), and sees queries that run with tracing suppressed.
 - `skip_test(reason)` skips from inside a running test. Skipped tests are listed with their reasons and counted in the summary.

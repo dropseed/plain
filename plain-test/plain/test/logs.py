@@ -36,8 +36,7 @@ class _RecordingHandler(logging.Handler):
 
     def __init__(self) -> None:
         super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-        self.span_contexts: list[SpanContext] = []
+        self.entries: list[tuple[logging.LogRecord, SpanContext]] = []
         # One handler can be attached to several loggers at once (the default
         # is two). A record that reaches more than one of them is still one
         # record, so it's counted once.
@@ -50,8 +49,7 @@ class _RecordingHandler(logging.Handler):
 
         from opentelemetry.trace import get_current_span
 
-        self.records.append(record)
-        self.span_contexts.append(get_current_span().get_span_context())
+        self.entries.append((record, get_current_span().get_span_context()))
 
 
 class CapturedLogs(Captured[logging.LogRecord]):
@@ -62,7 +60,17 @@ class CapturedLogs(Captured[logging.LogRecord]):
 
     def __init__(self) -> None:
         super().__init__(helper="capture_logs")
-        self._span_contexts: tuple[SpanContext, ...] = ()
+        # By the record's id. The record itself can't carry it: see
+        # _RecordingHandler.
+        self._span_context_of: dict[int, SpanContext] = {}
+
+    def finish_with_span_contexts(
+        self, entries: list[tuple[logging.LogRecord, SpanContext]]
+    ) -> None:
+        """Say what was captured: each record, with the span context that
+        was current when it was logged."""
+        self._span_context_of = {id(record): context for record, context in entries}
+        self.finish(record for record, _ in entries)
 
     @property
     def messages(self) -> list[str]:
@@ -70,7 +78,7 @@ class CapturedLogs(Captured[logging.LogRecord]):
         return [record.getMessage() for record in self]
 
     def __repr__(self) -> str:
-        if self._items is None:
+        if not self.finished:
             return super().__repr__()
         return f"<CapturedLogs {self.messages!r}>"
 
@@ -93,8 +101,8 @@ class CapturedLogs(Captured[logging.LogRecord]):
         once, so a typo or a duplicate can't pass silently.
         """
         matches = [
-            context
-            for record, context in zip(self, self._span_contexts, strict=True)
+            self._span_context_of[id(record)]
+            for record in self
             if record.getMessage() == message
         ]
         if not matches:
@@ -151,5 +159,4 @@ def capture_logs(
         for logger, original_level in zip(loggers, original_levels, strict=True):
             logger.removeHandler(handler)
             logger.setLevel(original_level)
-        captured._span_contexts = tuple(handler.span_contexts)
-        captured._finish(handler.records)
+        captured.finish_with_span_contexts(handler.entries)
