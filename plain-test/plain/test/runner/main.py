@@ -32,6 +32,11 @@ __all__ = []
 )
 @click.option("-x", "--fail-fast", is_flag=True, help="Stop at the first failure")
 @click.option("-v", "--verbose", is_flag=True, help="Print one line per test")
+@click.option(
+    "--full-values",
+    is_flag=True,
+    help="Print every value in a failure whole, however long",
+)
 def main(
     targets: tuple[str, ...],
     keyword: str | None,
@@ -39,6 +44,7 @@ def main(
     exclude_tags: tuple[str, ...],
     fail_fast: bool,
     verbose: bool,
+    full_values: bool,
 ) -> None:
     """Run tests
 
@@ -140,6 +146,7 @@ def main(
         tests,
         lifecycles=lifecycles,
         fail_fast=fail_fast,
+        full_values=full_values,
         on_result=reporter.result,
     )
 

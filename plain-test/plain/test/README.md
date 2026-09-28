@@ -582,6 +582,7 @@ plain test --tag slow                           # only tests tagged "slow"
 plain test --exclude-tag slow                   # everything but
 plain test -x                                   # stop at the first failure
 plain test -v                                   # one line per test, with its duration
+plain test --full-values                        # print every value in a failure whole
 ```
 
 | Flag                 | What it does                                          |
@@ -591,6 +592,7 @@ plain test -v                                   # one line per test, with its du
 | `--exclude-tag NAME` | Drop the tests with this tag. Repeat it to drop more  |
 | `-x`, `--fail-fast`  | Stop at the first failure                             |
 | `-v`, `--verbose`    | Print one line per test                               |
+| `--full-values`      | Print every value in a failure whole, however long    |
 
 `plain test --help` prints the same list, and the forms a target can take.
 
@@ -694,7 +696,7 @@ It's the only way to import one. `from tests.helpers import ...` and a relative 
 
 There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it. A `conftest.py` anywhere under the tests is a collection error.
 
-Only files named `test_*.py` have their [assertions](#assertions) rewritten. An `assert` in a helper module fails as a bare `AssertionError`.
+Only files named `test_*.py` have their [assertions](#assertions) rewritten. An `assert` in a helper module fails as a bare `AssertionError`, without the values inside it.
 
 ## Reading the output
 
@@ -715,28 +717,81 @@ Output isn't captured. What a test prints or logs shows up where it happens, bet
 
 ### Failures
 
-Every failure is listed after the run, and ends with the command that runs that test again:
+Every failure is listed after the run. It says where the test failed, what the values inside the assert were, what else the test had in hand, and how to run it again:
 
 ```
 FAILED tests/test_signup.py::test_signup_redirects
 
   Traceback (most recent call last):
-    File "/project/tests/test_signup.py", line 8, in test_signup_redirects
+    File "/project/tests/test_signup.py", line 10, in test_signup_redirects
       assert response.status_code == 302
-  AssertionError: assert response.status_code == 302
-    left:  200
-    right: 302
+  AssertionError
+
+  assert response.status_code == 302
+    response.status_code = 404
+      response = <ClientResponse status_code=404 of <Response status_code=404, "text/plain; charset=utf-8">>
+
+  locals:
+    client = <plain.test.client.Client object at 0x10ac756a0>
+    email = 'a@example.com'
 
 Re-run: plain test tests/test_signup.py::test_signup_redirects
 ```
 
 The traceback starts at your test. The runner's own frames are left out.
 
+Under the assert is each part of its expression and what it was, from the outside in: `response.status_code` was `404`, and the `response` it was read from is indented under it. What's written out in the expression (`302`) isn't repeated. See [Assertions](#assertions).
+
+`locals:` is every name the test function had bound when it failed, in the order they were bound, without the ones the assert already printed. It's there for every failure, not only a failed assert, and it's always the test function's own: when the error was raised in something the test called, the traceback shows where and the locals show what the test called it with. A name bound to a module, a class or a function is left out.
+
 The command is quoted wherever a shell would read the id for itself, so you can paste it as it is:
 
 ```
 Re-run: plain test 'tests/test_price.py::test_total[annual plan]'
 ```
+
+### Large values
+
+Two values that were expected to be equal, and are too large to read side by side, are printed as what differs between them:
+
+```
+  assert profile == expected
+    profile = <dict with 7 keys>
+    expected = <dict with 6 keys>
+
+  diff:
+    --- profile
+    +++ expected
+    @@ -4,4 +4,3 @@
+      'plan': 'annual',
+      'renews': '2027-01-01',
+    - 'seats': 3,
+    - 'trial': False}
+    + 'seats': 5}
+```
+
+`-` lines are the left side's and `+` lines are the right side's. What is compared depends on what the values are:
+
+| Values                       | Compared by                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
+| Text of more than one line   | Line. By each line's `repr` when they differ in a trailing space or line ending      |
+| Two long strings on one line | The first character that differs, with what is around it on each side                |
+| Dicts                        | Key, in sorted order                                                                 |
+| Lists, tuples and sets       | Item                                                                                 |
+| Dataclasses                  | Field                                                                                |
+| Anything a package describes | Line of [its description](#test-lifecycles). A model instance is one field to a line |
+
+Values that each fit on a line of 80 characters are printed whole and aren't diffed.
+
+A single value is printed up to 2,000 characters and a diff up to 60 lines. When either is cut short, the last line says by how much:
+
+```
+      ... 143,000 more characters (--full-values prints them)
+```
+
+Run the test again with `--full-values` to print everything.
+
+A value whose `repr` raises doesn't stop the report. It's printed as `<Order: its repr raised ValueError: no total>`, and everything else is printed as usual.
 
 ### Skipped tests
 
@@ -817,32 +872,54 @@ The tests that needed nothing from it still run. The ones that asked for a fixtu
 
 ## Assertions
 
-Use bare `assert`. When a comparison fails, the runner shows the expression as you wrote it, parentheses and line breaks included, and the value on each side:
-
-```
-AssertionError: assert response.status_code == 302
-  left:  200
-  right: 302
-```
-
-That works for a single comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`, `is`, `is not`, `in`, `not in`. Any other assertion shows the expression that was false:
-
-```
-AssertionError: assert user.is_active and user.is_staff
-```
-
-A message you give comes first:
+Use bare `assert`. When one fails, the [failure](#failures) shows the expression as you wrote it, and under it every value inside it:
 
 ```python
-assert items, "expected some items"
+def test_order_total():
+    order = create_order(lines=2)
+    assert len(order.lines) == expected_lines(order)
 ```
 
 ```
-AssertionError: expected some items
-assert items
+  assert len(order.lines) == expected_lines(order)
+    len(order.lines) = 2
+      order.lines = [<Line 1>, <Line 2>]
+        order = <Order 7>
+    expected_lines(order) = 3
 ```
 
-Each side is evaluated once, so an assertion with a side effect behaves the same as it would without the runner. Long values are shortened: a string to 400 characters, a list or dict to 20 items.
+That's every kind of expression: a comparison, a chain of them, a call, a membership test, `and`, `or`, `not`, arithmetic, `await`. There's nothing to add to an assert to see what went into it.
+
+A message is for saying why, not for printing values. It comes first:
+
+```python
+assert items, "the cart should keep what was added before login"
+```
+
+```
+  the cart should keep what was added before login
+  assert items
+    items = []
+```
+
+### What an assert does to your test
+
+Nothing you can observe. Each part of the expression is evaluated once, in the order Python evaluates it, so an assert that calls something with a side effect behaves the way it would anywhere else. The error raised is an ordinary `AssertionError`, with your message or none.
+
+A part Python never evaluated isn't evaluated by the runner either. The right side of an `and` whose left side was false is reported that way:
+
+```
+  assert user.is_admin and user.username == "grace"
+    user.is_admin = False
+      user = User(id=1, is_admin=False, username='ada')
+    user.username == "grace"  (not evaluated)
+```
+
+An assert holds on to nothing once it has finished, so a test that checks an object has been freed isn't affected by the assert before it.
+
+Three things are kept whole, without the values inside them: a comprehension, an f-string, and a generator passed to a call (`all(n > 0 for n in rows)` shows what `all()` returned). The values they were built from are in [`locals:`](#failures) when they're the test's own.
+
+Only files named `test_*.py` are rewritten this way. An `assert` in a [helper module](#shared-helpers) fails as a bare `AssertionError`, with the traceback and the test's locals.
 
 For an exception you expect, use [`raises`](#expected-exceptions) from `plain.test`.
 
@@ -881,7 +958,7 @@ class AppTestLifecycle(TestLifecycle):
 
 The runner finds the file by its path. There is nothing to register and no other place it looks.
 
-- **One file, one class.** `tests/lifecycle.py` defines exactly one [`TestLifecycle`](#test-lifecycles) subclass, under any name. `around_test(test)` wraps each test, and `setup_worker()` / `teardown_worker()` run once, before the first test and after the last.
+- **One file, one class.** `tests/lifecycle.py` defines exactly one [`TestLifecycle`](#test-lifecycles) subclass, under any name. `around_test(test)` wraps each test, and `setup_worker()` / `teardown_worker()` run once, before the first test and after the last. `describe_value(value)` says how a [failure](#failures) prints a value of your app's.
 - **It fails loudly.** If the file is there and doesn't import, defines no `TestLifecycle` subclass, defines more than one, or defines one that can't be created without arguments, the run stops before any test with a message saying which. When the file raised an error of its own, its traceback follows.
 - **It runs closest to the test.** Package lifecycles enter first, in the order of their entry point names, and the project's enters last. So the database transaction is already open when yours starts, and yours exits before the transaction is rolled back.
 - **It's for protection, not setup.** A user, an organization, a logged-in client: a test that reads one builds it in its body, by calling a helper. If a test would be wrong without the thing but never mentions it, that's the lifecycle's job.
@@ -904,7 +981,7 @@ from contextlib import contextmanager
 
 from plain.test import TestLifecycle
 
-from .registry import registry
+from .registry import Entry, registry
 
 
 class MyPackageTestLifecycle(TestLifecycle):
@@ -920,6 +997,11 @@ class MyPackageTestLifecycle(TestLifecycle):
     def around_test(self, test):
         registry.clear()
         yield
+
+    def describe_value(self, value):
+        if isinstance(value, Entry):
+            return f"Entry(key={value.key!r}, expires={value.expires!r})"
+        return None
 ```
 
 Then register it under the `plain.test` entry point group:
@@ -932,6 +1014,7 @@ mypackage = "mypackage.test:MyPackageTestLifecycle"
 
 - `setup_worker()` runs once before the first test, and `teardown_worker()` once after the last.
 - `around_test(test)` is a context manager entered around each test. `test` is a [`CollectedTest`](./lifecycle.py#CollectedTest), which you can import from `plain.test` to annotate it. `test.id` is the id the runner prints (`tests/test_cart.py::TestCart::test_add[empty]`), `test.name` is the part after the file (`TestCart::test_add[empty]`), and `test.tags` holds its `@tag` names, so a lifecycle can treat a tagged test differently. That's how `@isolated_db` works.
+- `describe_value(value)` is what a [failure](#failures) prints for a value your package owns, in place of its `repr`. Return `None` for anything that isn't yours. Use it when the `repr` says too little to fix a test by. The text is printed as it is, and a description of several lines is [diffed](#large-values) by line. It's called for the values in a failed assert and in the test's locals, not for what is inside a list or a dict. It must not change anything the test did, or do anything the test didn't: no queries, no requests.
 - `required_package` keeps the lifecycle from loading unless that package is in the app's `INSTALLED_PACKAGES`. An entry point is visible whenever the package is installed in the environment, which is wider than "the app uses it".
 - Lifecycles are entered in the order of their entry point names. The runner creates each one with no arguments.
 

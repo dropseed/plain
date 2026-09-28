@@ -6,7 +6,6 @@ quoted so that pasting it into a shell runs that test and no other.
 """
 
 import ast
-import shlex
 import textwrap
 import traceback
 from pathlib import Path
@@ -16,6 +15,8 @@ import click
 from ..definition import TestDefinitionError
 from .collection import CollectionError
 from .execution import TestResult, TestRun
+from .failure import AssertedPart, Failure, LocalValue
+from .printing import FULL_VALUES_FLAG, PrintedValue
 
 __all__ = []
 
@@ -54,13 +55,70 @@ def collection_error_text(cause: BaseException) -> str:
     return "".join(traceback.format_exception(type(cause), cause, tb)).rstrip()
 
 
-def rerun_command(test_id: str) -> str:
+def failure_text(failure: Failure) -> str:
     """
-    The command that runs one test, safe to paste. A case id can hold
-    anything (`test_price[annual plan]`), and a shell reads spaces, brackets,
-    quotes and `$` for itself unless the id is quoted.
+    What is printed for one failed test, under its `FAILED` line: where it
+    failed, the assert with the values inside it, what differs, and what
+    else the test had in hand.
     """
-    return f"plain test {shlex.quote(test_id)}"
+    sections = [failure.traceback.rstrip()]
+
+    failed_assert = failure.failed_assert
+    if failed_assert is not None:
+        lines = []
+        if failed_assert.message is not None:
+            lines.append(failed_assert.message)
+        lines.append(f"assert {failed_assert.expression}")
+        for part in failed_assert.parts:
+            lines.extend(_part_lines(part))
+        sections.append("\n".join(lines))
+
+        diff = failed_assert.diff
+        if diff is not None:
+            lines = ["diff:", *(f"  {line}" for line in diff.lines)]
+            if diff.cut_lines:
+                lines.append(
+                    f"  ... {diff.cut_lines:,} more lines"
+                    f" ({FULL_VALUES_FLAG} prints them)"
+                )
+            sections.append("\n".join(lines))
+
+    if failure.locals:
+        lines = ["locals:"]
+        for local in failure.locals:
+            lines.extend(_local_lines(local))
+        sections.append("\n".join(lines))
+
+    return "\n\n".join(sections)
+
+
+def _part_lines(part: AssertedPart) -> list[str]:
+    indent = "  " * (part.depth + 1)
+    if part.value is None:
+        return [f"{indent}{part.source}  (not evaluated)"]
+    return _named_value_lines(part.source, part.value, indent=indent)
+
+
+def _local_lines(local: LocalValue) -> list[str]:
+    return _named_value_lines(local.name, local.value, indent="  ")
+
+
+def _named_value_lines(name: str, value: PrintedValue, *, indent: str) -> list[str]:
+    """
+    `name = value` on one line, or the name and then a value of several
+    lines under it. After a value the cap cut short, how much was cut.
+    """
+    if "\n" in value.text:
+        lines = [f"{indent}{name} ="]
+        lines.extend(f"{indent}  {line}" for line in value.text.splitlines())
+    else:
+        lines = [f"{indent}{name} = {value.text}"]
+    if value.cut_characters:
+        lines.append(
+            f"{indent}  ... {value.cut_characters:,} more characters"
+            f" ({FULL_VALUES_FLAG} prints them)"
+        )
+    return lines
 
 
 class Reporter:
@@ -97,9 +155,10 @@ class Reporter:
             click.echo()
             click.secho(f"FAILED {result.test.id}", fg="red", bold=True)
             click.echo()
-            click.echo(textwrap.indent(result.traceback_text.rstrip(), "  "))
+            assert result.failure is not None
+            click.echo(textwrap.indent(failure_text(result.failure), "  "))
             click.echo()
-            click.secho(f"Re-run: {rerun_command(result.test.id)}", dim=True)
+            click.secho(f"Re-run: {result.failure.rerun_command}", dim=True)
 
     def skips(self, run: TestRun) -> None:
         # Verbose output already gave each skipped test its own line.

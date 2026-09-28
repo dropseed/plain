@@ -55,3 +55,20 @@ class TestLifecycle:
         lifecycles can use to vary behavior per-test.
         """
         yield
+
+    def describe_value(self, value: object) -> str | None:
+        """
+        What a failure report prints for a value this package owns, or None
+        for a value that isn't this package's to describe.
+
+        A report prints the values a failed test had in hand, by their
+        `repr`. This is for a value whose `repr` says too little to fix a
+        test by (a model instance that prints as its class and its id).
+        The text is printed as it is, on one line or several.
+
+        It is called while the test's lifecycles are still in place. It
+        must not change anything the test did, and must not do anything the
+        test didn't: a description that runs a query is a query the failing
+        test never ran.
+        """
+        return None

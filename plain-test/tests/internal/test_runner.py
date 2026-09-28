@@ -1,6 +1,9 @@
+import gc
+import weakref
 from contextlib import contextmanager
 
-from plain.test import TestLifecycle, raises, skip, skip_test
+from plain.test import TestLifecycle, patch, raises, skip, skip_test
+from plain.test.runner import execution
 from plain.test.runner.collection import RunnableTest
 from plain.test.runner.execution import run_tests
 
@@ -205,3 +208,71 @@ def test_a_failing_lifecycle_exit_outranks_the_skip():
 @skip("proves @skip works when collected by the engine itself")
 def test_skip_decorator_is_honored():
     raise AssertionError("never runs")
+
+
+# What a failure carries
+
+
+def test_a_failure_carries_text_and_lets_go_of_everything_else():
+    class Order:
+        pass
+
+    watching = []
+
+    def failing():
+        order = Order()
+        watching.append(weakref.ref(order))
+        raise ValueError("no total")
+
+    run = run_tests([make_test(failing)], lifecycles=[])
+
+    (result,) = run.results
+    assert result.failure is not None
+    assert result.failure.error_type == "ValueError"
+    assert result.failure.error_message == "no total"
+    assert "ValueError: no total" in result.failure.traceback
+    assert result.failure.rerun_command == "plain test test_x.py::test_x"
+    gc.collect()
+    assert watching[0]() is None
+
+
+def test_a_failure_is_described_while_the_lifecycles_are_in_place():
+    in_place = []
+
+    class Protecting(TestLifecycle):
+        @contextmanager
+        def around_test(self, test):
+            in_place.append("entered")
+            try:
+                yield
+            finally:
+                in_place.append("exited")
+
+        def describe_value(self, value):
+            in_place.append(f"described {value!r}")
+
+    def failing():
+        total = 41
+        raise ValueError(total)
+
+    failing_test = RunnableTest(id="test_x.py::test_x", func=failing, function=failing)
+    run_tests([failing_test], lifecycles=[Protecting()])
+
+    assert in_place == ["entered", "described 41", "exited"]
+
+
+def test_a_failure_that_cannot_be_described_is_still_reported():
+    def describing_goes_wrong(error, **kwargs):
+        raise RuntimeError("the printer broke")
+
+    def failing():
+        raise ValueError("no total")
+
+    with patch(execution, "describe_failure", describing_goes_wrong):
+        run = run_tests([make_test(failing)], lifecycles=[])
+
+    (result,) = run.results
+    assert result.outcome == "failed"
+    assert result.failure is not None
+    assert "ValueError: no total" in result.failure.traceback
+    assert "RuntimeError: the printer broke" in result.failure.traceback

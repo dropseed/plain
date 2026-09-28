@@ -2373,6 +2373,21 @@ The tests share one connection. The rollback undoes what a test did in its trans
 
 The package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
 
+### What a failure prints
+
+When a test fails, the [failure](../../../plain-test/plain/test/README.md#failures) prints the values it had in hand. A model instance is printed with its fields, and a queryset with what it holds:
+
+```
+  assert widget.size == "xl"
+    widget.size = 'm'
+      widget = Widget(id=3, name='bolt', size='m')
+
+  locals:
+    widgets = <QuerySet of Widget, not run: SELECT "examples_widget"."id", "examples_widget"."name", "examples_widget"."size" FROM "examples_widget" WHERE "examples_widget"."size" = %s with ('xl',)>
+```
+
+Printing never runs a query. A queryset that hasn't run is printed as the SQL it would run, and one that has is printed as its rows. A field that was deferred is printed as `<not loaded>`.
+
 ### Tests that can't run in a transaction
 
 A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./test/decorators.py#isolated_db):

@@ -5,7 +5,7 @@
 ### What's changed
 
 - `plain.test` is this package now, a dev dependency, and no longer part of Plain itself. It holds what a test file imports (`Client`, `raises`, `@cases`, the captures) and the runner behind `plain test`. `from plain.test import ...` reads the same as before.
-- Initial working engine: collection (`test_*` functions, `Test*` classes, async tests), assertion rewriting for bare `assert` with left/right values on failure, `@cases` expansion, `@skip`, `@tag` selection (`--tag`/`--exclude-tag`), `-k`/`-x`/`-v`, and failure output ending in a re-run command.
+- Initial working engine: collection (`test_*` functions, `Test*` classes, async tests), assertion rewriting for bare `assert`, `@cases` expansion, `@skip`, `@tag` selection (`--tag`/`--exclude-tag`), `-k`/`-x`/`-v`, and failure output ending in a re-run command.
 - `plain test` CLI, contributed through the `plain.cli` entry point group so it is available without `plain.runtime.setup()` (and therefore outside an app). Because nothing has set the runtime up by the time it runs, the runner makes the app-vs-library decision itself. The runner reads no `.env` files itself: plain.dev loads `.env.test` from its setup hook, as it does for every command.
 - Test lifecycle extension point: packages register a `TestLifecycle` under the `plain.test` entry point group. plain.postgres provides the automatic test database with per-test rolled-back transactions and `@isolated_db`; plain.email routes to the locmem backend and clears the outbox per test.
 - A project declares its own lifecycle in `tests/lifecycle.py`: one `TestLifecycle` subclass, found by its path, entered after the packages' lifecycles so it wraps closest to the test. A file that is there but doesn't hold exactly one usable lifecycle stops the run before any test.
@@ -17,6 +17,12 @@
 - `plain test --help` lists the flags and the forms a target takes.
 - The re-run command a failure prints is quoted for the shell, so a case id with spaces, brackets or `$` can be pasted.
 - A failed assertion shows the expression as the test wrote it. It was regenerated from the syntax tree, which dropped parentheses.
+- A failed assert prints every value inside its expression, from the outside in, for any expression: a comparison, a call, a membership test, `and`/`or`/`not`. Each part is evaluated once and in order, and a part Python never evaluated is reported as not evaluated. The error raised is an ordinary `AssertionError`, with the test's message or none.
+- Two large values that were expected to be equal are printed as a diff: text by line, dicts by key, lists by item, dataclasses by field.
+- Every failure prints the test function's locals.
+- A value is printed whole up to 2,000 characters and a diff up to 60 lines, and says how much was cut. `--full-values` prints everything. The 400-character and 20-item limits are gone.
+- A lifecycle's `describe_value(value)` says how a failure prints a value its package owns. plain.postgres prints a model instance with its fields and a queryset with its SQL or its rows, and runs no query to do it.
+- Test modules are loaded through the import machinery, so they have a spec and a loader, and an instance of a class defined in one can be pickled. Their rewritten bytecode is cached under a name of its own in `__pycache__`.
 - `CollectedTest`, what a lifecycle's `around_test(test)` receives, is in `plain.test`. Nothing in `plain.test.runner` is an importable API.
 - `capture_spans`, `capture_metrics`, `capture_logs` and `plain.postgres.test.capture_queries` hand back one shape: a read-only sequence of what was captured, read after the block ends. Reading one inside its block raises. `spans.filter(name=, kind=)`, `metrics.number_points()` / `metrics.histogram_points()`, `logs.messages` and `queries.sql_statements()` are the finders. Captures can be nested.
 - Captures nest, `capture_queries` and `max_queries` included: one opened inside another leaves the outer one whole. `CaptureSource` in `plain.test` is what a package's own capture helper is built on. Spans and metrics that nobody is capturing are dropped, not kept until the next capture.

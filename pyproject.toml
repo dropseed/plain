@@ -127,5 +127,6 @@ extra-paths = [
   "plain-oauthserver/tests",
   "plain-postgres/tests",
   "plain-templates/tests",
+  "plain-test/tests",
   "example",
 ]

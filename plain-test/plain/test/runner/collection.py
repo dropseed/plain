@@ -64,6 +64,10 @@ class RunnableTest(CollectedTest):
 
     func: Callable  # zero-argument callable that runs the test body
     skip_reason: str | None = None  # from `@skip`
+    # The test as the test file defined it. `func` calls it, with a case's
+    # values or on a fresh instance of its class. A failure is traced back
+    # to the frame that ran this function's code.
+    function: types.FunctionType | None = None
 
 
 def collect_tests(
@@ -384,6 +388,7 @@ def _expand(
                 func=run,
                 tags=tags,
                 skip_reason=skip_reason,
+                function=func,
             )
         ]
 
@@ -393,6 +398,7 @@ def _expand(
             func=functools.partial(run, *values),
             tags=tags,
             skip_reason=skip_reason,
+            function=func,
         )
         for index, (values, case_id) in enumerate(case_list)
     ]

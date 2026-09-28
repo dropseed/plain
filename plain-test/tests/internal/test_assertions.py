@@ -1,47 +1,93 @@
+"""The rewriter: what a rewritten assert does, and what it keeps.
+
+What a failure prints is tested in `public/test_failure_output.py`.
+"""
+
 import ast
+import asyncio
+from typing import Any
 
-from plain.test import raises
-from plain.test.runner.assertions import rewrite_asserts
+from plain.test import cases, raises
+from plain.test.runner.assertions import (
+    NOT_EVALUATED,
+    WatchedAssert,
+    rewrite_asserts,
+    watched_assert_of,
+)
 
 
-def run_rewritten(source: str) -> None:
+def run_rewritten(
+    source: str, *, names: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """
+    Run a module's source with its asserts rewritten. Returns its names,
+    and fills `names` with them when the source raises before it can.
+    """
     tree = ast.parse(source)
     tree = rewrite_asserts(tree, source=source)
     code = compile(tree, "<test>", "exec", dont_inherit=True)
-    exec(code, {})  # noqa: S102 — the rewritten tree is the thing under test
+    if names is None:
+        names = {}
+    exec(code, names)  # noqa: S102 — the rewritten tree is the thing under test
+    return names
 
 
-def test_compare_failure_shows_both_sides():
+def failed(source: str) -> WatchedAssert:
+    """What the assert that fails in `source` kept."""
     with raises(AssertionError) as caught:
-        run_rewritten("value = {'a': 1}\nassert value == {'a': 2}\n")
-    message = str(caught.exception)
-    assert "assert value == {'a': 2}" in message
-    assert "left:  {'a': 1}" in message
-    assert "right: {'a': 2}" in message
+        run_rewritten(source)
+    watched = watched_assert_of(caught.exception)
+    assert watched is not None
+    return watched
 
 
-def test_operands_evaluate_once():
-    source = (
-        "calls = []\n"
-        "def side(x):\n"
-        "    calls.append(x)\n"
-        "    return x\n"
-        "assert side(1) == side(1)\n"
-        "assert calls == [1, 1]\n"
+def kept(watched: WatchedAssert) -> list[tuple[int, str, Any]]:
+    """The parts that aren't written out, as (depth, source, value)."""
+    return [
+        (value.depth, value.source, value.value)
+        for value in watched.values
+        if not value.is_literal
+    ]
+
+
+# What is raised
+
+
+def test_what_is_raised_is_what_python_would_have_raised():
+    with raises(AssertionError) as caught:
+        run_rewritten("assert 1 == 2\n")
+    assert type(caught.exception) is AssertionError
+    assert caught.exception.args == ()
+    assert str(caught.exception) == ""
+
+
+def test_the_message_is_the_errors_message():
+    with raises(AssertionError) as caught:
+        run_rewritten("assert 1 == 2, 'the total should include shipping'\n")
+    assert caught.exception.args == ("the total should include shipping",)
+    watched = watched_assert_of(caught.exception)
+    assert watched is not None
+    assert watched.message == "the total should include shipping"
+
+
+def test_the_message_is_evaluated_only_when_the_assert_fails():
+    names = run_rewritten(
+        "made = []\n"
+        "def message():\n"
+        "    made.append('message')\n"
+        "    return 'why'\n"
+        "assert 1 == 1, message()\n"
     )
-    run_rewritten(source)
+    assert names["made"] == []
+
+    with raises(AssertionError, match="why"):
+        run_rewritten("def message():\n    return 'why'\nassert 1 == 2, message()\n")
 
 
-def test_assert_message_is_included():
-    with raises(AssertionError) as caught:
-        run_rewritten("assert 1 == 2, 'custom message'\n")
-    assert "custom message" in str(caught.exception)
-
-
-def test_truthiness_failure_shows_source():
-    with raises(AssertionError) as caught:
-        run_rewritten("items = []\nassert items\n")
-    assert "assert items" in str(caught.exception)
+def test_an_error_raised_inside_the_expression_is_that_error():
+    with raises(KeyError) as caught:
+        run_rewritten("settings = {}\nassert settings['missing'] == 1\n")
+    assert watched_assert_of(caught.exception) is None
 
 
 def test_passing_asserts_are_silent():
@@ -59,38 +105,371 @@ def test_module_future_imports_still_apply():
     )
 
 
-def test_failure_shows_the_expression_as_the_test_wrote_it():
+# What is kept
+
+
+def test_the_values_inside_the_expression_are_kept_from_the_outside_in():
+    watched = failed("rows = [1, 2]\nexpected = 3\nassert len(rows) == expected\n")
+    assert kept(watched) == [
+        (0, "len(rows)", 2),
+        (1, "rows", [1, 2]),
+        (0, "expected", 3),
+    ]
+
+
+def test_an_attribute_keeps_what_it_is_an_attribute_of():
+    watched = failed(
+        "class Response:\n"
+        "    status_code = 404\n"
+        "response = Response()\n"
+        "assert response.status_code == 200\n"
+    )
+    (status, response) = kept(watched)
+    assert status == (0, "response.status_code", 404)
+    assert response[:2] == (1, "response")
+
+
+def test_a_method_call_keeps_what_it_was_called_on_and_with():
+    watched = failed("data = {'ok': False}\nkey = 'ok'\nassert data.get(key)\n")
+    assert kept(watched) == [
+        (0, "data.get(key)", False),
+        (1, "data", {"ok": False}),
+        (1, "key", "ok"),
+    ]
+
+
+def test_the_function_that_is_called_is_not_kept():
+    watched = failed("assert len([]) == 1\n")
+    assert [source for _, source, _ in kept(watched)] == ["len([])"]
+
+
+def test_what_is_written_out_is_kept_only_as_a_side_of_a_comparison():
+    watched = failed("total = 41\nassert total == 42\n")
+    assert [(value.source, value.is_literal) for value in watched.values] == [
+        ("total", False),
+        ("42", True),
+    ]
+    assert watched.equality == (0, 1)
+
+
+def test_only_a_single_equality_has_two_sides_to_diff():
+    assert failed("a = 1\nassert a != 1\n").equality is None
+    assert failed("a = 1\nassert a == 2 == 3\n").equality is None
+    assert failed("a = []\nassert a\n").equality is None
+
+
+def test_a_subscript_keeps_what_is_between_the_brackets():
+    watched = failed(
+        "rows = [1, 2, 3]\nstart = 1\nstop = 2\nassert rows[start:stop] == []\n"
+    )
+    assert kept(watched) == [
+        (0, "rows[start:stop]", [2]),
+        (1, "rows", [1, 2, 3]),
+        (1, "start", 1),
+        (1, "stop", 2),
+    ]
+
+
+def test_a_not_keeps_what_was_true():
+    watched = failed("errors = ['required']\nassert not errors\n")
+    assert kept(watched) == [(0, "errors", ["required"])]
+
+
+def test_a_comparison_inside_an_expression_keeps_what_it_came_to():
+    watched = failed("a = 1\nb = 1\nvalid = False\nassert (a == b) is valid\n")
+    assert kept(watched) == [
+        (0, "a == b", True),
+        (1, "a", 1),
+        (1, "b", 1),
+        (0, "valid", False),
+    ]
+
+
+def test_arithmetic_keeps_what_it_came_to():
+    watched = failed("price = 10\ncount = 3\nassert price * count == 40\n")
+    assert kept(watched) == [
+        (0, "price * count", 30),
+        (1, "price", 10),
+        (1, "count", 3),
+    ]
+
+
+def test_a_display_keeps_its_elements():
+    watched = failed("a = 1\nb = 2\nassert [a, b] == [1, 3]\n")
+    assert kept(watched) == [(0, "[a, b]", [1, 2]), (1, "a", 1), (1, "b", 2)]
+
+
+def test_an_f_string_is_kept_whole():
+    watched = failed("name = 'a'\nassert f'{name}-{name!r}' == 'a-b'\n")
+    assert kept(watched) == [(0, "f'{name}-{name!r}'", "a-'a'")]
+
+
+def test_a_comprehension_is_kept_whole():
+    watched = failed("rows = [1, 2]\nassert [n * 2 for n in rows] == [2, 5]\n")
+    assert kept(watched) == [(0, "[n * 2 for n in rows]", [2, 4])]
+
+
+def test_a_generator_passed_to_a_call_is_not_kept():
+    watched = failed("rows = [1, 2]\nassert all(n > 1 for n in rows)\n")
+    assert kept(watched) == [(0, "all(n > 1 for n in rows)", False)]
+
+
+def test_a_part_written_over_several_lines_is_named_on_one():
+    watched = failed(
+        "def total(*prices):\n"
+        "    return sum(prices)\n"
+        "assert total(\n"
+        "    1,\n"
+        "    2,\n"
+        ") == 4\n"
+    )
+    assert kept(watched) == [(0, "total(1, 2)", 3)]
+
+
+# Evaluated once, in order, and only what Python would evaluate
+
+
+def test_every_part_is_evaluated_once_and_in_order():
+    names = run_rewritten(
+        "calls = []\n"
+        "def side(x):\n"
+        "    calls.append(x)\n"
+        "    return x\n"
+        "assert side(1) + side(2) == side(3)\n"
+        "assert side(side(4)) in [side(4)]\n"
+    )
+    assert names["calls"] == [1, 2, 3, 4, 4, 4]
+
+
+def test_a_part_with_a_side_effect_has_it_once_when_the_assert_fails():
+    names: dict[str, Any] = {}
+    with raises(AssertionError):
+        run_rewritten(
+            "sent = []\n"
+            "def send(message):\n"
+            "    sent.append(message)\n"
+            "    return len(sent)\n"
+            "assert send('hello') == 2\n",
+            names=names,
+        )
+    assert names["sent"] == ["hello"]
+
+
+def test_a_generator_is_run_through_once():
+    names = run_rewritten(
+        "yielded = []\n"
+        "def numbers():\n"
+        "    for n in [1, 2, 3]:\n"
+        "        yielded.append(n)\n"
+        "        yield n\n"
+        "generator = numbers()\n"
+        "assert list(generator) == [1, 2, 3]\n"
+        "assert list(generator) == []\n"
+        "assert sum(n for n in numbers()) == 6\n"
+    )
+    assert names["yielded"] == [1, 2, 3, 1, 2, 3]
+
+
+def test_the_right_side_of_an_and_is_left_alone_when_the_left_is_false():
+    watched = failed(
+        "def explode():\n"
+        "    raise RuntimeError('never called')\n"
+        "items = []\n"
+        "assert items and explode()\n"
+    )
+    assert kept(watched) == [(0, "items", []), (0, "explode()", NOT_EVALUATED)]
+
+
+def test_the_right_side_of_an_or_is_left_alone_when_the_left_is_true():
+    names = run_rewritten(
+        "calls = []\n"
+        "def called():\n"
+        "    calls.append(1)\n"
+        "    return True\n"
+        "assert True or called()\n"
+        "value = 1\n"
+        "assert value or called()\n"
+    )
+    assert names["calls"] == []
+
+
+def test_a_chained_comparison_stops_where_python_stops():
+    watched = failed(
+        "calls = []\n"
+        "def value(n):\n"
+        "    calls.append(n)\n"
+        "    return n\n"
+        "assert value(5) < value(2) < value(9)\n"
+    )
+    assert kept(watched) == [
+        (0, "value(5)", 5),
+        (0, "value(2)", 2),
+        (0, "value(9)", NOT_EVALUATED),
+    ]
+
+
+def test_a_conditional_expression_evaluates_one_branch():
+    watched = failed(
+        "def explode():\n"
+        "    raise RuntimeError('never called')\n"
+        "ready = False\n"
+        "fallback = 0\n"
+        "assert (explode() if ready else fallback)\n"
+    )
+    assert kept(watched) == [
+        (0, "explode() if ready else fallback", 0),
+        (1, "explode()", NOT_EVALUATED),
+        (1, "ready", False),
+        (1, "fallback", 0),
+    ]
+
+
+def test_a_part_that_was_not_evaluated_last_time_is_not_shown_from_before():
+    # The same assert runs twice. The second time, the right side is never
+    # evaluated, and must not be reported as what it was the first time.
+    watched = failed(
+        "for left, right in [(1, 1), (0, 5)]:\n    assert left and right == 1\n"
+    )
+    assert kept(watched) == [
+        (0, "left", 0),
+        (0, "right == 1", NOT_EVALUATED),
+        (1, "right", NOT_EVALUATED),
+    ]
+
+
+# Expressions that have to come through with their meaning intact
+
+
+@cases(
+    "values = [3, 4]\nassert (total := sum(values)) == 7\nassert total == 7\n",
+    "double = lambda n: n * 2\nassert (lambda n: n + 1)(double(2)) == 5\n",
+    "rows = [1, 2]\nassert {n: n * 2 for n in rows} == {1: 2, 2: 4}\n",
+    "rows = [1, 2]\nassert {n for n in rows} == {1, 2}\n",
+    "def add(*numbers, **named):\n"
+    "    return sum(numbers) + sum(named.values())\n"
+    "some = [1, 2]\n"
+    "more = {'a': 3}\n"
+    "assert add(*some, 4, **more, b=5) == 15\n",
+    "first = [1]\nrest = [2, 3]\nassert [*first, *rest] == [1, 2, 3]\n",
+    "defaults = {'a': 1}\nassert {**defaults, 'b': 2} == {'a': 1, 'b': 2}\n",
+    "name = 'x'\nwidth = 3\nassert f'{name:>{width}}' == '  x'\n",
+    "name = 'x'\nassert f'{name=}' == \"name='x'\"\n",
+    "grid = [[1, 2], [3, 4]]\nassert grid[1][0] == 3\nassert grid[-1][::-1] == [4, 3]\n",
+    "value = -1\nassert -value == 1\nassert not value == 1\nassert ~value == 0\n",
+    "assert ...\n",
+    "class Settings:\n    debug = True\n    assert debug\n",
+)
+def test_an_expression_comes_through_with_its_meaning(source):
+    run_rewritten(source)
+
+
+def test_a_template_string_is_kept_whole():
+    watched = failed("name = 'a'\nassert t'{name}'.strings == ('x',)\n")
+    assert [source for _, source, _ in kept(watched)] == [
+        "t'{name}'.strings",
+        "t'{name}'",
+    ]
+
+
+def test_an_awaited_call_keeps_what_was_awaited_and_not_the_coroutine():
+    names = run_rewritten(
+        "async def fetch(path):\n"
+        "    return 404\n"
+        "async def check():\n"
+        "    path = '/missing'\n"
+        "    assert await fetch(path) == 200\n"
+    )
+    with raises(AssertionError) as caught:
+        asyncio.run(names["check"]())
+    watched = watched_assert_of(caught.exception)
+    assert watched is not None
+    assert kept(watched) == [(0, "await fetch(path)", 404), (1, "path", "/missing")]
+
+
+def test_a_yield_in_an_assert_still_yields():
+    names = run_rewritten(
+        "def ask():\n    assert (yield 'question') == 'answer'\n    yield 'done'\n"
+    )
+    asking = names["ask"]()
+    assert next(asking) == "question"
+    assert asking.send("answer") == "done"
+
+
+# What an assert leaves behind
+
+
+def test_an_assert_that_passes_leaves_no_names_behind():
+    names = run_rewritten(
+        "def check():\n"
+        "    rows = [1]\n"
+        "    assert len(rows) == 1\n"
+        "    return sorted(locals())\n"
+        "left_in_the_function = check()\n"
+        "assert len([1]) == 1\n"
+    )
+    assert names["left_in_the_function"] == ["rows"]
+    assert not [name for name in names if name.startswith("__plain_test_0")]
+
+
+def test_an_assert_that_fails_leaves_no_names_behind():
+    names = run_rewritten(
+        "def check():\n"
+        "    rows = [1]\n"
+        "    try:\n"
+        "        assert len(rows) == 2\n"
+        "    except AssertionError:\n"
+        "        pass\n"
+        "    return sorted(locals())\n"
+        "left_in_the_function = check()\n"
+    )
+    assert names["left_in_the_function"] == ["rows"]
+
+
+def test_an_assert_does_not_keep_an_object_alive():
+    # The second assert is about an object the first one had in hand.
+    run_rewritten(
+        "import weakref\n"
+        "class Thing:\n"
+        "    pass\n"
+        "def check():\n"
+        "    thing = Thing()\n"
+        "    watching = weakref.ref(thing)\n"
+        "    assert watching() is not None\n"
+        "    del thing\n"
+        "    assert watching() is None\n"
+        "check()\n"
+    )
+
+
+# The expression, as the test file wrote it
+
+
+def test_the_expression_is_the_one_the_test_wrote():
     # Without its parentheses this is `"@" in email is valid`, which is a
     # chained comparison and a different expression.
-    with raises(AssertionError) as caught:
-        run_rewritten(
-            'email = "a@example.com"\nvalid = False\nassert ("@" in email) is valid\n'
-        )
-    message = str(caught.exception)
-    assert message.splitlines()[0] == 'assert ("@" in email) is valid'
-    assert "left:  True" in message
-    assert "right: False" in message
+    watched = failed(
+        'email = "a@example.com"\nvalid = False\nassert ("@" in email) is valid\n'
+    )
+    assert watched.expression == '("@" in email) is valid'
 
 
-def test_truthiness_failure_keeps_its_parentheses_and_quotes():
-    with raises(AssertionError) as caught:
-        run_rewritten('a = 1\nb = 1\nassert not (a and b) or (a == "one")\n')
-    assert str(caught.exception) == 'assert not (a and b) or (a == "one")'
+def test_the_expression_keeps_its_parentheses_and_quotes():
+    watched = failed('a = 1\nb = 1\nassert not (a and b) or (a == "one")\n')
+    assert watched.expression == 'not (a and b) or (a == "one")'
 
 
 def test_an_expression_written_over_several_lines_keeps_its_shape():
-    with raises(AssertionError) as caught:
-        run_rewritten(
-            "def check():\n"
-            "    result = {'a': 1}\n"
-            "    assert result == {\n"
-            "        'a': 1,\n"
-            "        'b': 2,\n"
-            "    }\n"
-            "check()\n"
-        )
-    assert str(caught.exception).splitlines()[:4] == [
-        "assert result == {",
+    watched = failed(
+        "def check():\n"
+        "    result = {'a': 1}\n"
+        "    assert result == {\n"
+        "        'a': 1,\n"
+        "        'b': 2,\n"
+        "    }\n"
+        "check()\n"
+    )
+    assert watched.expression.splitlines() == [
+        "result == {",
         "    'a': 1,",
         "    'b': 2,",
         "}",
@@ -99,30 +478,28 @@ def test_an_expression_written_over_several_lines_keeps_its_shape():
 
 def test_the_expression_is_found_by_bytes_not_characters():
     # The parser counts columns in UTF-8 bytes, and "é" is two of them.
-    with raises(AssertionError) as caught:
-        run_rewritten('name = "é"; assert name == "e"\n')
-    assert str(caught.exception).splitlines()[0] == 'assert name == "e"'
+    watched = failed('name = "é"; assert name == "e"\n')
+    assert watched.expression == 'name == "e"'
+    assert kept(watched) == [(0, "name", "é")]
 
 
 def test_a_form_feed_does_not_count_as_the_end_of_a_line():
-    with raises(AssertionError) as caught:
-        run_rewritten("first = 1\n\x0csecond = 2\nassert first == second\n")
-    assert str(caught.exception).splitlines()[0] == "assert first == second"
+    watched = failed("first = 1\n\x0csecond = 2\nassert first == second\n")
+    assert watched.expression == "first == second"
 
 
 def test_a_tab_indented_expression_over_several_lines_keeps_its_shape():
-    with raises(AssertionError) as caught:
-        run_rewritten(
-            "def check():\n"
-            "\tresult = {'a': 1}\n"
-            "\tassert result == {\n"
-            "\t\t'a': 1,\n"
-            "\t\t'b': 2,\n"
-            "\t}\n"
-            "check()\n"
-        )
-    assert str(caught.exception).splitlines()[:4] == [
-        "assert result == {",
+    watched = failed(
+        "def check():\n"
+        "\tresult = {'a': 1}\n"
+        "\tassert result == {\n"
+        "\t\t'a': 1,\n"
+        "\t\t'b': 2,\n"
+        "\t}\n"
+        "check()\n"
+    )
+    assert watched.expression.splitlines() == [
+        "result == {",
         "\t'a': 1,",
         "\t'b': 2,",
         "}",

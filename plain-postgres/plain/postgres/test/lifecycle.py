@@ -22,11 +22,58 @@ from contextlib import ExitStack, contextmanager
 from plain.test import CollectedTest, TestLifecycle
 
 from .. import transaction
+from ..base import Model
 from ..db import get_connection
 from ..otel import suppress_db_tracing
+from ..query import QuerySet
 from ..sources import runtime_pool_source
 from .database import use_test_database
 from .decorators import ISOLATED_DB_TAG
+
+# A model instance that prints in less than this is printed on one line.
+_ONE_LINE = 80
+
+
+def describe_model_instance(instance: Model) -> str:
+    """
+    A model instance with its fields: `Widget(id=1, name='bolt', size='m')`,
+    or one field to a line when that is long. Its `repr` is its class and
+    its id.
+
+    A field that was deferred is read from where a loaded one is kept, so
+    it is reported as not loaded and is not fetched.
+    """
+    fields = []
+    for field in instance._model_meta.fields:
+        if field.name in instance.__dict__:
+            fields.append(f"{field.name}={instance.__dict__[field.name]!r}")
+        else:
+            fields.append(f"{field.name}=<not loaded>")
+
+    name = type(instance).__name__
+    on_one_line = f"{name}({', '.join(fields)})"
+    if len(on_one_line) <= _ONE_LINE:
+        return on_one_line
+    return "\n".join([f"{name}(", *(f"    {field}," for field in fields), ")"])
+
+
+def describe_queryset(queryset: QuerySet) -> str:
+    """
+    A queryset by what it holds. One that has run prints its rows. One that
+    hasn't prints the SQL it would run, and doesn't run it.
+    """
+    name = f"{type(queryset).__name__} of {queryset.model.__name__}"
+    rows = queryset._result_cache
+    if rows is not None:
+        count = "1 row" if len(rows) == 1 else f"{len(rows):,} rows"
+        return f"<{name}, {count}: {rows!r}>"
+    try:
+        # Compiled from a copy. Compiling settles a query's joins and
+        # aliases, which is a change to the test's own queryset.
+        sql, params = queryset._chain().sql_query.sql_with_params()
+    except Exception:
+        return f"<{name}, not run>"
+    return f"<{name}, not run: {sql} with {params!r}>"
 
 
 class PostgresTestLifecycle(TestLifecycle):
@@ -56,6 +103,13 @@ class PostgresTestLifecycle(TestLifecycle):
             yield from self._run_in_isolated_database(test)
         else:
             yield from self._run_in_rolled_back_transaction()
+
+    def describe_value(self, value: object) -> str | None:
+        if isinstance(value, Model):
+            return describe_model_instance(value)
+        if isinstance(value, QuerySet):
+            return describe_queryset(value)
+        return None
 
     def _run_in_rolled_back_transaction(self) -> Generator[None]:
         with suppress_db_tracing():

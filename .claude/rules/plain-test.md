@@ -10,6 +10,7 @@ uv run plain test [targets] [options]
 - `uv run plain test -x` - Stop on first failure
 - `uv run plain test -v` - One line per test
 - `uv run plain test --tag slow` / `--exclude-tag slow` - Select by tag
+- `uv run plain test --full-values` - Print every value in a failure whole
 
 ## Writing tests
 
@@ -21,7 +22,8 @@ uv run plain test [targets] [options]
 - Runtime state enters through `with` blocks: `override_settings(...)`, `patch(obj, "name", value)`, `capture_spans()`, `capture_metrics()`, `capture_logs()` — from `plain.test`.
 - A `capture_*` block hands back a read-only sequence (`len()`, indexing, iteration). Read it after the `with` block ends — reading inside raises. Finders: `spans.filter(name=, kind=)`, `metrics.number_points(name, attributes=)` / `metrics.histogram_points(name, attributes=)`, `logs.messages`.
 - `raises(ExcType, match=...)` for expected exceptions; the caught exception is `caught.exception`.
-- Bare `assert` everywhere — failures show both sides of comparisons.
+- Bare `assert` everywhere. A failure prints every value inside the expression, a diff of two large values, and the test's locals, so don't add values to the assert: no `assert x == y, f"{x} != {y}"`, no `print()` before it. A message after the comma is for saying why.
+- A value in a failure is cut at 2,000 characters; `--full-values` prints it whole.
 - Database isolation is automatic (rolled-back transaction per test). DDL-heavy tests use `@isolated_db` from `plain.postgres.test`.
 - Package helpers import from their package, and that package's docs cover them under Testing: `plain.email.test.outbox`, `plain.postgres.test.capture_queries` (each query has `.sql` as sent and `.sql_with_params`; `queries.sql_statements(table=)` to pin statements) / `max_queries`, `plain.auth.test.login_client`, `plain.sessions.test.get_client_session`.
 - Import a shared helper module by its bare name: `tests/helpers.py` is `from helpers import create_user`, from any test file. `from tests.helpers import ...` and relative imports are collection errors.
