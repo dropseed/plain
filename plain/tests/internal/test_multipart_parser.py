@@ -7,8 +7,6 @@ be swallowed rather than reported. Each of those says so; the assertion is
 "this is what happens today", not "this is what should happen".
 """
 
-from io import BytesIO
-
 from plain.http import Request
 from plain.http.multipartparser import MultiPartParser, MultiPartParserError
 from plain.test import cases, raises
@@ -30,8 +28,8 @@ def _parse(
         method="POST",
         path="/",
         headers={"Content-Type": content_type, "Content-Length": str(len(body))},
+        body=body,
     )
-    request._stream = BytesIO(body)
     post, files = MultiPartParser(request).parse()
     return dict(post.lists()), files
 

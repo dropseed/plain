@@ -34,9 +34,10 @@ _T = TypeVar("_T")
 
 
 class RequestStream(Protocol):
-    """A bytes reader bound to ``Request._stream`` by the request creator
-    (server, test client, etc.). Anything providing ``read``, ``readline``,
-    and ``close`` over bytes will work.
+    """A request body that is read rather than held: what `Request(body=...)`
+    takes when the body isn't `bytes`. Anything providing `read`, `readline`
+    and `close` over bytes will work — the server passes the file it
+    received the body into.
     """
 
     def read(self, size: int | None = ..., /) -> bytes: ...
@@ -61,15 +62,6 @@ class Request:
 
     non_picklable_attrs = frozenset(["resolver_match", "_stream"])
 
-    # Set by the request creator (server, test client) before the view runs.
-    _stream: RequestStream
-
-    # Stamped by the server after body ingest so the request span can
-    # report what receiving the body cost (a slow upload happens before
-    # dispatch and would otherwise be invisible in traces). None outside
-    # a real server request (test client, h2 requests with no body).
-    _body_ingest_seconds: float | None = None
-
     def __init__(
         self,
         *,
@@ -77,11 +69,23 @@ class Request:
         path: str,
         headers: dict[str, str] | None = None,
         query_string: str = "",
+        body: bytes | RequestStream = b"",
+        body_ingest_seconds: float | None = None,
         server_scheme: str = "http",
         server_name: str = "",
         server_port: str = "",
         remote_addr: str = "",
     ):
+        """
+        `body` is the request's body: `bytes`, or a stream to read it from.
+        It is only the bytes — the `Content-Type` and `Content-Length`
+        headers that describe it are the caller's to pass in `headers`.
+
+        `body_ingest_seconds` is how long receiving the body took, for the
+        request span to report (a slow upload happens before the view runs
+        and would otherwise be invisible in traces). The server passes it;
+        a request that didn't arrive over a connection has none.
+        """
         self.unique_id = str(uuid.uuid4())
         self.resolver_match: ResolverMatch | None = None
 
@@ -93,6 +97,15 @@ class Request:
         self.query_string = query_string
         self.server_scheme = server_scheme
         self.headers = RequestHeaders(headers or {})
+
+        # Every body is read the same way, through `_stream`: bytes in hand
+        # are wrapped, so `body`, `form_data`, `files` and `read()` don't
+        # know which they were given.
+        self._stream: RequestStream = (
+            BytesIO(body) if isinstance(body, bytes) else body
+        )
+        self._read_started = False
+        self.body_ingest_seconds = body_ingest_seconds
 
         # Parse content type, params, and encoding from headers
         self.content_type: str | None
@@ -453,11 +466,9 @@ class Request:
 
     # File-like and iterator interface.
     #
-    # Expects self._stream to be set to an appropriate source of bytes by
-    # a corresponding request creator (e.g. server or test client).
-    # Also when request data has already been read by request.json_data,
-    # request.form_data, or request.body, self._stream points to a BytesIO
-    # instance containing that data.
+    # Reads come from self._stream, the body the request was constructed
+    # with. Once request.json_data, request.form_data, or request.body has
+    # read it all, self._stream points to a BytesIO holding that data.
 
     def read(self, *args: Any, **kwargs: Any) -> bytes:
         self._read_started = True

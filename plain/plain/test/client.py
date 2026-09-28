@@ -4,7 +4,6 @@ import json
 import time
 from http import HTTPStatus
 from http.cookies import SimpleCookie
-from io import BytesIO, IOBase
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse, urlsplit
 
@@ -19,7 +18,6 @@ from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.json import PlainJSONEncoder
 from plain.urls import get_resolver
-from plain.utils.encoding import force_bytes
 from plain.utils.http import urlencode
 from plain.utils.regex_helper import _lazy_re_compile
 
@@ -203,56 +201,6 @@ class ClientResponse:
             f"<ClientResponse status_code={self._status_code}"
             f" of {self._returned_response!r}>"
         )
-
-
-class FakePayload(IOBase):
-    """
-    A wrapper around BytesIO that restricts what can be read since data from
-    the network can't be sought and cannot be read outside of its content
-    length. This makes sure that views can't do anything under the test client
-    that wouldn't work in real life.
-    """
-
-    def __init__(self, initial_bytes: bytes | None = None) -> None:
-        self.__content = BytesIO()
-        self.__len = 0
-        self.read_started = False
-        if initial_bytes is not None:
-            self.write(initial_bytes)
-
-    def __len__(self) -> int:
-        return self.__len
-
-    def read(self, size: int | None = -1, /) -> bytes:
-        if not self.read_started:
-            self.__content.seek(0)
-            self.read_started = True
-        if size == -1 or size is None:
-            size = self.__len
-        else:
-            size = min(size, self.__len)
-        content = self.__content.read(size)
-        self.__len -= len(content)
-        return content
-
-    def readline(self, size: int | None = -1, /) -> bytes:
-        if not self.read_started:
-            self.__content.seek(0)
-            self.read_started = True
-        if size is None or size == -1:
-            size = self.__len
-        else:
-            size = min(size, self.__len)
-        content = self.__content.readline(size)
-        self.__len -= len(content)
-        return content
-
-    def write(self, b: bytes | str, /) -> None:
-        if self.read_started:
-            raise ValueError("Unable to write a payload after it's been read")
-        content = force_bytes(b)
-        self.__content.write(content)
-        self.__len += len(content)
 
 
 def _strip_forbidden_content_length(response: Response) -> None:
@@ -528,14 +476,12 @@ class RequestFactory:
             path=path,
             headers=all_headers,
             query_string=query_string,
+            body=body,
             server_scheme="https" if secure else "http",
             server_name=server_name,
             server_port=server_port or ("443" if secure else "80"),
             remote_addr="127.0.0.1",
         )
-
-        request._stream = FakePayload(body)
-        request._read_started = False
 
         return request
 

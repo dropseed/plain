@@ -124,7 +124,7 @@ class BodySink:
 
     feed() decoded bytes as they arrive; finish() seals the body and
     returns a file-like stream positioned at the start, suitable for
-    ``request._stream`` (the multipart parser and ``request.body`` read
+    ``Request(body=...)`` (the multipart parser and ``request.body`` read
     it like any file). close() discards everything and releases the
     budget — safe to call at any point, including after finish().
 

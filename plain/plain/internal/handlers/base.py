@@ -148,10 +148,10 @@ class BaseHandler:
         # The body is fully received before dispatch, so this span opens
         # after ingest — record what receiving the body cost, or a slow
         # upload reads as a fast view with unhappy users.
-        if request._body_ingest_seconds is not None:
+        if request.body_ingest_seconds is not None:
             span_attributes[HTTP_REQUEST_BODY_SIZE] = request.content_length
             span_attributes["plain.request.body_ingest_seconds"] = round(
-                request._body_ingest_seconds, 6
+                request.body_ingest_seconds, 6
             )
 
         # Start with just the method; updated to "{method} {route}" after

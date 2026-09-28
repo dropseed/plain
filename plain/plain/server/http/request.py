@@ -73,25 +73,20 @@ def create_request(
     server_name, server_port = _resolve_server_address(server, host, req.scheme)
     path = _resolve_path(req.path or "")
 
-    request = HttpRequest(
+    return HttpRequest(
         method=(req.method or "GET").upper(),
         path=path,
         headers=headers,
         query_string=req.query or "",
+        # The fully-ingested body (see BodySink) — never a socket-backed
+        # reader, so app reads can't block on the client.
+        body=stream,
+        body_ingest_seconds=ingest_seconds if received else None,
         server_scheme=req.scheme,
         server_name=server_name,
         server_port=server_port,
         remote_addr=remote_addr,
     )
-
-    # The fully-ingested body (see BodySink) — never a socket-backed
-    # reader, so app reads can't block on the client.
-    request._stream = stream
-    request._read_started = False
-    if received:
-        request._body_ingest_seconds = ingest_seconds
-
-    return request
 
 
 def _resolve_server_address(
