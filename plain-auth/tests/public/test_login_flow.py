@@ -2,7 +2,7 @@
 
 These exercise the functions users actually call from their login views —
 covering session persistence across requests, session-fixation protection,
-logout, and safe user-switching — rather than the test-only ``force_login``
+logout, and safe user-switching — rather than the test-only ``login_client``
 shortcut.
 """
 
