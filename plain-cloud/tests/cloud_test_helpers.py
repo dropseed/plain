@@ -7,6 +7,7 @@ from collections.abc import Generator
 
 import keyring
 import keyring.backend
+from plain.test import patch
 
 
 class InMemoryKeyring(keyring.backend.KeyringBackend):
@@ -35,11 +36,14 @@ def isolated_cloud_env() -> Generator[InMemoryKeyring]:
     """Point credential storage at a fresh tmp dir, clear env overrides, and
     install an in-memory keyring backend so tests don't touch the real OS
     keyring or the developer's actual home directory."""
-    with tempfile.TemporaryDirectory() as tmp:
-        original_home = os.environ.get("HOME")
+    with (
+        tempfile.TemporaryDirectory() as tmp,
+        patch(os.environ, "HOME", tmp),
+    ):
+        # `patch` sets a key for the block. These two have to be gone for
+        # it, which it has no way to say.
         original_token = os.environ.pop("PLAIN_CLOUD_TOKEN", None)
         original_api_url = os.environ.pop("PLAIN_CLOUD_API_URL", None)
-        os.environ["HOME"] = tmp
 
         backend = InMemoryKeyring()
         previous_keyring = keyring.get_keyring()
@@ -50,10 +54,6 @@ def isolated_cloud_env() -> Generator[InMemoryKeyring]:
             keyring.set_keyring(previous_keyring)
             # An env var is never legitimately None, so None is the
             # "wasn't set" marker and narrows the restore to str.
-            if original_home is None:
-                del os.environ["HOME"]
-            else:
-                os.environ["HOME"] = original_home
             if original_token is not None:
                 os.environ["PLAIN_CLOUD_TOKEN"] = original_token
             if original_api_url is not None:

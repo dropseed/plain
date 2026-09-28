@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from plain.postgres.migrations.loader import MigrationLoader
+from plain.test import patch
 
 TEMP_MIGRATIONS_MODULE = "temp_migrations_under_test"
 
@@ -39,11 +40,12 @@ def temp_migrations(*labels: str) -> Generator[Path]:
             return original(package_label)
 
         sys.path.insert(0, str(tmp_dir))
-        MigrationLoader.migrations_module = staticmethod(migrations_module)  # ty: ignore[invalid-assignment] (swapping a classmethod for the test)
         try:
-            yield root
+            with patch(
+                MigrationLoader, "migrations_module", staticmethod(migrations_module)
+            ):
+                yield root
         finally:
-            MigrationLoader.migrations_module = original  # ty: ignore[invalid-assignment] (restoring the classmethod)
             try:
                 sys.path.remove(str(tmp_dir))
             except ValueError:

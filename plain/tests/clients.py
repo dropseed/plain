@@ -5,21 +5,18 @@ from plain.urls.resolvers import _get_cached_resolver
 
 
 @contextmanager
-def _swap_router(
-    router_path: str, *, debug: bool = False, urls_trailing_slash: bool = True
-):
-    """Yield a Client routed at `router_path`, restoring settings on teardown.
+def _swap_router(router_path: str):
+    """Yield a Client routed at `router_path`, restoring settings on exit.
 
-    `urls_trailing_slash` defaults to True so legacy helpers whose
-    routers spell slashed routes continue to behave as before. New
-    helpers that exercise the global default explicitly pass
-    `urls_trailing_slash=False`.
+    Trailing slashes are on, because these routers spell their routes with
+    one. `test_urls_trailing_slash.py` has a helper of its own for the other
+    setting.
     """
     try:
         with override_settings(
             URLS_ROUTER=router_path,
-            DEBUG=debug,
-            URLS_TRAILING_SLASH=urls_trailing_slash,
+            DEBUG=False,
+            URLS_TRAILING_SLASH=True,
         ):
             _get_cached_resolver.cache_clear()
             client = Client(raise_exceptions=False)

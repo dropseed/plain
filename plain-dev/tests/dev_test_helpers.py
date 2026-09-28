@@ -59,9 +59,6 @@ def sandbox(*, chdir: bool = True) -> Generator[Sandbox]:
     checkout-state cache root and a throwaway env-key store."""
     original_cwd = Path.cwd()
     original_environ = dict(os.environ)
-    original_files_loaded = dotenv_module._files_loaded
-    original_consumed_env_key = dotenv_module._consumed_env_key
-    original_directives = dict(dotenv_module._directives)
     original_bound_sources = dict(dotenv_module.bound_sources)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -69,9 +66,8 @@ def sandbox(*, chdir: bool = True) -> Generator[Sandbox]:
         cache_path = tmp_path / "plain-cache"
         env_keys_path = tmp_path / "env-keys"
 
-        dotenv_module._files_loaded = False
-        dotenv_module._consumed_env_key = None
-        dotenv_module._directives = {}
+        # Emptied in place, not replaced: `plain.dev.env` imported this dict
+        # by name, and has to go on seeing the same one.
         dotenv_module.bound_sources.clear()
         for name in _SCRUBBED_ENV_VARS:
             os.environ.pop(name, None)
@@ -86,6 +82,11 @@ def sandbox(*, chdir: bool = True) -> Generator[Sandbox]:
             with (
                 patch(state_module, "PLAIN_CACHE_PATH", cache_path),
                 patch(envkeys_module, "ENV_KEYS_PATH", env_keys_path),
+                # What the dotenv loader remembers between calls starts
+                # blank, and goes back to what it was.
+                patch(dotenv_module, "_files_loaded", False),
+                patch(dotenv_module, "_consumed_env_key", None),
+                patch(dotenv_module, "_directives", {}),
             ):
                 yield Sandbox(tmp_path, cache_path, env_keys_path)
         finally:
@@ -93,8 +94,5 @@ def sandbox(*, chdir: bool = True) -> Generator[Sandbox]:
                 os.chdir(original_cwd)
             os.environ.clear()
             os.environ.update(original_environ)
-            dotenv_module._files_loaded = original_files_loaded
-            dotenv_module._consumed_env_key = original_consumed_env_key
-            dotenv_module._directives = original_directives
             dotenv_module.bound_sources.clear()
             dotenv_module.bound_sources.update(original_bound_sources)
