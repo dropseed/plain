@@ -3,6 +3,7 @@
 from app.users.models import User
 from plain.auth.requests import get_request_user
 from plain.auth.test import login_client, logout_client
+from plain.sessions.models import Session
 from plain.sessions.test import get_client_session
 from plain.test import Client
 
@@ -38,3 +39,23 @@ def test_login_client_keeps_what_the_session_already_held() -> None:
     login_client(client, user)
 
     assert get_client_session(client)["cart"] == "3 items"
+
+
+def test_a_first_login_leaves_one_session_behind() -> None:
+    user = User.query.create(username="ada")
+    client = Client()
+
+    login_client(client, user)
+
+    # The session the client got a cookie for is the one the login used.
+    [session] = Session.query.all()
+    assert client.cookies["sessionid"].value == session.session_key
+
+
+def test_logging_out_a_client_that_never_logged_in_leaves_no_session() -> None:
+    client = Client()
+
+    logout_client(client)
+
+    assert list(client.cookies) == []
+    assert Session.query.count() == 0

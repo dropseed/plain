@@ -43,10 +43,10 @@ class TestLifecycle:
     required_package: str | None = None
 
     def setup_worker(self) -> None:
-        """Called once per worker process, before any tests run."""
+        """Called once per run, before the first test."""
 
     def teardown_worker(self) -> None:
-        """Called once per worker process, after all tests have run."""
+        """Called once per run, after the last test."""
 
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:

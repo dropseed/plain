@@ -14,6 +14,4 @@ During a test run, `EMAIL_BACKEND` is routed to the in-memory backend and
 
 from plain.email.backends.locmem import outbox
 
-from .lifecycle import EmailTestLifecycle
-
-__all__ = ["EmailTestLifecycle", "outbox"]
+__all__ = ["outbox"]

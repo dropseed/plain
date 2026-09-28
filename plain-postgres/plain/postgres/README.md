@@ -2369,6 +2369,8 @@ Two things happen around your tests:
 - **A test database for the run.** When the run starts, a database named `test_<your database>` is created on the same server, then migrated and converged. It's dropped when the run ends. One left over from an interrupted run is replaced.
 - **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
 
+The tests share one connection. The rollback undoes what a test did in its transaction: rows, `SET`, temporary tables, and the locks a transaction holds. What belongs to the session carries over to the next test: a session-level advisory lock, a `LISTEN`, a server-side prepared statement. A test that needs a session of its own is [`@isolated_db`](#tests-that-cant-run-in-a-transaction).
+
 The package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
 
 ### Tests that can't run in a transaction

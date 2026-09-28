@@ -6,10 +6,9 @@ never send real email — and clears the outbox before each test.
 """
 
 from collections.abc import Generator
-from contextlib import contextmanager
-from typing import Any
+from contextlib import ExitStack, contextmanager
 
-from plain.test import CollectedTest, TestLifecycle
+from plain.test import CollectedTest, TestLifecycle, override_settings
 
 from ..backends.locmem import outbox
 
@@ -20,18 +19,16 @@ class EmailTestLifecycle(TestLifecycle):
     required_package = "plain.email"
 
     def __init__(self) -> None:
-        self._original_backend: Any = None
+        # Holds the setting overridden from setup to teardown.
+        self._in_memory_backend = ExitStack()
 
     def setup_worker(self) -> None:
-        from plain.runtime import settings
-
-        self._original_backend = settings.EMAIL_BACKEND
-        settings.EMAIL_BACKEND = _LOCMEM_BACKEND
+        self._in_memory_backend.enter_context(
+            override_settings(EMAIL_BACKEND=_LOCMEM_BACKEND)
+        )
 
     def teardown_worker(self) -> None:
-        from plain.runtime import settings
-
-        settings.EMAIL_BACKEND = self._original_backend
+        self._in_memory_backend.close()
 
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:

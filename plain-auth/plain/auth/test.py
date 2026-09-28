@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Any
 
 from plain.http.request import Request
 from plain.runtime import settings
-from plain.sessions import SessionStore
 from plain.sessions.requests import get_request_session, set_request_session
 from plain.sessions.test import get_client_session
 
@@ -22,10 +21,8 @@ def login_client(client: Client, user: Any) -> None:
     client makes afterwards is that user's.
     """
     request = Request(method="GET", path="/")
-    session = get_client_session(client)
-    if not session:
-        session = SessionStore()
-    set_request_session(request, session)
+    # The client's own session, which it gets a cookie for if it had none.
+    set_request_session(request, get_client_session(client))
     login(request, user)
     session = get_request_session(request)
     session.save()
@@ -51,13 +48,7 @@ def login_client(client: Client, user: Any) -> None:
 def logout_client(client: Client) -> None:
     """Log a test client out: end its session and drop its cookies."""
     request = Request(method="GET", path="/")
-    session = get_client_session(client)
-    if session:
-        set_request_session(request, session)
-        user = get_user(request)
-        set_request_user(request, user)
-    else:
-        session = SessionStore()
-        set_request_session(request, session)
+    set_request_session(request, get_client_session(client))
+    set_request_user(request, get_user(request))
     logout(request)
     client.cookies.clear()
