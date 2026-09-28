@@ -101,9 +101,7 @@ class Request:
         # Every body is read the same way, through `_stream`: bytes in hand
         # are wrapped, so `body`, `form_data`, `files` and `read()` don't
         # know which they were given.
-        self._stream: RequestStream = (
-            BytesIO(body) if isinstance(body, bytes) else body
-        )
+        self._stream: RequestStream = BytesIO(body) if isinstance(body, bytes) else body
         self._read_started = False
         self.body_ingest_seconds = body_ingest_seconds
 
