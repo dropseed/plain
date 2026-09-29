@@ -2388,6 +2388,14 @@ When a test fails, the [failure](../../../plain-test/plain/test/README.md#failur
 
 Printing never runs a query. A queryset that hasn't run is printed as the SQL it would run, and one that has is printed as its rows. A field that was deferred is printed as `<not loaded>`.
 
+A field that holds a secret is printed as `<withheld>`: an [encrypted field](#encrypted-fields), or a password from plain.passwords. A report is read by whoever reads the run.
+
+```
+    account = Account(id=1, name='payments', api_key=<withheld>)
+```
+
+If you write a field type whose value is a secret, say so on the class with `value_is_secret = True`.
+
 ### Tests that can't run in a transaction
 
 A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./test/decorators.py#isolated_db):

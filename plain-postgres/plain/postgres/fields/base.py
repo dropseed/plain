@@ -127,6 +127,11 @@ class Field[T](Selectable[T], RegisterLookupMixin):
     # Designates whether empty strings fundamentally are allowed at the
     # database level.
     empty_strings_allowed = True
+    # Whether what the field holds is a secret: a password's hash, a value
+    # kept encrypted. A model instance printed in a failed test's report is
+    # printed without it. A field type outside this package that holds one
+    # sets this to True.
+    value_is_secret = False
     empty_values = tuple(validators.EMPTY_VALUES)
 
     default_validators: tuple[

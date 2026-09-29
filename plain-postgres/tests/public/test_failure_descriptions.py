@@ -81,3 +81,40 @@ def test_a_value_that_is_not_the_databases_is_left_alone():
     assert describe(3) is None
     assert describe("a string") is None
     assert describe([Widget(name="bolt", size="m")]) is None
+
+
+def test_a_field_kept_encrypted_is_printed_as_withheld():
+    from app.examples.models.encrypted import SecretStore
+
+    store = SecretStore(
+        name="payments",
+        api_key="sk_live_FAKESECRET123",
+        config={"token": "FAKESECRET456"},
+    )
+
+    described = describe(store)
+    assert described == (
+        "SecretStore(\n"
+        "    id=None,\n"
+        "    api_key=<withheld>,\n"
+        "    config=<withheld>,\n"
+        "    name='payments',\n"
+        "    notes='',\n"
+        ")"
+    )
+    assert "FAKESECRET" not in described
+
+
+def test_a_field_type_says_whether_what_it_holds_is_a_secret():
+    from app.examples.models.encrypted import SecretStore
+
+    secret = {
+        field.name: field.value_is_secret for field in SecretStore._model_meta.fields
+    }
+    assert secret == {
+        "id": False,
+        "name": False,
+        "api_key": True,
+        "notes": True,
+        "config": True,
+    }

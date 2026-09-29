@@ -42,13 +42,21 @@ def describe_model_instance(instance: Model) -> str:
 
     A field that was deferred is read from where a loaded one is kept, so
     it is reported as not loaded and is not fetched.
+
+    A field whose type says its value is a secret (`value_is_secret`: an
+    encrypted field, a password) is printed as withheld. One with nothing
+    in it says so, since that gives nothing away.
     """
     fields = []
     for field in instance._model_meta.fields:
-        if field.name in instance.__dict__:
-            fields.append(f"{field.name}={instance.__dict__[field.name]!r}")
-        else:
+        if field.name not in instance.__dict__:
             fields.append(f"{field.name}=<not loaded>")
+            continue
+        value = instance.__dict__[field.name]
+        if field.value_is_secret and value not in (None, ""):
+            fields.append(f"{field.name}=<withheld>")
+        else:
+            fields.append(f"{field.name}={value!r}")
 
     name = type(instance).__name__
     on_one_line = f"{name}({', '.join(fields)})"
