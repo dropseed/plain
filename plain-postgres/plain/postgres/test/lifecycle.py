@@ -106,6 +106,7 @@ class PostgresTestLifecycle(TestLifecycle):
             self._test_database.enter_context(
                 use_test_database(
                     name=run.shared_name,
+                    made_by=run.record_for_a_database(),
                     runtime_url=run.runtime_url,
                     management_url=run.management_url,
                     verbosity=0,
@@ -167,6 +168,7 @@ class PostgresTestLifecycle(TestLifecycle):
 
         ctx = use_test_database(
             name=run.isolated_name(test_name),
+            made_by=run.record_for_a_database(),
             runtime_url=run.runtime_url,
             management_url=run.management_url,
             verbosity=0,

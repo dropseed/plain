@@ -17,6 +17,7 @@ from .identity import current_branch
 
 if TYPE_CHECKING:
     from plain.postgres.database_url import DatabaseConfig
+    from plain.postgres.test.leftovers import RunRecord
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,9 @@ class DevDatabase:
     created_via: str | None
     size_bytes: int
     is_test: bool = False
+    # What the test run that made it wrote into it. `None` for a database
+    # that is only named like a test database.
+    run_record: RunRecord | None = None
 
     @property
     def checkout_exists(self) -> bool:
@@ -62,29 +66,45 @@ class Cluster:
 
         return connection_count(self.config, name=name)
 
-    def test_database_in_use(self, name: str) -> bool:
-        """Whether a test database is some run's, right now.
-
-        A run holds a lock for as long as it lives, so this is true from
-        before it creates its database, not only once it has connected.
-        Something connected counts too: a test database named the way they
-        were before runs took a lock has nothing else to go by.
-        """
-        from plain.postgres.test.database import database_is_a_live_runs
-
-        if self.connection_count(name) > 0:
-            return True
-        return database_is_a_live_runs(self.config, name=name)
-
     def create_database(self, name: str, *, template: str | None = None) -> None:
         from plain.postgres.databases import create_database
 
         create_database(self.config, name=name, template=template)
 
-    def drop_database(self, name: str) -> None:
+    def drop_database(self, name: str, *, force: bool) -> None:
+        """Drop `name`. Forced, it throws off whatever is connected to it.
+        Not forced, it fails with `psycopg.errors.ObjectInUse` if anything
+        is, which is the way to drop a database nobody named."""
         from plain.postgres.databases import drop_database
 
-        drop_database(self.config, name=name, force=True)
+        drop_database(self.config, name=name, force=force)
+
+    def drop_if_a_dead_runs(self, name: str) -> str | None:
+        """Drop the test database `name` if the run that made it is dead.
+        Why it was left, if it was.
+
+        Everything about it is read again, with its run's lock held, and it
+        is dropped without `FORCE`: see `plain.postgres.test.leftovers`.
+        """
+        from plain.postgres.databases import get_database_comment
+        from plain.postgres.test.leftovers import (
+            drop_if_a_dead_runs,
+            maintenance_connection,
+            read_run_record,
+        )
+
+        record = read_run_record(get_database_comment(self.config, name=name))
+        if record is None:
+            return "it carries no record that a test run made it"
+        with maintenance_connection(self.config) as maintenance:
+            verdict = drop_if_a_dead_runs(
+                maintenance,
+                self.config,
+                name=name,
+                record=record,
+                tested_database=record.database,
+            )
+        return None if verdict.drop else verdict.reason
 
     # -- metadata ----------------------------------------------------------
 
@@ -139,28 +159,51 @@ class Cluster:
         database you can't see is one you can't drop. So a database counts as
         ours if it carries our metadata *or* it's named the way we name them.
 
-        Test databases (`test_{project}` / `test_{project}_{checkout}`) count
-        too, even though they carry no metadata. They're dropped on normal exit,
-        so one that exists at rest is usually debris from a crashed run — and
-        invisible debris is unreclaimable debris.
+        Test databases count too. A test run writes a record into each one
+        it makes, naming the database it was testing, and one whose record
+        names a database of ours is ours. So is one that is only named like
+        ours (`test_{project}…`) and carries no record, so that it can be
+        seen. Being listed is all a name earns: nothing is dropped for it.
 
         Going the other way — listing everything on the cluster — is wrong for
         the local backend, where one server holds databases we never created.
         """
         from plain.postgres.databases import list_databases
+        from plain.postgres.test.leftovers import read_run_record
+
+        def named_like_ours(name: str) -> bool:
+            return name == project_name or name.startswith(f"{project_name}_")
+
+        infos = list_databases(self.config)
+        records = {info.name: read_run_record(info.comment) for info in infos}
+        ours = {
+            info.name
+            for info in infos
+            if records[info.name] is None
+            and (
+                "created_via" in (_decode_metadata(info.comment) or {})
+                or named_like_ours(info.name)
+            )
+        }
 
         databases = []
-        for info in list_databases(self.config):
-            metadata = _decode_metadata(info.comment) or {}
-            ours = "created_via" in metadata
-            named_like_ours = info.name == project_name or info.name.startswith(
-                f"{project_name}_"
-            )
-            is_test = info.name == f"test_{project_name}" or info.name.startswith(
-                f"test_{project_name}_"
-            )
-            if not (ours or named_like_ours or is_test):
+        for info in infos:
+            record = records[info.name]
+            if record is not None:
+                is_test = True
+                listed = record.database in ours or named_like_ours(record.database)
+            else:
+                # Named like one, and nothing says a checkout made it.
+                is_test = (
+                    info.name.startswith("test_")
+                    and named_like_ours(info.name.removeprefix("test_"))
+                    and "created_via" not in (_decode_metadata(info.comment) or {})
+                )
+                listed = is_test or info.name in ours
+            if not listed:
                 continue
+
+            metadata = _decode_metadata(info.comment) or {}
             databases.append(
                 DevDatabase(
                     name=info.name,
@@ -169,6 +212,7 @@ class Cluster:
                     created_via=metadata.get("created_via"),
                     size_bytes=info.size_bytes,
                     is_test=is_test,
+                    run_record=record,
                 )
             )
         return databases
@@ -212,7 +256,8 @@ class Cluster:
         try:
             self._dump_restore(source, dest)
         except Exception:
-            self.drop_database(dest)  # don't strand a half-copied database
+            # Don't strand a half-copied database. Forced: this call made it.
+            self.drop_database(dest, force=True)
             raise
         return "dump-restore"
 

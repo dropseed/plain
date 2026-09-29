@@ -133,23 +133,57 @@ class ScratchApp:
         }
 
     def start_run(
-        self, *, environment: dict[str, str] | None = None
+        self,
+        *,
+        environment: dict[str, str] | None = None,
+        arguments: tuple[str, ...] = (),
+        hold_at_start: bool = False,
     ) -> subprocess.Popen:
+        """Start a run of the tests here.
+
+        With `hold_at_start` the process is started and waits for a line on
+        its stdin before it runs anything, so that its process id is known
+        while nothing of it exists yet.
+        """
+        if hold_at_start:
+            command = [sys.executable, "-c", _RUN_WHEN_TOLD, *arguments]
+        else:
+            command = [sys.executable, "-m", "plain.test", *arguments]
         return subprocess.Popen(
-            [sys.executable, "-m", "plain.test"],
+            command,
             cwd=self.root,
             env={**self.environment(), **(environment or {})},
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.PIPE if hold_at_start else subprocess.DEVNULL,
             text=True,
         )
 
-    def run(self, *, environment: dict[str, str] | None = None) -> tuple[int, str]:
+    def run(
+        self,
+        *,
+        environment: dict[str, str] | None = None,
+        arguments: tuple[str, ...] = (),
+    ) -> tuple[int, str]:
         """Run the tests here. The exit code, and everything printed."""
-        process = self.start_run(environment=environment)
+        process = self.start_run(environment=environment, arguments=arguments)
         output, _ = process.communicate(timeout=120)
         return process.returncode, output
+
+
+_RUN_WHEN_TOLD = (
+    "import runpy, sys\n"
+    "sys.stdin.readline()\n"
+    "sys.argv[0] = 'plain.test'\n"
+    "runpy.run_module('plain.test', run_name='__main__')\n"
+)
+
+
+def scratch_database_name(what: str) -> str:
+    """A name for a database a test makes, that nothing else could have:
+    `zz_safety_<what>_<random>`. A test drops what it made by this name, in
+    full, and nothing is ever dropped by how its name starts."""
+    return f"zz_safety_{what}_{secrets.token_hex(4)}"
 
 
 def make_scratch_app(test_files: dict[str, str]) -> ScratchApp:
@@ -163,8 +197,7 @@ def make_scratch_app(test_files: dict[str, str]) -> ScratchApp:
     # The URL as configured for this run of the tests. `settings.POSTGRES_URL`
     # is the test database while tests run; the environment is as it was.
     url_of_this_run = os.environ["PLAIN_POSTGRES_URL"]
-    name_of_this_run = parse_database_url(url_of_this_run)["DATABASE"]
-    configured_name = f"{name_of_this_run}_s{secrets.token_hex(3)}"
+    configured_name = scratch_database_name("app")
     return ScratchApp(
         root=root,
         configured_url=replace_database_name(url_of_this_run, configured_name),

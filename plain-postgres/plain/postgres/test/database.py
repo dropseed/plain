@@ -9,15 +9,18 @@ the run:
 
 So any number of runs in one checkout, at the same moment, each create,
 use and drop their own. A run that ends drops its databases. One that was
-killed leaves them, and the next run in that checkout removes them.
+killed leaves them, and the next run of that database removes them.
+
+**What a run may drop.** Its own databases, which it made. And what a dead
+run left, which it didn't, so that is decided narrowly: only a database
+that carries a run's record, for this configured database exactly, whose
+run is proved dead. `leftovers.py` has the rule. A database is never
+looked for by the start of its name.
 
 **Which runs are alive.** For as long as it lives, a run holds a session
 advisory lock on the `postgres` maintenance database, keyed by the name of
 its shared database. Postgres releases the lock when the run's connection
-goes, however the run ended. A database is a dead run's when nobody holds
-the lock its name says its run would hold. That is settled by asking for
-the lock, so a run is never mistaken for dead in the moment between
-creating a database and connecting to it.
+goes, however the run ended.
 
 **Where a connection goes.** While a test database is in use,
 `POSTGRES_URL` *is* that database: the setting is changed, and the pool is
@@ -30,10 +33,10 @@ development database by asking. `POSTGRES_MANAGEMENT_URL`, if set, is
 pointed at the test database too.
 """
 
-import hashlib
 import os
 import re
 import secrets
+import socket
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -46,9 +49,10 @@ from plain.postgres.database_url import (
     replace_database_name,
 )
 from plain.postgres.databases import (
-    connection_count,
     create_database,
     drop_database,
+    get_database_comment,
+    set_database_comment,
 )
 from plain.postgres.db import _db_conn
 from plain.postgres.dialect import MAX_NAME_LENGTH
@@ -62,12 +66,14 @@ from plain.postgres.utils import names_digest
 from plain.runtime import settings
 from psycopg import errors
 
-TEST_DATABASE_PREFIX = "test_"
+from .leftovers import (
+    RunRecord,
+    read_run_record,
+    remove_what_dead_runs_left,
+    run_lock_key,
+)
 
-# `r` and the process id of the run. When another live run already holds
-# that name (the same process id on another machine, on one server), `x`
-# and four random hex digits follow.
-_RUN_TOKEN = re.compile(r"_r[0-9]+(?:x[0-9a-f]+)?(?=_|$)")
+TEST_DATABASE_PREFIX = "test_"
 
 # The digest that ends a name that had to be cut to fit, and the `_` before it.
 _DIGEST_LENGTH = 8
@@ -78,9 +84,11 @@ _CUT_ROOM = _DIGEST_LENGTH + 1
 _SHARED_NAME_LIMIT = MAX_NAME_LENGTH - _CUT_ROOM
 
 # The room kept for a run token is the longest one's, so that where a
-# database's name is cut doesn't depend on the run. Every run of a checkout
-# then starts its names the same way, which is how one finds what another
-# left.
+# database's name is cut doesn't depend on the run, and every run of a
+# checkout starts its names the same way. A run token is `r` and the
+# process id. When another live run already holds that name (the same
+# process id on another machine, on one server), `x` and four random hex
+# digits follow.
 _LONGEST_RUN_TOKEN = len("r4194304x0000")
 
 
@@ -115,26 +123,6 @@ def isolated_database_name(shared_name: str, *, test_name: str) -> str:
     there is little room, and every test's name starts that way."""
     test = re.sub(r"[^0-9A-Za-z_]+", "_", test_name).removeprefix("test_")
     return _cut_to(f"{shared_name}_{test}", limit=MAX_NAME_LENGTH)
-
-
-def _lock_key(shared_name: str) -> int:
-    """The advisory lock a run holds, from the name of its shared database."""
-    digest = hashlib.sha256(f"plain.postgres.test:{shared_name}".encode()).digest()
-    return int.from_bytes(digest[:8], "big", signed=True)
-
-
-def _names_a_run_could_have(database_name: str) -> list[str]:
-    """
-    Every shared-database name `database_name` could belong to.
-
-    A name is read from its start up to each place a run token ends. Usually
-    that is one place. A checkout whose own name holds something shaped
-    like a run token gives two, and the database is its run's only if
-    neither is held.
-    """
-    return [
-        database_name[: match.end()] for match in _RUN_TOKEN.finditer(database_name)
-    ]
 
 
 class RunDatabases:
@@ -175,7 +163,13 @@ class RunDatabases:
             run_token = f"r{os.getpid()}x{secrets.token_hex(2)}"
         self.shared_name = shared_name
 
-        self._remove_what_dead_runs_left()
+        remove_what_dead_runs_left(
+            self._maintenance,
+            self.config,
+            tested_database=self.base_name,
+            held_run=self.shared_name,
+            say=_log,
+        )
 
     def release(self) -> None:
         """Give the name up. Closing the connection releases the lock."""
@@ -186,121 +180,71 @@ class RunDatabases:
     def isolated_name(self, test_name: str) -> str:
         return isolated_database_name(self.shared_name, test_name=test_name)
 
+    def record_for_a_database(self) -> RunRecord:
+        """What this run writes into a database it creates: that a test run
+        made it, for which configured database, and which run."""
+        return RunRecord(
+            database=self.base_name,
+            run=self.shared_name,
+            token=secrets.token_hex(8),
+            directory=os.getcwd(),
+            host=socket.gethostname(),
+            pid=os.getpid(),
+        )
+
     def _try_lock(self, shared_name: str) -> bool:
         assert self._maintenance is not None
         row = self._maintenance.execute(
-            "SELECT pg_try_advisory_lock(%s)", [_lock_key(shared_name)]
+            "SELECT pg_try_advisory_lock(%s)", [run_lock_key(shared_name)]
         ).fetchone()
         assert row is not None
         return row[0]
 
-    def _unlock(self, shared_name: str) -> None:
-        assert self._maintenance is not None
-        self._maintenance.execute(
-            "SELECT pg_advisory_unlock(%s)", [_lock_key(shared_name)]
-        )
 
-    def _remove_what_dead_runs_left(self) -> None:
-        """
-        Drop the test databases of this checkout whose run is no longer
-        alive. A database whose run holds its lock is left alone.
-        """
-        assert self._maintenance is not None
-        legacy_name = legacy_database_name(self.base_name)
-        rows = self._maintenance.execute(
-            "SELECT datname FROM pg_database WHERE starts_with(datname, %s)",
-            [legacy_name],
-        ).fetchall()
+def _create_test_database(
+    config: DatabaseConfig, *, name: str, made_by: RunRecord
+) -> None:
+    """Create the database `name`, and write into it that this run made it.
 
-        for (name,) in rows:
-            if name.startswith(self.shared_name):
-                continue  # this run's own
-            if name == legacy_name:
-                # `test_<database>`, the name before runs had their own. A
-                # run that old holds no lock, so go by whether anything is
-                # connected to it.
-                if connection_count(self.config, name=name) == 0:
-                    drop_database(self.config, name=name)
-                continue
-            self._remove_if_its_run_is_dead(name)
-
-    def _remove_if_its_run_is_dead(self, database_name: str) -> bool:
-        """Drop `database_name` unless a live run holds it. Says whether it did."""
-        run_names = _names_a_run_could_have(database_name)
-        if not run_names:
-            return False  # not named the way a run names its databases
-
-        held = []
-        try:
-            for run_name in run_names:
-                if not self._try_lock(run_name):
-                    return False  # a live run's
-                held.append(run_name)
-            # Holding the lock while dropping: a new run can't take the
-            # name and create this database in the middle of it.
-            drop_database(self.config, name=database_name, force=True)
-            return True
-        finally:
-            for run_name in held:
-                self._unlock(run_name)
-
-
-def database_is_a_live_runs(config: DatabaseConfig, *, name: str) -> bool:
-    """
-    Whether a run that is alive holds `name`. For `plain db clean` and the
-    like: a test database that is nobody's can be dropped, and one that a
-    run holds can't, even in the moment before the run connects to it.
-    """
-    run_names = _names_a_run_could_have(name)
-    if not run_names:
-        return False
-
-    maintenance_config: DatabaseConfig = {**config, "DATABASE": "postgres"}
-    with psycopg.connect(
-        **build_connection_params(maintenance_config), autocommit=True
-    ) as maintenance:
-        for run_name in run_names:
-            key = _lock_key(run_name)
-            row = maintenance.execute(
-                "SELECT pg_try_advisory_lock(%s)", [key]
-            ).fetchone()
-            assert row is not None
-            if not row[0]:
-                return True
-            maintenance.execute("SELECT pg_advisory_unlock(%s)", [key])
-    return False
-
-
-def _create_test_database(config: DatabaseConfig, *, name: str, verbosity: int) -> None:
-    """Create the test database, replacing one of the same name.
-
-    A run's names are its own, so a database already here under one of
-    them is what an earlier run with the same process id left.
+    A database already there under the name is replaced only if its record
+    says a run of this one's name made it. This run holds that name's lock,
+    so that run is this one, or an earlier one with the same process id
+    that is gone. Any other database of the name is somebody's, and is
+    left: the run stops.
     """
     try:
         create_database(config, name=name)
-        return
     except errors.DuplicateDatabase:
-        pass
-    except Exception as e:
-        _log(f"Got an error creating the test database: {e}")
-        sys.exit(2)
-
-    try:
-        if verbosity >= 1:
-            _log(f"Destroying old test database '{name}'...")
+        found = read_run_record(get_database_comment(config, name=name))
+        if (
+            found is None
+            or found.database != made_by.database
+            or found.run != made_by.run
+        ):
+            raise RuntimeError(
+                f"A database named {name!r} is already there, and no test run"
+                " of this name made it, so it is left as it is. This run"
+                f" needs the name. If the database is debris: plain db drop {name}"
+            ) from None
+        # Forced: it is this run's name, and this run holds the name's lock.
         drop_database(config, name=name, force=True)
         create_database(config, name=name)
-    except Exception as e:
-        _log(f"Got an error recreating the test database: {e}")
-        sys.exit(2)
+
+    set_database_comment(config, name=name, comment=made_by.as_comment())
 
 
 @contextmanager
 def use_test_database(
-    *, name: str, runtime_url: str, management_url: str = "", verbosity: int = 1
+    *,
+    name: str,
+    made_by: RunRecord,
+    runtime_url: str,
+    management_url: str = "",
+    verbosity: int = 1,
 ) -> Generator[str]:
     """Create the database `name`, make it the one in use, drop it on exit.
+
+    `made_by` is the record written into it (`RunDatabases.record_for_a_database`).
 
     Inside the block `get_connection()` returns a connection to it in this
     context, and the pool hands out connections to it in every other (see
@@ -325,7 +269,7 @@ def use_test_database(
     # Create the test database on the server via a direct `postgres`-DB
     # connection — test_conn itself can't connect to a DB that doesn't
     # exist yet, so we open a sibling connection against `postgres`.
-    _create_test_database(test_config, name=name, verbosity=verbosity)
+    _create_test_database(test_config, name=name, made_by=made_by)
 
     url_before = settings.POSTGRES_URL
     management_url_before = settings.POSTGRES_MANAGEMENT_URL
@@ -377,8 +321,9 @@ def use_test_database(
         if verbosity >= 1:
             _log(f"Destroying test database '{name}'...")
         try:
-            # Forced: a thread the code under test started may still hold a
-            # connection, and the run that used this database is done with it.
+            # Forced, and the one place a database is: this run made it a
+            # moment ago and is done with it, and a thread the code under
+            # test started may still hold a connection.
             drop_database(test_config, name=name, force=True)
         except Exception as e:
             _log(f"Got an error destroying the test database: {e}")
