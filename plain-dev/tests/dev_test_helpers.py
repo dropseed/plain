@@ -13,6 +13,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
+from plain.cli.runtime import get_running_command, set_running_command
 from plain.dev import dotenv as dotenv_module
 from plain.dev import envkeys as envkeys_module
 from plain.dev import state as state_module
@@ -96,3 +97,18 @@ def sandbox(*, chdir: bool = True) -> Generator[Sandbox]:
             os.environ.update(original_environ)
             dotenv_module.bound_sources.clear()
             dotenv_module.bound_sources.update(original_bound_sources)
+
+
+@contextmanager
+def running(command: str | None) -> Generator[None]:
+    """Be the process that is running `plain <command>`, for a block.
+
+    A test is inside a test run, so the command that was said is `test`.
+    `running(None)` is a process nobody told, which is read from `sys.argv`.
+    """
+    said_before = get_running_command()
+    set_running_command(command)
+    try:
+        yield
+    finally:
+        set_running_command(said_before)

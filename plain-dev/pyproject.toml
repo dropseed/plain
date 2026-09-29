@@ -23,7 +23,12 @@ dependencies = [
 env = "plain.dev.env:cli"
 
 [dependency-groups]
-dev = ["plain.postgres"]
+dev = [
+  "plain.postgres",
+  # `coverage run -m plain.test` is why the test runner can be started as a
+  # module; a test starts it that way.
+  "coverage",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["plain"]

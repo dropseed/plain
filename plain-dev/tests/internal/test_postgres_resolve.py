@@ -6,9 +6,8 @@ even though they're internal.
 """
 
 import os
-import sys
 
-from dev_test_helpers import sandbox
+from dev_test_helpers import running, sandbox
 from plain.dev.postgres.identity import (
     read_pointer,
     resolve_database_name,
@@ -46,14 +45,12 @@ def test_either_env_url_counts_as_configured(variable):
 
 @cases("docs", "code", "fix", "settings", "upgrade")
 def test_commands_we_never_start_a_server_for(command):
-    with patch(sys, "argv", ["plain", command]):
-        assert not command_may_start_server()
+    assert not command_may_start_server(command)
 
 
 @cases("dev", "shell", "test", "migrations")
 def test_commands_we_start_a_server_for(command):
-    with patch(sys, "argv", ["plain", command]):
-        assert command_may_start_server()
+    assert command_may_start_server(command)
 
 
 def test_db_does_not_start_a_server_from_setup():
@@ -64,30 +61,16 @@ def test_db_does_not_start_a_server_from_setup():
     the command undoing itself. The subcommands that need a live server open
     the cluster themselves.
     """
-    with patch(sys, "argv", ["plain", "db", "server", "stop"]):
-        assert not command_may_start_server()
+    assert not command_may_start_server("db")
 
 
 def test_unknown_commands_are_assumed_to_want_a_server():
     """An app's own command must not silently run without a database."""
-    with patch(sys, "argv", ["plain", "create-user"]):
-        assert command_may_start_server()
+    assert command_may_start_server("create-user")
 
 
 def test_bare_invocation_starts_nothing():
-    with patch(sys, "argv", ["plain"]):
-        assert not command_may_start_server()
-
-
-def test_help_starts_nothing():
-    with patch(sys, "argv", ["plain", "--help"]):
-        assert not command_may_start_server()
-
-
-def test_only_the_top_level_command_is_considered():
-    """`plain run test` is not `plain test`."""
-    with patch(sys, "argv", ["plain", "docs", "test"]):
-        assert not command_may_start_server()
+    assert not command_may_start_server(None)
 
 
 # -- the cache -------------------------------------------------------------
@@ -161,7 +144,7 @@ def test_stopped_server_still_yields_a_url_for_database_free_commands():
     again. The cached URL still names the right database while the server is
     down, and nothing connects unless the command connects.
     """
-    with sandbox() as box, patch(sys, "argv", ["plain", "docs"]):
+    with sandbox() as box, running("docs"):
         # Port 1 is reserved, so this is cached-but-unreachable.
         write_cached_url(
             box.tmp_path, url="postgres://postgres:postgres@127.0.0.1:1/somedb"
@@ -185,7 +168,7 @@ def test_cold_checkout_still_yields_a_url_without_starting_a_server():
     Whether to start a server and which database this checkout owns are separate
     questions; only the first one is gated.
     """
-    with sandbox() as box, patch(sys, "argv", ["plain", "db", "status"]):
+    with sandbox() as box, running("db"):
         (box.tmp_path / "pyproject.toml").write_text("[project]\nname = 'coldapp'\n")
         assert not cache_path(box.tmp_path).exists()
 

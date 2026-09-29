@@ -19,6 +19,7 @@ from .install import install
 from .memory import memory
 from .preflight import preflight_cli
 from .registry import cli_registry
+from .runtime import set_running_command
 from .scaffold import create
 from .server import server
 from .settings import settings
@@ -214,6 +215,15 @@ class PlainCommandCollection(click.CommandCollection):
             err=True,
         )
         sys.exit(1)
+
+    def resolve_command(
+        self, ctx: Context, args: list[str]
+    ) -> tuple[str | None, Command | None, list[str]]:
+        # Said before the command is looked up: looking it up can run
+        # setup(), and the hooks that run there ask which command this is.
+        if args:
+            set_running_command(args[0])
+        return super().resolve_command(ctx, args)
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv
