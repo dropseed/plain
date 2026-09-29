@@ -70,6 +70,10 @@ def test_acquisition_times_out_when_held_by_another_session():
             # The failed acquisition didn't disturb the holder.
             assert _lock_holder_count() == 1
 
+            # Given back before the session closes. Closing releases it
+            # too, but a moment later, and the next test takes the lock.
+            holder.execute("SELECT pg_advisory_unlock(%s)", [SCHEMA_LOCK_KEY])
+
     message = str(caught.exception)
     assert "3 attempt(s)" in message
     assert "pid=" in message  # identifies the holder
@@ -135,3 +139,19 @@ def test_verify_raises_when_lock_session_killed():
 
         with raises(SchemaLockLost, match="re-run the command"):
             verify()
+
+
+def test_the_lock_can_be_taken_again_at_once():
+    """Released when the block ends, not when the session's backend exits.
+
+    With the retry interval at a minute, a second acquisition that had to
+    wait for the first session to go away would time this test out.
+    """
+    with override_settings(
+        POSTGRES_SCHEMA_LOCK_RETRY_INTERVAL=60.0,
+        POSTGRES_SCHEMA_LOCK_MAX_RETRIES=1,
+    ):
+        for _ in range(20):
+            with schema_lock():
+                pass
+            assert _lock_holder_count() == 0
