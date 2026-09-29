@@ -93,7 +93,7 @@ def test_a_name_error_in_a_test_file_says_where():
         }
     )
     assert result.exit_code == 1
-    assert "COLLECTION ERROR" in result.output
+    assert "collection error tests/test_broken.py" in result.output
     assert 'tests/test_broken.py", line 1, in <module>' in result.output
     assert "NameError: name 'UNDEFINED_NAME' is not defined" in result.output
     assert "1 passed, 1 collection errors" in result.output
@@ -169,7 +169,7 @@ def test_a_test_that_takes_parameters_is_told_what_to_do():
         }
     )
     assert result.exit_code == 1
-    assert "COLLECTION ERROR" in result.output
+    assert "collection error tests/test_signup.py" in result.output
     assert "test_signup(user, client) takes parameters" in result.output
     assert "Nothing is passed to a test by name" in result.output
     # Nothing ran far enough to fail with a TypeError of its own.
@@ -197,11 +197,11 @@ def test_skips_are_counted_and_say_why():
     assert result.exit_code == 0
     assert "1 passed, 2 skipped" in result.output
     assert (
-        "SKIPPED tests/test_skips.py::test_decides_for_itself "
+        "skipped tests/test_skips.py::test_decides_for_itself "
         "(No bucket reachable from here)"
     ) in result.output
     assert (
-        "SKIPPED tests/test_skips.py::test_declared (Waiting on the billing API)"
+        "skipped tests/test_skips.py::test_declared (Waiting on the billing API)"
     ) in result.output
 
 
@@ -314,7 +314,7 @@ def test_a_terminal_is_shown_how_far_the_run_has_got_and_then_it_is_erased():
     assert f"{erase}1 of 2{erase}2 of 2, 1 failed{erase}" in written
     # Nothing of it is left: the report starts where the line was.
     report = written.rpartition(erase)[2]
-    assert "FAILED tests/test_it.py::test_two" in report
+    assert "failed tests/test_it.py::test_two" in report
     assert " of 2" not in report
 
     # One line per test is its own account of how far the run has got.
@@ -368,10 +368,10 @@ def test_every_rerun_command_runs_its_own_test_when_pasted(shell):
         rerun = run_pasted(root, command, shell=shell)
         assert "Collected 1 test\n" in rerun.output
         failed_lines = [
-            line for line in rerun.output.splitlines() if line.startswith("FAILED ")
+            line for line in rerun.output.splitlines() if line.startswith("failed ")
         ]
         assert len(failed_lines) == 1
-        rerun_ids.append(failed_lines[0].removeprefix("FAILED "))
+        rerun_ids.append(failed_lines[0].removeprefix("failed "))
 
     assert rerun_ids == [
         "tests/test_price.py::test_price[annual plan]",
@@ -441,7 +441,7 @@ def test_an_import_through_the_tests_directory_says_what_to_write():
         }
     )
     assert result.exit_code == 1
-    assert "COLLECTION ERROR" in result.output
+    assert "collection error tests/test_users.py" in result.output
     assert (
         "line 1: `from tests.helpers import create_user` should be "
         "`from helpers import create_user`"
@@ -506,9 +506,9 @@ def test_a_project_written_for_another_runner_is_told_what_any_project_would_be(
     assert "1 passed, 2 collection errors" in result.output
 
     headings = [
-        line.removeprefix("COLLECTION ERROR ")
+        line.removeprefix("collection error ")
         for line in result.output.splitlines()
-        if line.startswith("COLLECTION ERROR ")
+        if line.startswith("collection error ")
     ]
     assert headings == ["tests/test_a_pins.py", "tests/test_b_views.py"]
 
@@ -540,14 +540,14 @@ def test_a_one_paragraph_definition_error_is_printed_with_no_blank_lines():
     )
 
     lines = result.output.splitlines()
-    first = lines.index("COLLECTION ERROR tests/test_a.py")
+    first = lines.index("collection error tests/test_a.py")
     # Each is a heading and what is under it, set off from what is before
     # them and from what is after.
     assert lines[first - 1 : first + 5] == [
         "",
-        "COLLECTION ERROR tests/test_a.py",
+        "collection error tests/test_a.py",
         "  line 4: cases() requires at least one case",
-        "COLLECTION ERROR tests/test_b.py",
+        "collection error tests/test_b.py",
         "  line 4: cases() requires at least one case",
         "",
     ]
@@ -612,7 +612,7 @@ def test_a_case_is_named_for_its_values_where_it_is_reported():
     )
     result = run_runner(project)
     test = "tests/test_money.py::test_parses_dollars_into_cents"
-    assert f"FAILED {test}[5-500]" in result.output
+    assert f"failed {test}[5-500]" in result.output
     assert f"Re-run: plain test '{test}[5-500]'" in result.output
 
     rerun = run_runner(project, f"{test}[0.05-5]", "--verbose")

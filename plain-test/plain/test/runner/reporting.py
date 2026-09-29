@@ -55,7 +55,7 @@ def collection_error_text(cause: BaseException) -> str:
 
 def failure_text(failure: Failure) -> str:
     """
-    What is printed for one failed test, under its `FAILED` line: where it
+    What is printed for one failed test, under its `failed` line: where it
     failed, the assert with the values inside it, what differs, what else
     the test had in hand, and what it wrote.
     """
@@ -247,7 +247,7 @@ class TextReporter:
         if report.run is not None:
             for error in report.run.teardown_errors:
                 self._print_error()
-                self._print_error("TEARDOWN ERROR", fg="red")
+                self._print_error("teardown error", fg="red")
                 self._print_error()
                 self._print_error(textwrap.indent(_teardown_error_text(error), "  "))
 
@@ -268,7 +268,7 @@ class TextReporter:
         for result in run.failed:
             assert result.failure is not None
             self._print()
-            self._print(f"FAILED {result.test.id}", fg="red", bold=True)
+            self._print(f"failed {result.test.id}", fg="red", bold=True)
             self._print()
             self._print(textwrap.indent(failure_text(result.failure), "  "))
             self._print()
@@ -279,7 +279,7 @@ class TextReporter:
             self._print()
             for result in run.skipped:
                 self._print(
-                    f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow"
+                    f"skipped {result.test.id} ({result.skip_reason})", fg="yellow"
                 )
 
         # A definition error that is one paragraph is printed under its
@@ -291,7 +291,7 @@ class TextReporter:
             is_short = failure.is_definition_error and "\n\n" not in text
             if not (is_short and after_a_short_one):
                 self._print()
-            self._print(f"COLLECTION ERROR {failure.file}", fg="red", bold=True)
+            self._print(f"collection error {failure.file}", fg="red", bold=True)
             if not is_short:
                 self._print()
             self._print(textwrap.indent(text, "  "))
@@ -299,27 +299,27 @@ class TextReporter:
 
         for error in run.teardown_errors:
             self._print()
-            self._print("TEARDOWN ERROR", fg="red", bold=True)
+            self._print("teardown error", fg="red", bold=True)
             self._print()
             self._print(textwrap.indent(_teardown_error_text(error), "  "))
 
         if run.interrupted is not None:
             self._print()
-            self._print(f"INTERRUPTED {run.interrupted.test.id}", fg="red", bold=True)
+            self._print(f"interrupted {run.interrupted.test.id}", fg="red", bold=True)
             for section in output_sections(run.interrupted.output):
                 self._print()
                 self._print(textwrap.indent(section, "  "))
 
         if report.warnings:
             self._print()
-            self._print("WARNINGS", fg="yellow", bold=True)
+            self._print("warnings", fg="yellow", bold=True)
             self._print()
             for warning in report.warnings:
                 self._print(textwrap.indent(_warning_text(warning), "  "))
 
         if report.output:
             self._print()
-            self._print("WRITTEN OUTSIDE ANY TEST", bold=True)
+            self._print("written outside any test", bold=True)
             for section in output_sections(report.output):
                 self._print()
                 self._print(textwrap.indent(section, "  "))

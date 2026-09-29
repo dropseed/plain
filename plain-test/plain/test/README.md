@@ -771,7 +771,7 @@ What a test prints or logs is held while it runs: a test that fails has it print
 Every failure is listed after the run. It says where the test failed, what the values inside the assert were, what else the test had in hand, and how to run it again:
 
 ```
-FAILED tests/test_signup.py::test_signup_redirects
+failed tests/test_signup.py::test_signup_redirects
 
   Traceback (most recent call last):
     File "/project/tests/test_signup.py", line 10, in test_signup_redirects
@@ -875,7 +875,7 @@ A secret that is a string like any other by the time the test has it is printed 
 What a failed test wrote to stdout and stderr is printed with its failure, each under its own name and in the order it was written:
 
 ```
-FAILED tests/test_orders.py::test_order_total
+failed tests/test_orders.py::test_order_total
 
   Traceback (most recent call last):
     File "/project/tests/test_orders.py", line 16, in test_order_total
@@ -913,7 +913,7 @@ The last 10,000 characters of each stream are kept, and the failure says how muc
 A run stopped with Ctrl-C reports what it had: the failures so far, and what the test that was running had written.
 
 ```
-INTERRUPTED tests/test_sync.py::test_every_page
+interrupted tests/test_sync.py::test_every_page
 
   stdout:
     fetching page 1
@@ -927,7 +927,7 @@ Interrupted: 12 passed, 30 not run in 4.18s
 A warning a test raises is counted, whether the test passes or fails. Each distinct warning is listed once, with how many times it was raised and where it was raised first:
 
 ```
-WARNINGS
+warnings
 
   DeprecationWarning: old_price() is going away
     raised 3 times, first at tests/test_orders.py:9 in tests/test_orders.py::test_order_total
@@ -944,7 +944,7 @@ A warning is the same warning when it's the same kind saying the same thing, whe
 What's written while the app is set up, while the lifecycles are set up before the first test, and while they're taken down after the last, belongs to no test. It's printed after the run, whether the run passed or not:
 
 ```
-WRITTEN OUTSIDE ANY TEST
+written outside any test
 
   stderr:
     Managed Postgres unavailable: is Docker running?
@@ -978,7 +978,7 @@ This goes to stderr, and stdout has only `Collected 41 tests`. The lifecycles th
 A skipped test is listed with its reason, whether it came from `@skip` or from [`skip_test`](#skipping-from-inside-a-test), and it's counted in the summary:
 
 ```
-SKIPPED tests/test_uploads.py::test_upload_to_bucket (No bucket reachable from this machine)
+skipped tests/test_uploads.py::test_upload_to_bucket (No bucket reachable from this machine)
 ```
 
 ### Collection errors
@@ -986,7 +986,7 @@ SKIPPED tests/test_uploads.py::test_upload_to_bucket (No bucket reachable from t
 A file that can't be turned into tests is a collection error. The other files still run, and the run exits `1`.
 
 ```
-COLLECTION ERROR tests/test_signup.py
+collection error tests/test_signup.py
 
   These tests can't be run as written:
 
@@ -1006,7 +1006,7 @@ Each parameter is listed with how many of the file's tests take it. A file with 
 Every problem in the file is reported at once, so a file with four things wrong is fixed in one go:
 
 ```
-COLLECTION ERROR tests/test_orders.py
+collection error tests/test_orders.py
 
   These imports can't be used in a test file:
 
@@ -1048,7 +1048,7 @@ Each of those is the runner telling you a test is written in a way it can't run,
 Anything else is an error of the file's own, raised while it was being imported. It's printed with its traceback, starting at the test file, and with what the file wrote while it was loading:
 
 ```
-COLLECTION ERROR tests/test_billing.py
+collection error tests/test_billing.py
 
   Traceback (most recent call last):
     File "/project/tests/test_billing.py", line 1, in <module>

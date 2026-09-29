@@ -119,7 +119,7 @@ def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
 def section(output: str, heading: str) -> str:
     """
     One section of a report: from the line that starts with `heading`
-    (`FAILED tests/test_it.py::test_x`, `WRITTEN OUTSIDE ANY TEST`) to the
+    (`failed tests/test_it.py::test_x`, `written outside any test`) to the
     next line that isn't indented, which is the next section's heading.
     """
     lines = output.splitlines()

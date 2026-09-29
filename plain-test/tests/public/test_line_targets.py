@@ -146,7 +146,7 @@ def test_a_line_of_a_file_that_cant_be_read_reports_the_file():
     project = make_project({"tests/test_broken.py": "def test_one(:\n    pass\n"})
     result = run_runner(project, "tests/test_broken.py:2")
     assert result.exit_code == 1
-    assert "COLLECTION ERROR tests/test_broken.py" in result.output
+    assert "collection error tests/test_broken.py" in result.output
     assert "SyntaxError" in result.output
 
 
