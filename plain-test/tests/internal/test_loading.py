@@ -1,7 +1,7 @@
 """A test module is loaded by the import machinery, and cached out of the way.
 
-Each test writes its files under names no other test uses, because a module
-that is loaded stays loaded for the run.
+Each test writes its files under names no other test uses, so that what one
+test cached or loaded is never what another finds.
 """
 
 import importlib
@@ -237,3 +237,24 @@ def test_a_helper_module_is_not_rewritten():
     helper = sys.modules["loading_helpers_unrewritten"]
     assert module.check is helper.check
     assert not isinstance(helper.__loader__, loading.TestModuleLoader)
+
+
+def test_a_file_of_the_same_name_under_another_root_is_another_module():
+    first_root = Path(tempfile.mkdtemp()).resolve()
+    second_root = Path(tempfile.mkdtemp()).resolve()
+    (first_root / "test_same_name.py").write_text("WHERE = 'first'\n")
+    (second_root / "test_same_name.py").write_text("WHERE = 'second'\n")
+
+    first = loading.load_test_module(
+        first_root / "test_same_name.py", layout=layout_for(first_root)
+    )
+    second = loading.load_test_module(
+        second_root / "test_same_name.py", layout=layout_for(second_root)
+    )
+    assert first.WHERE == "first"
+    assert second.WHERE == "second"
+    # And the same file is loaded once.
+    again = loading.load_test_module(
+        second_root / "test_same_name.py", layout=layout_for(second_root)
+    )
+    assert again is second

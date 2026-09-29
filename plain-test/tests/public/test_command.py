@@ -433,6 +433,153 @@ def test_a_lifecycle_under_the_wrong_name_stops_the_run():
     assert "test body" not in result.output
 
 
+# What a project that was written for pytest is told
+
+
+CONFTEST_WITH_A_KID = (
+    "import pytest\n"
+    "\n"
+    "@pytest.fixture\n"
+    "def kid(db):\n"
+    "    return 'a kid'\n"
+    "\n"
+    "@pytest.fixture(autouse=True)\n"
+    "def no_payments(monkeypatch):\n"
+    "    pass\n"
+)
+
+USES_PYTEST = (
+    "import pytest\n"
+    "\n"
+    "def test_pin(kid):\n"
+    "    with pytest.raises(ValueError):\n"
+    "        kid.set_pin('x')\n"
+)
+
+
+def test_a_project_written_for_pytest_is_told_each_thing_once():
+    result = run_in_project(
+        {
+            "tests/conftest.py": CONFTEST_WITH_A_KID,
+            "tests/test_a_pins.py": USES_PYTEST,
+            "tests/test_b_pins.py": USES_PYTEST,
+            "tests/test_c_views.py": "def test_view(db, kid):\n    assert True\n",
+            "tests/test_d_views.py": "def test_view(kid):\n    assert True\n",
+            "tests/test_e_fine.py": "def test_fine():\n    assert True\n",
+        }
+    )
+    assert result.exit_code == 1
+    assert "1 passed, 5 collection errors" in result.output
+
+    headings = [
+        line.removeprefix("COLLECTION ERROR ")
+        for line in result.output.splitlines()
+        if line.startswith("COLLECTION ERROR ")
+    ]
+    # The conftest first: it is where the fixtures were, so what it says
+    # is what the rest are about.
+    assert headings == [
+        "tests/conftest.py",
+        "tests/test_a_pins.py",
+        "tests/test_b_pins.py",
+        "tests/test_c_views.py",
+        "tests/test_d_views.py",
+    ]
+
+    # Nothing got as far as failing on its own.
+    assert "Traceback" not in result.output
+    assert "ModuleNotFoundError" not in result.output
+
+    # What is true of every file is said once.
+    assert result.output.count("pytest isn't used here") == 1
+    assert result.output.count("pytest.raises: `raises`, from plain.test.") == 1
+    assert result.output.count("nothing is passed to a test") == 1
+    assert (
+        "  line 1: `import pytest`\n"
+        "  It uses pytest.raises. What replaces pytest is in the error for "
+        "tests/test_a_pins.py.\n"
+    ) in result.output
+
+    # What is true of one file is said for that file.
+    assert "    kid  1 test  a fixture in tests/conftest.py" in result.output
+    assert "    db   1 test  delete it: every test already runs" in result.output
+
+
+def test_a_test_that_yields_is_not_reported_as_passed():
+    result = run_in_project(
+        {
+            "tests/test_yields.py": (
+                "def test_leftover():\n    assert False\n    yield\n"
+                "\n"
+                "async def test_async_leftover():\n    assert False\n    yield\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert "0 passed, 1 collection errors" in result.output
+    assert "test_leftover() has a `yield` in it." in result.output
+    assert "test_async_leftover() has a `yield` in it." in result.output
+    assert result.output.count("A test can't yield") == 1
+
+
+def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
+    result = run_in_project(
+        {
+            "tests/shared_checks.py": "def test_shared():\n    assert False\n",
+            "tests/test_kinds.py": (
+                "import unittest\n"
+                "\n"
+                "from shared_checks import test_shared\n"
+                "\n"
+                "class TestGroup:\n"
+                "    @staticmethod\n"
+                "    def test_static():\n"
+                "        assert False, 'the static method ran'\n"
+                "\n"
+                "class UserTests(unittest.TestCase):\n"
+                "    def test_it(self):\n"
+                "        assert False\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert "UserTests is a unittest.TestCase" in result.output
+    assert "test_shared is defined in shared_checks, not in this file" in result.output
+
+    # With those two gone, the static method is a test that runs.
+    result = run_in_project(
+        {
+            "tests/test_kinds.py": (
+                "class TestGroup:\n"
+                "    @staticmethod\n"
+                "    def test_static():\n"
+                "        assert False, 'the static method ran'\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert "FAILED tests/test_kinds.py::TestGroup::test_static" in result.output
+    assert "the static method ran" in result.output
+
+
+def test_a_conftest_is_refused_however_the_target_is_written():
+    project = make_project(
+        {
+            "tests/conftest.py": CONFTEST_WITH_A_KID,
+            "tests/accounts/test_it.py": "def test_it():\n    assert True\n",
+        }
+    )
+    for target in (
+        "tests/accounts",
+        "tests/accounts/test_it.py",
+        "tests/accounts/test_it.py::test_it",
+    ):
+        result = run_runner(project, target)
+        assert result.exit_code == 1
+        assert "COLLECTION ERROR tests/conftest.py" in result.output
+        assert "1 passed, 1 collection errors" in result.output
+
+
 def test_a_case_is_named_for_its_values_where_it_is_reported():
     project = make_project(
         {
