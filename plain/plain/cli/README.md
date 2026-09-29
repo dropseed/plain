@@ -243,7 +243,7 @@ Runs core validation checks in order, stopping on first failure:
 5. `plain migrations create --dry-run --check` (if DB connected)
 6. `plain test` (if `plain.test` is installed)
 
-Use `--skip-test` to skip tests for faster iteration.
+Use `--skip-test` to skip tests for faster iteration. A project with no tests passes this step: `plain test` says "No tests found" and the check moves on.
 
 #### Custom check commands
 
