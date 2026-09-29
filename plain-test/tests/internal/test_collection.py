@@ -2,7 +2,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from plain.test import TestDefinitionError, case, cases, patch, raises
+from plain.test import TestDefinitionError, patch, raises
 from plain.test.runner.collection import collect_tests
 from plain.test.runner.execution import run_tests
 from plain.test.runner.reporting import collection_error_text
@@ -149,8 +149,8 @@ def test_objects_that_refuse_attribute_access_are_left_alone():
 def test_parameters_nothing_passes_in_are_a_collection_error():
     root = write_tests(
         {
-            "test_fixtures.py": (
-                "def test_signup(db, client):\n"
+            "test_parameters.py": (
+                "def test_signup(user, client):\n"
                 "    assert True\n"
                 "\n"
                 "def test_fine():\n"
@@ -168,16 +168,16 @@ def test_parameters_nothing_passes_in_are_a_collection_error():
     # The rest of the run is untouched; the file with the problem runs nothing.
     assert [t.id for t in tests] == ["test_other.py::test_ok"]
     assert len(errors) == 1
-    assert errors[0].path.name == "test_fixtures.py"
+    assert errors[0].path.name == "test_parameters.py"
 
     error = errors[0].error
     assert isinstance(error, TestDefinitionError)
     message = str(error)
     # Every test that needs the fix is named, with the parameters in question.
-    assert "test_signup(db, client) takes parameters" in message
+    assert "test_signup(user, client) takes parameters" in message
     assert "TestGroup::test_in_class(settings) takes parameters" in message
     assert "test_fine" not in message
-    assert "There are no fixtures" in message
+    assert "Nothing is passed to a test by name" in message
     assert "@cases" in message
 
 
@@ -349,95 +349,22 @@ def test_skip_test_skips_one_case_and_runs_the_others():
     assert run.results[1].skip_reason == "Encrypted fields have no conditions"
 
 
-def test_a_conftest_is_a_collection_error_wherever_it_is():
+def test_a_file_that_isnt_a_test_file_is_left_alone_whatever_it_is_called():
+    """The runner knows one kind of file, `test_*.py`. Nothing else is read,
+    run or reported, whatever another runner would have made of it."""
     root = write_tests(
         {
-            "conftest.py": "import pytest\n",
-            "accounts/conftest.py": "import pytest\n",
+            "conftest.py": "import a_module_that_is_not_installed\n",
+            "accounts/conftest.py": "raise RuntimeError('this file was run')\n",
+            "accounts/__init__.py": "raise RuntimeError('this file was run')\n",
+            "accounts/helpers.py": "raise RuntimeError('this file was run')\n",
             "accounts/test_users.py": "def test_user():\n    assert True\n",
         }
     )
-    tests, errors = collect_tests(["."], root=root)
-    assert [t.id for t in tests] == ["accounts/test_users.py::test_user"]
-    assert [error.path for error in errors] == [
-        root.resolve() / "conftest.py",
-        root.resolve() / "accounts" / "conftest.py",
-    ]
-    assert all(isinstance(error.error, TestDefinitionError) for error in errors)
-
-
-def test_a_conftest_in_a_directory_that_is_never_searched_is_not_reported():
-    root = write_tests(
-        {
-            ".venv/lib/conftest.py": "",
-            "node_modules/thing/conftest.py": "",
-            "node_modules/thing/test_theirs.py": "def test_x():\n    assert True\n",
-            "test_one.py": "def test_one():\n    assert True\n",
-        }
-    )
-    tests, errors = collect_tests(["."], root=root)
-    assert [t.id for t in tests] == ["test_one.py::test_one"]
-    assert errors == []
-
-
-def test_a_conftest_above_a_single_file_target_is_found():
-    root = write_tests(
-        {
-            "conftest.py": "import pytest\n",
-            "accounts/conftest.py": "import pytest\n",
-            "billing/conftest.py": "import pytest\n",
-            "accounts/test_users.py": "def test_user():\n    assert True\n",
-        }
-    )
-    tests, errors = collect_tests(["accounts/test_users.py"], root=root)
-    assert len(tests) == 1
-    # The ones pytest would have applied to that file, and not billing's.
-    assert [error.path for error in errors] == [
-        root.resolve() / "conftest.py",
-        root.resolve() / "accounts" / "conftest.py",
-    ]
-
-
-def test_a_conftest_is_reported_once_for_overlapping_targets():
-    root = write_tests(
-        {
-            "conftest.py": "import pytest\n",
-            "test_one.py": "def test_one():\n    assert True\n",
-        }
-    )
-    _, errors = collect_tests([".", "test_one.py"], root=root)
-    assert len(errors) == 1
-
-
-def test_a_conftest_names_its_fixtures_without_being_imported():
-    root = write_tests(
-        {
-            "conftest.py": (
-                "import pytest\n"
-                "import a_module_that_is_not_installed\n"
-                "\n"
-                "@pytest.fixture\n"
-                "def user(db):\n"
-                "    return object()\n"
-                "\n"
-                "@pytest.fixture(scope='session')\n"
-                "def server():\n"
-                "    yield\n"
-                "\n"
-                "@pytest.fixture(autouse=True)\n"
-                "def no_network(monkeypatch):\n"
-                "    pass\n"
-                "\n"
-                "def a_plain_function():\n"
-                "    pass\n"
-            ),
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    message = str(errors[0].error)
-    assert "Fixtures in this file: user, server" in message
-    assert "Autouse fixtures in this file: no_network" in message
-    assert "a_plain_function" not in message
+    for target in (".", "accounts", "accounts/test_users.py"):
+        tests, errors = collect_tests([target], root=root)
+        assert [t.id for t in tests] == ["accounts/test_users.py::test_user"]
+        assert errors == []
 
 
 def test_only_a_tests_directory_refuses_imports_through_its_name():
@@ -528,7 +455,8 @@ def test_a_test_that_yields_is_a_collection_error():
     for name in ("test_sync", "test_async", "test_wrapped", "TestGroup::test_method"):
         assert f"{name}() has a `yield` in it" in message
     assert "test_fine" not in message
-    # What a pytest test that yielded becomes, either kind.
+    # What to write, for a test that yielded values and for one that
+    # yielded between setup and cleanup.
     assert "@cases(...)" in message
     assert "`@contextmanager`" in message
 
@@ -569,57 +497,25 @@ def test_static_and_class_methods_are_tests_too():
     assert len(run.passed) == 4
 
 
-def test_a_static_method_that_takes_fixtures_is_told_so():
+def test_a_static_method_that_takes_parameters_is_told_so():
     root = write_tests(
         {
             "test_methods.py": (
                 "class TestGroup:\n"
                 "    @staticmethod\n"
-                "    def test_static(db):\n"
+                "    def test_static(user):\n"
                 "        assert True\n"
                 "\n"
                 "    @classmethod\n"
-                "    def test_class(cls, db):\n"
+                "    def test_class(cls, user):\n"
                 "        assert True\n"
             )
         }
     )
     _, errors = collect_tests(["."], root=root)
     message = str(errors[0].error)
-    assert "TestGroup::test_static(db) takes parameters" in message
-    assert "TestGroup::test_class(db) takes parameters" in message
-
-
-def test_a_unittest_testcase_is_a_collection_error_whatever_it_is_called():
-    root = write_tests(
-        {
-            "test_unittest.py": (
-                "import unittest\n"
-                "from unittest import TestCase\n"
-                "\n"
-                "class UserTests(unittest.TestCase):\n"
-                "    def test_it(self):\n"
-                "        self.assertEqual(1, 2)\n"
-                "\n"
-                "class TestNamedOurWay(TestCase):\n"
-                "    def setUp(self):\n"
-                "        self.user = 'a user'\n"
-                "    def test_it(self):\n"
-                "        assert self.user\n"
-            ),
-        }
-    )
-    tests, errors = collect_tests(["."], root=root)
-    assert tests == []
-    assert len(errors) == 1
-    message = str(errors[0].error)
-    assert "UserTests is a unittest.TestCase." in message
-    assert "TestNamedOurWay is a unittest.TestCase." in message
-    # What to write instead is said once for the two of them.
-    assert message.count("unittest isn't run here") == 1
-    assert "setUp()" in message
-    # The class that was imported to be the base is not one of them.
-    assert "TestCase is a unittest.TestCase" not in message
+    assert "TestGroup::test_static(user) takes parameters" in message
+    assert "TestGroup::test_class(user) takes parameters" in message
 
 
 def import_modules_from(root: Path):
@@ -697,175 +593,63 @@ def test_a_class_made_from_an_imported_one_runs_the_tests_it_was_given():
     assert [t.name for t in tests] == ["TestMade::test_in_base", "TestMade::test_own"]
 
 
-# A conftest, wherever the target points
-
-
-def test_a_conftest_above_a_directory_target_is_found():
-    root = write_tests(
-        {
-            "conftest.py": "import pytest\n",
-            "accounts/conftest.py": "import pytest\n",
-            "accounts/users/test_users.py": "def test_user():\n    assert True\n",
-            "billing/conftest.py": "import pytest\n",
-        }
-    )
-    expected = [
-        root.resolve() / "conftest.py",
-        root.resolve() / "accounts" / "conftest.py",
-    ]
-    for target in (
-        "accounts/users",
-        "accounts/users/test_users.py",
-        "accounts/users/test_users.py::test_user",
-    ):
-        tests, errors = collect_tests([target], root=root)
-        assert len(tests) == 1
-        assert [error.path for error in errors] == expected
-
-
-def test_a_conftest_comes_before_the_files_that_used_it():
-    root = write_tests(
-        {
-            "accounts/conftest.py": "import pytest\n",
-            "accounts/test_users.py": "def test_user(db):\n    assert True\n",
-            "test_first.py": "def test_first(db):\n    assert True\n",
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    # The conftest is found in a directory that is searched after the
-    # first test file, and is still the first thing said.
-    assert [error.path.name for error in errors] == [
-        "conftest.py",
-        "test_first.py",
-        "test_users.py",
-    ]
-
-
-# What a fixture was, and what to write
-
-
-def test_a_parameter_that_was_a_known_fixture_says_what_to_write():
-    root = write_tests(
-        {
-            "test_fixtures.py": (
-                "def test_signup(db, settings, monkeypatch, tmp_path, caplog):\n"
-                "    assert True\n"
-            ),
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    message = str(errors[0].error)
-    assert "db           1 test  delete it: every test already runs" in message
-    assert "settings     1 test  `with override_settings(NAME=value):`" in message
-    assert 'monkeypatch  1 test  `with patch(target, "name", value):`' in message
-    assert "tmp_path     1 test  `with tempfile.TemporaryDirectory()" in message
-    assert "caplog       1 test  `with capture_logs() as logs:`" in message
-
-
-def test_a_parameter_that_was_a_conftest_fixture_says_which_conftest():
-    root = write_tests(
-        {
-            "conftest.py": (
-                "import pytest\n\n@pytest.fixture\ndef kid(db):\n    return 'a kid'\n"
-            ),
-            "test_views.py": (
-                "def test_passbook(kid, account, limit=3):\n    assert True\n"
-            ),
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    message = str(errors[1].error)
-    assert "test_passbook(kid, account, limit=3) takes parameters" in message
-    assert "kid      1 test  a fixture in conftest.py" in message
-    # One nothing is known about has its count and no more.
-    assert message.endswith("  account  1 test")
-    # One with a default is not something to fix.
-    assert "limit  " not in message
-
-
 def test_a_file_with_many_tests_to_fix_says_how_many_and_not_which():
     tests_asking = "".join(
-        f"def test_number_{number}(db, org):\n    assert True\n\n"
+        f"def test_number_{number}(user, org):\n    assert True\n\n"
         for number in range(12)
     )
     root = write_tests(
-        {"test_many.py": tests_asking + "def test_other(org):\n    assert True\n"}
+        {"test_many.py": tests_asking + "def test_other(org, limit=3):\n    pass\n"}
     )
     _, errors = collect_tests(["."], root=root)
-    message = str(errors[0].error)
-    assert "13 tests take parameters, and nothing passes them in." in message
-    assert "test_number_3" not in message
-    assert "db   12 tests  delete it" in message
-    assert "org  13 tests" in message
+    assert str(errors[0].error) == (
+        "These tests can't be run as written:\n"
+        "\n"
+        "  13 tests take parameters, and nothing passes them in.\n"
+        "\n"
+        # One with a default is not something to fix.
+        "  user  12 tests\n"
+        "  org   13 tests\n"
+        "\n"
+        "Nothing is passed to a test by name. A test gets what it needs in its\n"
+        "body, by calling a helper or entering a `with` block, and takes values\n"
+        "only from @cases(...)."
+    )
 
 
-def test_what_there_is_instead_of_fixtures_is_said_once():
+def test_what_a_test_takes_is_said_once():
     root = write_tests(
         {
-            "test_a.py": "def test_a(db):\n    assert True\n",
-            "test_b.py": "def test_b(db):\n    assert True\n",
-            "test_c.py": "def test_c(db):\n    assert True\n",
+            "test_a.py": "def test_a(user):\n    assert True\n",
+            "test_b.py": "def test_b(user):\n    assert True\n",
+            "test_c.py": "def test_c(user):\n    assert True\n",
         }
     )
     _, errors = collect_tests(["."], root=root)
     messages = [str(error.error) for error in errors]
-    assert [message.count("There are no fixtures") for message in messages] == [
-        1,
-        0,
-        0,
+    said = [
+        message.count("Nothing is passed to a test by name") for message in messages
     ]
+    assert said == [1, 0, 0]
     for message in messages[1:]:
-        assert "test_b(db) takes" in message or "test_c(db) takes" in message
+        assert "test_b(user) takes" in message or "test_c(user) takes" in message
         assert "What to write instead is in the error for test_a.py." in message
     # Each is still the one kind of error there is.
     assert all(type(error.error) is TestDefinitionError for error in errors)
 
 
-def test_with_a_conftest_it_is_the_conftest_that_says_it():
+def test_a_module_that_isnt_installed_is_an_import_error_like_any_other():
+    """The runner knows nothing of other runners. A file written for one
+    imports a module that isn't there, which is what the file is told."""
     root = write_tests(
         {
-            "conftest.py": "import pytest\n",
-            "test_a.py": "def test_a(db):\n    assert True\n",
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    assert "There are no\nfixtures" in str(errors[0].error)
-    # The file says what its own parameters were, and no more.
-    assert str(errors[1].error) == (
-        "These tests can't be run as written:\n"
-        "\n"
-        "  test_a(db) takes parameters, and nothing passes them in.\n"
-        "\n"
-        "  db  1 test  delete it: every test already runs in a transaction "
-        "that is rolled back"
-    )
-
-
-# A file that imports pytest
-
-
-def test_a_file_that_imports_pytest_says_what_replaces_what_it_uses():
-    root = write_tests(
-        {
-            "test_pytest.py": (
-                '"""A docstring."""\n'
-                "\n"
+            "test_written_for_another_runner.py": (
                 "import pytest\n"
                 "\n"
-                "@pytest.fixture\n"
-                "def user(db):\n"
-                "    return 'a user'\n"
-                "\n"
                 "@pytest.mark.parametrize('n', [1, 2])\n"
-                "def test_numbers(n):\n"
+                "def test_numbers(n, tmp_path):\n"
                 "    with pytest.raises(ValueError):\n"
                 "        int('x')\n"
-                "    with pytest.raises(KeyError):\n"
-                "        {}['x']\n"
-                "\n"
-                "@pytest.mark.slow\n"
-                "def test_slow():\n"
-                "    assert pytest.approx(0.3) == 0.1 + 0.2\n"
             ),
             "test_fine.py": "def test_fine():\n    assert True\n",
         }
@@ -873,119 +657,14 @@ def test_a_file_that_imports_pytest_says_what_replaces_what_it_uses():
     tests, errors = collect_tests(["."], root=root)
     assert [t.id for t in tests] == ["test_fine.py::test_fine"]
     assert len(errors) == 1
-    error = errors[0].error
-    assert type(error) is TestDefinitionError
-    assert error.line == 3
-    message = str(error)
-    assert "line 3: `import pytest`" in message
-    assert (
-        "It uses pytest.raises ×2, pytest.fixture, pytest.mark.parametrize, "
-        "pytest.approx, pytest.mark.slow."
-    ) in message
-    assert "pytest isn't used here, and isn't installed." in message
-    assert "What replaces what this file uses:" in message
-    assert "pytest.raises: `raises`, from plain.test." in message
-    assert "pytest.mark.parametrize: `@cases`, from plain.test" in message
-    assert "pytest.fixture: a helper function the test calls in its body." in message
-    assert 'pytest.mark.slow: `@tag("name")`, from plain.test.' in message
-    assert "pytest.approx: `math.isclose(a, b, abs_tol=...)`." in message
-    assert 'plain docs test --search "Migrating from pytest"' in message
-    # It was read, not run: nothing got as far as the import failing.
-    assert "ModuleNotFoundError" not in message
+    assert type(errors[0].error) is ModuleNotFoundError
 
-
-@cases(
-    case("from pytest import raises\n", "`from pytest import raises`", id="from"),
-    case("import pytest as pt\n", "`import pytest as pt`", id="as"),
-    case("import pytest_mock\n", "`import pytest_mock`", id="a plugin"),
-    case(
-        "def test_x():\n    import pytest\n",
-        "line 2: `import pytest`",
-        id="inside a test",
-    ),
-)
-def test_pytest_is_found_however_it_is_imported(source, written):
-    root = write_tests({"test_pytest.py": source})
-    _, errors = collect_tests(["."], root=root)
-    assert type(errors[0].error) is TestDefinitionError
-    assert written in str(errors[0].error)
-
-
-def test_names_taken_from_pytest_are_counted_under_their_own_names():
-    root = write_tests(
-        {
-            "test_pytest.py": (
-                "import pytest as pt\n"
-                "from pytest import raises as throws\n"
-                "\n"
-                "def test_x():\n"
-                "    with throws(ValueError):\n"
-                "        pt.skip('not here')\n"
-            ),
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    message = str(errors[0].error)
-    assert "It uses pytest.raises, pytest.skip." in message
-    assert 'pytest.skip: `skip_test("reason")`, from plain.test.' in message
-
-
-def test_what_replaces_pytest_is_said_once_for_every_file_that_imports_it():
-    root = write_tests(
-        {
-            "test_a.py": (
-                "import pytest\n\ndef test_a():\n    pytest.raises(ValueError)\n"
-            ),
-            "test_b.py": ("import pytest\n\ndef test_b():\n    pytest.skip('no')\n"),
-            "test_c.py": "import pytest\n",
-        }
-    )
-    _, errors = collect_tests(["."], root=root)
-    assert [error.path.name for error in errors] == [
-        "test_a.py",
-        "test_b.py",
-        "test_c.py",
-    ]
-    first, second, third = (str(error.error) for error in errors)
-
-    # The first says what replaces everything any of them uses.
-    assert "pytest isn't used here" in first
-    assert "What replaces what these files use:" in first
-    assert "pytest.raises: `raises`" in first
-    assert "pytest.skip: `skip_test" in first
-
-    assert second == (
-        "line 1: `import pytest`\n"
-        "It uses pytest.skip. What replaces pytest is in the error for test_a.py."
-    )
-    assert third == (
-        "line 1: `import pytest`\nWhat replaces pytest is in the error for test_a.py."
-    )
-    assert all(type(error.error) is TestDefinitionError for error in errors)
-
-
-def test_a_helper_module_that_imports_pytest_is_named():
-    root = write_tests(
-        {
-            "helpers_importing_pytest.py": (
-                "import os\nimport pytest\n\ndef make_user():\n    return 'a user'\n"
-            ),
-            "test_uses_helper.py": (
-                "from helpers_importing_pytest import make_user\n"
-                "\n"
-                "def test_user():\n"
-                "    assert make_user()\n"
-            ),
-        }
-    )
-    with import_modules_from(root):
-        tests, errors = collect_tests(["test_uses_helper.py"], root=root)
-    assert tests == []
-    assert type(errors[0].error) is TestDefinitionError
-    message = str(errors[0].error)
-    assert "helpers_importing_pytest.py, line 2: `import pytest`" in message
-    assert "pytest isn't used here" in message
-    assert "Traceback" not in message
+    text = collection_error_text(errors[0].error)
+    lines = text.splitlines()
+    assert lines[0] == "Traceback (most recent call last):"
+    assert ", line 1, in <module>" in lines[1]
+    assert lines[-1] == "ModuleNotFoundError: No module named 'pytest'"
+    assert "plain.test" not in text
 
 
 def test_why_a_helper_is_imported_by_its_bare_name_is_said_once():
@@ -1009,25 +688,23 @@ def test_why_a_helper_is_imported_by_its_bare_name_is_said_once():
     assert all(type(error.error) is TestDefinitionError for error in errors)
 
 
-def test_an_import_from_a_conftest_is_not_told_to_import_the_conftest():
+def test_a_helper_module_is_a_helper_module_whatever_it_is_called():
     root = write_tests(
         {
             "tests/conftest.py": "def make_user():\n    return 'a user'\n",
-            "tests/test_a_from_conftest.py": (
-                "from tests.conftest import make_user\n"
-                "from .conftest import make_user as again\n"
-                "from conftest import make_user as a_third_time\n"
-                "import conftest\n"
+            "tests/test_a.py": (
+                "from conftest import make_user\n"
+                "\n"
+                "def test_user():\n"
+                "    assert make_user() == 'a user'\n"
             ),
+            "tests/test_b.py": "from tests.conftest import make_user\n",
         }
     )
-    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
-    message = str(errors[1].error)
-    for line in (1, 2, 3):
-        assert f"line {line}: `from " in message
-    assert "line 4: `import conftest` imports from a conftest.py" in message
-    assert message.count("Import `make_user` from the helper module it moves to") == 3
-    assert "should be" not in message
+    with import_modules_from(root / "tests"):
+        tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    assert [t.id for t in tests] == ["tests/test_a.py::test_user"]
+    assert "should be `from conftest import make_user`" in str(errors[0].error)
 
 
 def test_a_case_that_passes_too_few_names_what_it_fills_and_what_it_doesnt():
@@ -1057,48 +734,47 @@ def test_a_case_that_passes_too_few_names_what_it_fills_and_what_it_doesnt():
     ) in message
 
 
-def test_a_file_written_for_pytest_says_everything_wrong_with_it_at_once():
-    """It imports pytest, its tests take fixtures, and one has two
-    parametrize decorators. Found one at a time, that is three runs."""
+def test_a_file_says_everything_wrong_with_it_at_once():
+    """It imports a helper the wrong way, its tests take parameters, one
+    has two `@cases` and one yields. Found one at a time, that is four
+    runs."""
     root = write_tests(
         {
-            "test_orders.py": (
-                "import pytest\n"
+            "tests/helpers.py": "value = 1\n",
+            "tests/test_orders.py": (
+                "from plain.test import cases\n"
+                "from tests.helpers import value\n"
                 "\n"
                 "\n"
-                "def test_total(db, order):\n"
+                "def test_total(order):\n"
                 "    assert order.total == 5\n"
                 "\n"
                 "\n"
-                '@pytest.mark.parametrize("plan", ["monthly", "annual"])\n'
-                '@pytest.mark.parametrize("amount, currency", [(5, "usd")])\n'
-                "def test_price(db, plan, amount, currency):\n"
-                "    with pytest.raises(ValueError):\n"
-                "        pass\n"
+                '@cases("monthly", "annual")\n'
+                '@cases((5, "usd"))\n'
+                "def test_price(plan, amount, currency):\n"
+                "    pass\n"
                 "\n"
                 "\n"
                 "def test_steps():\n"
                 "    yield 1\n"
-            )
+            ),
         }
     )
 
-    tests, errors = collect_tests(["."], root=root)
+    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
 
     assert tests == []
     assert len(errors) == 1
     message = str(errors[0].error)
-    assert "line 1: `import pytest`" in message
-    assert "pytest.mark.parametrize ×2" in message
-    assert "test_total(db, order) takes parameters" in message
-    assert "test_price(db, plan, amount, currency) takes parameters" in message
-    # What nothing fills is `db` and `order`. `parametrize` fills the rest.
-    assert "db     2 tests  delete it" in message
+    assert (
+        "line 2: `from tests.helpers import value` should be "
+        "`from helpers import value`"
+    ) in message
+    assert "test_total(order) takes parameters" in message
     assert "order  1 test" in message
-    assert "plan  " not in message
-    assert "line 10: test_price has 2 parametrize decorators." in message
+    assert "line 11: test_price has 2 @cases. A test takes one." in message
     assert "test_steps() has a `yield` in it." in message
-    assert "What replaces what this file uses:" in message
 
 
 def test_every_decorator_that_would_raise_is_reported_not_the_first():
@@ -1124,7 +800,7 @@ def test_every_decorator_that_would_raise_is_reported_not_the_first():
                 "    pass\n"
                 "\n"
                 "\n"
-                "def test_fourth(db):\n"
+                "def test_fourth(user):\n"
                 "    pass\n"
             )
         }
@@ -1137,7 +813,7 @@ def test_every_decorator_that_would_raise_is_reported_not_the_first():
     assert "line 6: test_first has 2 @cases. A test takes one." in message
     assert 'line 10: @skip requires a reason: @skip("why")' in message
     assert 'line 15: @tag requires at least one name: @tag("slow")' in message
-    assert "test_fourth(db) takes parameters" in message
+    assert "test_fourth(user) takes parameters" in message
 
 
 def test_a_decorator_the_reader_doesnt_know_may_pass_the_parameters():
@@ -1145,60 +821,40 @@ def test_a_decorator_the_reader_doesnt_know_may_pass_the_parameters():
     mock, so its parameter isn't one that nothing fills."""
     root = write_tests(
         {
-            "test_patched.py": (
-                "import pytest\n"
+            "tests/helpers.py": "value = 1\n",
+            "tests/test_patched.py": (
                 "from unittest import mock\n"
+                "\n"
+                # What makes this a file that is read, not run.
+                "from tests.helpers import value\n"
                 "\n"
                 "\n"
                 '@mock.patch("os.getcwd")\n'
                 "def test_patched(getcwd):\n"
                 "    pass\n"
-            )
+            ),
         }
     )
 
-    _, errors = collect_tests(["."], root=root)
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
 
     message = str(errors[0].error)
-    assert "line 1: `import pytest`" in message
+    assert "line 3: `from tests.helpers import value`" in message
     assert "takes parameters" not in message
 
 
 _A_TEST = "def test_one():\n    assert True\n"
 
 
-def test_a_tests_init_file_with_code_in_it_is_reported_once():
-    """Nothing imports the tests directory as a package, so nothing runs it."""
+def test_a_tests_directory_is_not_imported_as_a_package():
     root = write_tests(
         {
-            "tests/__init__.py": "import os\n\nos.environ['SEEDED'] = '1'\n",
+            "tests/__init__.py": "raise RuntimeError('this file was run')\n",
             "tests/test_first.py": _A_TEST,
-            "tests/test_second.py": _A_TEST,
         }
     )
 
     tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
 
-    assert [test.id for test in tests] == [
-        "tests/test_first.py::test_one",
-        "tests/test_second.py::test_one",
-    ]
-    assert [error.path for error in errors] == [(root / "tests/__init__.py").resolve()]
-    message = str(errors[0].error)
-    assert "tests/__init__.py has code in it, and nothing runs it." in message
-    assert "tests/lifecycle.py" in message
-    assert "delete the file" in message
-
-
-@cases(
-    case("", id="empty"),
-    case('"""The tests."""\n', id="a docstring"),
-    case("# nothing here\n", id="a comment"),
-)
-def test_a_tests_init_file_with_nothing_to_run_is_left_alone(source):
-    root = write_tests({"tests/__init__.py": source, "tests/test_first.py": _A_TEST})
-
-    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
-
-    assert len(tests) == 1
+    assert [test.id for test in tests] == ["tests/test_first.py::test_one"]
     assert errors == []

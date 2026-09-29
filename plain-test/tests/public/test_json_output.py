@@ -273,7 +273,7 @@ def test_a_file_that_could_not_be_collected_is_in_the_document():
     document = run_as_json(
         {
             **ORDERS_PROJECT,
-            "tests/test_signup.py": "def test_signup(db, client):\n    pass\n",
+            "tests/test_signup.py": "def test_signup(user, client):\n    pass\n",
         }
     )
     assert document["counts"]["collection_errors"] == 2
@@ -290,7 +290,7 @@ def test_a_file_that_could_not_be_collected_is_in_the_document():
     written_wrongly = by_file["tests/test_signup.py"]
     assert written_wrongly["is_definition_error"] is True
     assert written_wrongly["error_type"] == "TestDefinitionError"
-    assert "There are no fixtures" in written_wrongly["message"]
+    assert "Nothing is passed to a test by name" in written_wrongly["message"]
     assert written_wrongly["traceback"] is None
 
 
@@ -298,14 +298,19 @@ def test_a_definition_error_about_one_line_says_which():
     document = run_as_json(
         {
             "tests/test_billing.py": (
-                "import os\n\nimport pytest\n\n\ndef test_it():\n    pass\n"
+                "from plain.test import cases\n"
+                "\n"
+                "\n"
+                "@cases()\n"
+                "def test_it(amount):\n"
+                "    pass\n"
             ),
         }
     )
 
     [error] = document["collection_errors"]
     assert error["is_definition_error"] is True
-    assert error["line"] == 3
+    assert error["line"] == 4
 
 
 def test_a_run_that_could_not_start_prints_a_document_too():

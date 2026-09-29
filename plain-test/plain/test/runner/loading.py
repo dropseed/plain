@@ -24,7 +24,6 @@ import importlib.util
 import marshal
 import sys
 import types
-from dataclasses import dataclass
 from pathlib import Path
 
 from ..definition import TestDefinitionError
@@ -123,17 +122,6 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
         # of them, and each would take a run of its own to find.
         imports = import_problems(tree, layout=self.layout)
         tests = tests_as_written(tree)
-
-        # pytest isn't installed, so the import would be where it stopped.
-        pytest_import = pytest_import_in(tree)
-        if pytest_import is not None:
-            raise ImportsPytest(
-                imported_at=pytest_import,
-                uses=pytest_names_used(tree),
-                other_import_problems=imports,
-                tests=tests,
-                layout=self.layout,
-            )
 
         if imports:
             raise ImportsAnotherWay(imports, tests=tests, layout=self.layout)
@@ -251,23 +239,10 @@ def _remove_caches_left_by_other_rewriters(cache_path: Path) -> None:
             other.unlink(missing_ok=True)
 
 
-def _imported_from_a_conftest(node: ast.Import | ast.ImportFrom) -> str | None:
-    """What an import takes from a conftest, or None if it isn't one of one."""
-    if isinstance(node, ast.ImportFrom):
-        module = node.module or ""
-        if module.split(".")[-1] == "conftest":
-            return ", ".join(f"`{alias.name}`" for alias in node.names)
-        if any(alias.name == "conftest" for alias in node.names):
-            return "what it holds"
-    elif any(alias.name.split(".")[-1] == "conftest" for alias in node.names):
-        return "what it holds"
-    return None
-
-
 def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
     """
     Imports in a test module that reach a helper module some way other than
-    its bare name, or that reach a conftest.
+    its bare name.
 
     A relative import is refused: the packages a test module is in are
     empty, so there is nothing beside it to import. An import through the
@@ -277,16 +252,6 @@ def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
     """
     problems = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Import | ast.ImportFrom):
-            continue
-        from_a_conftest = _imported_from_a_conftest(node)
-        if from_a_conftest is not None:
-            problems.append(
-                f"line {node.lineno}: `{ast.unparse(node)}` imports from a "
-                "conftest.py, which is a pytest file. Import "
-                f"{from_a_conftest} from the helper module it moves to."
-            )
-            continue
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
             names = ", ".join(
@@ -322,20 +287,6 @@ def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
     return problems
 
 
-# The names pytest and what comes with it are imported by. A plugin is
-# `pytest_<name>`, and pytest's own insides are `_pytest`.
-def is_pytest(module_name: str) -> bool:
-    top = module_name.split(".")[0]
-    return top == "pytest" or top.startswith(("pytest_", "_pytest"))
-
-
-@dataclass(frozen=True, kw_only=True)
-class PytestImport:
-    line: int
-    # The import as the file wrote it: `import pytest`.
-    written: str
-
-
 class ImportsAnotherWay(TestDefinitionError):
     """
     A test file imports a helper module some way other than by its bare
@@ -364,194 +315,3 @@ class ImportsAnotherWay(TestDefinitionError):
     def what_is_wrong(self) -> str:
         listed = "\n".join(f"  {problem}" for problem in self.problems)
         return f"These imports can't be used in a test file:\n\n{listed}"
-
-
-class ImportsPytest(TestDefinitionError):
-    """
-    A test file imports pytest. What it says on its own is the whole of it:
-    where, what the file uses from pytest, and what replaces each. A run
-    that finds it in many files says the last part once, from `uses`.
-    """
-
-    def __init__(
-        self,
-        *,
-        imported_at: PytestImport,
-        uses: dict[str, int],
-        other_import_problems: list[str],
-        layout: Layout,
-        imported_by: str | None = None,
-        tests: ProblemsInAFile | None = None,
-    ) -> None:
-        self.imported_at = imported_at
-        self.uses = uses
-        self.other_import_problems = other_import_problems
-        # What reading the file showed about its tests.
-        self.tests = tests or ProblemsInAFile()
-        # The helper module that imports it, when it isn't the test file.
-        self.imported_by = imported_by
-        super().__init__(
-            "\n\n".join(
-                [
-                    self.what_this_file_does(),
-                    what_replaces_pytest(uses, layout=layout, used_by="this file"),
-                ]
-            ),
-            line=imported_at.line if imported_by is None else None,
-        )
-
-    def what_this_file_does(self, *, explained_for: str | None = None) -> str:
-        """
-        Where pytest is imported, and what is used from it. `explained_for`
-        is the file whose error says what replaces pytest, in a run that
-        has said it already.
-        """
-        where = f"line {self.imported_at.line}"
-        if self.imported_by is not None:
-            where = f"{self.imported_by}, {where}"
-        lines = [f"{where}: `{self.imported_at.written}`"]
-
-        sentences = []
-        if self.uses:
-            used = ", ".join(
-                f"{name} ×{count}" if count > 1 else name
-                for name, count in self.uses.items()
-            )
-            sentences.append(f"It uses {used}.")
-        if explained_for is not None:
-            sentences.append(
-                f"What replaces pytest is in the error for {explained_for}."
-            )
-        if sentences:
-            lines.append(" ".join(sentences))
-
-        lines.extend(self.other_import_problems)
-        return "\n".join(lines)
-
-
-_WHAT_REPLACES = {
-    "pytest.raises": "`raises`, from plain.test. What was caught is\n`caught.exception`, read after the block.",
-    "pytest.fixture": "a helper function the test calls in its body. One that\ncleans up after itself is a `@contextmanager` the test enters\nwith `with`. One with `autouse=True` is a TestLifecycle's\n`around_test()`, in {lifecycle_file}.",
-    "pytest.mark.parametrize": "`@cases`, from plain.test: one tuple for each case.",
-    "pytest.param": '`case(..., id="name")`, from plain.test.',
-    "pytest.mark.skip": '`@skip("reason")`, from plain.test.',
-    "pytest.mark.skipif": '`skip_test("reason")` in the test, under the `if`.',
-    "pytest.mark.xfail": '`@skip("reason")`, or `raises` around what fails.',
-    "pytest.mark.usefixtures": "the helper, called or entered in the test's body.",
-    "pytest.skip": '`skip_test("reason")`, from plain.test.',
-    "pytest.fail": '`raise AssertionError("why")`.',
-    "pytest.approx": "`math.isclose(a, b, abs_tol=...)`.",
-    "pytest.MonkeyPatch": '`with patch(target, "name", value):`, from plain.test.',
-    "pytest.warns": "`warnings.catch_warnings(record=True)`.",
-    "pytest.deprecated_call": "`warnings.catch_warnings(record=True)`.",
-}
-
-_WHAT_REPLACES_A_MARK = '`@tag("name")`, from plain.test.'
-
-WHERE_THE_PYTEST_TABLE_IS = 'plain docs test --search "Migrating from pytest"'
-
-
-def what_replaces_pytest(uses: dict[str, int], *, layout: Layout, used_by: str) -> str:
-    """
-    What to write instead of each thing used from pytest. `used_by` is who
-    uses them: "this file", or "these files".
-    """
-    lifecycle_file = layout.shown(layout.helper_directory / "lifecycle.py")
-
-    lines = ["pytest isn't used here, and isn't installed."]
-    replaced = []
-    for name in uses:
-        replacement = _WHAT_REPLACES.get(name)
-        if replacement is None and name.startswith("pytest.mark."):
-            replacement = _WHAT_REPLACES_A_MARK
-        if replacement is None:
-            continue
-        replacement = replacement.replace("{lifecycle_file}", lifecycle_file)
-        first, *rest = replacement.split("\n")
-        replaced.append(f"  {name}: {first}")
-        replaced.extend(f"    {line}" for line in rest)
-    if replaced:
-        uses_them = "uses" if used_by == "this file" else "use"
-        lines += ["", f"What replaces what {used_by} {uses_them}:", "", *replaced]
-    lines += [
-        "",
-        f"Everything pytest had and what replaces it: {WHERE_THE_PYTEST_TABLE_IS}",
-    ]
-    return "\n".join(lines)
-
-
-def pytest_import_in(tree: ast.Module) -> PytestImport | None:
-    """The first import of pytest in a module, if it has one."""
-    found = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.level == 0:
-            imported = [node.module or ""]
-        else:
-            continue
-        if any(is_pytest(name) for name in imported):
-            found.append(node)
-    if not found:
-        return None
-    first = min(found, key=lambda node: node.lineno)
-    return PytestImport(line=first.lineno, written=ast.unparse(first))
-
-
-def pytest_names_used(tree: ast.Module) -> dict[str, int]:
-    """
-    What a module uses from pytest and how many times, most used first:
-    `{"pytest.raises": 4, "pytest.mark.parametrize": 2}`.
-    """
-    # What the module calls pytest, and what it calls the names it took
-    # from it: `import pytest as pt`, `from pytest import raises as throws`.
-    modules = set()
-    names = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name == "pytest":
-                    modules.add(alias.asname or alias.name)
-        elif (
-            isinstance(node, ast.ImportFrom)
-            and node.level == 0
-            and node.module == "pytest"
-        ):
-            for alias in node.names:
-                names[alias.asname or alias.name] = f"pytest.{alias.name}"
-
-    counts: dict[str, int] = {}
-
-    def count(node: ast.AST) -> None:
-        dotted = _dotted_name(node)
-        if dotted is not None:
-            root, _, rest = dotted.partition(".")
-            if root in modules and rest:
-                used = f"pytest.{rest}"
-            elif root in names:
-                used = names[root] + (f".{rest}" if rest else "")
-            else:
-                used = None
-            if used is not None:
-                counts[used] = counts.get(used, 0) + 1
-                # `pytest.mark.parametrize` is one use, not three.
-                return
-        for child in ast.iter_child_nodes(node):
-            count(child)
-
-    for statement in tree.body:
-        if not isinstance(statement, ast.Import | ast.ImportFrom):
-            count(statement)
-    return dict(sorted(counts.items(), key=lambda item: -item[1]))
-
-
-def _dotted_name(node: ast.AST) -> str | None:
-    """`pytest.mark.skip` for the expression that says so, or None."""
-    parts = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if not isinstance(node, ast.Name) or not isinstance(node.ctx, ast.Load):
-        return None
-    parts.append(node.id)
-    return ".".join(reversed(parts))

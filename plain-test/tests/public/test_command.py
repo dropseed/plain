@@ -155,11 +155,11 @@ def test_plain_env_is_test_unless_it_was_set():
     assert result.exit_code == 0, result.output
 
 
-def test_a_test_that_asks_for_fixtures_is_told_what_to_do():
+def test_a_test_that_takes_parameters_is_told_what_to_do():
     result = run_in_project(
         {
             "tests/test_signup.py": (
-                "def test_signup(db, client):\n"
+                "def test_signup(user, client):\n"
                 "    assert True\n"
                 "\n"
                 "def test_fine():\n"
@@ -170,8 +170,8 @@ def test_a_test_that_asks_for_fixtures_is_told_what_to_do():
     )
     assert result.exit_code == 1
     assert "COLLECTION ERROR" in result.output
-    assert "test_signup(db, client) takes parameters" in result.output
-    assert "There are no fixtures" in result.output
+    assert "test_signup(user, client) takes parameters" in result.output
+    assert "Nothing is passed to a test by name" in result.output
     # Nothing ran far enough to fail with a TypeError of its own.
     assert "missing 2 required positional arguments" not in result.output
     assert "1 passed, 1 collection errors" in result.output
@@ -392,38 +392,6 @@ def test_a_rerun_command_with_nothing_for_a_shell_to_read_is_left_bare():
     assert "Re-run: plain test tests/test_one.py::test_one\n" in result.output
 
 
-CONFTEST = (
-    "import pytest\n"
-    "\n"
-    "@pytest.fixture\n"
-    "def user(db):\n"
-    "    return object()\n"
-    "\n"
-    "@pytest.fixture(autouse=True)\n"
-    "def no_payments(monkeypatch):\n"
-    "    pass\n"
-)
-
-
-def test_a_conftest_is_refused_and_says_where_its_contents_go():
-    result = run_in_project(
-        {
-            "tests/conftest.py": CONFTEST,
-            "tests/test_one.py": "def test_one():\n    assert True\n",
-        }
-    )
-    assert result.exit_code == 1
-    assert "COLLECTION ERROR" in result.output
-    assert "tests/conftest.py" in result.output
-    assert "conftest.py is a pytest file, and nothing reads it here" in result.output
-    assert "such as tests/helpers.py" in result.output
-    assert "`around_test()`, in\n    tests/lifecycle.py" in result.output
-    assert "Fixtures in this file: user" in result.output
-    assert "Autouse fixtures in this file: no_payments" in result.output
-    # The tests that need nothing from it still run.
-    assert "1 passed, 1 collection errors" in result.output
-
-
 HELPERS = "def create_user():\n    return 'a user'\n"
 
 TEST_USING_A_HELPER = (
@@ -514,88 +482,75 @@ def test_a_lifecycle_under_the_wrong_name_stops_the_run():
     assert "test body" not in result.output
 
 
-# What a project that was written for pytest is told
-
-
-CONFTEST_WITH_A_KID = (
-    "import pytest\n"
-    "\n"
-    "@pytest.fixture\n"
-    "def kid(db):\n"
-    "    return 'a kid'\n"
-    "\n"
-    "@pytest.fixture(autouse=True)\n"
-    "def no_payments(monkeypatch):\n"
-    "    pass\n"
-)
-
-USES_PYTEST = (
-    "import pytest\n"
-    "\n"
-    "def test_pin(kid):\n"
-    "    with pytest.raises(ValueError):\n"
-    "        kid.set_pin('x')\n"
-)
-
-
-def test_a_project_written_for_pytest_is_told_each_thing_once():
+def test_a_project_written_for_another_runner_is_told_what_any_project_would_be():
+    """The runner knows its own rules and no other runner's. A file that
+    isn't a test file is left alone, a module that isn't installed is an
+    import error, and a test that takes parameters is told a test takes
+    none."""
     result = run_in_project(
         {
-            "tests/conftest.py": CONFTEST_WITH_A_KID,
-            "tests/test_a_pins.py": USES_PYTEST,
-            "tests/test_b_pins.py": USES_PYTEST,
-            "tests/test_c_views.py": "def test_view(db, kid):\n    assert True\n",
-            "tests/test_d_views.py": "def test_view(kid):\n    assert True\n",
-            "tests/test_e_fine.py": "def test_fine():\n    assert True\n",
+            "tests/__init__.py": "raise RuntimeError('this file was run')\n",
+            "tests/conftest.py": "raise RuntimeError('this file was run')\n",
+            "tests/test_a_pins.py": (
+                "import pytest\n"
+                "\n"
+                "def test_pin(kid):\n"
+                "    with pytest.raises(ValueError):\n"
+                "        kid.set_pin('x')\n"
+            ),
+            "tests/test_b_views.py": "def test_view(db, kid):\n    assert True\n",
+            "tests/test_c_fine.py": "def test_fine():\n    assert True\n",
         }
     )
     assert result.exit_code == 1
-    assert "1 passed, 5 collection errors" in result.output
+    assert "1 passed, 2 collection errors" in result.output
 
     headings = [
         line.removeprefix("COLLECTION ERROR ")
         for line in result.output.splitlines()
         if line.startswith("COLLECTION ERROR ")
     ]
-    # The conftest first: it is where the fixtures were, so what it says
-    # is what the rest are about.
-    assert headings == [
-        "tests/conftest.py",
-        "tests/test_a_pins.py",
-        "tests/test_b_pins.py",
-        "tests/test_c_views.py",
-        "tests/test_d_views.py",
-    ]
+    assert headings == ["tests/test_a_pins.py", "tests/test_b_views.py"]
 
-    # Nothing got as far as failing on its own.
-    assert "Traceback" not in result.output
+    assert "ModuleNotFoundError: No module named 'pytest'" in result.output
+    assert "test_view(db, kid) takes parameters" in result.output
+    assert "this file was run" not in result.output
+    # Nothing is said about what either file was written for.
+    said_of_pytest = [line for line in result.output.splitlines() if "pytest" in line]
+    assert said_of_pytest == [
+        "      import pytest",
+        "  ModuleNotFoundError: No module named 'pytest'",
+    ]
+    for word in ("conftest", "fixture", "__init__"):
+        assert word not in result.output
 
 
 def test_a_one_paragraph_definition_error_is_printed_with_no_blank_lines():
-    """Every line of a run is read. A file that has only to say what is
-    wrong with it, and where that was explained, takes the lines that says."""
-    only_imports_pytest = "import pytest\n\n\ndef test_it():\n    pytest.skip()\n"
+    """Every line of a run is read. A file that has one thing to say takes
+    the lines that says."""
+    has_no_cases = (
+        "from plain.test import cases\n\n\n@cases()\ndef test_it(n):\n    pass\n"
+    )
     result = run_in_project(
         {
-            "tests/test_a.py": only_imports_pytest,
-            "tests/test_b.py": only_imports_pytest,
-            "tests/test_c.py": only_imports_pytest,
+            "tests/test_a.py": has_no_cases,
+            "tests/test_b.py": has_no_cases,
+            "tests/test_c.py": "def test_fine():\n    assert True\n",
         }
     )
 
     lines = result.output.splitlines()
-    second = lines.index("COLLECTION ERROR tests/test_b.py")
-    third = lines.index("COLLECTION ERROR tests/test_c.py")
-    # The first says what replaces pytest, in paragraphs, and is set off
-    # from what follows it.
-    assert lines[second - 1] == ""
-    # The second and third are each a heading and what is under it.
-    assert lines[second:third] == [
+    first = lines.index("COLLECTION ERROR tests/test_a.py")
+    # Each is a heading and what is under it, set off from what is before
+    # them and from what is after.
+    assert lines[first - 1 : first + 5] == [
+        "",
+        "COLLECTION ERROR tests/test_a.py",
+        "  line 4: cases() requires at least one case",
         "COLLECTION ERROR tests/test_b.py",
-        "  line 1: `import pytest`",
-        "  It uses pytest.skip. What replaces pytest is in the error for tests/test_a.py.",
+        "  line 4: cases() requires at least one case",
+        "",
     ]
-    assert lines[third + 1] == "  line 1: `import pytest`"
 
 
 def test_a_test_that_yields_is_not_reported_as_passed():
@@ -620,26 +575,19 @@ def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
         {
             "tests/shared_checks.py": "def test_shared():\n    assert False\n",
             "tests/test_kinds.py": (
-                "import unittest\n"
-                "\n"
                 "from shared_checks import test_shared\n"
                 "\n"
                 "class TestGroup:\n"
                 "    @staticmethod\n"
                 "    def test_static():\n"
                 "        assert False, 'the static method ran'\n"
-                "\n"
-                "class UserTests(unittest.TestCase):\n"
-                "    def test_it(self):\n"
-                "        assert False\n"
             ),
         }
     )
     assert result.exit_code == 1
-    assert "UserTests is a unittest.TestCase" in result.output
     assert "test_shared is defined in shared_checks, not in this file" in result.output
 
-    # With those two gone, the static method is a test that runs.
+    # With that gone, the static method is a test that runs.
     result = run_in_project(
         {
             "tests/test_kinds.py": (
@@ -653,24 +601,6 @@ def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
     assert result.exit_code == 1
     assert "FAILED tests/test_kinds.py::TestGroup::test_static" in result.output
     assert "the static method ran" in result.output
-
-
-def test_a_conftest_is_refused_however_the_target_is_written():
-    project = make_project(
-        {
-            "tests/conftest.py": CONFTEST_WITH_A_KID,
-            "tests/accounts/test_it.py": "def test_it():\n    assert True\n",
-        }
-    )
-    for target in (
-        "tests/accounts",
-        "tests/accounts/test_it.py",
-        "tests/accounts/test_it.py::test_it",
-    ):
-        result = run_runner(project, target)
-        assert result.exit_code == 1
-        assert "COLLECTION ERROR tests/conftest.py" in result.output
-        assert "1 passed, 1 collection errors" in result.output
 
 
 def test_a_case_is_named_for_its_values_where_it_is_reported():

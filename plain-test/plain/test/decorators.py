@@ -57,8 +57,8 @@ _LONGEST_ID_FROM_VALUES = 60
 
 def cases(*case_args: Any) -> Callable:
     """
-    Parametrize a test. Each argument becomes its own test run, passed as
-    the test function's positional arguments.
+    Run a test once for each case. Each argument is a case, passed as the
+    test function's positional arguments.
 
         @cases(
             ("a@example.com", True),

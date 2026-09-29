@@ -7,20 +7,18 @@ methods (a fresh instance per test). Test modules get assertion rewriting
 when imported; helper modules do not.
 
 Nothing that looks like a test is left out without a word. What can't be
-run as it is written (a test that takes fixtures, one that yields, a
-`unittest.TestCase`, a test imported from another file) is a collection
-error for its file, which says what to write instead.
+run as it is written (a test that takes parameters nothing passes in, one
+that yields, a test imported from another file) is a collection error for
+its file, which says what to write instead.
 
 Helper modules are imported by their bare name from one directory, the
 helper directory. The caller puts it on `sys.path` before collecting. A test
 module can't reach them any other way: see `loading.import_problems`.
 """
 
-import ast
 import functools
 import inspect
 import os
-import traceback
 import types
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -34,22 +32,17 @@ from ..decorators import (
 from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
 from .layout import Layout
-from .loading import (
-    ImportsAnotherWay,
-    ImportsPytest,
-    PytestImport,
-    is_pytest,
-    load_test_module,
-    what_replaces_pytest,
-)
+from .loading import ImportsAnotherWay, load_test_module
 from .output_capture import NO_OUTPUT, OutputCapture
-from .problems import NO_FIXTURES_ADVICE, CantBeRunAsWritten, ProblemsInAFile
+from .problems import (
+    A_TEST_TAKES_ONLY_ITS_CASES,
+    CantBeRunAsWritten,
+    ProblemsInAFile,
+)
 
 __all__ = []
 
 _SKIP_DIR_NAMES = {"__pycache__", "node_modules"}
-
-_CONFTEST_FILE_NAME = "conftest.py"
 
 
 class CollectionError(Exception):
@@ -108,8 +101,6 @@ def collect_tests(
 
     Returns the collected tests plus any per-file collection errors — one
     unimportable file shouldn't stop every other file's tests from running.
-    A `conftest.py` comes first among the errors: it is where the fixtures
-    the other files ask for were, so what it says explains what they say.
     """
     root = (root or Path.cwd()).resolve()
     layout = Layout(
@@ -119,59 +110,29 @@ def collect_tests(
     )
     skip_dir_names = _SKIP_DIR_NAMES | set(exclude_dirs)
 
-    # Everything is found before anything is loaded, so that a test file is
-    # read knowing which conftest files there are.
+    # Every target is found before anything is loaded, so a target that
+    # isn't there stops the run before a test file has been run.
     files_of_targets: list[tuple[list[Path], str]] = []
-    conftest_files: list[Path] = []
     for target in targets or ["."]:
         path_part, _, name_part = target.partition("::")
         base = (root / path_part).resolve() if path_part not in ("", ".") else root
 
-        # The ones above the target apply to it whichever way it is
-        # written: as a file, a directory, or one test in a file.
-        conftest_files.extend(_conftest_files_above(base, root=root))
         if base.is_file():
             files = [base]
         elif base.is_dir():
-            files, conftest_files_found = _find_test_and_conftest_files(
-                base, skip_dir_names=skip_dir_names
-            )
-            conftest_files.extend(conftest_files_found)
+            files = _find_test_files(base, skip_dir_names=skip_dir_names)
         else:
             raise FileNotFoundError(f"No such test target: {target}")
         files_of_targets.append((files, name_part))
 
-    # Overlapping targets find the same file twice.
-    conftest_files = list(dict.fromkeys(conftest_files))
-    fixtures_in_conftests: dict[str, str] = {}
     errors: list[CollectionError] = []
-
-    init_file = layout.helper_directory / "__init__.py"
-    if _has_code_nothing_runs(init_file):
-        message = _tests_is_not_a_package_message(init_file, layout=layout)
-        errors.append(CollectionError(init_file, TestDefinitionError(message)))
-
-    for conftest_file in conftest_files:
-        fixtures, autouse_fixtures = _fixture_names(conftest_file)
-        shown = layout.shown(conftest_file)
-        for name in fixtures:
-            fixtures_in_conftests.setdefault(name, f"a fixture in {shown}")
-        for name in autouse_fixtures:
-            fixtures_in_conftests.setdefault(name, f"an autouse fixture in {shown}")
-        message = _conftest_message(
-            fixtures=fixtures, autouse_fixtures=autouse_fixtures, layout=layout
-        )
-        errors.append(CollectionError(conftest_file, TestDefinitionError(message)))
-
     collected: list[RunnableTest] = []
     for files, name_part in files_of_targets:
         for file in files:
             if capture is not None:
                 capture.discard()
             try:
-                tests = _collect_file(
-                    file, layout=layout, fixtures_in_conftests=fixtures_in_conftests
-                )
+                tests = _collect_file(file, layout=layout)
             except CollectionError as error:
                 if capture is not None:
                     error.output = capture.take()
@@ -181,9 +142,7 @@ def collect_tests(
                 tests = [t for t in tests if _matches_target(t.name, name_part)]
             collected.extend(tests)
 
-    _say_each_thing_once(
-        errors, layout=layout, fixtures_in_conftests=fixtures_in_conftests
-    )
+    _say_each_thing_once(errors, layout=layout)
 
     # De-duplicate (overlapping targets) while preserving order.
     seen: set[str] = set()
@@ -195,74 +154,44 @@ def collect_tests(
     return unique, errors
 
 
-def _say_each_thing_once(
-    errors: list[CollectionError],
-    *,
-    layout: Layout,
-    fixtures_in_conftests: dict[str, str],
-) -> None:
+def _say_each_thing_once(errors: list[CollectionError], *, layout: Layout) -> None:
     """
     Say what is wrong with each file that is written in a way that can't be
     run, and say why once.
 
-    A file's error has what is wrong with that file: the pytest it imports,
-    the imports it can't use, the tests it defines wrongly. Eighty files
-    that import pytest, or ask for fixtures, have one thing to be told
-    between them. The first says it, and the rest say where the first is.
+    A file's error has what is wrong with that file: the imports it can't
+    use, the tests it defines wrongly. Eighty files whose tests take
+    parameters have one thing to be told between them. The first says it,
+    and the rest say where the first is.
     """
     written_wrongly = [
         error
         for error in errors
-        if isinstance(
-            error.error, ImportsPytest | ImportsAnotherWay | CantBeRunAsWritten
-        )
+        if isinstance(error.error, ImportsAnotherWay | CantBeRunAsWritten)
     ]
-
-    importing_pytest = [
-        e for e in written_wrongly if isinstance(e.error, ImportsPytest)
-    ]
-    pytest_uses: dict[str, int] = {}
-    for error in importing_pytest:
-        assert isinstance(error.error, ImportsPytest)
-        for name, count in error.error.uses.items():
-            pytest_uses[name] = pytest_uses.get(name, 0) + count
-    pytest_uses = dict(sorted(pytest_uses.items(), key=lambda item: -item[1]))
-
     importing_another_way = [
         e for e in written_wrongly if isinstance(e.error, ImportsAnotherWay)
     ]
-    asking_for_fixtures = [
+    taking_parameters = [
         e
         for e in written_wrongly
         if e.error.tests.tests_taking_parameters  # ty: ignore[unresolved-attribute]
     ]
-    # A conftest's error says there are no fixtures, and where each kind
-    # goes, and each file names the conftest its fixtures were in.
-    a_conftest_says_it = any(e.path.name == _CONFTEST_FILE_NAME for e in errors)
 
     for error in written_wrongly:
         cause = error.error
-        assert isinstance(cause, ImportsPytest | ImportsAnotherWay | CantBeRunAsWritten)
+        assert isinstance(cause, ImportsAnotherWay | CantBeRunAsWritten)
         sections = []
 
-        if isinstance(cause, ImportsPytest):
-            first = importing_pytest[0]
-            sections.append(
-                cause.what_this_file_does(
-                    explained_for=None if error is first else layout.shown(first.path)
-                )
-            )
         if isinstance(cause, ImportsAnotherWay):
             sections.append(cause.what_is_wrong())
 
         if cause.tests:
-            sections.append(
-                cause.tests.what_is_wrong(fixtures_in_conftests=fixtures_in_conftests)
-            )
-        if error in asking_for_fixtures and not a_conftest_says_it:
-            first = asking_for_fixtures[0]
+            sections.append(cause.tests.what_is_wrong())
+        if error in taking_parameters:
+            first = taking_parameters[0]
             if error is first:
-                sections.append(NO_FIXTURES_ADVICE)
+                sections.append(A_TEST_TAKES_ONLY_ITS_CASES)
             else:
                 sections.append(
                     "What to write instead is in the error for "
@@ -271,11 +200,6 @@ def _say_each_thing_once(
 
         if isinstance(cause, ImportsAnotherWay) and error is importing_another_way[0]:
             sections.append(cause.why)
-        if isinstance(cause, ImportsPytest) and error is importing_pytest[0]:
-            used_by = "this file" if len(importing_pytest) == 1 else "these files"
-            sections.append(
-                what_replaces_pytest(pytest_uses, layout=layout, used_by=used_by)
-            )
 
         # Handed on as the one kind of error there is, not as the kind made
         # here to keep what was known.
@@ -288,12 +212,8 @@ def _matches_target(name: str, target: str) -> bool:
     return name == target or name.startswith((f"{target}[", f"{target}::"))
 
 
-def _find_test_and_conftest_files(
-    directory: Path, *, skip_dir_names: set[str]
-) -> tuple[list[Path], list[Path]]:
-    """The test files under a directory, and the conftest files among them."""
-    test_files = []
-    conftest_files = []
+def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
+    files = []
     for dirpath, dirnames, filenames in os.walk(directory):
         # Prune skipped directories in place so os.walk never descends into
         # them (rglob can't prune — a .venv or node_modules would get a full
@@ -301,137 +221,15 @@ def _find_test_and_conftest_files(
         dirnames[:] = sorted(
             d for d in dirnames if d not in skip_dir_names and not d.startswith(".")
         )
-        test_files.extend(
+        files.extend(
             Path(dirpath) / f
             for f in sorted(filenames)
             if f.startswith("test_") and f.endswith(".py")
         )
-        if _CONFTEST_FILE_NAME in filenames:
-            conftest_files.append(Path(dirpath) / _CONFTEST_FILE_NAME)
-    return test_files, conftest_files
+    return files
 
 
-def _conftest_files_above(target: Path, *, root: Path) -> list[Path]:
-    """
-    The conftest files that would have applied to everything in a target:
-    the ones in each directory above it, up to the root, and for a file the
-    one beside it. A directory's own, and the ones below it, are found when
-    it is searched.
-    """
-    nearest = target.parent
-    if not nearest.is_relative_to(root):
-        # A directory has nothing above it to look in. A file has the
-        # directory it is in, which nothing else will search.
-        directories = [nearest] if target.is_file() else []
-    else:
-        directories = [
-            directory
-            for directory in (nearest, *nearest.parents)
-            if directory.is_relative_to(root)
-        ]
-    return [
-        directory / _CONFTEST_FILE_NAME
-        for directory in reversed(directories)
-        if (directory / _CONFTEST_FILE_NAME).is_file()
-    ]
-
-
-def _has_code_nothing_runs(init_file: Path) -> bool:
-    """
-    Whether the tests directory has an `__init__.py` with code in it.
-
-    The tests directory is not imported as a package: a test file is loaded
-    on its own, and a helper module by its bare name. So nothing runs the
-    file. One with nothing in it, or a docstring, is left alone: it does no
-    harm, and lets no import work that wouldn't without it.
-    """
-    try:
-        tree = ast.parse(init_file.read_text(), filename=str(init_file))
-    except OSError:
-        return False  # there isn't one
-    except SyntaxError:
-        return True
-    is_a_docstring = lambda node: (
-        isinstance(node, ast.Expr)
-        and isinstance(node.value, ast.Constant)
-        and isinstance(node.value.value, str)
-    )
-    return any(not is_a_docstring(node) for node in tree.body)
-
-
-def _tests_is_not_a_package_message(init_file: Path, *, layout: Layout) -> str:
-    directory = layout.shown(init_file.parent)
-    shown = layout.shown(init_file)
-    lifecycle_file = layout.shown(layout.helper_directory / "lifecycle.py")
-    directory = "The tests directory" if directory == "." else f"{directory}/"
-    return (
-        f"{shown} has code in it, and nothing runs it. {directory} is not\n"
-        "a package here: a test file is loaded on its own, and a helper\n"
-        "module is imported by its bare name. Move what the file does to a\n"
-        "helper module the tests call, or to a TestLifecycle in\n"
-        f"{lifecycle_file} if every test needs it. Then delete the file."
-    )
-
-
-def _conftest_message(
-    *, fixtures: list[str], autouse_fixtures: list[str], layout: Layout
-) -> str:
-    helpers_file = layout.shown(layout.helper_directory / "helpers.py")
-    lifecycle_file = layout.shown(layout.helper_directory / "lifecycle.py")
-
-    lines = [
-        "conftest.py is a pytest file, and nothing reads it here. There are no",
-        "fixtures: nothing in this file runs, and nothing is passed to a test",
-        "by name. Move what it holds, then delete the file.",
-        "",
-        "- A fixture that tests ask for becomes a function in a helper module,",
-        f"  such as {helpers_file}. A test imports it",
-        "  (`from helpers import create_user`) and calls it in its body. A",
-        "  fixture that cleans up after itself becomes a `@contextmanager`",
-        "  that the test enters with `with`.",
-        "- A fixture that protected every test without being asked for",
-        "  (`autouse=True`) becomes a TestLifecycle's `around_test()`, in",
-        f"  {lifecycle_file}.",
-        "- Hooks (`pytest_configure`, `pytest_collection_modifyitems`, ...)",
-        "  have no equivalent.",
-    ]
-    if fixtures:
-        lines += ["", f"Fixtures in this file: {', '.join(fixtures)}"]
-    if autouse_fixtures:
-        lines += ["", f"Autouse fixtures in this file: {', '.join(autouse_fixtures)}"]
-    return "\n".join(lines)
-
-
-def _fixture_names(path: Path) -> tuple[list[str], list[str]]:
-    """
-    The fixtures a conftest defines, as (asked for by name, autouse). Read
-    from its syntax, since importing it would need pytest.
-    """
-    try:
-        tree = ast.parse(path.read_text(), filename=str(path))
-    except SyntaxError, UnicodeDecodeError:
-        return [], []
-
-    fixtures = []
-    autouse_fixtures = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            continue
-        for decorator in node.decorator_list:
-            written = ast.unparse(decorator)
-            if "fixture" not in written:
-                continue
-            if "autouse=True" in written:
-                autouse_fixtures.append(node.name)
-            else:
-                fixtures.append(node.name)
-            break
-    return fixtures, autouse_fixtures
-
-
-def _collect_file(
-    path: Path, *, layout: Layout, fixtures_in_conftests: dict[str, str]
-) -> list[RunnableTest]:
+def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:
     module = _import_test_module(path, layout=layout)
     relative = layout.shown(path)
 
@@ -467,11 +265,6 @@ def _collect_file(
             tests.extend(_expand(obj, base_id=f"{relative}::{name}"))
             continue
 
-        if _is_a_unittest_case(obj):
-            # `TestCase` itself, imported to be a base class, is not a test.
-            if defined_here:
-                problems.unittest_cases.append(name)
-            continue
         if not name.startswith("Test"):
             continue
         if defined_here:
@@ -488,14 +281,6 @@ def _collect_file(
         raise CollectionError(path, CantBeRunAsWritten(problems))
 
     return tests
-
-
-def _is_a_unittest_case(cls: type) -> bool:
-    # By name: importing unittest to ask would cost every run the import.
-    return any(
-        base.__module__ == "unittest.case" and base.__name__ == "TestCase"
-        for base in cls.__mro__
-    )
 
 
 def _yields(func: types.FunctionType) -> bool:
@@ -718,42 +503,12 @@ def _expand(
 def _import_test_module(path: Path, *, layout: Layout) -> types.ModuleType:
     try:
         return load_test_module(path, layout=layout)
-    except (ImportsPytest, ImportsAnotherWay, CantBeRunAsWritten) as e:
+    except (ImportsAnotherWay, CantBeRunAsWritten) as e:
         raise CollectionError(path, e) from e
     except TestDefinitionError as e:
         raise CollectionError(path, _with_its_line(e, path=path)) from e
-    except ModuleNotFoundError as e:
-        imports_pytest = _a_helper_imports_pytest(e, layout=layout)
-        raise CollectionError(path, imports_pytest or e) from e
     except Exception as e:
         raise CollectionError(path, e) from e
-
-
-def _a_helper_imports_pytest(
-    error: ModuleNotFoundError, *, layout: Layout
-) -> ImportsPytest | None:
-    """
-    What to say when a module the test file imports, imports pytest. The
-    test file's own import was found by reading it, before it was run.
-    """
-    if error.name is None or not is_pytest(error.name):
-        return None
-    # The last frame is the import that failed.
-    frames = traceback.extract_tb(error.__traceback__)
-    if not frames:
-        return None
-    importing = frames[-1]
-    assert importing.lineno is not None
-    return ImportsPytest(
-        imported_at=PytestImport(
-            line=importing.lineno,
-            written=(importing.line or f"import {error.name}").strip(),
-        ),
-        uses={},
-        other_import_problems=[],
-        layout=layout,
-        imported_by=layout.shown(Path(importing.filename)),
-    )
 
 
 def _with_its_line(error: TestDefinitionError, *, path: Path) -> TestDefinitionError:

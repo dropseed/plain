@@ -20,36 +20,10 @@ from ..definition import TestDefinitionError
 
 __all__ = []
 
-NO_FIXTURES_ADVICE = (
-    "There are no fixtures: nothing is passed to a test by name. A test gets\n"
-    "what it needs in its body, by calling a helper or entering a `with`\n"
-    "block, and takes values only from @cases(...)."
-)
-
-# What to write for a parameter that was one of pytest's fixtures, or one of
-# the fixtures Plain's pytest plugin had.
-_WHAT_REPLACES_A_FIXTURE = {
-    "db": "delete it: every test already runs in a transaction that is rolled back",
-    "isolated_db": "`@isolated_db` on the test, from plain.postgres.test",
-    "client": "`client = Client()` in the test, from plain.test",
-    "settings": "`with override_settings(NAME=value):`, from plain.test",
-    "monkeypatch": '`with patch(target, "name", value):`, from plain.test',
-    "tmp_path": "`with tempfile.TemporaryDirectory() as directory:`",
-    "tmpdir": "`with tempfile.TemporaryDirectory() as directory:`",
-    "caplog": "`with capture_logs() as logs:`, from plain.test",
-    "capsys": "`with contextlib.redirect_stdout(io.StringIO()) as written:`",
-    "capfd": "`with contextlib.redirect_stdout(io.StringIO()) as written:`",
-    "request": "pytest's own, with no equivalent: a test's values come from @cases",
-    "otel_spans": "`with capture_spans() as spans:`, from plain.test",
-    "otel_metrics": "`with capture_metrics() as metrics:`, from plain.test",
-    "capture_queries": "`with capture_queries() as queries:`, from plain.postgres.test",
-}
-
-_UNITTEST_ISNT_RUN = (
-    "unittest isn't run here: nothing would call setUp() or tearDown().\n"
-    "Write a class with no base class, named Test*. What setUp() made, each\n"
-    "test makes in its body or gets from a helper. `self.assertEqual(a, b)`\n"
-    "is `assert a == b`."
+A_TEST_TAKES_ONLY_ITS_CASES = (
+    "Nothing is passed to a test by name. A test gets what it needs in its\n"
+    "body, by calling a helper or entering a `with` block, and takes values\n"
+    "only from @cases(...)."
 )
 
 _A_TEST_IS_RUN_WHERE_IT_IS_DEFINED = (
@@ -63,10 +37,9 @@ _A_TEST_IS_RUN_WHERE_IT_IS_DEFINED = (
 
 _A_TEST_CANT_YIELD = (
     "A test can't yield: calling a function with a `yield` in it makes a\n"
-    "generator, and runs none of its body. Values it yielded to be checked\n"
-    "one at a time are passed in with @cases(...). A yield that stood between\n"
-    "setup and cleanup belongs in a `@contextmanager` helper, which the test\n"
-    "enters with `with`."
+    "generator, and runs none of its body. Values to be checked one at a\n"
+    "time are passed in with @cases(...). Setup with cleanup after it belongs\n"
+    "in a `@contextmanager` helper, which the test enters with `with`."
 )
 
 ONE_CASES_FOR_EVERY_COMBINATION = (
@@ -91,16 +64,13 @@ class ProblemsInAFile:
 
     # A test that can't be run for a reason of its own, and what to write.
     of_one_test: list[str] = field(default_factory=list)
-    # The tests with more than one `@cases`, or more than one `parametrize`:
-    # the test, which of the two, and how many.
-    tests_with_cases_twice: list[tuple[str, str, int]] = field(default_factory=list)
+    # The tests with more than one `@cases`: the test, and how many.
+    tests_with_cases_twice: list[tuple[str, int]] = field(default_factory=list)
     # Whether running the file would stop at a decorator that raises: a
     # second `@cases`, a `@skip` or `@tag` that isn't called.
     stops_at_a_decorator: bool = False
     # The tests that have a `yield` in them.
     tests_that_yield: list[str] = field(default_factory=list)
-    # The classes that are a `unittest.TestCase`.
-    unittest_cases: list[str] = field(default_factory=list)
     # The tests that were imported, each with the module it is defined in.
     defined_elsewhere: list[tuple[str, str]] = field(default_factory=list)
     # The tests that take parameters nothing passes in, as they are written:
@@ -114,26 +84,19 @@ class ProblemsInAFile:
             self.of_one_test
             or self.tests_with_cases_twice
             or self.tests_that_yield
-            or self.unittest_cases
             or self.defined_elsewhere
             or self.tests_taking_parameters
         )
 
-    def what_is_wrong(self, *, fixtures_in_conftests: dict[str, str]) -> str:
+    def what_is_wrong(self) -> str:
         """
-        The tests, and what each parameter was. Without the advice about
-        fixtures, which a run says once: `NO_FIXTURES_ADVICE`.
+        The tests, and the parameters nothing passes in. Without the rule
+        about parameters, which a run says once:
+        `A_TEST_TAKES_ONLY_ITS_CASES`.
         """
         lines = list(self.of_one_test)
-        for name, decorator, count in self.tests_with_cases_twice:
-            if decorator == "@cases":
-                lines.append(f"{name} has {count} @cases. A test takes one.")
-            else:
-                lines.append(
-                    f"{name} has {count} parametrize decorators. "
-                    "They become one @cases."
-                )
-        lines.extend(f"{name} is a unittest.TestCase." for name in self.unittest_cases)
+        for name, count in self.tests_with_cases_twice:
+            lines.append(f"{name} has {count} @cases. A test takes one.")
         lines.extend(
             f"{name} is defined in {module}, not in this file."
             for name, module in self.defined_elsewhere
@@ -160,18 +123,10 @@ class ProblemsInAFile:
             table = []
             for name, count in self.parameters.items():
                 tests = "1 test" if count == 1 else f"{count} tests"
-                what_it_was = fixtures_in_conftests.get(
-                    name
-                ) or _WHAT_REPLACES_A_FIXTURE.get(name)
-                row = f"{name.ljust(widest)}  {tests}"
-                if what_it_was is not None:
-                    row = f"{row}  {what_it_was}"
-                table.append(row)
+                table.append(f"{name.ljust(widest)}  {tests}")
             sections.append(textwrap.indent("\n".join(table), "  "))
         if self.tests_with_cases_twice:
             sections.append(ONE_CASES_FOR_EVERY_COMBINATION)
-        if self.unittest_cases:
-            sections.append(_UNITTEST_ISNT_RUN)
         if self.defined_elsewhere:
             sections.append(_A_TEST_IS_RUN_WHERE_IT_IS_DEFINED)
         if self.tests_that_yield:
@@ -182,13 +137,12 @@ class ProblemsInAFile:
 class CantBeRunAsWritten(TestDefinitionError):
     """
     A file's tests can't be run as they are written. `collection` says it,
-    with what the run knows: which fixtures its conftest files had, and
-    what it has said already for another file.
+    with what the run knows: what it has said already for another file.
     """
 
     def __init__(self, tests: ProblemsInAFile) -> None:
         self.tests = tests
-        super().__init__(tests.what_is_wrong(fixtures_in_conftests={}))
+        super().__init__(tests.what_is_wrong())
 
 
 # ---------------------------------------------------------------------------
@@ -200,11 +154,9 @@ _PASSES_NOTHING = (
     "plain.test.skip",
     "plain.test.tag",
     "plain.postgres.test.isolated_db",
-    "pytest.mark.",
 )
 
 _CASES = "plain.test.cases"
-_PARAMETRIZE = "pytest.mark.parametrize"
 _NEEDS_TO_BE_CALLED = {
     "plain.test.skip": '@skip requires a reason: @skip("why")',
     "plain.test.tag": '@tag requires at least one name: @tag("slow")',
@@ -216,7 +168,7 @@ type _Function = ast.FunctionDef | ast.AsyncFunctionDef
 def _names_imported(tree: ast.Module) -> dict[str, str]:
     """
     What each name a module imports stands for: `{"cases": "plain.test.cases",
-    "pt": "pytest"}`.
+    "pg": "plain.postgres"}`.
     """
     names = {}
     for node in tree.body:
@@ -235,7 +187,7 @@ def _names_imported(tree: ast.Module) -> dict[str, str]:
 
 
 def _dotted(node: ast.expr) -> str | None:
-    """`pytest.mark.skip` for the expression that says so, or None."""
+    """`plain.test.skip` for the expression that says so, or None."""
     parts = []
     while isinstance(node, ast.Attribute):
         parts.append(node.attr)
@@ -273,28 +225,6 @@ def _yields(function: _Function) -> bool:
     return False
 
 
-def _names_parametrize_fills(decorator: ast.Call) -> list[str] | None:
-    """
-    The parameters a `parametrize` passes values for, from its first
-    argument, or None when that isn't written out where it can be read.
-    """
-    if not decorator.args:
-        return None
-    names = decorator.args[0]
-    if isinstance(names, ast.Constant) and isinstance(names.value, str):
-        return [name.strip() for name in names.value.split(",") if name.strip()]
-    if isinstance(names, ast.List | ast.Tuple):
-        found = []
-        for element in names.elts:
-            if not (
-                isinstance(element, ast.Constant) and isinstance(element.value, str)
-            ):
-                return None
-            found.append(element.value)
-        return found
-    return None
-
-
 def _read_a_test(
     function: _Function,
     *,
@@ -308,9 +238,7 @@ def _read_a_test(
         return
 
     filled_by_the_call = 1 if in_a_class else 0
-    filled_by_parametrize: list[str] = []
     times_cases = 0
-    times_parametrize = 0
     # Whether every decorator is one this module knows passes no values
     # but the ones counted here.
     parameters_are_known = True
@@ -335,24 +263,14 @@ def _read_a_test(
         if origin == _CASES:
             times_cases += 1
             parameters_are_known = False  # its values fill them, by position
-        elif origin == _PARAMETRIZE and isinstance(decorator, ast.Call):
-            times_parametrize += 1
-            names = _names_parametrize_fills(decorator)
-            if names is None:
-                parameters_are_known = False
-            else:
-                filled_by_parametrize.extend(names)
         elif origin is None or not origin.startswith(_PASSES_NOTHING):
             parameters_are_known = False
 
-    where = f"line {function.lineno}: {name}"
     if times_cases > 1:
-        problems.tests_with_cases_twice.append((where, "@cases", times_cases))
-        problems.stops_at_a_decorator = True
-    if times_parametrize > 1:
         problems.tests_with_cases_twice.append(
-            (where, "parametrize", times_parametrize)
+            (f"line {function.lineno}: {name}", times_cases)
         )
+        problems.stops_at_a_decorator = True
 
     if not parameters_are_known:
         return
@@ -367,11 +285,7 @@ def _read_a_test(
         )
         if default is None
     ]
-    nothing_fills = [
-        argument
-        for argument in [*with_no_default[filled_by_the_call:], *keyword_only]
-        if argument.arg not in filled_by_parametrize
-    ]
+    nothing_fills = [*with_no_default[filled_by_the_call:], *keyword_only]
     if not nothing_fills:
         return
 
@@ -403,14 +317,6 @@ def tests_as_written(tree: ast.Module) -> ProblemsInAFile:
                 )
 
         elif isinstance(node, ast.ClassDef):
-            is_a_unittest_case = any(
-                _where_it_comes_from(base, imported=imported)
-                in ("unittest.TestCase", "unittest.case.TestCase")
-                for base in node.bases
-            )
-            if is_a_unittest_case:
-                problems.unittest_cases.append(node.name)
-                continue
             if not node.name.startswith("Test"):
                 continue
             for member in node.body:

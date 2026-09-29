@@ -5,7 +5,7 @@ import inspect
 from functools import cached_property
 
 from plain.http import Request, Response
-from plain.test import Client, build_request, case, cases, raises
+from plain.test import Client, build_request, raises
 from plain.test.client import ClientResponse
 
 
@@ -99,46 +99,16 @@ def test_build_request_takes_the_clients_keywords() -> None:
 # says what to write.
 
 
-@cases(
-    case("force_login", "login_client(client, user)", id="force_login"),
-    case("logout", "logout_client(client)", id="logout"),
-    case("session", "get_client_session(client)", id="session"),
-    case("trace", 'client.request("TRACE", path)', id="trace"),
-)
-def test_a_name_the_client_used_to_have_says_what_to_write(name, replacement) -> None:
-    with raises(AttributeError, match="The test client has no") as caught:
-        getattr(Client(), name)
+def test_a_name_the_client_lacks_is_an_attribute_error_like_any_other() -> None:
+    with raises(AttributeError) as caught:
+        Client().force_login  # ty: ignore[unresolved-attribute]  # noqa: B018
 
-    assert replacement in str(caught.exception)
+    assert str(caught.exception) == "'Client' object has no attribute 'force_login'"
 
 
-def test_any_other_name_the_client_lacks_says_what_it_has() -> None:
-    with raises(AttributeError, match="It makes requests") as caught:
-        Client().no_such_thing  # noqa: B018
-
-    assert "`websocket`" in str(caught.exception)
-    assert "`cookies`" in str(caught.exception)
-
-
-@cases("post", "put", "patch", "delete")
-def test_data_passed_by_position_says_which_keyword(verb) -> None:
-    send = getattr(Client(), verb)
-
-    with raises(TypeError, match="keywords after it") as caught:
-        send("/", {"email": "a@example.com"})
-
-    assert "`form_data=`" in str(caught.exception)
-    assert "`json_data=`" in str(caught.exception)
-
-
-@cases("get", "head", "options")
-def test_a_query_passed_by_position_says_which_keyword(verb) -> None:
-    send = getattr(Client(), verb)
-
-    with raises(TypeError, match="keywords after it") as caught:
-        send("/", {"page": "2"})
-
-    assert "`query_params=`" in str(caught.exception)
+def test_everything_after_the_path_is_passed_by_name() -> None:
+    with raises(TypeError, match="takes 2 positional arguments but 3 were given"):
+        Client().post("/", {"email": "a@example.com"})  # ty: ignore[too-many-positional-arguments]
 
 
 def test_the_verbs_keep_the_signatures_they_are_written_with() -> None:
