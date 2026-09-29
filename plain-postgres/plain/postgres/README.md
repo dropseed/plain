@@ -2463,10 +2463,11 @@ def test_set_many_is_one_statement():
 
 Pass `table="users_user"` to keep only the statements that name that table. The name is matched as a quoted identifier, so `users_user` doesn't match `users_usertag`.
 
-Two things to know about what's counted:
+Three things to know about what's counted:
 
 - **Transactions.** Every test runs inside a transaction, so an `atomic()` block in the code under test is a savepoint. `SAVEPOINT` and `RELEASE SAVEPOINT` are statements, and they're in both `queries` and `sql_statements()`. In an [`@isolated_db`](#tests-that-cant-run-in-a-transaction) test the same block is a real `BEGIN` and `COMMIT`. The connection issues those itself, so they're in `queries` (with `is_statement` false) and left out of `sql_statements()`.
 - **Queries the framework runs for itself.** `capture_queries` records at the connection, so it sees every query, including ones that run with tracing turned off inside [`suppress_db_tracing()`](#tracing) and so never appear as spans.
+- **Requests.** A capture around `client.get(...)` holds what the view ran, in an `@isolated_db` test too, where each request takes a connection from the pool and returns it.
 
 ## Settings
 

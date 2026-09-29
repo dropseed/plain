@@ -2,7 +2,6 @@
 Database test helpers.
 """
 
-from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -83,7 +82,9 @@ def capture_queries() -> Generator[CapturedQueries]:
         assert queries[0].sql.startswith("SELECT")
 
     It records at the connection, so it sees every query whether or not the
-    query is traced.
+    query is traced, and whether or not the connection was returned to the
+    pool and taken out again along the way, as it is by a request outside a
+    transaction.
     """
     conn = get_connection()
     previous = conn.force_debug_cursor
@@ -109,14 +110,14 @@ def _query_source_of(conn: DatabaseConnection) -> CaptureSource[CapturedQuery]:
         # The source holds the connection's log, not the connection, so it
         # doesn't keep a closed connection from being let go.
         source = CaptureSource(
-            read=partial(_queries_in, conn.queries_log),
-            clear=conn.queries_log.clear,
+            read=partial(_queries_in, conn.captured_queries_log),
+            clear=conn.captured_queries_log.clear,
         )
         _query_sources[conn] = source
     return source
 
 
-def _queries_in(queries_log: deque[dict[str, Any]]) -> list[CapturedQuery]:
+def _queries_in(queries_log: list[dict[str, Any]]) -> list[CapturedQuery]:
     return [
         CapturedQuery(
             sql=entry.get("sql_as_sent", entry["sql"]),
