@@ -23,6 +23,7 @@ from .failure import (
     shown_path,
 )
 from .output_capture import NO_OUTPUT, Output, OutputCapture
+from .phases import Part
 
 __all__ = []
 
@@ -107,6 +108,11 @@ class TestRun:
     teardown_output: Output = NO_OUTPUT
     # Each distinct warning once, in the order first raised.
     warnings: list[RaisedWarning] = field(default_factory=list)
+    # How long each lifecycle took to set up and to take down, by its class,
+    # and how long the tests took between, first to last.
+    lifecycle_setup: tuple[Part, ...] = ()
+    lifecycle_teardown: tuple[Part, ...] = ()
+    tests_seconds: float = 0.0
 
     @property
     def passed(self) -> list[TestResult]:
@@ -153,6 +159,9 @@ def run_tests(
     setup_failure = None
     setup_output = NO_OUTPUT
     raised_warnings = _RaisedWarnings()
+    lifecycle_setup: list[Part] = []
+    lifecycle_teardown: list[Part] = []
+    tests_seconds = 0.0
 
     # Track which lifecycles actually set up, so a failure partway through
     # setup still tears down the ones that completed (e.g. drops the test
@@ -160,6 +169,7 @@ def run_tests(
     started: list[TestLifecycle] = []
     try:
         for lifecycle in lifecycles:
+            setup_start = time.monotonic()
             try:
                 lifecycle.setup_worker()
             except KeyboardInterrupt:
@@ -175,30 +185,42 @@ def run_tests(
                     traceback=format_traceback(error),
                 )
                 break
+            finally:
+                lifecycle_setup.append(
+                    Part(
+                        name=type(lifecycle).__qualname__,
+                        seconds=time.monotonic() - setup_start,
+                    )
+                )
             started.append(lifecycle)
 
         # What setting up wrote is the run's, not the first test's.
         setup_output = capture.take()
 
-        for test in tests if setup_failure is None else ():
-            try:
-                result = _run_one(
-                    test,
-                    lifecycles=lifecycles,
-                    full_values=full_values,
-                    capture=capture,
-                    raised_warnings=raised_warnings,
-                )
-            except KeyboardInterrupt:
-                interrupted = InterruptedTest(test=test, output=capture.take())
-                break
-            results.append(result)
-            if on_result is not None:
-                on_result(result)
-            if fail_fast and result.outcome == "failed":
-                break
+        tests_start = time.monotonic()
+        try:
+            for test in tests if setup_failure is None else ():
+                try:
+                    result = _run_one(
+                        test,
+                        lifecycles=lifecycles,
+                        full_values=full_values,
+                        capture=capture,
+                        raised_warnings=raised_warnings,
+                    )
+                except KeyboardInterrupt:
+                    interrupted = InterruptedTest(test=test, output=capture.take())
+                    break
+                results.append(result)
+                if on_result is not None:
+                    on_result(result)
+                if fail_fast and result.outcome == "failed":
+                    break
+        finally:
+            tests_seconds = time.monotonic() - tests_start
     finally:
         for lifecycle in reversed(started):
+            teardown_start = time.monotonic()
             # One lifecycle's teardown failure shouldn't skip the others.
             try:
                 lifecycle.teardown_worker()
@@ -208,6 +230,13 @@ def run_tests(
                 teardown_errors.append(
                     TeardownError(
                         traceback=format_traceback(error), output=capture.take()
+                    )
+                )
+            finally:
+                lifecycle_teardown.append(
+                    Part(
+                        name=type(lifecycle).__qualname__,
+                        seconds=time.monotonic() - teardown_start,
                     )
                 )
 
@@ -221,6 +250,9 @@ def run_tests(
         # What a teardown that raised wrote is with its error.
         teardown_output=capture.take(),
         warnings=raised_warnings.each_once(),
+        lifecycle_setup=tuple(lifecycle_setup),
+        lifecycle_teardown=tuple(lifecycle_teardown),
+        tests_seconds=tests_seconds,
     )
 
 

@@ -129,6 +129,19 @@ def document(report: RunReport, *, list_passed: bool) -> dict[str, Any]:
         # lifecycles, and taking them down. A stopped run's is in `stopped`.
         "stdout": _stream(report.output.stdout),
         "stderr": _stream(report.output.stderr),
+        # Where the time went, in the order it went there.
+        "phases": [
+            {
+                "name": phase.name,
+                "seconds": round(phase.seconds, 4),
+                "measured": phase.measured,
+                "parts": [
+                    {"name": part.name, "seconds": round(part.seconds, 4)}
+                    for part in phase.parts
+                ],
+            }
+            for phase in report.phases
+        ],
     }
 
 

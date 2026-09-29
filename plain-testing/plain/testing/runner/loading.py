@@ -17,6 +17,7 @@ ordinary import never looks for. See `cache_path_for`.
 """
 
 import ast
+import dataclasses
 import functools
 import hashlib
 import importlib.machinery
@@ -24,7 +25,9 @@ import importlib.util
 import marshal
 import os
 import sys
+import time
 import types
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..definition import TestDefinitionError
@@ -35,6 +38,37 @@ from .problems import CantBeRunAsWritten, ProblemsInAFile, tests_as_written
 __all__ = []
 
 _CACHE_TAG_PREFIX = "plaintest"
+
+
+@dataclass(frozen=True, kw_only=True)
+class RewriterWork:
+    """
+    The test files the loader has handled in this process: how many were
+    rewritten and compiled, how many were read back from the cache, and how
+    long each took. A cold cache is the difference between the two.
+    """
+
+    rewritten_files: int = 0
+    rewritten_seconds: float = 0.0
+    cached_files: int = 0
+    cached_seconds: float = 0.0
+
+    def since(self, before: RewriterWork) -> RewriterWork:
+        return RewriterWork(
+            rewritten_files=self.rewritten_files - before.rewritten_files,
+            rewritten_seconds=self.rewritten_seconds - before.rewritten_seconds,
+            cached_files=self.cached_files - before.cached_files,
+            cached_seconds=self.cached_seconds - before.cached_seconds,
+        )
+
+
+_work = RewriterWork()
+
+
+def rewriter_work() -> RewriterWork:
+    """The work done so far. Take one before and one after to count a run's."""
+    return _work
+
 
 # A bytecode file's header: the interpreter's magic number, a flags field
 # (zero for a file checked against its source's time and size), then the
@@ -153,6 +187,9 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
         in a different place. It can't be told where to look, so the steps
         are written out here.
         """
+        global _work
+
+        started = time.perf_counter()
         source_path = self.get_filename(fullname)
         stats = self.path_stats(source_path)
         # A bytecode file has four bytes for each, as the standard one does.
@@ -173,9 +210,17 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
             else:
                 if cached[:_HEADER_LENGTH] == header:
                     try:
-                        return marshal.loads(cached[_HEADER_LENGTH:])
+                        code = marshal.loads(cached[_HEADER_LENGTH:])
                     except EOFError, ValueError, TypeError:
                         pass  # cut short or damaged: compile it again
+                    else:
+                        _work = dataclasses.replace(
+                            _work,
+                            cached_files=_work.cached_files + 1,
+                            cached_seconds=_work.cached_seconds
+                            + (time.perf_counter() - started),
+                        )
+                        return code
 
         code = self.source_to_code(self.get_data(source_path), source_path)
 
@@ -185,6 +230,11 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
             # does for any module's bytecode.
             self.set_data(self.cache_path, header + marshal.dumps(code))
             _remove_caches_left_by_other_rewriters(Path(self.cache_path))
+        _work = dataclasses.replace(
+            _work,
+            rewritten_files=_work.rewritten_files + 1,
+            rewritten_seconds=_work.rewritten_seconds + (time.perf_counter() - started),
+        )
         return code
 
 

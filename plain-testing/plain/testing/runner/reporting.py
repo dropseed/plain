@@ -23,10 +23,15 @@ from .failure import (
     format_collection_traceback,
 )
 from .output_capture import Output, StreamOutput
+from .phases import Phase, seconds_in_all, seconds_outside_the_tests
 from .printing import FULL_VALUES_FLAG, PrintedValue
 from .report import ParameterNothingPasses, RunReport
 
 __all__ = []
+
+# A run that spent this long on everything but the tests says where it went,
+# without being asked. Under it, a passing run is still two lines.
+SECONDS_OUTSIDE_THE_TESTS_WORTH_A_WORD = 1.0
 
 _STATUS_COLORS = {
     "passed": "green",
@@ -369,6 +374,47 @@ class TextReporter:
 
         self._print()
         self._print(line, fg="green" if report.exit_code == 0 else "red", bold=True)
+
+        outside = seconds_outside_the_tests(report.phases)
+        if self.verbose or outside > SECONDS_OUTSIDE_THE_TESTS_WORTH_A_WORD:
+            self._print()
+            self._print(phases_heading(report.phases), bold=True)
+            self._print(textwrap.indent(phases_text(report.phases), "  "))
+
+
+def phases_heading(phases: tuple[Phase, ...]) -> str:
+    return f"where the {seconds_in_all(phases):.2f}s went"
+
+
+def phases_text(phases: tuple[Phase, ...]) -> str:
+    """
+    The phases as a timeline, one line each, with a phase's parts under it:
+
+        python startup      0.04s  cpu time, before Plain was imported
+        command             0.05s
+        runtime setup       0.77s
+          hook dev-setup    0.30s
+          import app.agents 0.40s
+        tests               0.02s
+    """
+    names = max(len(_phase_label(phase.name)) for phase in phases)
+    for phase in phases:
+        for part in phase.parts:
+            names = max(names, len(part.name) + 2)
+
+    lines = []
+    for phase in phases:
+        line = f"{_phase_label(phase.name).ljust(names)}  {phase.seconds:6.2f}s"
+        if phase.measured == "cpu":
+            line += "  cpu time, before Plain was imported"
+        lines.append(line)
+        for part in phase.parts:
+            lines.append(f"  {part.name.ljust(names - 2)}  {part.seconds:6.2f}s")
+    return "\n".join(lines)
+
+
+def _phase_label(name: str) -> str:
+    return name.replace("_", " ")
 
 
 def _teardown_error_text(error: TeardownError) -> str:

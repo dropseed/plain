@@ -7,7 +7,9 @@ import click
 
 if TYPE_CHECKING:
     from .execution import TestResult
+    from .loading import RewriterWork
     from .output_capture import OutputCapture
+    from .phases import Part
     from .report import Command, RunReport
 
 __all__ = []
@@ -191,10 +193,17 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
     from .failure import describe_collection_error, format_traceback, shown_path
     from .layout import find_tests_directory, import_helper_modules_from
     from .lifecycle_discovery import load_app_lifecycle, load_package_lifecycles
+    from .loading import rewriter_work
     from .output_capture import joined
+    from .phases import RunTimeline, runtime_setup_parts
     from .report import RunReport, StoppedRun
     from .reporting import collection_error_text
     from .targets import TargetError
+
+    # The time before this point went on the `plain` command finding this
+    # one and reading its options.
+    timeline = RunTimeline()
+    timeline.phase_ended("command")
 
     # What is written outside any test and any file being collected, a
     # piece at a time as the run gets on.
@@ -219,6 +228,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             ),
             collection_failures=(),
             selected=0,
+            phases=timeline.phases(),
         )
 
     def could_not_set_up(what: str, error: BaseException) -> RunReport:
@@ -236,23 +246,19 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
         try:
             plain.runtime.setup()
         except plain.runtime.AppPathNotFound:
-            lifecycles = []
+            has_app = False
             application_directory = None
         except KeyboardInterrupt:
             raise
         except BaseException as error:
             return could_not_set_up("Setting up the app", error)
         else:
-            try:
-                lifecycles = load_package_lifecycles()
-            except KeyboardInterrupt:
-                raise
-            except BaseException as error:
-                return could_not_set_up("Loading the packages' test lifecycles", error)
+            has_app = True
             # Tests aren't kept in the application: it is what is imported
             # as `app` and what gets deployed. Collection leaves its test
             # files out and says that it did.
             application_directory = plain.runtime.APP_PATH
+        timeline.phase_ended("runtime_setup", parts=runtime_setup_parts())
 
         # Where this run's tests are is worked out here, once. Helper modules
         # are imported from the tests directory. A project with no tests
@@ -261,6 +267,16 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
         tests_directory = find_tests_directory(root)
         has_tests_directory = tests_directory.is_dir()
         import_helper_modules_from(tests_directory if has_tests_directory else root)
+        timeline.phase_ended("helper_modules")
+
+        lifecycles = []
+        if has_app:
+            try:
+                lifecycles = load_package_lifecycles()
+            except KeyboardInterrupt:
+                raise
+            except BaseException as error:
+                return could_not_set_up("Loading the packages' test lifecycles", error)
 
         # The project's own lifecycle goes last, so it wraps closest to the
         # test: it enters with the packages' protection already in place (the
@@ -279,12 +295,14 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             )
         if app_lifecycle is not None:
             lifecycles.append(app_lifecycle)
+        timeline.phase_ended("lifecycles_loaded")
 
         # What setting up wrote is the run's. From here to the first test,
         # what is written is a file being loaded, and is kept by that file
         # if it can't be collected.
         outside_tests.append(capture.take())
 
+        rewriter_work_before = rewriter_work()
         try:
             tests, collection_errors = collect_tests(
                 list(command.targets),
@@ -306,6 +324,10 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
                 for t in tests
                 if not any(tag in t.tags for tag in command.exclude_tags)
             ]
+        timeline.phase_ended(
+            "collection",
+            parts=_rewriter_parts(rewriter_work().since(rewriter_work_before)),
+        )
 
         if not tests and not collection_errors:
             return stopped("no_tests_found", "No tests found")
@@ -324,6 +346,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             on_result=reporter.result,
             capture=capture,
         )
+        timeline.run_ended(run)
     except KeyboardInterrupt:
         # Stopped before the first test, or while the lifecycles were being
         # taken down. A test that was running when it was stopped is in the
@@ -346,16 +369,49 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             run=run,
         )
 
+    collection_failures = tuple(
+        describe_collection_error(
+            error, file=shown_path(str(error.path)), output=error.output
+        )
+        for error in collection_errors
+    )
+    # Printing the report comes after this, and isn't in it.
+    timeline.phase_ended("report")
+
     return RunReport(
         command=command,
         run=run,
         stopped=None,
-        collection_failures=tuple(
-            describe_collection_error(
-                error, file=shown_path(str(error.path)), output=error.output
-            )
-            for error in collection_errors
-        ),
+        collection_failures=collection_failures,
         selected=len(tests),
+        phases=timeline.phases(),
         output=joined(outside_tests),
     )
+
+
+def _rewriter_parts(work: RewriterWork) -> tuple[Part, ...]:
+    """
+    What collecting spent on the test files: the ones rewritten and compiled
+    (a cold cache, or a file that changed) and the ones read back from the
+    cache. Reading the directories and finding the tests is the rest.
+    """
+    from .phases import Part
+
+    parts = []
+    if work.rewritten_files:
+        plural = "" if work.rewritten_files == 1 else "s"
+        parts.append(
+            Part(
+                name=f"rewrote {work.rewritten_files} file{plural}",
+                seconds=work.rewritten_seconds,
+            )
+        )
+    if work.cached_files:
+        plural = "" if work.cached_files == 1 else "s"
+        parts.append(
+            Part(
+                name=f"read {work.cached_files} file{plural} from the cache",
+                seconds=work.cached_seconds,
+            )
+        )
+    return tuple(parts)

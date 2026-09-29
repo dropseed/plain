@@ -31,6 +31,7 @@
 - [Where tests live](#where-tests-live)
     - [Shared helpers](#shared-helpers)
 - [Reading the output](#reading-the-output)
+    - [Where the time went](#where-the-time-went)
     - [Failures](#failures)
     - [Large values](#large-values)
     - [What the test wrote](#what-the-test-wrote)
@@ -785,6 +786,44 @@ skipped tests/test_cart.py::test_refund (Waiting on the new billing API)
 
 What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away. [Warnings](#warnings) are counted and listed once each, and what was [written outside any test](#written-outside-any-test) is printed at the end.
 
+### Where the time went
+
+A run is mostly not tests. Before the first one the app is set up, its packages are imported, the test files are read and the test database is made, and after the last one it's dropped. When all of that came to more than a second, the report says where it went, and with `--verbose` it always does:
+
+```
+1 passed in 0.52s
+
+where the 1.27s went
+  python startup           0.04s  cpu time, before Plain was imported
+  command                  0.05s
+  runtime setup            0.77s
+    hook dev-setup         0.30s
+    other hooks (6)        0.01s
+    settings               0.02s
+    import app.agents      0.40s
+    other imports (27)     0.03s
+    ready()                0.01s
+  helper modules           0.00s
+  lifecycles loaded        0.01s
+  collection               0.02s
+    rewrote 1 file         0.01s
+  lifecycle setup          0.15s
+    EmailTestLifecycle     0.00s
+    PostgresTestLifecycle  0.15s
+  tests                    0.02s
+  lifecycle teardown       0.05s
+    PostgresTestLifecycle  0.05s
+    EmailTestLifecycle     0.00s
+  report                   0.00s
+  unaccounted              0.00s
+```
+
+It's a timeline, in the order things happened. The clock starts when Plain is first imported. What came before that, the interpreter starting and Python's own imports, a process can't time, so the first line is the CPU time it had used by then, which for startup work is close to the same thing. `unaccounted` is what the marks between phases don't cover. Printing the report comes after the last mark and isn't in it.
+
+The parts an app can do something about are under `runtime setup`. A `plain.setup` hook (plain.dev's reads the `.env` files and finds the database) or a package's import that took 50 ms or more gets a line of its own. An import that slow is usually a module importing a client library at the top, which every command then pays for. The rest share the `other imports` line. `lifecycle setup` is each package's [lifecycle](#what-packages-do-for-every-test) by name: for plain.postgres, creating the test database.
+
+Under a second outside the tests, a passing run is still two lines. The [JSON document](#as-json) has the phases always, as `phases`.
+
 ### Failures
 
 Every failure is listed after the run. It says where the test failed, what the values inside the assert were, what else the test had in hand, and how to run it again:
@@ -1275,7 +1314,123 @@ plain test --json --list-passed
     "stderr": {
         "text": "",
         "cut_characters": 0
-    }
+    },
+    "phases": [
+        {
+            "name": "python_startup",
+            "seconds": 0.0381,
+            "measured": "cpu",
+            "parts": []
+        },
+        {
+            "name": "command",
+            "seconds": 0.0512,
+            "measured": "wall",
+            "parts": []
+        },
+        {
+            "name": "runtime_setup",
+            "seconds": 0.7706,
+            "measured": "wall",
+            "parts": [
+                {
+                    "name": "hook dev-setup",
+                    "seconds": 0.3021
+                },
+                {
+                    "name": "other hooks (6)",
+                    "seconds": 0.0104
+                },
+                {
+                    "name": "settings",
+                    "seconds": 0.0188
+                },
+                {
+                    "name": "import app.agents",
+                    "seconds": 0.4013
+                },
+                {
+                    "name": "other imports (27)",
+                    "seconds": 0.0296
+                },
+                {
+                    "name": "ready()",
+                    "seconds": 0.0084
+                }
+            ]
+        },
+        {
+            "name": "helper_modules",
+            "seconds": 0.0012,
+            "measured": "wall",
+            "parts": []
+        },
+        {
+            "name": "lifecycles_loaded",
+            "seconds": 0.0058,
+            "measured": "wall",
+            "parts": []
+        },
+        {
+            "name": "collection",
+            "seconds": 0.0193,
+            "measured": "wall",
+            "parts": [
+                {
+                    "name": "rewrote 1 file",
+                    "seconds": 0.0117
+                }
+            ]
+        },
+        {
+            "name": "lifecycle_setup",
+            "seconds": 0.1503,
+            "measured": "wall",
+            "parts": [
+                {
+                    "name": "EmailTestLifecycle",
+                    "seconds": 0.0
+                },
+                {
+                    "name": "PostgresTestLifecycle",
+                    "seconds": 0.1503
+                }
+            ]
+        },
+        {
+            "name": "tests",
+            "seconds": 0.0024,
+            "measured": "wall",
+            "parts": []
+        },
+        {
+            "name": "lifecycle_teardown",
+            "seconds": 0.0471,
+            "measured": "wall",
+            "parts": [
+                {
+                    "name": "PostgresTestLifecycle",
+                    "seconds": 0.0471
+                },
+                {
+                    "name": "EmailTestLifecycle",
+                    "seconds": 0.0
+                }
+            ]
+        },
+        {
+            "name": "report",
+            "seconds": 0.0003,
+            "measured": "wall",
+            "parts": []
+        },
+        {
+            "name": "unaccounted",
+            "seconds": 0.0019,
+            "measured": "wall",
+            "parts": []
+        }
+    ]
 }
 ```
 
@@ -1290,6 +1445,7 @@ plain test --json --list-passed
 - **The document's own `stdout` and `stderr`** are what was [written outside any test](#written-outside-any-test). A failure's are what its test wrote.
 - **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead. `line` is the line it is about when it is about one, such as a `@cases()` with no cases in it, and null when it is about several.
 - **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
+- **`phases`** is [where the time went](#where-the-time-went), in the order it went there, and is there for every run, however short. A stopped run has the phases it got through. `measured` is `"wall"` for every phase but `python_startup`, which is `"cpu"`: the CPU time the process had used before Plain was imported, the nearest it has to how long that took. `parts` are the lines under a phase in the text report, and `seconds` is the phase's whole, whatever its parts add up to.
 - **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
 
 - **`parameters_nothing_passes`** is what the collection errors come to, when tests take parameters and nothing passes them in: each parameter, how many tests across the run take it, and in how many files. The one taken by the most tests is first.

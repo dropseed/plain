@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from .execution import RaisedWarning, TestRun
 from .failure import CollectionFailure
 from .output_capture import NO_OUTPUT, Output
+from .phases import Phase
 
 __all__ = []
 
@@ -105,6 +106,8 @@ class RunReport:
     stopped: StoppedRun | None
     collection_failures: tuple[CollectionFailure, ...]
     selected: int
+    # Where the time went, phase by phase, as far as the run got.
+    phases: tuple[Phase, ...]
     # What was written outside any test and any file being collected:
     # setting up the app, setting up the lifecycles and taking them down.
     # Empty for a stopped run, whose `stopped.output` it is.
