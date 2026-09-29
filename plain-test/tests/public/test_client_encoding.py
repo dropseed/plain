@@ -83,3 +83,26 @@ def test_a_string_body_with_no_charset_is_utf8():
     request = build_request("POST", "/x", body="café", content_type="text/plain")
 
     assert request.body == "café".encode()
+
+
+@cases(
+    case(BytesIO(b"zip bytes"), id="a BytesIO"),
+    case(b"zip bytes", id="bytes"),
+    case([BytesIO(b"one"), BytesIO(b"two")], id="a list of files"),
+)
+def test_a_file_in_form_data_is_refused(value):
+    """It would be sent as a text field holding the object's repr."""
+    with raises(TypeError, match="files=") as caught:
+        build_request("POST", "/x", form_data={"archive": value})
+
+    assert "form_data['archive']" in str(caught.exception)
+
+
+def test_a_file_in_form_data_is_refused_beside_files_too():
+    with raises(TypeError, match="files="):
+        build_request(
+            "POST",
+            "/x",
+            form_data={"archive": BytesIO(b"zip bytes")},
+            files={"other": BytesIO(b"more")},
+        )

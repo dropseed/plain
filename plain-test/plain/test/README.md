@@ -98,6 +98,8 @@ response = client.post(
 
 A form is urlencoded, and becomes multipart only when `files=` is given — the same choice a browser makes, so the view under test sees the content type it will see in production.
 
+A file goes in `files=`, never in `form_data=`. A file object or bytes in `form_data` raises `TypeError` and names the key: it would have been sent as a text field.
+
 Send JSON — the value is serialized for you:
 
 ```python
@@ -1627,6 +1629,7 @@ The test client, where everything after the path is now keyword-only:
 | Before                                            | Now                                                                         |
 | ------------------------------------------------- | --------------------------------------------------------------------------- |
 | `client.post(path, {...})`, `data={...}`          | `form_data={...}`                                                           |
+| a file in `data={...}`                            | `files={...}`. `form_data` refuses one                                      |
 | `data=x, content_type="application/json"`         | `json_data=x`                                                               |
 | raw bytes with a content type                     | `body=b"...", content_type="..."`                                           |
 | `client.get(path, {...})`                         | `query_params={...}`                                                        |

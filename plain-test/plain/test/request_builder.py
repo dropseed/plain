@@ -183,6 +183,9 @@ def encode_request_body(
             "content_type only applies to a raw body — form_data and json_data set their own"
         )
 
+    if form_data is not None:
+        _refuse_files_in_form_data(form_data)
+
     if json_data is not None:
         return (
             json.dumps(json_data, cls=PlainJSONEncoder).encode(),
@@ -218,3 +221,26 @@ def encode_request_body(
         )
 
     return (b"", "")
+
+
+def _refuse_files_in_form_data(form_data: dict[str, Any]) -> None:
+    """
+    A file in `form_data` would be sent as a text field holding the
+    object's `repr`, and the view would find no file. Say where it goes.
+    """
+    for name, value in form_data.items():
+        values = value if isinstance(value, list | tuple) else [value]
+        for one in values:
+            if _is_file_content(one):
+                raise TypeError(
+                    f"form_data[{name!r}] is {type(one).__name__}, which is a "
+                    "file's content. A form's text fields go in form_data and "
+                    f"its files go in files: files={{{name!r}: ...}}"
+                )
+
+
+def _is_file_content(value: Any) -> bool:
+    if isinstance(value, bytes | bytearray | memoryview):
+        return True
+    # An open file, a BytesIO, an uploaded file: what can be read from.
+    return callable(getattr(value, "read", None))
