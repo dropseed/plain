@@ -96,7 +96,7 @@ def test_a_name_error_in_a_test_file_says_where():
     assert "collection error tests/test_broken.py" in result.output
     assert 'tests/test_broken.py", line 1, in <module>' in result.output
     assert "NameError: name 'UNDEFINED_NAME' is not defined" in result.output
-    assert "1 passed, 1 collection errors" in result.output
+    assert "1 passed, 1 collection error" in result.output
 
 
 def test_a_bare_skip_says_which_line():
@@ -174,7 +174,7 @@ def test_a_test_that_takes_parameters_is_told_what_to_do():
     assert "Nothing is passed to a test by name" in result.output
     # Nothing ran far enough to fail with a TypeError of its own.
     assert "missing 2 required positional arguments" not in result.output
-    assert "1 passed, 1 collection errors" in result.output
+    assert "1 passed, 1 collection error" in result.output
 
 
 TAKING_PARAMETERS = {
@@ -658,7 +658,7 @@ def test_a_test_that_yields_is_not_reported_as_passed():
         }
     )
     assert result.exit_code == 1
-    assert "0 passed, 1 collection errors" in result.output
+    assert "0 passed, 1 collection error" in result.output
     assert "test_leftover() has a `yield` in it." in result.output
     assert "test_async_leftover() has a `yield` in it." in result.output
     assert result.output.count("A test can't yield") == 1
@@ -686,7 +686,7 @@ def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
         }
     )
     assert result.exit_code == 1
-    assert "0 passed, 1 collection errors" in result.output
+    assert "0 passed, 1 collection error" in result.output
     assert "test_shared is defined in shared_checks, not in this file" in result.output
     assert "line 3: TestGroup is a class with 2 tests in it." in result.output
     assert "test_generator() has a `yield` in it." in result.output

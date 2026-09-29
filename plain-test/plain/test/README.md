@@ -702,7 +702,11 @@ Nothing that looks like a test is left out without a word. These are [collection
 
 An `async def` test uses the client the way any test does. `client.get()` and the rest are ordinary calls, not awaited, whether the view they reach is sync or async, and the test's event loop waits while the request runs. The exception is [`client.websocket()`](#websockets), which is for synchronous tests.
 
-With no target, `plain test` searches the directory you ran it from. It doesn't look in `app/`, in directories whose name starts with a dot, or in `node_modules`.
+With no target, `plain test` searches the directory you ran it from. It doesn't look in directories whose name starts with a dot, in `node_modules`, or in `__pycache__`.
+
+Tests aren't kept in `app/`. It's the application: the package your code imports as `app`, and what gets deployed. A test file in it would ship with it, and would be part of that package, where a helper module can only be imported through the app's name. So there's one place for tests, and it's beside the application.
+
+A `test_*.py` file in `app/` that has tests in it isn't run, and isn't passed over without a word either. It's a [collection error](#collection-errors) that says which files they are and where they belong, whether the search came to them or you named one as a target. A module of your application that is named `test_*.py` and defines no tests, such as a `test_connection.py` that checks a connection, is left alone.
 
 ### Shared helpers
 
@@ -769,7 +773,7 @@ Collected 41 tests
 The last line counts what happened:
 
 ```
-41 passed, 1 failed, 2 skipped, 1 collection errors in 0.62s
+41 passed, 1 failed, 2 skipped, 1 collection error in 0.62s
 ```
 
 When stdout is a terminal, one line says how far the run has got while it runs (`12 of 41, 1 failed`). It's written over itself and erased before the report, so nothing of it is left, and it's never written to a pipe or a file. With `--verbose` each test gets a line of its own as it finishes, with its outcome as `--json` spells it:
@@ -1047,6 +1051,22 @@ collection error tests/test_orders.py
 
 What is true of many files is said once. The first file whose tests take parameters carries the paragraph that says what a test takes, and the ones after it say what is wrong with their own file and name the first.
 
+Test files in the application are one error for the run, reported first. More than three are counted by directory:
+
+```
+collection error app
+
+  19 test files are in app/, and none of them was run:
+
+    app/tests          17 files
+    app/billing/tests  2 files
+
+  Tests live in tests/, beside app/. app/ is the application: it is
+  imported as `app`, and it is what gets deployed. Move them to tests/. A
+  test file is the same file there, and a helper module it imports is
+  imported by its path from tests/.
+```
+
 When more than one file has tests that take parameters, the run adds them up after the last file's error, the parameter most tests take first:
 
 ```
@@ -1072,6 +1092,7 @@ Here is what each message is asking for:
 | `line 8: @skip requires a reason`                                                       | Write `@skip("why")`, not a bare `@skip`                                                                     |
 | `line 8: @tag requires at least one name`                                               | Write `@tag("slow")`, not a bare `@tag`                                                                      |
 | `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its path from `tests/` |
+| `19 test files are in app/, and none of them was run:`                                  | Move them to `tests/`, beside `app/`. [Tests aren't kept in the application](#where-tests-live)              |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
 

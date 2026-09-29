@@ -14,13 +14,17 @@ is a collection error for its file, which says what to write instead.
 Helper modules are imported by their path from one directory, the helper
 directory. The caller puts it on `sys.path` before collecting. A test module
 can't reach them any other way: see `loading.import_problems`.
+
+Tests aren't kept in the application. A test file that is in it is not run,
+and the run says so: `problems.tests_are_not_kept_in_the_application`.
 """
 
+import ast
 import functools
 import inspect
 import os
 import types
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,13 +35,14 @@ from ..decorators import (
 )
 from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
-from .layout import Layout
+from .layout import Layout, find_tests_directory
 from .loading import ImportsAnotherWay, load_test_module
 from .output_capture import NO_OUTPUT, OutputCapture
 from .problems import (
     A_TEST_TAKES_ONLY_ITS_CASES,
     CantBeRunAsWritten,
     ProblemsInAFile,
+    tests_are_not_kept_in_the_application,
 )
 from .targets import TargetError, name_of_the_test_at, read_target
 
@@ -81,7 +86,7 @@ def collect_tests(
     targets: list[str],
     *,
     root: Path | None = None,
-    exclude_dirs: Iterable[str] = (),
+    application_directory: Path | None = None,
     helper_directory: Path | None = None,
     capture: OutputCapture | None = None,
 ) -> tuple[list[RunnableTest], list[CollectionError]]:
@@ -90,8 +95,10 @@ def collect_tests(
     `path::name`, or the test at `path:line`), relative to `root` (default:
     cwd). A target that can't be used raises `TargetError`.
 
-    `exclude_dirs` adds directory names to skip during discovery (e.g. the
-    runner excludes the Plain `app` directory in app mode).
+    `application_directory` is where the application is, when there is one.
+    Tests aren't kept in it. A test file the search comes to there, or a
+    target that is in it, is not run, and the run has a collection error that
+    says which files and where they belong.
 
     `helper_directory` is the tests directory, where helper modules live. A
     test module imports `<helper_directory>/helpers.py` as `helpers`, and is
@@ -113,7 +120,9 @@ def collect_tests(
         helper_directory=(helper_directory or root).resolve(),
         refused_import_name=helper_directory.name if helper_directory else None,
     )
-    skip_dir_names = _SKIP_DIR_NAMES | set(exclude_dirs)
+    if application_directory is not None:
+        application_directory = application_directory.resolve()
+    kept_in_the_application: list[Path] = []
 
     # Every target is found before anything is loaded, so a target that
     # isn't there stops the run before a test file has been run.
@@ -122,6 +131,19 @@ def collect_tests(
         target = read_target(written)
         base = (root / target.path).resolve() if target.path not in ("", ".") else root
         name_part = target.name
+
+        if application_directory is not None and base.is_relative_to(
+            application_directory
+        ):
+            # Named, and not run for being named. A test that runs only when
+            # it is asked for by name is one a plain `plain test` leaves out.
+            if base.is_file():
+                kept_in_the_application.append(base)
+            elif base.is_dir():
+                kept_in_the_application.extend(_test_files_kept_in(base))
+            else:
+                raise TargetError(f"No such test target: {written}")
+            continue
 
         if base.is_file():
             files = [base]
@@ -132,7 +154,14 @@ def collect_tests(
                     name_of_the_test_at(base, line=target.line, written=written) or ""
                 )
         elif base.is_dir() and target.line is None:
-            files = _find_test_files(base, skip_dir_names=skip_dir_names)
+            files = _find_test_files(base, leaving_out=application_directory)
+            if (
+                application_directory is not None
+                and application_directory.is_relative_to(base)
+            ):
+                kept_in_the_application.extend(
+                    _test_files_kept_in(application_directory)
+                )
         elif base.is_dir():
             raise TargetError(
                 f"No test at {written}: {target.path} is a directory, and a"
@@ -143,6 +172,26 @@ def collect_tests(
         files_of_targets.append((files, name_part))
 
     errors: list[CollectionError] = []
+    if application_directory is not None and kept_in_the_application:
+        tests_directory = find_tests_directory(root)
+        # First: it is about where the run's tests are, not about one file.
+        errors.append(
+            CollectionError(
+                application_directory,
+                TestDefinitionError(
+                    tests_are_not_kept_in_the_application(
+                        _once_each_as_shown(kept_in_the_application, layout=layout),
+                        application=layout.shown(application_directory),
+                        tests=(
+                            None
+                            if tests_directory == root
+                            else layout.shown(tests_directory)
+                        ),
+                    )
+                ),
+            )
+        )
+
     collected: list[RunnableTest] = []
     for files, name_part in files_of_targets:
         for file in files:
@@ -230,14 +279,25 @@ def _matches_target(name: str, target: str) -> bool:
     return name == target or name.startswith(f"{target}[")
 
 
-def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
+def _find_test_files(directory: Path, *, leaving_out: Path | None = None) -> list[Path]:
+    """
+    The files named `test_*.py` under a directory.
+
+    Not looked in: directories whose name starts with a dot, `node_modules`
+    and `__pycache__`, where nobody keeps tests, and `leaving_out`, which is
+    the application.
+    """
     files = []
     for dirpath, dirnames, filenames in os.walk(directory):
         # Prune skipped directories in place so os.walk never descends into
         # them (rglob can't prune — a .venv or node_modules would get a full
         # tree walk).
         dirnames[:] = sorted(
-            d for d in dirnames if d not in skip_dir_names and not d.startswith(".")
+            d
+            for d in dirnames
+            if d not in _SKIP_DIR_NAMES
+            and not d.startswith(".")
+            and Path(dirpath, d) != leaving_out
         )
         files.extend(
             Path(dirpath) / f
@@ -245,6 +305,48 @@ def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]
             if f.startswith("test_") and f.endswith(".py")
         )
     return files
+
+
+def _test_files_kept_in(directory: Path) -> list[Path]:
+    """
+    The test files in a directory of the application: the ones named
+    `test_*.py` that have tests in them. An application can have a module
+    called `test_connection.py` that checks a connection and tests nothing.
+    """
+    return [file for file in _find_test_files(directory) if _has_tests_in_it(file)]
+
+
+def _has_tests_in_it(file: Path) -> bool:
+    """
+    Whether a file defines a test, as far as reading it can tell: a
+    function named `test_*`, or a class with one in it. A file that can't be
+    read as Python is taken to, since its name says it is a test file and
+    nothing says it isn't.
+    """
+    try:
+        tree = ast.parse(file.read_text(), filename=str(file))
+    except SyntaxError, UnicodeDecodeError, OSError:
+        return True
+
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            defined = node.body
+        else:
+            defined = [node]
+        for member in defined:
+            is_a_function = isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
+            if is_a_function and member.name.startswith("test_"):
+                return True
+    return False
+
+
+def _once_each_as_shown(files: list[Path], *, layout: Layout) -> list[str]:
+    shown = []
+    for file in files:
+        name = layout.shown(file)
+        if name not in shown:
+            shown.append(name)
+    return shown
 
 
 def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:

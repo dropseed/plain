@@ -356,7 +356,8 @@ class TextReporter:
         if counts.skipped:
             parts.append(f"{counts.skipped} skipped")
         if counts.collection_errors:
-            parts.append(f"{counts.collection_errors} collection errors")
+            plural = "" if counts.collection_errors == 1 else "s"
+            parts.append(f"{counts.collection_errors} collection error{plural}")
         if counts.not_run:
             parts.append(f"{counts.not_run} not run")
         if counts.warnings:

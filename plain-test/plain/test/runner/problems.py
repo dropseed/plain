@@ -64,6 +64,59 @@ ONE_CASES_FOR_EVERY_COMBINATION = (
 # A file with more tests than this to fix says how many, not which.
 _MOST_TESTS_NAMED = 3
 
+# A run with more test files than this in the application says which
+# directories they are in, not which files.
+_MOST_FILES_NAMED = 3
+
+
+def tests_are_not_kept_in_the_application(
+    files: list[str], *, application: str, tests: str | None
+) -> str:
+    """
+    What a run says about the test files it found in the application and
+    didn't run. `tests` is the tests directory, or None when the run was
+    started in it.
+    """
+    if len(files) == 1:
+        found = f"1 test file is in {application}/, and it was not run:"
+        them = "it"
+    else:
+        found = (
+            f"{len(files)} test files are in {application}/, and none of them was run:"
+        )
+        them = "them"
+
+    if len(files) > _MOST_FILES_NAMED:
+        in_each: dict[str, int] = {}
+        for file in files:
+            directory = file.rpartition("/")[0]
+            in_each[directory] = in_each.get(directory, 0) + 1
+        widest = max(len(directory) for directory in in_each)
+        where = [
+            f"{directory.ljust(widest)}  {'1 file' if count == 1 else f'{count} files'}"
+            for directory, count in in_each.items()
+        ]
+    else:
+        where = files
+
+    if tests is None:
+        where_tests_live = f"Tests live beside {application}/, in this directory."
+        move = f"Move {them} out of {application}/, into this directory."
+        imported_from = "this directory"
+    else:
+        where_tests_live = f"Tests live in {tests}/, beside {application}/."
+        move = f"Move {them} to {tests}/."
+        imported_from = f"{tests}/"
+
+    what_to_do = textwrap.fill(
+        f"{where_tests_live} {application}/ is the application: it is imported"
+        f" as `{application}`, and it is what gets deployed. {move} A test file"
+        " is the same file there, and a helper module it imports is imported"
+        f" by its path from {imported_from}.",
+        width=72,
+    )
+    return "\n\n".join([found, textwrap.indent("\n".join(where), "  "), what_to_do])
+
 
 @dataclass(kw_only=True)
 class ProblemsInAFile:

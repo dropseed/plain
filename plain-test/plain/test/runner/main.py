@@ -237,7 +237,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             plain.runtime.setup()
         except plain.runtime.AppPathNotFound:
             lifecycles = []
-            exclude_dirs: tuple[str, ...] = ()
+            application_directory = None
         except KeyboardInterrupt:
             raise
         except BaseException as error:
@@ -249,9 +249,10 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
                 raise
             except BaseException as error:
                 return could_not_set_up("Loading the packages' test lifecycles", error)
-            # The Plain `app` directory isn't a place tests live — a
-            # convention the runner knows, not the collection kernel.
-            exclude_dirs = ("app",)
+            # Tests aren't kept in the application: it is what is imported
+            # as `app` and what gets deployed. Collection leaves its test
+            # files out and says that it did.
+            application_directory = plain.runtime.APP_PATH
 
         # Where this run's tests are is worked out here, once. Helper modules
         # are imported from the tests directory. A project with no tests
@@ -288,7 +289,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
             tests, collection_errors = collect_tests(
                 list(command.targets),
                 root=root,
-                exclude_dirs=exclude_dirs,
+                application_directory=application_directory,
                 helper_directory=tests_directory if has_tests_directory else None,
                 capture=capture,
             )
