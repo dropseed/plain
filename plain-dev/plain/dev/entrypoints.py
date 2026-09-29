@@ -1,6 +1,8 @@
 from importlib.util import find_spec
 from pathlib import Path
 
+from plain.cli.runtime import when_the_running_command_is_found
+
 from .dotenv import load_dotenv_files
 from .utils import has_pyproject_toml
 
@@ -29,8 +31,11 @@ def setup() -> None:
     if has_postgres:
         _ensure_managed_postgres()
 
-    # Auto-start dev services for commands that need the runtime
-    auto_start_services()
+    # Dev services are started for the commands that need them, once there
+    # is known to be such a command. This hook runs for `plain tset` too, and
+    # for `plain test` with no plain.test installed, and services started
+    # for a command that doesn't exist are left running by it.
+    when_the_running_command_is_found(auto_start_services)
 
 
 def _ensure_managed_postgres() -> None:

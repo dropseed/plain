@@ -20,7 +20,7 @@ from .install import install
 from .memory import memory
 from .preflight import preflight_cli
 from .registry import cli_registry
-from .runtime import set_running_command
+from .runtime import set_running_command, the_running_command_was_found
 from .scaffold import create
 from .server import server
 from .settings import settings
@@ -248,7 +248,13 @@ class PlainCommandCollection(click.CommandCollection):
         # setup(), and the hooks that run there ask which command this is.
         if args:
             set_running_command(args[0])
-        return super().resolve_command(ctx, args)
+        name, command, remaining = super().resolve_command(ctx, args)
+        # Said once there is a command by that name. For one that was
+        # mistyped, or whose package isn't installed, nothing that waited to
+        # be started for it is.
+        if command is not None:
+            the_running_command_was_found()
+        return name, command, remaining
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv

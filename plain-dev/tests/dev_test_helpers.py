@@ -13,7 +13,12 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from plain.cli.runtime import get_running_command, set_running_command
+from plain.cli.runtime import (
+    get_running_command,
+    running_command_is_found,
+    set_running_command,
+    the_running_command_was_found,
+)
 from plain.dev import dotenv as dotenv_module
 from plain.dev import envkeys as envkeys_module
 from plain.dev import state as state_module
@@ -107,8 +112,11 @@ def running(command: str | None) -> Generator[None]:
     `running(None)` is a process nobody told, which is read from `sys.argv`.
     """
     said_before = get_running_command()
+    was_found_before = running_command_is_found()
     set_running_command(command)
     try:
         yield
     finally:
         set_running_command(said_before)
+        if was_found_before:
+            the_running_command_was_found()

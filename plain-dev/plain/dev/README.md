@@ -71,6 +71,8 @@ and also in `plain pre-commit` so preflight and tests have what they need.
 redis = {cmd = "redis-server --port 6399"}
 ```
 
+They also start in the background for the commands that use the app: `plain test`, `plain shell`, `plain request`, `plain preflight`, `plain migrations`, `plain postgres` and `plain run`. They start once the command is known to exist, so a mistyped command starts nothing. Set `DEV_SERVICES_AUTO=false` to turn that off, and stop them with `plain dev --stop`.
+
 You don't need a service for Postgres — see [Databases](#databases) below.
 
 #### Custom processes
