@@ -2384,7 +2384,18 @@ test_shop_main_r48213
 
 So any number of runs can go at once in one checkout, with nothing to configure. Each creates, uses and drops its own.
 
-A run that was killed leaves its database behind. The next run in that checkout removes it, and so does `plain db clean`. Neither touches the database of a run that is still going. A run holds a lock on the server for as long as it lives, and that is what they go by.
+A run writes a record into each database it creates, in the database's comment: that a test run made it, which database it was testing, and which run and process. A run that was killed leaves its database behind, and the next run of that database removes it. So does `plain db clean`.
+
+That is dropping a database the run didn't make, so it is decided narrowly. A database is removed only when all of this is so:
+
+- It carries a run's record. A database without one is never touched, whatever it is named: `test_shop` is how `test_shop_api`'s databases start too, and a name proves nothing.
+- The record names the database this run is testing, as a whole value.
+- Nobody holds the lock that run would hold. A run holds a lock on the server for as long as it lives.
+- The process that made it isn't running, and nothing is connected to it.
+
+It is dropped without `FORCE`, so if something connects in the meantime the drop fails and the database stays. When a database is left in doubt, the run says so in one line and names the command that drops it: `plain db drop <name>`.
+
+If a database already has the name a run needs and doesn't carry that run's record, the run stops without touching it.
 
 ### The test database is the only database
 

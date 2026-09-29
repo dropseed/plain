@@ -66,10 +66,15 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 - `plain postgres shell` for a psql prompt on the active database; it accepts
   piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect
   data.
-- `plain db clean` drops databases whose checkout directory is gone, and test
-  databases a killed run left. Forks are full copies, so deleted worktrees do
-  leave disk behind. It lists what it would drop and asks first: read the
-  list before passing `--yes`.
+- Forks are full copies, so deleted worktrees leave disk behind, and a killed
+  test run leaves its databases. `plain db clean --dry-run` lists every
+  database of the project with the reason it would be dropped or is left.
+  Run that, read it, and show it to the person.
+- Dropping a database can't be undone. `plain db clean` asks before it drops
+  and has no flag that skips the question, so it is the person's to run. Never
+  pass `--yes` or `--force` to `plain db drop` or `plain db reset` unless the
+  person named that database. Never drop a database by a pattern, a prefix, or
+  the result of a query: only by its whole name.
 - One Postgres container per project, started on demand and never removed
   automatically. `plain db server list` shows them all, `plain db server stop`
   frees one up (~76MB each), `plain db server remove` deletes it and its data.

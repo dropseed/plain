@@ -188,7 +188,8 @@ plain db use <name>          # point this checkout somewhere else (no name: back
 plain db create [name]       # a new empty database
 plain db reset               # drop and recreate this one, empty
 plain db drop <name>         # delete a database
-plain db clean               # delete databases whose checkout is gone
+plain db clean --dry-run     # list what is debris and what isn't, and why
+plain db clean               # the same list, then ask, then drop the debris
 plain db url                 # print the URL and nothing else, for scripts
 ```
 
@@ -200,7 +201,44 @@ is safe to build on.
 
 For a psql prompt on this checkout's database, use [`plain postgres shell`](../../plain-postgres/plain/postgres/README.md) — it connects to whatever database is active, managed or not.
 
-Forks are real copies, so deleted worktrees leave real disk behind. `plain db clean` finds databases whose checkout directory no longer exists and offers to drop them — it never touches a database that doesn't record where it came from, and never the project's main database, which is the fork source for every checkout.
+`plain db drop` and `plain db reset` drop the database you named and nothing else. If something is connected to it they stop and say so; `--force` throws the connections off.
+
+### Cleaning up
+
+Forks are real copies, so deleted worktrees leave real disk behind, and a test run that was killed leaves its databases. `plain db clean` drops both. It drops databases nobody named, and a dropped database can't be brought back, so it shows its reasoning first:
+
+```bash
+plain db clean --dry-run
+```
+
+```
+Would drop 1 (8.5 MB):
+  shop_old_feature                       8.5 MB  /work/shop-old-feature
+      its checkout is gone
+
+Leaving 3:
+  shop                                   9.1 MB  /work/shop
+      the project's main database, which every checkout forks from
+  shop_feature                           8.5 MB  /work/shop-feature
+      the checkout at /work/shop-feature is configured to use it
+  scratch                                7.2 MB  (no recorded owner)
+      no record of which checkout made it
+```
+
+Every database of the project is in one list or the other. `plain db clean` prints the same two lists, asks, and then drops what is under "Would drop". There is no flag that skips the question. To drop a database without being asked, name it: `plain db drop <name> --yes`.
+
+A development database is dropped only when all of this is so:
+
+- It isn't the project's main database or this checkout's.
+- No checkout of the project is configured to use it. This goes by what each checkout uses now, so a worktree that was moved, or pointed at a database with `plain db use`, keeps it whatever the database's metadata says.
+- Its metadata names the checkout that made it, and that checkout is gone.
+- Nothing is connected to it.
+
+A checkout is gone when its directory is missing and git no longer lists a worktree that held it. A worktree git still lists, with its directory missing, may be on a volume that isn't mounted, so its database is left until `git worktree prune` has run. Outside a git repository the only checkout known is the one you run the command from, and a missing directory counts only when the directory that held it is still there.
+
+A test database is dropped only when it carries the record of the run that made it and that run is dead. [plain.postgres's testing docs](../../plain-postgres/plain/postgres/README.md#the-runs-own-database) have that rule. A database that is only named like a test database is listed and left.
+
+Nothing is dropped with `FORCE`. If something connects to a database between the listing and the drop, the drop fails and the database stays.
 
 `plain db` changes **which** database you're on; [`plain postgres sync`](../../plain-postgres/plain/postgres/README.md) changes the **schema** of the one you're on. `plain db` exists only when `plain.dev` is installed — it's a development tool with no production counterpart.
 
