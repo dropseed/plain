@@ -580,27 +580,24 @@ def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
                 "class TestGroup:\n"
                 "    @staticmethod\n"
                 "    def test_static():\n"
-                "        assert False, 'the static method ran'\n"
+                "        assert False\n"
+                "\n"
+                "    def test_method(self):\n"
+                "        assert False\n"
+                "\n"
+                "def test_generator():\n"
+                "    assert False\n"
+                "    yield\n"
             ),
-        }
+        },
+        # CLASSES AS TESTS: this argument.
+        environment={"PLAIN_TEST_CLASSES": "refused"},
     )
     assert result.exit_code == 1
+    assert "0 passed, 1 collection errors" in result.output
     assert "test_shared is defined in shared_checks, not in this file" in result.output
-
-    # With that gone, the static method is a test that runs.
-    result = run_in_project(
-        {
-            "tests/test_kinds.py": (
-                "class TestGroup:\n"
-                "    @staticmethod\n"
-                "    def test_static():\n"
-                "        assert False, 'the static method ran'\n"
-            ),
-        }
-    )
-    assert result.exit_code == 1
-    assert "FAILED tests/test_kinds.py::TestGroup::test_static" in result.output
-    assert "the static method ran" in result.output
+    assert "line 3: TestGroup is a class with 2 tests in it." in result.output
+    assert "test_generator() has a `yield` in it." in result.output
 
 
 def test_a_case_is_named_for_its_values_where_it_is_reported():

@@ -2,14 +2,14 @@
 Test collection.
 
 Conventions: files named `test_*.py` (searched recursively from the target),
-functions named `test_*`, and classes named `Test*` containing `test_*`
-methods (a fresh instance per test). Test modules get assertion rewriting
-when imported; helper modules do not.
+and in them functions named `test_*`. A test is a function, and a file is
+the group. Test modules get assertion rewriting when imported; helper
+modules do not.
 
 Nothing that looks like a test is left out without a word. What can't be
 run as it is written (a test that takes parameters nothing passes in, one
-that yields, a test imported from another file) is a collection error for
-its file, which says what to write instead.
+that yields, a class with tests in it, a test imported from another file)
+is a collection error for its file, which says what to write instead.
 
 Helper modules are imported by their bare name from one directory, the
 helper directory. The caller puts it on `sys.path` before collecting. A test
@@ -31,6 +31,7 @@ from ..decorators import (
 )
 from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
+from . import problems as problems_module
 from .layout import Layout
 from .loading import ImportsAnotherWay, load_test_module
 from .output_capture import NO_OUTPUT, OutputCapture
@@ -69,8 +70,8 @@ class RunnableTest(CollectedTest):
     func: Callable  # zero-argument callable that runs the test body
     skip_reason: str | None = None  # from `@skip`
     # The test as the test file defined it. `func` calls it, with a case's
-    # values or on a fresh instance of its class. A failure is traced back
-    # to the frame that ran this function's code.
+    # values. A failure is traced back to the frame that ran this function's
+    # code.
     function: types.FunctionType | None = None
 
 
@@ -221,9 +222,11 @@ def _say_each_thing_once(errors: list[CollectionError], *, layout: Layout) -> No
 
 
 def _matches_target(name: str, target: str) -> bool:
-    """Whether a test name matches a `::`-target: exact, a case of it, or a
-    test within the targeted class."""
-    return name == target or name.startswith((f"{target}[", f"{target}::"))
+    """Whether a test name matches a `::`-target: exact, or a case of it."""
+    if name == target or name.startswith(f"{target}["):
+        return True
+    # CLASSES AS TESTS: a test within the targeted class.
+    return problems_module.TEST_CLASSES_ARE_COLLECTED and name.startswith(f"{target}::")
 
 
 def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
@@ -252,18 +255,13 @@ def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:
     # that needs the same fix twenty times says so once.
     problems = ProblemsInAFile()
 
-    # Only functions and classes are ever tests. Anything else in the
+    # Only functions and classes are ever looked at. Anything else in the
     # module's namespace is left alone entirely — a test module can hold
     # objects that object to being probed for attributes.
     named = [
         (name, obj)
         for name, obj in vars(module).items()
         if inspect.isfunction(obj) or inspect.isclass(obj)
-    ]
-    classes_defined_here = [
-        obj
-        for _, obj in named
-        if inspect.isclass(obj) and obj.__module__ == module.__name__
     ]
 
     for name, obj in named:
@@ -279,22 +277,70 @@ def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:
             tests.extend(_expand(obj, base_id=f"{relative}::{name}"))
             continue
 
-        if not name.startswith("Test"):
+        # CLASSES AS TESTS: the `if`, and what is under it.
+        if problems_module.TEST_CLASSES_ARE_COLLECTED:
+            tests.extend(
+                _collect_a_class_as_tests(
+                    obj,
+                    name=name,
+                    module=module,
+                    relative=relative,
+                    problems=problems,
+                )
+            )
             continue
-        if defined_here:
-            tests.extend(_collect_class(obj, relative=relative, problems=problems))
-        elif _test_methods(obj) and not any(
-            issubclass(cls, obj) for cls in classes_defined_here
-        ):
-            # A class imported to be a base class has its tests run by the
-            # class that is made from it. One imported and left at that has
-            # tests nothing here runs.
-            problems.defined_elsewhere.append((name, obj.__module__))
+
+        # A class the file defines, with tests in it. One that was imported
+        # is someone else's class, and what it holds was never going to be
+        # run by this file.
+        tests_in_it = _tests_defined_in(obj)
+        if defined_here and tests_in_it:
+            line = getattr(obj, "__firstlineno__", None)
+            problems.classes_with_tests.append((line, name, len(tests_in_it)))
 
     if problems:
         raise CollectionError(path, CantBeRunAsWritten(problems))
 
     return tests
+
+
+def _tests_defined_in(cls: type) -> list[str]:
+    """The names of the tests a class's own body defines."""
+    return [
+        name
+        for name, obj in vars(cls).items()
+        if name.startswith("test_")
+        and (inspect.isfunction(obj) or isinstance(obj, staticmethod | classmethod))
+    ]
+
+
+# CLASSES AS TESTS: this function.
+def _collect_a_class_as_tests(
+    cls: type,
+    *,
+    name: str,
+    module: types.ModuleType,
+    relative: str,
+    problems: ProblemsInAFile,
+) -> list[RunnableTest]:
+    if not name.startswith("Test"):
+        return []
+    if cls.__module__ == module.__name__:
+        return _collect_class(cls, relative=relative, problems=problems)
+
+    classes_defined_here = [
+        obj
+        for obj in vars(module).values()
+        if inspect.isclass(obj) and obj.__module__ == module.__name__
+    ]
+    if _test_methods(cls) and not any(
+        issubclass(defined, cls) for defined in classes_defined_here
+    ):
+        # A class imported to be a base class has its tests run by the
+        # class that is made from it. One imported and left at that has
+        # tests nothing here runs.
+        problems.defined_elsewhere.append((name, cls.__module__))
+    return []
 
 
 def _yields(func: types.FunctionType) -> bool:
@@ -323,7 +369,8 @@ def _check_a_test(
     Add what is wrong with how one test is written: it yields, it takes
     parameters nothing passes in, or its @cases don't fit them.
 
-    `takes` is what calling it fills in before any values: "nothing" for a
+    CLASSES AS TESTS: `takes`, which is always "nothing" without them. It
+    is what calling the test fills in before any values: "nothing" for a
     function and a static method, "its instance" for a method, and "its
     class" for a class method.
     """
@@ -418,6 +465,7 @@ def _listed(names: list[str]) -> str:
     return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
+# CLASSES AS TESTS: this function.
 def _test_methods(cls: type) -> dict[str, tuple[types.FunctionType, str]]:
     """
     A class's tests by name, each with what calling it fills in: "its
@@ -440,6 +488,7 @@ def _test_methods(cls: type) -> dict[str, tuple[types.FunctionType, str]]:
     return methods
 
 
+# CLASSES AS TESTS: this function.
 def _collect_class(
     cls: type, *, relative: str, problems: ProblemsInAFile
 ) -> list[RunnableTest]:
@@ -485,7 +534,12 @@ def _expand(
     extra_tags: tuple[str, ...] = (),
     class_skip: str | None = None,
 ) -> list[RunnableTest]:
-    """Expand @cases into one test per case."""
+    """
+    Expand @cases into one test per case.
+
+    CLASSES AS TESTS: `call`, `extra_tags` and `class_skip`, which are a
+    class's and are never passed without them.
+    """
     run = call if call is not None else func
     tags = (*extra_tags, *getattr(func, TEST_TAGS_ATTRIBUTE, ()))
     skip_reason = getattr(func, TEST_SKIP_ATTRIBUTE, None) or class_skip

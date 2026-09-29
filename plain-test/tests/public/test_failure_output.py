@@ -315,20 +315,21 @@ def test_locals_leave_out_what_the_assert_printed_and_what_says_nothing():
     assert block(output, "locals:") == ["locals:", "  second = 2"]
 
 
-def test_a_test_in_a_class_and_a_case_of_a_test_have_their_locals():
+def test_a_case_of_a_test_has_its_values_among_its_locals():
     output = failing(
         "from plain.test import cases\n"
         "\n"
-        "class TestPrices:\n"
-        "    @cases(('annual', 100))\n"
-        "    def test_price(self, plan, price):\n"
-        "        discount = 10\n"
-        "        raise ValueError('no price')\n"
+        "@cases(('annual', 100))\n"
+        "def test_price(plan, price):\n"
+        "    discount = 10\n"
+        "    raise ValueError('no price')\n"
     )
-    found = block(output, "locals:")
-    assert found[0] == "locals:"
-    assert found[1].startswith("  self = <")
-    assert found[2:] == ["  plan = 'annual'", "  price = 100", "  discount = 10"]
+    assert block(output, "locals:") == [
+        "locals:",
+        "  plan = 'annual'",
+        "  price = 100",
+        "  discount = 10",
+    ]
 
 
 def test_an_async_test_has_its_values_and_its_locals():

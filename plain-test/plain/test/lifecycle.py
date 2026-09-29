@@ -24,15 +24,15 @@ class CollectedTest:
     """
 
     # Where the test is and what it is called, as the runner prints it:
-    # "tests/test_signup.py::test_welcome", "...::TestInvites::test_expired",
-    # or "...::test_price[annual]" for one case of a test with `@cases`.
+    # "tests/test_signup.py::test_welcome", or "...::test_price[annual]" for
+    # one case of a test with `@cases`.
     id: str
-    # The names given to `@tag(...)`, the class's before the test's own.
+    # The names given to `@tag(...)`.
     tags: tuple[str, ...] = ()
 
     @property
     def name(self) -> str:
-        """The test's name within its file (e.g. "TestInvites::test_expired")."""
+        """The test's name within its file (e.g. "test_price[annual]")."""
         return self.id.partition("::")[2]
 
 

@@ -633,8 +633,6 @@ A target is a path, optionally followed by `::` and a name, or by `:` and a line
 | `tests/checkout`                           | Every test file under that directory |
 | `tests/test_views.py`                      | Every test in that file              |
 | `tests/test_views.py::test_homepage`       | That test, and every case of it      |
-| `tests/test_views.py::TestCart`            | Every test in that class             |
-| `tests/test_views.py::TestCart::test_add`  | That method                          |
 | `'tests/test_email.py::test_valid[empty]'` | That one case                        |
 | `tests/test_views.py:42`                   | The test line 42 is in               |
 
@@ -675,7 +673,6 @@ Put tests in `tests/`, beside `app/`. The runner looks for:
 
 - Files named `test_*.py`, in any subdirectory
 - Functions named `test_*`
-- Classes named `Test*`, and the `test_*` methods on them, static and class methods included
 - `async def test_*`, which the runner awaits for you
 
 ```python
@@ -687,21 +684,21 @@ def test_empty_cart():
     assert Client().get("/cart/").status_code == 200
 
 
-class TestCheckout:
-    def test_requires_login(self):
-        assert Client().get("/checkout/").redirect_to == "/login/"
+def test_checkout_requires_login():
+    assert Client().get("/checkout/").redirect_to == "/login/"
 
 
 async def test_price_lookup():
     assert await fetch_price("A-1") == 1200
 ```
 
-A class is a way to group tests, and nothing more. Each test gets a fresh instance, and there are no setup or teardown methods. A class inherits the tests of its base classes.
+A test is a function, and a file is the group. To group tests, put them in a file of their own, and to share what they set up, write a function they call.
 
 Nothing that looks like a test is left out without a word. These are [collection errors](#collection-errors), each saying what to write instead:
 
 - A test with a `yield` in it. Calling it would make a generator and run none of its body
-- A `test_*` function or a `Test*` class imported from another module. A test is run by the file that defines it. A class imported to be the base of one defined in the file is fine
+- A class with `test_*` methods in it, whatever it's named and whatever it inherits from. None of them would run
+- A `test_*` function imported from another module. A test is run by the file that defines it
 
 An `async def` test uses the client the way any test does. `client.get()` and the rest are ordinary calls, not awaited, whether the view they reach is sync or async, and the test's event loop waits while the request runs. The exception is [`client.websocket()`](#websockets), which is for synchronous tests.
 
@@ -1037,7 +1034,7 @@ What is true of many files is said once. The first file whose tests take paramet
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `test_x(user, plan) takes parameters, and nothing passes them in.`                      | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`             |
 | `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value, for a. Nothing fills b.` | Make that case pass a value for each parameter, in their order                                         |
-| `TestCart::test_add() is a method, and has no self parameter.`                          | Add `self`                                                                                             |
+| `line 8: TestCart is a class with 3 tests in it.`                                       | Write each of its tests as a function of the file, and what they shared as functions they call         |
 | `test_x() has a yield in it.`                                                           | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper    |
 | `test_x is defined in billing, not in this file.`                                       | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_` |
 | `line 8: test_x has 2 @cases. A test takes one.`                                        | Use one `@cases`, built from both lists, each case one flat tuple. The message shows how               |
@@ -1464,7 +1461,7 @@ mypackage = "mypackage.test:MyPackageTestLifecycle"
 ```
 
 - `setup_worker()` runs once before the first test, and `teardown_worker()` once after the last.
-- `around_test(test)` is a context manager entered around each test. `test` is a [`CollectedTest`](./lifecycle.py#CollectedTest), which you can import from `plain.test` to annotate it. `test.id` is the id the runner prints (`tests/test_cart.py::TestCart::test_add[empty]`), `test.name` is the part after the file (`TestCart::test_add[empty]`), and `test.tags` holds its `@tag` names, so a lifecycle can treat a tagged test differently. That's how `@isolated_db` works.
+- `around_test(test)` is a context manager entered around each test. `test` is a [`CollectedTest`](./lifecycle.py#CollectedTest), which you can import from `plain.test` to annotate it. `test.id` is the id the runner prints (`tests/test_cart.py::test_add[empty]`), `test.name` is the part after the file (`test_add[empty]`), and `test.tags` holds its `@tag` names, so a lifecycle can treat a tagged test differently. That's how `@isolated_db` works.
 - `describe_value(value)` is what a [failure](#failures) prints for a value your package owns, in place of its `repr`. Return `None` for anything that isn't yours. Use it when the `repr` says too little to fix a test by. The text is printed as it is, and a description of several lines is [diffed](#large-values) by line. It's called for the values in a failed assert and in the test's locals, and for what's inside them when they're a list, a tuple, a dict or a set. It must not change anything the test did, or do anything the test didn't: no queries, no requests. And it must not print what your package knows to be a [secret](#secrets): a report is read by more than the person who ran the test.
 - `required_package` keeps the lifecycle from loading unless that package is in the app's `INSTALLED_PACKAGES`. An entry point is visible whenever the package is installed in the environment, which is wider than "the app uses it".
 - Lifecycles are entered in the order of their entry point names. The runner creates each one with no arguments.

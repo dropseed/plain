@@ -18,7 +18,7 @@ uv run plain test [targets] [options]
 
 ## Writing tests
 
-- Files `tests/**/test_*.py`; functions `test_*`; classes `Test*` with `test_*` methods (fresh instance per test, no setup_method). Define a test in the file that runs it. A test with a `yield` in it is a collection error: none of its body would run.
+- Files `tests/**/test_*.py`; functions `test_*`. A test is a function and a file is the group: a class with `test_*` methods in it is a collection error. Define a test in the file that runs it. A test with a `yield` in it is a collection error: none of its body would run.
 - Nothing is passed to a test by name, and no file but `test_*.py` and `tests/lifecycle.py` is read. A test function takes no parameters except the values `@cases` passes; one that does is a collection error. Shared setup is ordinary Python — helper functions the test calls in its body.
 - Protection every test needs (no network, counters reset) goes in `tests/lifecycle.py`: one `TestLifecycle` subclass, found by that exact path, wrapping every test. Never put setup a test reads there.
 - Decorators declare static facts: `@cases(...)` (the test runs once for each case; one `@cases` per test), `@skip("reason")`, `@tag("name")` — from `plain.test`. A case is reported by its values, `test_price[5-500]`, when they are all strings, numbers, booleans, `None` or enum members, and numbered otherwise; wrap one in `case(..., id="name")` to name it.

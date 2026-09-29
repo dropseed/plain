@@ -217,12 +217,12 @@ def test_a_lifecycle_is_handed_the_core_type():
             yield
 
     run_tests(
-        [RunnableTest(id="t.py::TestA::test_b[0]", func=lambda: None, tags=("slow",))],
+        [RunnableTest(id="t.py::test_b[0]", func=lambda: None, tags=("slow",))],
         lifecycles=[Watching()],
     )
     assert isinstance(seen[0], CollectedTest)
-    assert seen[0].id == "t.py::TestA::test_b[0]"
-    assert seen[0].name == "TestA::test_b[0]"
+    assert seen[0].id == "t.py::test_b[0]"
+    assert seen[0].name == "test_b[0]"
     assert seen[0].tags == ("slow",)
 
 

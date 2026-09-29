@@ -95,8 +95,6 @@ def main(
       tests/test_signup.py                          a file
       tests/test_signup.py::test_welcome            a test
       tests/test_signup.py:42                       the test line 42 is in
-      tests/test_signup.py::TestInvites             a class
-      tests/test_signup.py::TestInvites::test_sent  a test in a class
       'tests/test_price.py::test_total[annual]'     one case of a test
 
     Quote a target that names a case. A failure prints the command that

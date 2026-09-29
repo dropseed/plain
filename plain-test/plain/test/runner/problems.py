@@ -13,12 +13,26 @@ is said about that test's parameters.
 """
 
 import ast
+import os
 import textwrap
 from dataclasses import dataclass, field
 
 from ..definition import TestDefinitionError
 
 __all__ = []
+
+# CLASSES AS TESTS
+#
+# A test is a function, and a class that holds tests is a definition error.
+# That is how the runner is meant to be, and it is how it runs when this is
+# False. It is True until every test class in this repository has been
+# written as functions, so that those suites run in the meantime.
+#
+# To see a suite as it will be: PLAIN_TEST_CLASSES=refused plain test
+#
+# When the classes are gone, delete this, and with it every block in the
+# runner and in its tests marked "CLASSES AS TESTS".
+TEST_CLASSES_ARE_COLLECTED = os.environ.get("PLAIN_TEST_CLASSES") != "refused"
 
 A_TEST_TAKES_ONLY_ITS_CASES = (
     "Nothing is passed to a test by name. A test gets what it needs in its\n"
@@ -33,6 +47,13 @@ _A_TEST_IS_RUN_WHERE_IT_IS_DEFINED = (
     "`from billing import test_connection as check_connection`. A test made\n"
     "by a decorator belongs to the decorator's module until the decorator\n"
     "uses `functools.wraps`."
+)
+
+_A_TEST_IS_A_FUNCTION = (
+    "A test is a function, and a file is the group. Write each of the\n"
+    "class's tests as a function of the file, and what they shared as\n"
+    "functions they call. A class that isn't a test, and has to have a\n"
+    "method named `test_*`, belongs in a helper module."
 )
 
 _A_TEST_CANT_YIELD = (
@@ -71,6 +92,9 @@ class ProblemsInAFile:
     stops_at_a_decorator: bool = False
     # The tests that have a `yield` in them.
     tests_that_yield: list[str] = field(default_factory=list)
+    # The classes that hold tests: the line each is on, its name, and how
+    # many tests are in it.
+    classes_with_tests: list[tuple[int | None, str, int]] = field(default_factory=list)
     # The tests that were imported, each with the module it is defined in.
     defined_elsewhere: list[tuple[str, str]] = field(default_factory=list)
     # The tests that take parameters nothing passes in, as they are written:
@@ -84,6 +108,7 @@ class ProblemsInAFile:
             self.of_one_test
             or self.tests_with_cases_twice
             or self.tests_that_yield
+            or self.classes_with_tests
             or self.defined_elsewhere
             or self.tests_taking_parameters
         )
@@ -97,6 +122,10 @@ class ProblemsInAFile:
         lines = list(self.of_one_test)
         for name, count in self.tests_with_cases_twice:
             lines.append(f"{name} has {count} @cases. A test takes one.")
+        for line, name, count in self.classes_with_tests:
+            where = f"line {line}: " if line is not None else ""
+            tests = "1 test" if count == 1 else f"{count} tests"
+            lines.append(f"{where}{name} is a class with {tests} in it.")
         lines.extend(
             f"{name} is defined in {module}, not in this file."
             for name, module in self.defined_elsewhere
@@ -127,6 +156,8 @@ class ProblemsInAFile:
             sections.append(textwrap.indent("\n".join(table), "  "))
         if self.tests_with_cases_twice:
             sections.append(ONE_CASES_FOR_EVERY_COMBINATION)
+        if self.classes_with_tests:
+            sections.append(_A_TEST_IS_A_FUNCTION)
         if self.defined_elsewhere:
             sections.append(_A_TEST_IS_RUN_WHERE_IT_IS_DEFINED)
         if self.tests_that_yield:
@@ -237,6 +268,8 @@ def _read_a_test(
         problems.tests_that_yield.append(name)
         return
 
+    # CLASSES AS TESTS: `in_a_class` and `filled_by_the_call`, which is 0
+    # without them, and the two decorators that are a method's.
     filled_by_the_call = 1 if in_a_class else 0
     times_cases = 0
     # Whether every decorator is one this module knows passes no values
@@ -317,12 +350,17 @@ def tests_as_written(tree: ast.Module) -> ProblemsInAFile:
                 )
 
         elif isinstance(node, ast.ClassDef):
-            if not node.name.startswith("Test"):
-                continue
-            for member in node.body:
-                if isinstance(
-                    member, ast.FunctionDef | ast.AsyncFunctionDef
-                ) and member.name.startswith("test_"):
+            tests_in_it = [
+                member
+                for member in node.body
+                if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
+                and member.name.startswith("test_")
+            ]
+            # CLASSES AS TESTS: the `if`, and what is under it.
+            if TEST_CLASSES_ARE_COLLECTED:
+                if not node.name.startswith("Test"):
+                    continue
+                for member in tests_in_it:
                     _read_a_test(
                         member,
                         name=f"{node.name}::{member.name}",
@@ -330,5 +368,10 @@ def tests_as_written(tree: ast.Module) -> ProblemsInAFile:
                         imported=imported,
                         problems=problems,
                     )
+                continue
+            if tests_in_it:
+                problems.classes_with_tests.append(
+                    (node.lineno, node.name, len(tests_in_it))
+                )
 
     return problems

@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 from plain.test import TestDefinitionError, patch, raises
+from plain.test.runner import problems
 from plain.test.runner.collection import collect_tests
 from plain.test.runner.execution import run_tests
 from plain.test.runner.reporting import collection_error_text
@@ -18,71 +19,39 @@ def write_tests(files: dict[str, str]) -> Path:
     return root
 
 
-def test_collects_functions_and_classes():
+def test_collects_the_functions_named_for_it():
     root = write_tests(
         {
             "test_things.py": (
-                "def test_one():\n"
-                "    assert True\n"
+                "import dataclasses\n"
                 "\n"
-                "class TestGroup:\n"
-                "    def test_two(self):\n"
-                "        assert True\n"
+                "def make_thing():\n"
+                "    return Thing(name='a thing')\n"
+                "\n"
+                "@dataclasses.dataclass\n"
+                "class Thing:\n"
+                "    name: str\n"
+                "\n"
+                "    def check(self):\n"
+                "        return True\n"
                 "\n"
                 "class TestHelperlike:\n"
                 "    pass\n"
+                "\n"
+                "def test_one():\n"
+                "    assert make_thing().check()\n"
+                "\n"
+                "async def test_two():\n"
+                "    assert True\n"
             )
         }
     )
     tests, errors = collect_tests(["."], root=root)
     assert [t.id for t in tests] == [
         "test_things.py::test_one",
-        "test_things.py::TestGroup::test_two",
+        "test_things.py::test_two",
     ]
     assert errors == []
-
-
-def test_collects_inherited_test_methods():
-    root = write_tests(
-        {
-            "test_inherit.py": (
-                "class Shared:\n"
-                "    def test_from_base(self):\n"
-                "        assert True\n"
-                "\n"
-                "class TestChild(Shared):\n"
-                "    def test_own(self):\n"
-                "        assert True\n"
-                "    def test_from_base(self):\n"
-                "        assert True  # override collects once\n"
-            )
-        }
-    )
-    tests, _ = collect_tests(["."], root=root)
-    names = [t.name for t in tests]
-    assert names == ["TestChild::test_from_base", "TestChild::test_own"]
-
-
-def test_class_target_selects_all_its_methods():
-    root = write_tests(
-        {
-            "test_target.py": (
-                "class TestOne:\n"
-                "    def test_a(self):\n"
-                "        assert True\n"
-                "    def test_b(self):\n"
-                "        assert True\n"
-                "\n"
-                "def test_other():\n"
-                "    assert True\n"
-            )
-        }
-    )
-    tests, _ = collect_tests(["test_target.py::TestOne"], root=root)
-    assert [t.name for t in tests] == ["TestOne::test_a", "TestOne::test_b"]
-
-    tests, _ = collect_tests(["test_target.py::TestOne::test_b"], root=root)
-    assert [t.name for t in tests] == ["TestOne::test_b"]
 
 
 def test_cases_expand_with_bound_arguments():
@@ -157,9 +126,8 @@ def test_parameters_nothing_passes_in_are_a_collection_error():
                 "def test_fine():\n"
                 "    assert True\n"
                 "\n"
-                "class TestGroup:\n"
-                "    def test_in_class(self, settings):\n"
-                "        assert True\n"
+                "async def test_async(settings):\n"
+                "    assert True\n"
             ),
             "test_other.py": "def test_ok():\n    assert True\n",
         }
@@ -176,7 +144,7 @@ def test_parameters_nothing_passes_in_are_a_collection_error():
     message = str(error)
     # Every test that needs the fix is named, with the parameters in question.
     assert "test_signup(user, client) takes parameters" in message
-    assert "TestGroup::test_in_class(settings) takes parameters" in message
+    assert "test_async(settings) takes parameters" in message
     assert "test_fine" not in message
     assert "Nothing is passed to a test by name" in message
     assert "@cases" in message
@@ -220,10 +188,9 @@ def test_cases_that_do_not_fit_the_parameters_are_a_collection_error():
                 "def test_add(a, b):\n"
                 "    assert a + b\n"
                 "\n"
-                "class TestGroup:\n"
-                "    @cases(1, 2)\n"
-                "    def test_in_class(self, value):\n"
-                "        assert value\n"
+                "@cases(1, 2)\n"
+                "def test_one_value(value):\n"
+                "    assert value\n"
             )
         }
     )
@@ -233,9 +200,9 @@ def test_cases_that_do_not_fit_the_parameters_are_a_collection_error():
     message = str(errors[0].error)
     assert "test_add(a, b) doesn't fit its @cases" in message
     assert "case [too many] passes 3 values, and the test takes 2: a and b." in message
-    # Its first case fits, and so does every case of the method.
+    # Its first case fits, and so does every case of the other test.
     assert "case [1-2]" not in message
-    assert "test_in_class" not in message
+    assert "test_one_value" not in message
 
 
 def test_a_second_cases_is_a_collection_error():
@@ -438,11 +405,6 @@ def test_a_test_that_yields_is_a_collection_error():
                 "    assert False\n"
                 "    yield\n"
                 "\n"
-                "class TestGroup:\n"
-                "    def test_method(self):\n"
-                "        assert False\n"
-                "        yield\n"
-                "\n"
                 "def test_fine():\n"
                 "    assert True\n"
             )
@@ -453,7 +415,7 @@ def test_a_test_that_yields_is_a_collection_error():
     assert len(errors) == 1
     assert isinstance(errors[0].error, TestDefinitionError)
     message = str(errors[0].error)
-    for name in ("test_sync", "test_async", "test_wrapped", "TestGroup::test_method"):
+    for name in ("test_sync", "test_async", "test_wrapped"):
         assert f"{name}() has a `yield` in it" in message
     assert "test_fine" not in message
     # What to write, for a test that yielded values and for one that
@@ -462,61 +424,106 @@ def test_a_test_that_yields_is_a_collection_error():
     assert "`@contextmanager`" in message
 
 
-def test_static_and_class_methods_are_tests_too():
+def classes_are_refused():
+    """As the runner is meant to be: a class with tests in it isn't run."""
+    # CLASSES AS TESTS: this function, and every `with` that enters it.
+    return patch(problems, "TEST_CLASSES_ARE_COLLECTED", False)
+
+
+def test_a_class_with_tests_in_it_is_a_collection_error():
     root = write_tests(
         {
-            "test_methods.py": (
-                "from plain.test import cases\n"
+            "test_classes.py": (
+                "import unittest\n"
                 "\n"
-                "ran = []\n"
+                "class TestCheckout:\n"
+                "    def test_requires_login(self):\n"
+                "        assert False\n"
                 "\n"
-                "class TestGroup:\n"
                 "    @staticmethod\n"
                 "    def test_static():\n"
-                "        ran.append('static')\n"
+                "        assert False\n"
                 "\n"
                 "    @classmethod\n"
                 "    def test_class(cls):\n"
-                "        ran.append(cls.__name__)\n"
+                "        assert False\n"
                 "\n"
-                "    @staticmethod\n"
-                "    @cases(1, 2)\n"
-                "    def test_static_cases(number):\n"
-                "        ran.append(number)\n"
-            )
+                "    def helper(self):\n"
+                "        pass\n"
+                "\n"
+                "class UserTests(unittest.TestCase):\n"
+                "    def test_it(self):\n"
+                "        self.assertEqual(1, 2)\n"
+                "\n"
+                "class TestHelperlike:\n"
+                "    def check(self):\n"
+                "        pass\n"
+                "\n"
+                "def test_fine():\n"
+                "    assert True\n"
+            ),
+            "test_other.py": "def test_ok():\n    assert True\n",
         }
     )
-    tests, errors = collect_tests(["."], root=root)
-    assert errors == []
-    assert [t.name for t in tests] == [
-        "TestGroup::test_static",
-        "TestGroup::test_class",
-        "TestGroup::test_static_cases[1]",
-        "TestGroup::test_static_cases[2]",
-    ]
-    run = run_tests(tests, lifecycles=[])
-    assert len(run.passed) == 4
+    with classes_are_refused():
+        tests, errors = collect_tests(["."], root=root)
+
+    assert [t.id for t in tests] == ["test_other.py::test_ok"]
+    assert len(errors) == 1
+    assert type(errors[0].error) is TestDefinitionError
+    assert str(errors[0].error) == (
+        "These tests can't be run as written:\n"
+        "\n"
+        "  line 3: TestCheckout is a class with 3 tests in it.\n"
+        "  line 18: UserTests is a class with 1 test in it.\n"
+        "\n"
+        "A test is a function, and a file is the group. Write each of the\n"
+        "class's tests as a function of the file, and what they shared as\n"
+        "functions they call. A class that isn't a test, and has to have a\n"
+        "method named `test_*`, belongs in a helper module."
+    )
 
 
-def test_a_static_method_that_takes_parameters_is_told_so():
+def test_a_class_that_was_imported_is_someone_elses_class():
     root = write_tests(
         {
-            "test_methods.py": (
-                "class TestGroup:\n"
-                "    @staticmethod\n"
-                "    def test_static(user):\n"
-                "        assert True\n"
+            "fakes_shared_by_collection_tests.py": (
+                "class FakeBackend:\n"
+                "    def test_connection(self):\n"
+                "        return 'not a test: the app calls this'\n"
+            ),
+            "test_uses_the_fake.py": (
+                "from fakes_shared_by_collection_tests import FakeBackend\n"
                 "\n"
-                "    @classmethod\n"
-                "    def test_class(cls, user):\n"
-                "        assert True\n"
-            )
+                "def test_backend():\n"
+                "    assert FakeBackend().test_connection()\n"
+            ),
         }
     )
-    _, errors = collect_tests(["."], root=root)
-    message = str(errors[0].error)
-    assert "TestGroup::test_static(user) takes parameters" in message
-    assert "TestGroup::test_class(user) takes parameters" in message
+    with import_modules_from(root), classes_are_refused():
+        tests, errors = collect_tests(["test_uses_the_fake.py"], root=root)
+    assert errors == []
+    assert [t.name for t in tests] == ["test_backend"]
+
+
+def test_a_class_is_not_something_a_target_can_name():
+    root = write_tests(
+        {
+            "test_target.py": (
+                "def test_one():\n"
+                "    assert True\n"
+                "\n"
+                "@cases(1, 2)\n"
+                "def test_many(number):\n"
+                "    assert number\n"
+            ).replace("@cases", "from plain.test import cases\n\n@cases", 1)
+        }
+    )
+    with classes_are_refused():
+        tests, _ = collect_tests(["test_target.py::test_many"], root=root)
+        assert [t.name for t in tests] == ["test_many[1]", "test_many[2]"]
+        tests, _ = collect_tests(["test_target.py::test"], root=root)
+        assert tests == []
 
 
 def import_modules_from(root: Path):
@@ -532,26 +539,15 @@ def test_a_test_imported_from_another_module_is_a_collection_error():
                 "\n"
                 "def test_connection():\n"
                 "    return 'not a test: the app calls this'\n"
-                "\n"
-                "class TestShared:\n"
-                "    def test_in_shared_class(self):\n"
-                "        assert False\n"
-                "\n"
-                "class TestBase:\n"
-                "    def test_in_base(self):\n"
-                "        assert True\n"
             ),
             "test_imports.py": (
                 "from checks_shared_by_collection_tests import (\n"
-                "    TestBase,\n"
-                "    TestShared,\n"
                 "    test_connection as check_connection,\n"
                 "    test_shared,\n"
                 ")\n"
                 "\n"
-                "class TestMade(TestBase):\n"
-                "    def test_own(self):\n"
-                "        assert check_connection()\n"
+                "def test_own():\n"
+                "    assert check_connection()\n"
             ),
         }
     )
@@ -561,37 +557,12 @@ def test_a_test_imported_from_another_module_is_a_collection_error():
     assert len(errors) == 1
     message = str(errors[0].error)
     listed = message.split("\n\n")[1]
+    # One imported under another name is not a test, and is not listed.
     assert listed == (
-        "  TestShared is defined in checks_shared_by_collection_tests, "
-        "not in this file.\n"
         "  test_shared is defined in checks_shared_by_collection_tests, "
         "not in this file."
     )
-    # One imported under another name is not a test, and one imported to be
-    # a base class has its tests run by the class made from it. Neither is
-    # listed.
     assert "A test is run by the file that defines it" in message
-
-
-def test_a_class_made_from_an_imported_one_runs_the_tests_it_was_given():
-    root = write_tests(
-        {
-            "bases_shared_by_collection_tests.py": (
-                "class TestBase:\n    def test_in_base(self):\n        assert True\n"
-            ),
-            "test_made.py": (
-                "from bases_shared_by_collection_tests import TestBase\n"
-                "\n"
-                "class TestMade(TestBase):\n"
-                "    def test_own(self):\n"
-                "        assert True\n"
-            ),
-        }
-    )
-    with import_modules_from(root):
-        tests, errors = collect_tests(["test_made.py"], root=root)
-    assert errors == []
-    assert [t.name for t in tests] == ["TestMade::test_in_base", "TestMade::test_own"]
 
 
 def test_a_file_with_many_tests_to_fix_says_how_many_and_not_which():
@@ -737,8 +708,8 @@ def test_a_case_that_passes_too_few_names_what_it_fills_and_what_it_doesnt():
 
 def test_a_file_says_everything_wrong_with_it_at_once():
     """It imports a helper the wrong way, its tests take parameters, one
-    has two `@cases` and one yields. Found one at a time, that is four
-    runs."""
+    has two `@cases`, one yields and one is in a class. Found one at a
+    time, that is five runs."""
     root = write_tests(
         {
             "tests/helpers.py": "value = 1\n",
@@ -759,15 +730,22 @@ def test_a_file_says_everything_wrong_with_it_at_once():
                 "\n"
                 "def test_steps():\n"
                 "    yield 1\n"
+                "\n"
+                "\n"
+                "class TestRefunds:\n"
+                "    def test_refund(self):\n"
+                "        pass\n"
             ),
         }
     )
 
-    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    with classes_are_refused():
+        tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
 
     assert tests == []
     assert len(errors) == 1
     message = str(errors[0].error)
+    assert "line 19: TestRefunds is a class with 1 test in it." in message
     assert (
         "line 2: `from tests.helpers import value` should be "
         "`from helpers import value`"
