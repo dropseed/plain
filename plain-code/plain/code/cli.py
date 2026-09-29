@@ -360,7 +360,7 @@ def _tests_directory_search_path() -> list[str]:
     The ty arguments that let a test file find the helper modules beside it.
 
     `plain test` puts a project's `tests/` directory on the import path, so a
-    test file imports a helper module by its bare name
+    test file imports a helper module by its path from there
     (`from helpers import create_user`). The type checker has to look in the
     same place. It finds `tests/` by itself only when the directory isn't a
     package, and with a `tests/__init__.py` in it every one of those imports

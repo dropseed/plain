@@ -729,9 +729,24 @@ def test_profile_shows_the_email():
     assert "ada@example.com" in response.text
 ```
 
-`tests/` is on the import path, so `tests/helpers.py` is `helpers`. That's true for a test file in any subdirectory, whichever directory you run from, and whatever target you pass.
+`tests/` is on the import path, so a helper module is imported by its path from `tests/`. `tests/helpers.py` is `helpers`. That's true for a test file in any subdirectory, whichever directory you run from, and whatever target you pass.
 
-It's the only way to import one. `from tests.helpers import ...` and a relative `from .helpers import ...` are [collection errors](#collection-errors) that say what to write instead. A module imported under two names is loaded twice, and the two copies don't share their state.
+A helper that belongs to one directory of tests can live in it. It's imported the same way, by its path from `tests/`, by the test file beside it and by any other:
+
+```python
+# tests/billing/refund_helpers.py is `billing.refund_helpers`
+from billing.refund_helpers import create_refund
+```
+
+The directory needs no `__init__.py`.
+
+It's the only way to import one. These are [collection errors](#collection-errors) that say what to write instead:
+
+- `from tests.helpers import ...`, through the name of the tests directory
+- `from .refund_helpers import ...`, a relative import
+- `from refund_helpers import ...`, by the end of its path, when the module is further down than `tests/`
+
+A module imported under two names is loaded twice, and the two copies don't share their state.
 
 `tests/` comes first on the import path, so a helper module named like an installed package takes its place. Give a helper module a name nothing else has.
 
@@ -1041,7 +1056,7 @@ What is true of many files is said once. The first file whose tests take paramet
 | `line 8: cases() ids must be unique`                                                    | Give the case another name. It is what another case is called, or numbered                             |
 | `line 8: @skip requires a reason`                                                       | Write `@skip("why")`, not a bare `@skip`                                                               |
 | `line 8: @tag requires at least one name`                                               | Write `@tag("slow")`, not a bare `@tag`                                                                |
-| `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name    |
+| `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its path from `tests/` |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
 
@@ -1413,7 +1428,7 @@ The runner finds the file by its path. There is nothing to register and no other
 
 The file has to be `tests/lifecycle.py`. A lifecycle written somewhere the runner doesn't read would protect nothing, so the places one ends up by mistake are checked: `tests/lifecycles.py`, `tests/life_cycle.py`, `tests/lifecycle/__init__.py`, and `lifecycle.py` or `lifecycles.py` beside `tests/`. If one of those is there and mentions `TestLifecycle`, the run stops and says where the file belongs. A `lifecycle.py` deeper inside `tests/` isn't checked, and isn't loaded.
 
-`tests/lifecycle.py` imports [helper modules](#shared-helpers) the way a test file does, by their bare names.
+`tests/lifecycle.py` imports [helper modules](#shared-helpers) the way a test file does, by their paths from `tests/`.
 
 `tests/` is the directory beside `app/`. If you run `plain test` from inside a directory named `tests`, the file is that directory's `lifecycle.py`.
 

@@ -98,7 +98,7 @@ def load_app_lifecycle(*, root: Path, tests_directory: Path) -> TestLifecycle | 
 
     `root` is the directory `plain test` runs from, and `tests_directory` is
     the tests directory found from it. The file imports the project's helper
-    modules by their bare names, as a test file does, so the caller has
+    modules by their paths from it, as a test file does, so the caller has
     already put the directory they live in on `sys.path`.
 
     A file that is there but doesn't hold exactly one usable TestLifecycle

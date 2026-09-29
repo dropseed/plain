@@ -22,6 +22,7 @@ import hashlib
 import importlib.machinery
 import importlib.util
 import marshal
+import os
 import sys
 import types
 from pathlib import Path
@@ -67,6 +68,14 @@ def load_test_module(path: Path, *, layout: Layout) -> types.ModuleType:
     sys.modules[name] = module
     try:
         loader.exec_module(module)
+    except ModuleNotFoundError as error:
+        sys.modules.pop(name, None)
+        problems = imports_of_a_helper_by_part_of_its_path(
+            path, missing=error.name, layout=layout
+        )
+        if problems:
+            raise ImportsAnotherWay(problems, layout=layout) from error
+        raise
     except BaseException:
         sys.modules.pop(name, None)
         raise
@@ -120,7 +129,7 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
         # A file that can't be run says everything reading it shows, about
         # its imports and about its tests. Run, it would stop at the first
         # of them, and each would take a run of its own to find.
-        imports = import_problems(tree, layout=self.layout)
+        imports = import_problems(tree, layout=self.layout, path=Path(path))
         tests = tests_as_written(tree)
 
         if imports:
@@ -239,10 +248,10 @@ def _remove_caches_left_by_other_rewriters(cache_path: Path) -> None:
             other.unlink(missing_ok=True)
 
 
-def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
+def import_problems(tree: ast.Module, *, layout: Layout, path: Path) -> list[str]:
     """
-    Imports in a test module that reach a helper module some way other than
-    its bare name.
+    Imports in the test module at `path` that reach a helper module some way
+    other than by its path from the tests directory.
 
     A relative import is refused: the packages a test module is in are
     empty, so there is nothing beside it to import. An import through the
@@ -250,6 +259,8 @@ def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
     runs from the directory above it, and loads a second copy of a module
     that something else imported as `helpers`.
     """
+    directories = _directories_a_file_is_under(path, layout=layout)
+
     problems = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -260,14 +271,20 @@ def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
             )
             if node.level > 0:
                 written = f"from {'.' * node.level}{module} import {names}"
-                bare_module = module
+                # One dot is the file's own directory, and each dot more is
+                # a directory further up.
+                up = node.level - 1
+                beside = directories[: len(directories) - up] if up else directories
+                if up > len(directories):
+                    beside = ()
+                from_module = ".".join([*beside, *([module] if module else [])])
             elif module.split(".")[0] == layout.refused_import_name:
                 written = f"from {module} import {names}"
-                bare_module = module.partition(".")[2]
+                from_module = module.partition(".")[2]
             else:
                 continue
-            if bare_module:
-                corrected = f"from {bare_module} import {names}"
+            if from_module:
+                corrected = f"from {from_module} import {names}"
             else:
                 corrected = f"import {names}"
         elif isinstance(node, ast.Import):
@@ -287,11 +304,95 @@ def import_problems(tree: ast.Module, *, layout: Layout) -> list[str]:
     return problems
 
 
+def _directories_a_file_is_under(path: Path, *, layout: Layout) -> tuple[str, ...]:
+    """
+    The directories between the tests directory and a file in it:
+    `("billing", "refunds")` for `tests/billing/refunds/test_partial.py`,
+    and none for a file in the tests directory itself.
+    """
+    directory = path.parent
+    if directory.is_relative_to(layout.helper_directory):
+        return directory.relative_to(layout.helper_directory).parts
+    return ()
+
+
+def imports_of_a_helper_by_part_of_its_path(
+    path: Path, *, missing: str | None, layout: Layout
+) -> list[str]:
+    """
+    What to write, when the test file at `path` couldn't import `missing`
+    and a module by that name is further down in the tests directory.
+
+    `tests/billing/helpers.py` is `billing.helpers`. A test file beside it
+    that writes `from helpers import charge` finds nothing, or finds
+    `tests/helpers.py`, which is another module. Only the first can be told
+    from here, and it is told when it happens: what is in the tests
+    directory can change without the test file changing.
+    """
+    if not missing:
+        return []
+    top_name = missing.split(".")[0]
+
+    where_it_is = []
+    for directory, directory_names, file_names in os.walk(layout.helper_directory):
+        directory_names[:] = sorted(
+            name
+            for name in directory_names
+            if not name.startswith(".") and name != "__pycache__"
+        )
+        if Path(directory) == layout.helper_directory:
+            continue
+        if f"{top_name}.py" in file_names or top_name in directory_names:
+            under = Path(directory).relative_to(layout.helper_directory).parts
+            where_it_is.append(".".join(under))
+    if not where_it_is:
+        return []
+
+    try:
+        tree = ast.parse(path.read_text(), filename=str(path))
+    except OSError, SyntaxError, ValueError:
+        return []
+
+    problems = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0:
+            module = node.module or ""
+            if module.split(".")[0] != top_name:
+                continue
+            names = ", ".join(
+                f"{alias.name} as {alias.asname}" if alias.asname else alias.name
+                for alias in node.names
+            )
+            written = f"from {module} import {names}"
+            corrected = [
+                f"from {under}.{module} import {names}" for under in where_it_is
+            ]
+        elif isinstance(node, ast.Import):
+            by_that_name = [
+                alias for alias in node.names if alias.name.split(".")[0] == top_name
+            ]
+            if not by_that_name:
+                continue
+            alias = by_that_name[0]
+            written = f"import {alias.name}"
+            if alias.asname:
+                written += f" as {alias.asname}"
+            corrected = [
+                f"import {under}.{alias.name} as {alias.asname or top_name}"
+                for under in where_it_is
+            ]
+        else:
+            continue
+        either = " or ".join(f"`{one}`" for one in corrected)
+        problems.append(f"line {node.lineno}: `{written}` should be {either}")
+    return problems
+
+
 class ImportsAnotherWay(TestDefinitionError):
     """
-    A test file imports a helper module some way other than by its bare
-    name. Each problem says what to write, so a run that finds them in many
-    files says why once.
+    A test file imports a helper module some way other than by its path
+    from the tests directory. Each problem says what to write, so a run that
+    finds them in many files says why once.
     """
 
     def __init__(
@@ -304,11 +405,13 @@ class ImportsAnotherWay(TestDefinitionError):
         self.problems = problems
         # What reading the file showed about its tests.
         self.tests = tests or ProblemsInAFile()
-        helpers_file = layout.shown(layout.helper_directory / "helpers.py")
+        at_the_top = layout.shown(layout.helper_directory / "helpers.py")
+        further_down = layout.shown(layout.helper_directory / "billing" / "helpers.py")
         self.why = (
-            "A helper module is imported by its bare name, whichever\n"
-            "directory the test file is in and wherever the command runs\n"
-            f"from: {helpers_file} is `helpers`."
+            "A helper module is imported by its path from the tests directory,\n"
+            "whichever directory the test file is in and wherever the command\n"
+            f"runs from: {at_the_top} is `helpers`, and\n"
+            f"{further_down} is `billing.helpers`."
         )
         super().__init__(f"{self.what_is_wrong()}\n\n{self.why}")
 

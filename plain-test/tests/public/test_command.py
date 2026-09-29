@@ -402,7 +402,7 @@ TEST_USING_A_HELPER = (
 )
 
 
-def test_a_helper_module_is_imported_by_its_bare_name_from_the_project_root():
+def test_a_helper_module_in_tests_is_imported_by_its_name_from_the_project_root():
     root = make_project(
         {
             "tests/helpers.py": HELPERS,
@@ -467,6 +467,55 @@ def test_a_relative_import_says_what_to_write():
         "`from helpers import create_user`"
     ) in result.output
     assert "plain_tests" not in result.output
+
+
+REFUND_HELPERS = "def create_refund():\n    return 'a refund'\n"
+
+
+def test_a_helper_in_a_directory_of_tests_is_imported_by_its_path_from_tests():
+    root = make_project(
+        {
+            "tests/billing/refund_helpers.py": REFUND_HELPERS,
+            "tests/billing/test_refunds.py": (
+                "from billing.refund_helpers import create_refund\n"
+                "\n"
+                "def test_refund():\n"
+                "    assert create_refund() == 'a refund'\n"
+            ),
+            "tests/test_totals.py": (
+                "from billing.refund_helpers import create_refund\n"
+                "\n"
+                "def test_total():\n"
+                "    assert create_refund() == 'a refund'\n"
+            ),
+        }
+    )
+    for arguments in ([], ["tests/billing"], ["tests/billing/test_refunds.py"]):
+        result = run_runner(root, *arguments)
+        assert result.exit_code == 0, result.output
+    assert "2 passed" in run_runner(root).output
+    assert not (root / "tests/billing/__init__.py").exists()
+
+
+def test_a_helper_imported_by_the_end_of_its_path_says_what_to_write():
+    result = run_in_project(
+        {
+            "tests/billing/refund_helpers.py": REFUND_HELPERS,
+            "tests/billing/test_refunds.py": (
+                "from refund_helpers import create_refund\n"
+                "\n"
+                "def test_refund():\n"
+                "    assert create_refund() == 'a refund'\n"
+            ),
+        }
+    )
+    assert result.exit_code == 1
+    assert (
+        "line 1: `from refund_helpers import create_refund` should be "
+        "`from billing.refund_helpers import create_refund`"
+    ) in result.output
+    assert "tests/billing/helpers.py is `billing.helpers`" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_a_lifecycle_under_the_wrong_name_stops_the_run():

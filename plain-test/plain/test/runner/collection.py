@@ -11,9 +11,9 @@ run as it is written (a test that takes parameters nothing passes in, one
 that yields, a class with tests in it, a test imported from another file)
 is a collection error for its file, which says what to write instead.
 
-Helper modules are imported by their bare name from one directory, the
-helper directory. The caller puts it on `sys.path` before collecting. A test
-module can't reach them any other way: see `loading.import_problems`.
+Helper modules are imported by their path from one directory, the helper
+directory. The caller puts it on `sys.path` before collecting. A test module
+can't reach them any other way: see `loading.import_problems`.
 """
 
 import functools

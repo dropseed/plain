@@ -376,6 +376,133 @@ def test_every_import_problem_in_a_file_is_reported_together():
     ) in message
 
 
+def test_a_helper_in_a_directory_is_imported_by_its_path_from_tests():
+    root = write_tests(
+        {
+            "tests/billing/refund_helpers.py": "def refund():\n    return 5\n",
+            "tests/billing/test_refunds.py": (
+                "from billing.refund_helpers import refund\n"
+                "\n"
+                "def test_refund():\n"
+                "    assert refund() == 5\n"
+            ),
+            "tests/test_totals.py": (
+                "from billing.refund_helpers import refund\n"
+                "\n"
+                "def test_total():\n"
+                "    assert refund() == 5\n"
+            ),
+        }
+    )
+    with import_modules_from(root / "tests"):
+        tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+        run = run_tests(tests, lifecycles=[])
+    sys.modules.pop("billing.refund_helpers", None)
+    sys.modules.pop("billing", None)
+    assert errors == []
+    assert sorted(test.id for test in tests) == [
+        "tests/billing/test_refunds.py::test_refund",
+        "tests/test_totals.py::test_total",
+    ]
+    assert [result.outcome for result in run.results] == ["passed", "passed"]
+    # A directory under tests/ needs nothing in it to be imported through.
+    assert not (root / "tests/billing/__init__.py").exists()
+
+
+def test_a_relative_import_is_corrected_from_where_the_file_is():
+    root = write_tests(
+        {
+            "tests/helpers.py": "value = 1\n",
+            "tests/billing/refund_helpers.py": "value = 2\n",
+            "tests/billing/refunds/test_partial.py": (
+                "from ..refund_helpers import value\n"
+                "from .. import refund_helpers\n"
+                "from ...helpers import value as top\n"
+                "from . import beside\n"
+                "from .beside import thing\n"
+                "from ....too_far import thing as far\n"
+            ),
+        }
+    )
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    message = str(errors[0].error)
+    assert (
+        "line 1: `from ..refund_helpers import value` should be "
+        "`from billing.refund_helpers import value`"
+    ) in message
+    assert (
+        "line 2: `from .. import refund_helpers` should be "
+        "`from billing import refund_helpers`"
+    ) in message
+    assert (
+        "line 3: `from ...helpers import value as top` should be "
+        "`from helpers import value as top`"
+    ) in message
+    assert (
+        "line 4: `from . import beside` should be `from billing.refunds import beside`"
+    ) in message
+    assert (
+        "line 5: `from .beside import thing` should be "
+        "`from billing.refunds.beside import thing`"
+    ) in message
+    assert (
+        "line 6: `from ....too_far import thing as far` should be "
+        "`from too_far import thing as far`"
+    ) in message
+
+
+def test_a_helper_imported_by_the_end_of_its_path_is_told_the_whole_of_it():
+    root = write_tests(
+        {
+            "tests/billing/refund_helpers.py": "def refund():\n    return 5\n",
+            "tests/billing/test_refunds.py": (
+                "import os\n"
+                "from refund_helpers import refund\n"
+                "\n"
+                "def test_refund():\n"
+                "    import refund_helpers as mine\n"
+            ),
+        }
+    )
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    assert len(errors) == 1
+    assert type(errors[0].error) is TestDefinitionError
+    assert str(errors[0].error) == (
+        "These imports can't be used in a test file:\n"
+        "\n"
+        "  line 2: `from refund_helpers import refund` should be "
+        "`from billing.refund_helpers import refund`\n"
+        "  line 5: `import refund_helpers as mine` should be "
+        "`import billing.refund_helpers as mine`\n"
+        "\n"
+        "A helper module is imported by its path from the tests directory,\n"
+        "whichever directory the test file is in and wherever the command\n"
+        "runs from: tests/helpers.py is `helpers`, and\n"
+        "tests/billing/helpers.py is `billing.helpers`."
+    )
+
+
+def test_a_helper_by_that_name_in_two_directories_is_told_both():
+    root = write_tests(
+        {
+            "tests/billing/shared.py": "value = 1\n",
+            "tests/orders/shared.py": "value = 2\n",
+            "tests/test_either.py": "from shared import value\n",
+        }
+    )
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    assert (
+        "line 1: `from shared import value` should be "
+        "`from billing.shared import value` or `from orders.shared import value`"
+    ) in str(errors[0].error)
+
+
+def test_a_module_that_is_nowhere_is_the_import_error_it_always_was():
+    root = write_tests({"tests/test_missing.py": "from nowhere_at_all import x\n"})
+    _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    assert isinstance(errors[0].error, ModuleNotFoundError)
+
+
 # What looks like a test and can't be run
 
 
@@ -630,7 +757,7 @@ def test_a_module_that_isnt_installed_is_an_import_error_like_any_other():
     assert "plain.test" not in text
 
 
-def test_why_a_helper_is_imported_by_its_bare_name_is_said_once():
+def test_why_a_helper_is_imported_by_its_path_from_tests_is_said_once():
     root = write_tests(
         {
             "tests/helpers.py": "value = 1\n",
@@ -641,7 +768,12 @@ def test_why_a_helper_is_imported_by_its_bare_name_is_said_once():
     _, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
     first, second = (str(error.error) for error in errors)
     assert "should be `from helpers import value`" in first
-    assert "A helper module is imported by its bare name" in first
+    assert (
+        "A helper module is imported by its path from the tests directory,\n"
+        "whichever directory the test file is in and wherever the command\n"
+        "runs from: tests/helpers.py is `helpers`, and\n"
+        "tests/billing/helpers.py is `billing.helpers`."
+    ) in first
     assert second == (
         "These imports can't be used in a test file:\n"
         "\n"
