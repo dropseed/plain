@@ -68,6 +68,8 @@ plain code check --skip-oxc
 plain code check --skip-annotations
 ```
 
+The type check looks in your project's `tests/` directory for modules, the same as `plain test` does, so a test file's `from helpers import create_user` resolves to `tests/helpers.py` with nothing to configure.
+
 If [`plain.dev`](/plain-dev/README.md) is installed, `plain code check` will be run automatically as a part of `plain pre-commit` to help catch issues before they are committed.
 
 ### `plain code annotations`

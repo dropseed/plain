@@ -16,6 +16,9 @@ dependencies = [
   "tomlkit>=0.11.0",
 ]
 
+[dependency-groups]
+dev = ["plain.test<1.0.0"]
+
 # Make this available as a standalone command
 # in case plain can't load or something (this can run anyways)
 [project.scripts]

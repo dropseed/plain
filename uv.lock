@@ -858,6 +858,11 @@ dependencies = [
     { name = "ty" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "plain-test" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
@@ -866,6 +871,9 @@ requires-dist = [
     { name = "tomlkit", specifier = ">=0.11.0" },
     { name = "ty", specifier = ">=0.0.82,<1.0.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "plain-test", editable = "plain-test" }]
 
 [[package]]
 name = "plain-connect"
