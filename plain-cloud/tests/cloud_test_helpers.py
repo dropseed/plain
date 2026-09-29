@@ -52,9 +52,14 @@ def isolated_cloud_env() -> Generator[InMemoryKeyring]:
             yield backend
         finally:
             keyring.set_keyring(previous_keyring)
-            # An env var is never legitimately None, so None is the
-            # "wasn't set" marker and narrows the restore to str.
-            if original_token is not None:
-                os.environ["PLAIN_CLOUD_TOKEN"] = original_token
-            if original_api_url is not None:
-                os.environ["PLAIN_CLOUD_API_URL"] = original_api_url
+            _put_back("PLAIN_CLOUD_TOKEN", original_token)
+            _put_back("PLAIN_CLOUD_API_URL", original_api_url)
+
+
+def _put_back(name: str, original: str | None) -> None:
+    """Leave an environment variable as it was before the block: set to
+    what it held, or gone if it wasn't set, whatever the block did to it."""
+    if original is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = original

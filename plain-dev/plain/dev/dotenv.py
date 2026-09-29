@@ -1,9 +1,9 @@
 """Bash-compatible `.env` file parsing and Plain dev/test dotenv loading.
 
 `plain.dev` owns all dotenv code so that production deployments (which don't
-install plain.dev) never load `.env` files. plain.test opportunistically
-imports `load_dotenv_files` — if plain.dev is installed, `.env.test*` loads
-under the test runner; if not, it falls back to a minimal loader.
+install plain.dev) never load `.env` files. That goes for a test run too: the
+test runner reads no `.env` files of its own, and `.env.test*` loads because
+plain.dev's setup hook loads it, as it does for every command.
 
 Parser supports:
 - KEY=value (basic unquoted)
