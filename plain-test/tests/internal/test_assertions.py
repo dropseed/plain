@@ -7,7 +7,7 @@ import ast
 import asyncio
 from typing import Any
 
-from plain.test import cases, raises
+from plain.test import case, cases, raises
 from plain.test.runner.assertions import (
     NOT_EVALUATED,
     WatchedAssert,
@@ -361,6 +361,162 @@ def test_a_part_that_was_not_evaluated_last_time_is_not_shown_from_before():
 )
 def test_an_expression_comes_through_with_its_meaning(source):
     run_rewritten(source)
+
+
+# Every kind of expression there is, where an assert can have it. Each one
+# says what it evaluates through `seen()`, which writes it down.
+
+WRITES_DOWN_WHAT_IS_EVALUATED = (
+    "log = []\n"
+    "def seen(value, label=None):\n"
+    "    log.append(value if label is None else label)\n"
+    "    return value\n"
+    "class Grid:\n"
+    "    def __getitem__(self, key):\n"
+    "        return key\n"
+    "grid = Grid()\n"
+)
+
+# Named for the class of `ast.expr` each is there for.
+EXPRESSIONS_BY_KIND = {
+    "Attribute": ["class A:\n    b = 1\nassert seen(A, 'A').b == 1\n"],
+    "Await": [
+        (
+            "async def get(v):\n    return seen(v)\n"
+            "async def main():\n"
+            "    assert await get(seen(1, 'argument')) == 1\n"
+            "    assert [await get(x) for x in [2]] == [2]\n"
+        )
+    ],
+    "BinOp": [
+        "assert seen(1) + seen(2) * seen(3) == 7\n",
+        "assert seen(7) // seen(2) == 3 and seen(2) ** seen(3) == 8\n",
+    ],
+    "BoolOp": ["assert seen(1) and seen(2) or seen(3)\n"],
+    "Call": [
+        "assert max(seen(1), seen(2), key=seen(None, 'key')) == 2\n",
+        (
+            "def f(*a, **k):\n    return (a, k)\n"
+            "xs = [1]\nks = {'a': 2}\n"
+            "assert f(*seen(xs, 'xs'), **seen(ks, 'ks')) == ((1,), {'a': 2})\n"
+        ),
+    ],
+    "Compare": [
+        "assert seen(1) < seen(2) < seen(3) != seen(4)\n",
+        "xs = [1]\nassert seen(1) in seen(xs, 'xs') and seen(2) not in xs\n",
+        "assert seen(None, 'none') is None\n",
+    ],
+    "Constant": ["assert 1 == seen(1) and 'a' and ... and b'x' and 1.5\n"],
+    "Dict": [
+        (
+            "d = {'a': 1}\n"
+            "assert {**seen(d, 'd'), seen('b'): seen(2)} == {'a': 1, 'b': 2}\n"
+        )
+    ],
+    "DictComp": ["assert {seen(x): x for x in seen([1, 2], 'rows')} == {1: 1, 2: 2}\n"],
+    "FormattedValue": ["w = 3\nassert f'{seen(1):>{seen(w)}}{seen(2)!r}' == '  12'\n"],
+    "GeneratorExp": ["assert sum(seen(x) for x in seen([1, 2], 'rows')) == 3\n"],
+    "IfExp": ["assert (seen(1) if seen(True, 'test') else seen(2)) == 1\n"],
+    "Interpolation": ["assert t'{seen(1)}'.interpolations[0].value == 1\n"],
+    "JoinedStr": ["assert f'{seen(1)}-{seen(2)}' == '1-2'\n"],
+    "Lambda": ["assert (lambda x: seen(x))(seen(1)) == 1\n"],
+    "List": ["xs = [1]\nassert [*seen(xs, 'xs'), seen(2)] == [1, 2]\n"],
+    "ListComp": [
+        "assert [seen(x) for x in seen([1, 2], 'rows')] == [1, 2]\n",
+        "assert [y for x in [1, 2] if (y := seen(x))] == [1, 2]\n",
+    ],
+    "Name": ["x = seen(1)\nassert x\n"],
+    "NamedExpr": ["assert (n := seen(3)) + seen(n) == 6\n"],
+    "Set": ["xs = [1]\nassert {*seen(xs, 'xs'), seen(2)} == {1, 2}\n"],
+    "SetComp": ["assert {seen(x) for x in seen([1, 2], 'rows')} == {1, 2}\n"],
+    "Slice": [
+        "xs = [1, 2, 3]\nassert xs[seen(0) : seen(2) : seen(1)] == [1, 2]\n",
+        (
+            "assert grid[seen(1) : seen(2), :: seen(3)] == "
+            "(slice(1, 2), slice(None, None, 3))\n"
+        ),
+    ],
+    "Starred": [
+        "at = (1, 2)\nassert grid[*seen(at, 'at')] == (1, 2)\n",
+        (
+            "at = (1,)\n"
+            "assert grid[*seen(at, 'at'), seen(2) : seen(3)] == (1, slice(2, 3))\n"
+        ),
+        "xs = [1]\nassert (*seen(xs, 'xs'), 3) == (1, 3)\n",
+    ],
+    "Subscript": [
+        "xs = [1, 2]\nassert seen(xs, 'xs')[seen(0)] == 1\n",
+        "assert grid[seen(1), ...] == (1, ...)\n",
+    ],
+    "TemplateStr": ["assert t'{seen(1)}-{seen(2)}'.strings == ('', '-', '')\n"],
+    "Tuple": ["assert [seen(1), (seen(2), seen(3))] == [1, (2, 3)]\n"],
+    "UnaryOp": ["assert -seen(1) == -1 and not seen(0) and ~seen(0) == -1\n"],
+    "Yield": [
+        ("def asks():\n    assert (yield seen(1)) == 'answer'\n    yield 'done'\n")
+    ],
+    "YieldFrom": [
+        (
+            "def gives():\n"
+            "    assert (yield from seen([1], 'rows')) is None\n"
+            "    yield 'done'\n"
+        )
+    ],
+}
+
+
+def what_running_it_evaluates(source: str, *, rewritten: bool) -> list[Any]:
+    """Run a module that uses `seen()`, and say what it saw, in order."""
+    source = WRITES_DOWN_WHAT_IS_EVALUATED + source
+    tree = ast.parse(source)
+    if rewritten:
+        tree = rewrite_asserts(tree, source=source)
+    names: dict[str, Any] = {}
+    exec(compile(tree, "<test>", "exec", dont_inherit=True), names)  # noqa: S102
+    if "main" in names:
+        asyncio.run(names["main"]())
+    if "asks" in names:
+        asking = names["asks"]()
+        assert next(asking) == 1
+        assert asking.send("answer") == "done"
+    if "gives" in names:
+        assert list(names["gives"]()) == [1, "done"]
+    return names["log"]
+
+
+def test_there_is_an_expression_for_every_kind_there_is():
+    # A Python that adds a kind of expression fails here, until the list
+    # above has one that uses it.
+    every_kind = {kind.__name__ for kind in ast.expr.__subclasses__()}
+    assert sorted(EXPRESSIONS_BY_KIND) == sorted(every_kind)
+
+
+@cases(
+    *(
+        case(source, id=f"{kind} {number}")
+        for kind, sources in EXPRESSIONS_BY_KIND.items()
+        for number, source in enumerate(sources)
+    )
+)
+def test_every_kind_of_expression_evaluates_what_it_did_before(source):
+    as_written = what_running_it_evaluates(source, rewritten=False)
+    assert as_written != []
+    assert what_running_it_evaluates(source, rewritten=True) == as_written
+
+
+def test_a_starred_subscript_keeps_what_is_starred():
+    watched = failed(
+        "class Grid:\n"
+        "    def __getitem__(self, key):\n"
+        "        return key\n"
+        "grid = Grid()\n"
+        "at = (1, 2)\n"
+        "assert grid[*at] == (3, 4)\n"
+    )
+    assert kept(watched) == [
+        (0, "grid[*at]", (1, 2)),
+        (1, "grid", watched.values[1].value),
+        (1, "at", (1, 2)),
+    ]
 
 
 def test_a_template_string_is_kept_whole():

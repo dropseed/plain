@@ -332,7 +332,10 @@ class _Watcher:
         return self.watch(node, depth=depth)
 
     def _watch_slice(self, node: ast.expr, *, depth: int) -> ast.expr:
-        """What is between the brackets: `rows[start:stop]` keeps both."""
+        """
+        What is between the brackets: `rows[start:stop]` keeps both, and
+        `grid[*position]` keeps `position`.
+        """
         if isinstance(node, ast.Slice):
             if node.lower is not None:
                 node.lower = self.watch(node.lower, depth=depth)
@@ -346,7 +349,9 @@ class _Watcher:
                 self._watch_slice(element, depth=depth) for element in node.elts
             ]
             return node
-        return self.watch(node, depth=depth)
+        # Neither a slice nor a starred expression is a value on its own, so
+        # neither can be kept: only what it is made of can.
+        return self._watch_element(node, depth=depth)
 
 
 def _written_out(value: str | int | bool | tuple | None) -> ast.expr:
