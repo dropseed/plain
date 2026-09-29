@@ -13,26 +13,12 @@ is said about that test's parameters.
 """
 
 import ast
-import os
 import textwrap
 from dataclasses import dataclass, field
 
 from ..definition import TestDefinitionError
 
 __all__ = []
-
-# CLASSES AS TESTS
-#
-# A test is a function, and a class that holds tests is a definition error.
-# That is how the runner is meant to be, and it is how it runs when this is
-# False. It is True until every test class in this repository has been
-# written as functions, so that those suites run in the meantime.
-#
-# To see a suite as it will be: PLAIN_TEST_CLASSES=refused plain test
-#
-# When the classes are gone, delete this, and with it every block in the
-# runner and in its tests marked "CLASSES AS TESTS".
-TEST_CLASSES_ARE_COLLECTED = os.environ.get("PLAIN_TEST_CLASSES") != "refused"
 
 A_TEST_TAKES_ONLY_ITS_CASES = (
     "Nothing is passed to a test by name. A test gets what it needs in its\n"
@@ -260,7 +246,6 @@ def _read_a_test(
     function: _Function,
     *,
     name: str,
-    in_a_class: bool,
     imported: dict[str, str],
     problems: ProblemsInAFile,
 ) -> None:
@@ -268,9 +253,6 @@ def _read_a_test(
         problems.tests_that_yield.append(name)
         return
 
-    # CLASSES AS TESTS: `in_a_class` and `filled_by_the_call`, which is 0
-    # without them, and the two decorators that are a method's.
-    filled_by_the_call = 1 if in_a_class else 0
     times_cases = 0
     # Whether every decorator is one this module knows passes no values
     # but the ones counted here.
@@ -280,18 +262,13 @@ def _read_a_test(
         called = decorator.func if isinstance(decorator, ast.Call) else decorator
         origin = _where_it_comes_from(called, imported=imported)
 
-        if isinstance(decorator, ast.Name | ast.Attribute):
-            if origin in _NEEDS_TO_BE_CALLED:
-                problems.of_one_test.append(
-                    f"line {decorator.lineno}: {_NEEDS_TO_BE_CALLED[origin]}"
-                )
-                problems.stops_at_a_decorator = True
-                continue
-            if isinstance(decorator, ast.Name) and decorator.id == "staticmethod":
-                filled_by_the_call = 0
-                continue
-            if isinstance(decorator, ast.Name) and decorator.id == "classmethod":
-                continue
+        is_called = isinstance(decorator, ast.Call)
+        if not is_called and origin in _NEEDS_TO_BE_CALLED:
+            problems.of_one_test.append(
+                f"line {decorator.lineno}: {_NEEDS_TO_BE_CALLED[origin]}"
+            )
+            problems.stops_at_a_decorator = True
+            continue
 
         if origin == _CASES:
             times_cases += 1
@@ -318,11 +295,11 @@ def _read_a_test(
         )
         if default is None
     ]
-    nothing_fills = [*with_no_default[filled_by_the_call:], *keyword_only]
+    nothing_fills = [*with_no_default, *keyword_only]
     if not nothing_fills:
         return
 
-    every_parameter = [*positional[filled_by_the_call:], *arguments.kwonlyargs]
+    every_parameter = [*positional, *arguments.kwonlyargs]
     written = ", ".join(ast.unparse(argument) for argument in every_parameter)
     problems.tests_taking_parameters.append(f"{name}({written})")
     for argument in nothing_fills:
@@ -344,7 +321,6 @@ def tests_as_written(tree: ast.Module) -> ProblemsInAFile:
                 _read_a_test(
                     node,
                     name=node.name,
-                    in_a_class=False,
                     imported=imported,
                     problems=problems,
                 )
@@ -356,19 +332,6 @@ def tests_as_written(tree: ast.Module) -> ProblemsInAFile:
                 if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
                 and member.name.startswith("test_")
             ]
-            # CLASSES AS TESTS: the `if`, and what is under it.
-            if TEST_CLASSES_ARE_COLLECTED:
-                if not node.name.startswith("Test"):
-                    continue
-                for member in tests_in_it:
-                    _read_a_test(
-                        member,
-                        name=f"{node.name}::{member.name}",
-                        in_a_class=True,
-                        imported=imported,
-                        problems=problems,
-                    )
-                continue
             if tests_in_it:
                 problems.classes_with_tests.append(
                     (node.lineno, node.name, len(tests_in_it))

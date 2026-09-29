@@ -31,7 +31,6 @@ from ..decorators import (
 )
 from ..definition import TestDefinitionError
 from ..lifecycle import CollectedTest
-from . import problems as problems_module
 from .layout import Layout
 from .loading import ImportsAnotherWay, load_test_module
 from .output_capture import NO_OUTPUT, OutputCapture
@@ -223,10 +222,7 @@ def _say_each_thing_once(errors: list[CollectionError], *, layout: Layout) -> No
 
 def _matches_target(name: str, target: str) -> bool:
     """Whether a test name matches a `::`-target: exact, or a case of it."""
-    if name == target or name.startswith(f"{target}["):
-        return True
-    # CLASSES AS TESTS: a test within the targeted class.
-    return problems_module.TEST_CLASSES_ARE_COLLECTED and name.startswith(f"{target}::")
+    return name == target or name.startswith(f"{target}[")
 
 
 def _find_test_files(directory: Path, *, skip_dir_names: set[str]) -> list[Path]:
@@ -273,21 +269,8 @@ def _collect_file(path: Path, *, layout: Layout) -> list[RunnableTest]:
             if not defined_here:
                 problems.defined_elsewhere.append((name, obj.__module__))
                 continue
-            _check_a_test(obj, name=name, takes="nothing", problems=problems)
+            _check_a_test(obj, name=name, problems=problems)
             tests.extend(_expand(obj, base_id=f"{relative}::{name}"))
-            continue
-
-        # CLASSES AS TESTS: the `if`, and what is under it.
-        if problems_module.TEST_CLASSES_ARE_COLLECTED:
-            tests.extend(
-                _collect_a_class_as_tests(
-                    obj,
-                    name=name,
-                    module=module,
-                    relative=relative,
-                    problems=problems,
-                )
-            )
             continue
 
         # A class the file defines, with tests in it. One that was imported
@@ -314,35 +297,6 @@ def _tests_defined_in(cls: type) -> list[str]:
     ]
 
 
-# CLASSES AS TESTS: this function.
-def _collect_a_class_as_tests(
-    cls: type,
-    *,
-    name: str,
-    module: types.ModuleType,
-    relative: str,
-    problems: ProblemsInAFile,
-) -> list[RunnableTest]:
-    if not name.startswith("Test"):
-        return []
-    if cls.__module__ == module.__name__:
-        return _collect_class(cls, relative=relative, problems=problems)
-
-    classes_defined_here = [
-        obj
-        for obj in vars(module).values()
-        if inspect.isclass(obj) and obj.__module__ == module.__name__
-    ]
-    if _test_methods(cls) and not any(
-        issubclass(defined, cls) for defined in classes_defined_here
-    ):
-        # A class imported to be a base class has its tests run by the
-        # class that is made from it. One imported and left at that has
-        # tests nothing here runs.
-        problems.defined_elsewhere.append((name, cls.__module__))
-    return []
-
-
 def _yields(func: types.FunctionType) -> bool:
     """Whether calling a function makes a generator and runs none of it."""
     functions = [func]
@@ -359,20 +313,11 @@ def _yields(func: types.FunctionType) -> bool:
 
 
 def _check_a_test(
-    func: types.FunctionType,
-    *,
-    name: str,
-    takes: str,
-    problems: ProblemsInAFile,
+    func: types.FunctionType, *, name: str, problems: ProblemsInAFile
 ) -> None:
     """
     Add what is wrong with how one test is written: it yields, it takes
     parameters nothing passes in, or its @cases don't fit them.
-
-    CLASSES AS TESTS: `takes`, which is always "nothing" without them. It
-    is what calling the test fills in before any values: "nothing" for a
-    function and a static method, "its instance" for a method, and "its
-    class" for a class method.
     """
     if _yields(func):
         problems.tests_that_yield.append(name)
@@ -382,20 +327,13 @@ def _check_a_test(
     # (`@mock.patch(...)`) wraps the test in a function that takes anything,
     # and that wrapper is what the runner calls.
     signature = inspect.signature(func, follow_wrapped=False)
-    filled_in = () if takes == "nothing" else (object(),)
-    if filled_in and not signature.parameters:
-        what = "self" if takes == "its instance" else "cls"
-        problems.of_one_test.append(
-            f"{name}() is a method, and has no `{what}` parameter."
-        )
-        return
-    parameters = list(signature.parameters.values())[len(filled_in) :]
+    parameters = list(signature.parameters.values())
     written = f"{name}({', '.join(str(parameter) for parameter in parameters)})"
 
     case_list = getattr(func, TEST_CASES_ATTRIBUTE, None)
     if case_list is None:
         try:
-            signature.bind(*filled_in)
+            signature.bind()
         except TypeError:
             problems.tests_taking_parameters.append(written)
             for parameter in parameters:
@@ -413,7 +351,7 @@ def _check_a_test(
 
     for values, case_id in case_list:
         try:
-            signature.bind(*filled_in, *values)
+            signature.bind(*values)
         except TypeError:
             problems.of_one_test.append(
                 f"{written} doesn't fit its @cases: case [{case_id}] "
@@ -465,91 +403,17 @@ def _listed(names: list[str]) -> str:
     return f"{', '.join(names[:-1])} and {names[-1]}"
 
 
-# CLASSES AS TESTS: this function.
-def _test_methods(cls: type) -> dict[str, tuple[types.FunctionType, str]]:
-    """
-    A class's tests by name, each with what calling it fills in: "its
-    instance" for a method, "its class" for a class method, and "nothing"
-    for a static method.
-    """
-    # Walk the MRO base-first so inherited test methods are collected too,
-    # with subclass overrides replacing the base definition in place.
-    methods: dict[str, tuple[types.FunctionType, str]] = {}
-    for klass in reversed(cls.__mro__):
-        for name, obj in vars(klass).items():
-            if not name.startswith("test_"):
-                continue
-            if inspect.isfunction(obj):
-                methods[name] = (obj, "its instance")
-            elif isinstance(obj, classmethod) and inspect.isfunction(obj.__func__):
-                methods[name] = (obj.__func__, "its class")
-            elif isinstance(obj, staticmethod) and inspect.isfunction(obj.__func__):
-                methods[name] = (obj.__func__, "nothing")
-    return methods
-
-
-# CLASSES AS TESTS: this function.
-def _collect_class(
-    cls: type, *, relative: str, problems: ProblemsInAFile
-) -> list[RunnableTest]:
-    methods = _test_methods(cls)
-    if not methods:
-        return []  # a Test*-named helper (e.g. a view class), not a test class
-
-    class_skip = getattr(cls, TEST_SKIP_ATTRIBUTE, None)
-    class_tags = tuple(getattr(cls, TEST_TAGS_ATTRIBUTE, ()))
-
-    tests = []
-    for name, (method, takes) in methods.items():
-        _check_a_test(
-            method, name=f"{cls.__name__}::{name}", takes=takes, problems=problems
-        )
-
-        def make_call(cls: type = cls, method_name: str = name) -> Callable:
-            def call(*args: object) -> object:
-                # On a fresh instance, whatever kind of method it is: a
-                # static or a class method is called the same way.
-                instance = cls()
-                return getattr(instance, method_name)(*args)
-
-            return call
-
-        tests.extend(
-            _expand(
-                method,
-                base_id=f"{relative}::{cls.__name__}::{name}",
-                call=make_call(),
-                extra_tags=class_tags,
-                class_skip=class_skip,
-            )
-        )
-    return tests
-
-
-def _expand(
-    func: types.FunctionType,
-    *,
-    base_id: str,
-    call: Callable | None = None,
-    extra_tags: tuple[str, ...] = (),
-    class_skip: str | None = None,
-) -> list[RunnableTest]:
-    """
-    Expand @cases into one test per case.
-
-    CLASSES AS TESTS: `call`, `extra_tags` and `class_skip`, which are a
-    class's and are never passed without them.
-    """
-    run = call if call is not None else func
-    tags = (*extra_tags, *getattr(func, TEST_TAGS_ATTRIBUTE, ()))
-    skip_reason = getattr(func, TEST_SKIP_ATTRIBUTE, None) or class_skip
+def _expand(func: types.FunctionType, *, base_id: str) -> list[RunnableTest]:
+    """Expand @cases into one test per case."""
+    tags = tuple(getattr(func, TEST_TAGS_ATTRIBUTE, ()))
+    skip_reason = getattr(func, TEST_SKIP_ATTRIBUTE, None)
     case_list = getattr(func, TEST_CASES_ATTRIBUTE, None)
 
     if case_list is None:
         return [
             RunnableTest(
                 id=base_id,
-                func=run,
+                func=func,
                 tags=tags,
                 skip_reason=skip_reason,
                 function=func,
@@ -559,7 +423,7 @@ def _expand(
     return [
         RunnableTest(
             id=f"{base_id}[{case_id}]",
-            func=functools.partial(run, *values),
+            func=functools.partial(func, *values),
             tags=tags,
             skip_reason=skip_reason,
             function=func,

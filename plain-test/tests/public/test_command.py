@@ -589,9 +589,7 @@ def test_nothing_that_looks_like_a_test_is_left_out_without_a_word():
                 "    assert False\n"
                 "    yield\n"
             ),
-        },
-        # CLASSES AS TESTS: this argument.
-        environment={"PLAIN_TEST_CLASSES": "refused"},
+        }
     )
     assert result.exit_code == 1
     assert "0 passed, 1 collection errors" in result.output

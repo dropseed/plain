@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 from plain.test import TestDefinitionError, patch, raises
-from plain.test.runner import problems
 from plain.test.runner.collection import collect_tests
 from plain.test.runner.execution import run_tests
 from plain.test.runner.reporting import collection_error_text
@@ -424,12 +423,6 @@ def test_a_test_that_yields_is_a_collection_error():
     assert "`@contextmanager`" in message
 
 
-def classes_are_refused():
-    """As the runner is meant to be: a class with tests in it isn't run."""
-    # CLASSES AS TESTS: this function, and every `with` that enters it.
-    return patch(problems, "TEST_CLASSES_ARE_COLLECTED", False)
-
-
 def test_a_class_with_tests_in_it_is_a_collection_error():
     root = write_tests(
         {
@@ -465,8 +458,7 @@ def test_a_class_with_tests_in_it_is_a_collection_error():
             "test_other.py": "def test_ok():\n    assert True\n",
         }
     )
-    with classes_are_refused():
-        tests, errors = collect_tests(["."], root=root)
+    tests, errors = collect_tests(["."], root=root)
 
     assert [t.id for t in tests] == ["test_other.py::test_ok"]
     assert len(errors) == 1
@@ -500,7 +492,7 @@ def test_a_class_that_was_imported_is_someone_elses_class():
             ),
         }
     )
-    with import_modules_from(root), classes_are_refused():
+    with import_modules_from(root):
         tests, errors = collect_tests(["test_uses_the_fake.py"], root=root)
     assert errors == []
     assert [t.name for t in tests] == ["test_backend"]
@@ -519,11 +511,10 @@ def test_a_class_is_not_something_a_target_can_name():
             ).replace("@cases", "from plain.test import cases\n\n@cases", 1)
         }
     )
-    with classes_are_refused():
-        tests, _ = collect_tests(["test_target.py::test_many"], root=root)
-        assert [t.name for t in tests] == ["test_many[1]", "test_many[2]"]
-        tests, _ = collect_tests(["test_target.py::test"], root=root)
-        assert tests == []
+    tests, _ = collect_tests(["test_target.py::test_many"], root=root)
+    assert [t.name for t in tests] == ["test_many[1]", "test_many[2]"]
+    tests, _ = collect_tests(["test_target.py::test"], root=root)
+    assert tests == []
 
 
 def import_modules_from(root: Path):
@@ -739,8 +730,7 @@ def test_a_file_says_everything_wrong_with_it_at_once():
         }
     )
 
-    with classes_are_refused():
-        tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
 
     assert tests == []
     assert len(errors) == 1
