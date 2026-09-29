@@ -44,6 +44,7 @@
 - [Testing code outside the app](#testing-code-outside-the-app)
 - [How it works](#how-it-works)
 - [Design rules](#design-rules)
+- [Migrating from pytest](#migrating-from-pytest)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -291,7 +292,11 @@ def test_big_import(): ...
 
 `@cases` is the only way a test takes parameters. Nothing is passed to a test by name, so a test whose parameters no case fills is rejected when the file is collected, with a message naming the test and the parameters.
 
-Cases are reported by position — `test_email_validation[0]`, `[1]`. Wrap one in [`case`](./decorators.py#case) to name it instead:
+A case is reported by its values, joined with `-`: `test_email_validation[a@example.com-True]` and `test_email_validation[nope-False]`. That's what a failure is headed with, and what its re-run command names.
+
+Cases are named that way when every value of every case is a string, a number, a boolean, `None` or an enum member (by its name), and no two cases come out the same. When one can't be, because a value is a list or an object, a string is empty or has a line break in it, or the name would pass 60 characters, all of that test's cases are numbered instead: `test_email_validation[0]`, `[1]`. One test's cases are all named or all numbered.
+
+Wrap a case in [`case`](./decorators.py#case) to give it a name of its own:
 
 ```python
 from plain.test import case, cases
@@ -305,7 +310,7 @@ def test_email_validation(email, valid):
     assert is_valid_email(email) is valid
 ```
 
-That reports as `test_email_validation[no at sign]`, and the re-run command in the failure output names the case. The id sits on the case it names, so adding or reordering cases can't shift the names onto the wrong values.
+That reports as `test_email_validation[no at sign]`. The id sits on the case it names, so adding or reordering cases can't shift the names onto the wrong values. The ids of one test's cases are all different, however each got its id: a name that is what another case is called or numbered raises.
 
 A test takes one `@cases`. A second one raises instead of replacing the first. For every combination of two lists, pass the combinations:
 
@@ -650,7 +655,7 @@ Put tests in `tests/`, beside `app/`. The runner looks for:
 
 - Files named `test_*.py`, in any subdirectory
 - Functions named `test_*`
-- Classes named `Test*`, and the `test_*` methods on them
+- Classes named `Test*`, and the `test_*` methods on them, static and class methods included
 - `async def test_*`, which the runner awaits for you
 
 ```python
@@ -672,6 +677,12 @@ async def test_price_lookup():
 ```
 
 A class is a way to group tests, and nothing more. Each test gets a fresh instance, and there are no setup or teardown methods. A class inherits the tests of its base classes.
+
+Nothing that looks like a test is left out without a word. These are [collection errors](#collection-errors), each saying what to write instead:
+
+- A test with a `yield` in it. Calling it would make a generator and run none of its body
+- A `unittest.TestCase`, whatever it is named. Nothing would call `setUp()`
+- A `test_*` function or a `Test*` class imported from another module. A test is run by the file that defines it. A class imported to be the base of one defined in the file is fine
 
 An `async def` test uses the client the way any test does. `client.get()` and the rest are ordinary calls, not awaited, whether the view they reach is sync or async, and the test's event loop waits while the request runs. The exception is [`client.websocket()`](#websockets), which is for synchronous tests.
 
@@ -708,7 +719,7 @@ It's the only way to import one. `from tests.helpers import ...` and a relative 
 
 `tests/` comes first on the import path, so a helper module named like an installed package takes its place. Give a helper module a name nothing else has.
 
-There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it. A `conftest.py` anywhere under the tests is a collection error.
+There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it. A `conftest.py` is a collection error, anywhere under the tests and in any directory above the target you passed.
 
 Only files named `test_*.py` have their [assertions](#assertions) rewritten. An `assert` in a helper module fails as a bare `AssertionError`, without the values inside it.
 
@@ -953,24 +964,36 @@ COLLECTION ERROR tests/test_signup.py
 
   These tests can't be run as written:
 
-    test_signup(db, client) takes parameters, and nothing passes them in.
+    test_signup(db, user, settings) takes parameters, and nothing passes them in.
+
+    db        1 test  delete it: every test already runs in a transaction that is rolled back
+    user      1 test
+    settings  1 test  `with override_settings(NAME=value):`, from plain.test
 
   There are no fixtures: nothing is passed to a test by name. A test gets
   what it needs in its body, by calling a helper or entering a `with`
   block, and takes values only from @cases(...).
 ```
 
-Every test in the file with a problem is named at once. Here is what each message is asking for:
+Every problem in the file is reported at once. Each parameter is listed with how many of the file's tests take it and, where the runner knows, what it was: one of pytest's own fixtures and what to write instead, or a fixture in a `conftest.py` the run found. A file with more than three such tests says how many, not which.
+
+What is true of many files is said once. The first file that asks for fixtures carries the paragraph above, and the ones after it say what is wrong with their own file and name the first. Here is what each message is asking for:
 
 | Message                                                            | What to do                                                                                              |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `test_x(db, client) takes parameters, and nothing passes them in.` | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`              |
 | `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value.`    | Make that case pass as many values as the test has parameters                                           |
 | `TestCart::test_add() is a method, and has no self parameter.`     | Add `self`                                                                                              |
+| `test_x() has a yield in it.`                                      | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper     |
+| `UserTests is a unittest.TestCase.`                                | Write a class with no base class, named `Test*`, with plain `assert`                                    |
+| `test_x is defined in billing, not in this file.`                  | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_`  |
+| `line 3: import pytest`                                            | Replace what the file uses from pytest. The message lists each. See [below](#a-file-written-for-pytest) |
 | `line 8: test_x already has @cases.`                               | Use one `@cases`. For every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))` |
+| `line 8: cases() ids must be unique`                               | Give the case another name. It is what another case is called, or numbered                              |
 | `line 8: @skip requires a reason`                                  | Write `@skip("why")`, not a bare `@skip`                                                                |
 | `line 8: @tag requires at least one name`                          | Write `@tag("slow")`, not a bare `@tag`                                                                 |
 | `from tests.helpers import x should be from helpers import x`      | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
+| `from tests.conftest import x imports from a conftest.py`          | Import it from the helper module it moves to, once the conftest is gone                                 |
 | `conftest.py is a pytest file, ...`                                | Move what the file holds, then delete it. See below                                                     |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
@@ -986,7 +1009,36 @@ COLLECTION ERROR tests/test_billing.py
   ModuleNotFoundError: No module named 'billing_helpers'
 ```
 
-A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name:
+#### A file written for pytest
+
+A file that imports pytest is found by reading it, before it is run, so the error is about pytest and not about a module that isn't installed. It says where the import is and what the file uses from pytest, and what replaces each:
+
+```
+COLLECTION ERROR tests/test_billing.py
+
+  line 1: `import pytest`
+  It uses pytest.raises ×2, pytest.mark.parametrize.
+
+  pytest isn't used here, and isn't installed.
+
+  What replaces what these files use:
+
+    pytest.raises: `raises`, from plain.test. What was caught is
+      `caught.exception`, read after the block.
+    pytest.mark.parametrize: `@cases`, from plain.test: one tuple for each case.
+    pytest.skip: `skip_test("reason")`, from plain.test.
+
+  Everything pytest had and what replaces it: plain docs test --search "Migrating from pytest"
+
+COLLECTION ERROR tests/test_invoices.py
+
+  line 1: `import pytest`
+  It uses pytest.skip. What replaces pytest is in the error for tests/test_billing.py.
+```
+
+The first file's list covers what every file in the run uses, so it is printed once however many files there are. A helper module that imports pytest is named the same way, in the error for the test file that imports the helper.
+
+A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name. It comes before the other collection errors, since the fixtures they ask for were in it:
 
 ```
 COLLECTION ERROR tests/conftest.py
@@ -1011,7 +1063,19 @@ COLLECTION ERROR tests/conftest.py
   Autouse fixtures in this file: no_payments
 ```
 
-The tests that needed nothing from it still run. The ones that asked for a fixture are collection errors of their own.
+The tests that needed nothing from it still run. The ones that asked for a fixture are collection errors of their own, and each names the conftest its fixtures were in:
+
+```
+COLLECTION ERROR tests/test_signup.py
+
+  These tests can't be run as written:
+
+    test_signup(db, user, settings) takes parameters, and nothing passes them in.
+
+    db        1 test  delete it: every test already runs in a transaction that is rolled back
+    user      1 test  a fixture in tests/conftest.py
+    settings  1 test  `with override_settings(NAME=value):`, from plain.test
+```
 
 ### As JSON
 
@@ -1483,6 +1547,127 @@ plain.test.runner  ──drives──▶  tests/lifecycle.py      (your project'
 7. **Standard library first, and helpers live with their owner.** The runner doesn't wrap what Python already does well (`tempfile.TemporaryDirectory`, `math.isclose`, `contextlib.redirect_stdout`). A helper specific to a package ships in that package's `plain.<package>.test`.
 8. **Setup is explicit, protection is automatic.** State a test reads is acquired in its body. What guards tests from each other and from the outside world belongs in a lifecycle, which wraps every test without being asked. Packages ship theirs; your project declares its own in [one place](#project-lifecycle).
 
+## Migrating from pytest
+
+`plain.test` replaces `plain.pytest`, and there's no release where both run. Assertions don't change. What changes is how a test gets what it needs.
+
+Run `plain test` on the suite as it is. It runs the tests that need nothing from pytest and says what is left in the rest, each thing once:
+
+- Each `conftest.py`, first, with the fixtures it defines
+- Each file that imports pytest, with the line, what it uses from pytest, and what replaces each
+- Each file whose tests still take fixtures, with every parameter and what it was
+
+Then, in the order that leaves the fewest errors standing:
+
+1. Move what each `conftest.py` holds, then delete the file. Fixtures tests ask for become functions in a helper module such as `tests/helpers.py`. Autouse fixtures that protected every test become [`tests/lifecycle.py`](#project-lifecycle).
+2. Import helper modules by their bare names: `from helpers import create_user`, not `from tests.helpers import ...`, `from .helpers import ...` or anything from `conftest`.
+3. In each test file, replace what it uses from pytest, drop the fixture parameters, and get what they gave in the test's body.
+
+A few things pytest ran are collection errors here, so that nothing is left out without a word: a `unittest.TestCase`, a test with a `yield` in it, and a test imported from another module. See [Where tests live](#where-tests-live).
+
+Fixtures:
+
+| pytest                                              | Now                                                                                                                  |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `def test_x(db):`, `@pytest.mark.usefixtures("db")` | `def test_x():`. Every test already runs in a rolled-back transaction                                                |
+| `isolated_db` fixture                               | `@isolated_db` from `plain.postgres.test`                                                                            |
+| a fixture a test reads (`user`, `client`)           | a function the test calls in its body: `user = create_user()`                                                        |
+| a fixture with teardown (`yield`)                   | a `@contextmanager` function the test enters with `with`                                                             |
+| a fixture that returns a factory (`make_user`)      | the factory itself, imported                                                                                         |
+| `conftest.py`                                       | a module you import: `tests/helpers.py`, as `from helpers import create_user`                                        |
+| an autouse fixture that protects every test         | `tests/lifecycle.py`, one `TestLifecycle` subclass                                                                   |
+| an autouse fixture that sets up one file            | an explicit `with helper():` in each test that needs it                                                              |
+| `setup_method` / `teardown_method`                  | the same: a context manager the test enters. A `Test*` class gets a fresh instance per test and has no setup methods |
+| `settings` fixture                                  | `with override_settings(NAME=value):`                                                                                |
+| `monkeypatch.setattr(obj, "name", value)`           | `with patch(obj, "name", value):`. It takes the object, not a dotted string                                          |
+| `monkeypatch.setenv("KEY", "value")`, `setitem`     | `with patch(os.environ, "KEY", "value"):`                                                                            |
+| `monkeypatch.delenv`, `delattr`                     | no equivalent. Use `unittest.mock.patch.dict(os.environ)` and delete inside it                                       |
+| `otel_spans` / `otel_metrics`                       | `with capture_spans() as spans:` / `with capture_metrics() as metrics:`                                              |
+| `caplog`                                            | `with capture_logs() as logs:`                                                                                       |
+| `capsys`                                            | `with contextlib.redirect_stdout(io.StringIO()) as out:`                                                             |
+| `tmp_path`                                          | `with tempfile.TemporaryDirectory() as tmp:` then `Path(tmp)`                                                        |
+| `mailoutbox` / the email outbox fixture             | `from plain.email.test import outbox`                                                                                |
+
+Marks and helpers:
+
+| pytest                                         | Now                                                                            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pytest.raises(E, match=...)`, `excinfo.value` | `raises(E, match=...)`, `caught.exception`, readable after the block           |
+| `pytest.mark.parametrize("a,b", [...])`        | `@cases((a, b), (a, b))`. A single value is passed bare                        |
+| `pytest.param(..., id="x")`, `ids=[...]`       | `case(..., id="x")` inside `@cases`                                            |
+| the ids pytest made from the values, `[5-500]` | the same, when every value is a string, a number, a boolean, `None` or an enum |
+| stacked `parametrize`                          | one `@cases(*itertools.product(FIRST, SECOND))`                                |
+| `pytest.mark.skip(reason=...)`                 | `@skip("reason")`. The reason is required                                      |
+| `pytest.mark.skipif(condition, ...)`           | `if condition: skip_test("reason")` as the test's first line                   |
+| `pytest.skip("reason")` in a test              | `skip_test("reason")`                                                          |
+| custom marks, `-m slow`                        | `@tag("slow")`, `--tag slow`                                                   |
+| `pytest.mark.xfail`                            | no equivalent. `@skip` it with the reason, or assert the failure with `raises` |
+| `pytest.approx(x, abs=...)`                    | `math.isclose(a, x, abs_tol=...)` inside a bare `assert`                       |
+| `pytest-asyncio`                               | nothing. `async def test_*` runs as written                                    |
+
+Spans, metrics, logs and queries. Each `capture_*` block hands back a read-only sequence, and it's read after the block ends:
+
+| Before                                                          | Now                                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `otel_spans.get_finished_spans()`                               | `spans` itself: `len(spans)`, `spans[0]`, `for span in spans`                              |
+| `[s for s in otel_spans.get_finished_spans() if s.name == "x"]` | `spans.filter(name="x")`. It also takes `kind=`                                            |
+| `otel_spans.get_finished_spans() == ()`                         | `list(spans) == []`                                                                        |
+| `otel_spans.clear()` after the setup                            | open `with capture_spans() as spans:` after the setup                                      |
+| `otel_metrics.get_metrics_data()`, walked down to data points   | `metrics.number_points(name)` or `metrics.histogram_points(name)`                          |
+| filtering those points by an attribute                          | `attributes={"key": "value"}` on either                                                    |
+| `otel_metrics.collect()`                                        | nothing. Metrics are collected when the block ends                                         |
+| `caplog.records`, `caplog.messages`                             | `logs` itself, and `logs.messages`                                                         |
+| reading any of them partway through the test                    | end the block first. Reading a capture inside its block raises                             |
+| `queries[0]["sql"]` from `capture_queries`                      | `queries[0].sql_with_params`, or `queries[0].sql` for the statement with its `%s` in place |
+| a hand-written `execute_wrapper` that records statements        | `queries.sql_statements()` from `capture_queries`                                          |
+| `install_test_tracer()`, `install_test_meter()`                 | gone. `capture_spans()` and `capture_metrics()` install what they need                     |
+
+The test client, where everything after the path is now keyword-only:
+
+| Before                                            | Now                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------------------- |
+| `client.post(path, {...})`, `data={...}`          | `form_data={...}`                                                           |
+| `data=x, content_type="application/json"`         | `json_data=x`                                                               |
+| raw bytes with a content type                     | `body=b"...", content_type="..."`                                           |
+| `client.get(path, {...})`                         | `query_params={...}`                                                        |
+| `follow=True`                                     | `follow_redirects=True`                                                     |
+| `response.content`                                | `response.body` for bytes, `response.text` for a string                     |
+| `response.content.decode()`                       | `response.text`                                                             |
+| `response.json()`, `json.loads(response.content)` | `response.json_data`                                                        |
+| `response.url` on a redirect                      | `response.redirect_to`                                                      |
+| `response.user`                                   | `get_request_user(response.request)` from `plain.auth.requests`             |
+| `RequestFactory().get("/x")`, `.post("/x", ...)`  | `build_request("GET", "/x")`, `build_request("POST", "/x", ...)`            |
+| `RequestFactory().generic("PUT", "/x")`           | `build_request("PUT", "/x")`                                                |
+| `RequestFactory().request(data=, query_string=)`  | the client's keywords: `body=`, `form_data=`, `json_data=`, `query_params=` |
+| `RequestFactory(headers=...)`, `factory.cookies`  | `headers=` on each `build_request()`, with a `Cookie` header for cookies    |
+| `RequestFactory(json_encoder=...)`                | gone. Encode it yourself and pass `body=`                                   |
+| `secure=False`                                    | a full URL: `client.get("http://testserver/x")`                             |
+| `server_name=`, `server_port=`                    | a full URL: `client.get("https://example.com:8443/x")`                      |
+| `Client(raise_request_exception=False)`           | `Client(raise_exceptions=False)`                                            |
+| `client.trace(path)`                              | `client.request("TRACE", path)`, for any method                             |
+| `client.request(request)` with a built `Request`  | `client.request(method, path, ...)`                                         |
+| `client.force_login(user)`                        | `login_client(client, user)` from `plain.auth.test`                         |
+| `client.logout()`                                 | `logout_client(client)` from `plain.auth.test`                              |
+| `client.session`                                  | `get_client_session(client)` from `plain.sessions.test`                     |
+| `client.cookies = SimpleCookie()`                 | `client.cookies.clear()`                                                    |
+| `ws.response.request`                             | `ws.request`                                                                |
+| any other attribute of the view's response        | `response.returned_response.<name>`                                         |
+
+Only the test client's response changes. `content` on a `Response` your own code builds or a view returns is unchanged.
+
+The client's response has a fixed set of names and no longer passes anything else through to the response the view returned: `status_code`, `headers`, `cookies`, `body`, `text`, `json_data`, `redirect_to`, `redirect_chain`, `request`, `exception`, and `returned_response`. Reading another name raises an `AttributeError` that lists them. The route is `response.request.resolver_match`, and whether the body streamed is `response.returned_response.streaming`. `WebSocketRejected.response` is one of these too.
+
+Plugins with no replacement yet:
+
+- `pytest-xdist`: tests run in one process. Drop `-n`.
+- `pytest-randomly`, `pytest-rerunfailures`: no equivalent. Tests run in a fixed order, once.
+- `pytest-timeout`: no equivalent.
+- `pytest-playwright` and the `testbrowser` fixture: no equivalent. Browser tests can't be migrated yet.
+- `pytest-mock`: use `unittest.mock` directly, or `patch` from `plain.test`.
+- `pytest-cov`: `coverage run -m plain.test`, then `coverage report`.
+- `freezegun`, `time-machine`, `hypothesis`: these are libraries, not plugins. They keep working.
+- Editor test explorers speak pytest's protocol and won't find these tests.
+
 ## FAQs
 
 #### What is the difference between Client and build_request?
@@ -1518,7 +1703,7 @@ Yes. `python -m plain.test` is the same runner as `plain test`, so `coverage run
 
 #### Can I use pytest, or pytest plugins?
 
-No. This isn't pytest, and there's nothing to load a plugin into. A library that doesn't depend on pytest keeps working as a library: `freezegun` and `time-machine` for freezing time, `hypothesis` for generated inputs, `unittest.mock` for mocks.
+No. This isn't pytest, and there's nothing to load a plugin into. A library that doesn't depend on pytest keeps working as a library: `freezegun` and `time-machine` for freezing time, `hypothesis` for generated inputs, `unittest.mock` for mocks. [Migrating from pytest](#migrating-from-pytest) has what replaces each thing pytest had.
 
 #### What about my editor's test explorer?
 

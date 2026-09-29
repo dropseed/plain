@@ -17,10 +17,10 @@ uv run plain test [targets] [options]
 
 ## Writing tests
 
-- Files `tests/**/test_*.py`; functions `test_*`; classes `Test*` with `test_*` methods (fresh instance per test, no setup_method).
+- Files `tests/**/test_*.py`; functions `test_*`; classes `Test*` with `test_*` methods (fresh instance per test, no setup_method). Define a test in the file that runs it. No `unittest.TestCase`, no test with a `yield` in it, no `import pytest`: each is a collection error.
 - There are no fixtures, and a `conftest.py` is a collection error. A test function takes no parameters except the values `@cases` passes; one that does is a collection error. Shared setup is ordinary Python — helper functions the test calls in its body.
 - Protection every test needs (no network, counters reset) goes in `tests/lifecycle.py`: one `TestLifecycle` subclass, found by that exact path, wrapping every test. Never put setup a test reads there.
-- Decorators declare static facts: `@cases(...)` (parametrize; wrap a case in `case(..., id="name")` to name it; one `@cases` per test), `@skip("reason")`, `@tag("name")` — from `plain.test`.
+- Decorators declare static facts: `@cases(...)` (parametrize; one `@cases` per test), `@skip("reason")`, `@tag("name")` — from `plain.test`. A case is reported by its values, `test_price[5-500]`, when they are all strings, numbers, booleans, `None` or enum members, and numbered otherwise; wrap one in `case(..., id="name")` to name it.
 - To skip from inside a running test, call `skip_test("reason")`.
 - Runtime state enters through `with` blocks: `override_settings(...)`, `patch(obj, "name", value)`, `capture_spans()`, `capture_metrics()`, `capture_logs()` — from `plain.test`.
 - A `capture_*` block hands back a read-only sequence (`len()`, indexing, iteration). Read it after the `with` block ends — reading inside raises. Finders: `spans.filter(name=, kind=)`, `metrics.number_points(name, attributes=)` / `metrics.histogram_points(name, attributes=)`, `logs.messages`.
@@ -34,4 +34,4 @@ uv run plain test [targets] [options]
 - `Client` (from `plain.test`) speaks request vocabulary: `form_data=`, `json_data=`, `query_params=`, `files=`, `body=`/`content_type=`; `follow_redirects=True`; responses have a fixed set of names (`status_code`, `headers`, `body`, `text`, `json_data`, `redirect_to`, `request`, …) and `returned_response` for the `Response` the view returned. Log a client in with `login_client(client, user)` from `plain.auth.test`; read its session with `get_client_session(client)` from `plain.sessions.test`. `client.websocket(path)` opens a socket to a view's `websocket()` (`WebSocketRejected` if the handshake is refused). A path goes to `https://testserver`; pass a full URL (`http://testserver/x`) when the scheme or host matters. `Client(raise_exceptions=False)` returns the 5xx instead of raising what the view raised.
 - `build_request(method, path, ...)` (from `plain.test`) builds a `Request` without sending it, with the client's keywords, for calling a view or middleware directly. There is no `RequestFactory`.
 
-Run `uv run plain docs test` for full documentation. `plain.test` is a dev dependency (`uv add plain.test --dev`), not part of Plain itself.
+Moving a suite off pytest: `uv run plain docs test --search "Migrating from pytest"` has what replaces each fixture, mark and client call. Run `uv run plain docs test` for full documentation. `plain.test` is a dev dependency (`uv add plain.test --dev`), not part of Plain itself.
