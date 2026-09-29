@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
 import h2.events
+import pytest
 from plain.http import (
     AsyncStreamingResponse,
     FileResponse,
@@ -29,7 +30,8 @@ from plain.internal.handlers.response_lifecycle import (
     ResponseBodyError,
     ResponseLifecycle,
 )
-from plain.test import build_request, raises
+from plain.test import RequestFactory
+from plain.views import ServerSentEvent, ServerSentEventsView
 from server_stubs import (
     ContextHandler,
     capture_logger,
@@ -228,7 +230,7 @@ def _pool() -> ThreadPoolExecutor:
 
 
 def _lifecycle(response: Response, executor: ThreadPoolExecutor) -> ResponseLifecycle:
-    return stub_lifecycle(build_request("GET", "/"), response, executor)
+    return stub_lifecycle(RequestFactory().get("/"), response, executor)
 
 
 def test_failing_aclose_still_runs_the_resource_closers() -> None:
@@ -260,6 +262,40 @@ def test_failing_aclose_still_runs_the_resource_closers() -> None:
     finally:
         executor.shutdown(wait=True)
     assert closer_ran == [True]
+
+
+def test_sse_stream_cleanup_runs_before_the_send_returns() -> None:
+    # A client that leaves mid-stream closes the response's iterators. The
+    # view's stream() sits two generators down; its cleanup (an unsubscribe,
+    # a cursor) has to run then, inside the request, not whenever the GC
+    # gets to the orphaned generator.
+    stream_closed: list[bool] = []
+
+    class Events(ServerSentEventsView):
+        async def stream(self) -> AsyncIterator[ServerSentEvent]:
+            try:
+                while True:
+                    yield ServerSentEvent(data="tick")
+                    await asyncio.sleep(0)
+            finally:
+                stream_closed.append(True)
+
+    async def scenario() -> None:
+        request = RequestFactory().get("/")
+        response = Events(request=request).get()
+        lifecycle = stub_lifecycle(request, response, executor)
+
+        async def write() -> None:
+            await anext(lifecycle)
+
+        await lifecycle.send(write)
+        assert stream_closed == [True]
+
+    executor = _pool()
+    try:
+        asyncio.run(scenario())
+    finally:
+        executor.shutdown(wait=True)
 
 
 def test_cancelled_async_cleanup_still_runs_the_resource_closers() -> None:
@@ -319,10 +355,10 @@ def test_async_generator_keeps_its_task_across_yields() -> None:
                 pass
 
         started = time.monotonic()
-        with raises(ResponseBodyError) as raised:
+        with pytest.raises(ResponseBodyError) as raised:
             await asyncio.wait_for(lifecycle.send(write), timeout=2)
         # The generator's own timeout, well before wait_for's.
-        assert isinstance(raised.exception.__cause__, TimeoutError)
+        assert isinstance(raised.value.__cause__, TimeoutError)
         assert time.monotonic() - started < 1
 
     executor = _pool()
