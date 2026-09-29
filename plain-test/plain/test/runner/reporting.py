@@ -34,7 +34,9 @@ _STATUS_COLORS = {
     "skipped": "yellow",
 }
 
-_DOTS = {"passed": ".", "failed": "F", "skipped": "s"}
+# Takes the cursor back to the start of the line and clears the line: what
+# the progress line is written over, and erased, with.
+_START_OF_A_CLEARED_LINE = "\r\x1b[K"
 
 
 def collection_error_text(cause: BaseException) -> str:
@@ -146,13 +148,30 @@ class TextReporter:
 
     `out` and `err` are where the runner's own output goes. While the run
     holds what tests write, they are not `sys.stdout` and `sys.stderr`.
+
+    A test that passes prints nothing. With `verbose` each test prints a
+    line as it finishes. With `progress`, which is for a terminal someone is
+    watching, one line says how far the run has got: it is written over
+    itself as tests finish and erased before the report, so nothing of it
+    is left in what the run printed.
     """
 
-    def __init__(self, *, out: TextIO, err: TextIO, verbose: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        out: TextIO,
+        err: TextIO,
+        verbose: bool = False,
+        progress: bool = False,
+    ) -> None:
         self.out = out
         self.err = err
         self.verbose = verbose
-        self._dots_on_line = 0
+        self.progress = progress and not verbose
+        self._collected = 0
+        self._finished = 0
+        self._failed = 0
+        self._progress_is_shown = False
 
     def _print(
         self,
@@ -171,29 +190,47 @@ class TextReporter:
     def collected(self, count: int) -> None:
         plural = "" if count == 1 else "s"
         self._print(f"Collected {count} test{plural}", dim=True)
+        self._collected = count
 
     def result(self, result: TestResult) -> None:
-        color = _STATUS_COLORS[result.outcome]
-        bold = result.outcome == "failed"
+        self._finished += 1
+        if result.outcome == "failed":
+            self._failed += 1
+
         if self.verbose:
-            status = result.outcome.upper()
-            line = f"{status:<7} {result.test.id}"
+            # The outcome as `--json` spells it.
+            line = f"{result.outcome:<7} {result.test.id}"
             if result.outcome == "skipped":
                 line += f" ({result.skip_reason})"
             else:
                 line += f" ({result.duration:.3f}s)"
-            self._print(line, fg=color, bold=bold)
-        else:
-            self._print(_DOTS[result.outcome], newline=False, fg=color, bold=bold)
-            self._dots_on_line += 1
-            if self._dots_on_line >= 80:
-                self._print()
-                self._dots_on_line = 0
+            self._print(
+                line,
+                fg=_STATUS_COLORS[result.outcome],
+                bold=result.outcome == "failed",
+            )
+        elif self.progress:
+            self._show_progress()
+
+    def _show_progress(self) -> None:
+        line = f"{self._finished} of {self._collected}"
+        if self._failed:
+            line += f", {self._failed} failed"
+        self.out.write(f"{_START_OF_A_CLEARED_LINE}{line}")
+        self.out.flush()
+        self._progress_is_shown = True
+
+    def _erase_progress(self) -> None:
+        if self._progress_is_shown:
+            self.out.write(_START_OF_A_CLEARED_LINE)
+            self.out.flush()
+            self._progress_is_shown = False
 
     def _stopped(self, report: RunReport) -> None:
         """The run ended before any test was run."""
         stopped = report.stopped
         assert stopped is not None
+        self._erase_progress()
         if stopped.reason == "no_tests_found":
             self._print(stopped.message, fg="yellow")
             return
@@ -226,8 +263,7 @@ class TextReporter:
         run = report.run
         assert run is not None
 
-        if not self.verbose and self._dots_on_line:
-            self._print()
+        self._erase_progress()
 
         for result in run.failed:
             assert result.failure is not None

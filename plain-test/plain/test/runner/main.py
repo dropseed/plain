@@ -26,8 +26,7 @@ class Reporter(Protocol):
 @click.command()
 @click.argument("targets", nargs=-1)
 @click.option(
-    "-k",
-    "keyword",
+    "--match",
     metavar="TEXT",
     default=None,
     help="Run only tests whose id contains TEXT",
@@ -46,9 +45,8 @@ class Reporter(Protocol):
     multiple=True,
     help="Leave out tests tagged NAME (repeatable)",
 )
-@click.option("-x", "--fail-fast", is_flag=True, help="Stop at the first failure")
+@click.option("--fail-fast", is_flag=True, help="Stop at the first failure")
 @click.option(
-    "-v",
     "--verbose",
     is_flag=True,
     help="Print one line per test (not with --json)",
@@ -59,7 +57,6 @@ class Reporter(Protocol):
     help="Print every value and all the output in a failure, however long",
 )
 @click.option(
-    "-s",
     "--show-output",
     is_flag=True,
     help="Let what tests print and log through as they write it (not with --json)",
@@ -77,7 +74,7 @@ class Reporter(Protocol):
 )
 def main(
     targets: tuple[str, ...],
-    keyword: str | None,
+    match: str | None,
     tags: tuple[str, ...],
     exclude_tags: tuple[str, ...],
     fail_fast: bool,
@@ -117,14 +114,14 @@ def main(
       1    a test failed, or a file couldn't be collected
       2    the command can't be used as given
       3    setting up failed, so no test was run
-      5    no tests matched
+      4    no tests matched
       130  stopped with Ctrl-C
     """
     if as_json and verbose:
         raise click.UsageError(
-            "--json prints one document when the run is over, and -v has"
-            " nothing to add to it. Pass --list-passed to have every test in"
-            " the document."
+            "--json prints one document when the run is over, and --verbose"
+            " has nothing to add to it. Pass --list-passed to have every test"
+            " in the document."
         )
     if as_json and show_output:
         raise click.UsageError(
@@ -135,7 +132,7 @@ def main(
     if list_passed and not as_json:
         raise click.UsageError(
             "--list-passed says what goes in the --json document. For a line"
-            " per test as they run, pass -v."
+            " per test as they run, pass --verbose."
         )
 
     # Tests run with PLAIN_ENV=test. The runner reads no `.env` files itself:
@@ -158,7 +155,7 @@ def main(
         argv=tuple(sys.argv),
         directory=str(Path.cwd()),
         targets=targets,
-        keyword=keyword,
+        match=match,
         tags=tags,
         exclude_tags=exclude_tags,
         fail_fast=fail_fast,
@@ -172,7 +169,13 @@ def main(
             reporter = JsonReporter(out=capture.real_stdout, list_passed=list_passed)
         else:
             reporter = TextReporter(
-                out=capture.real_stdout, err=capture.real_stderr, verbose=verbose
+                out=capture.real_stdout,
+                err=capture.real_stderr,
+                verbose=verbose,
+                # For someone watching a terminal. What is let through with
+                # --show-output is written where a line of progress would
+                # be, so there is none then.
+                progress=capture.real_stdout.isatty() and not show_output,
             )
         report = _run(command, capture=capture, reporter=reporter)
         reporter.finished(report)
@@ -292,8 +295,8 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
         except FileNotFoundError as e:
             return stopped("target_not_found", str(e))
 
-        if command.keyword:
-            tests = [t for t in tests if command.keyword in t.id]
+        if command.match:
+            tests = [t for t in tests if command.match in t.id]
         if command.tags:
             tests = [t for t in tests if any(tag in t.tags for tag in command.tags)]
         if command.exclude_tags:

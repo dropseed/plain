@@ -129,5 +129,5 @@ Don't guess at errors — reproduce them first, read the traceback, then fix wha
 - `uv run plain check` — lint, preflight, migration, and test checks in one shot (add `--skip-test` for faster iteration)
 - `uv run plain request /path` — hit a view and see the full error/stacktrace. It comes with plain.dev; its flags are in the Development rule.
 - `uv run plain shell -c "..."` — run a quick snippet to test behavior in isolation
-- `uv run plain test -x -k test_name` — run a specific failing test, stop on first failure
+- `uv run plain test --fail-fast --match test_name` — run a specific failing test, stop on first failure
 - `print()` statements — add them, run the code, read the output, then remove before committing

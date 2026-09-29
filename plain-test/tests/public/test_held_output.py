@@ -46,7 +46,6 @@ def test_what_a_passing_test_writes_is_not_printed():
     assert result.stderr == ""
     assert result.stdout.splitlines() == [
         "Collected 1 test",
-        ".",
         "",
         result.stdout.splitlines()[-1],
     ]
@@ -173,7 +172,6 @@ def test_what_is_written_outside_any_test_is_printed_when_every_test_passes():
     assert result.stderr == ""
     assert result.stdout.splitlines()[:-1] == [
         "Collected 1 test",
-        ".",
         "",
         "WRITTEN OUTSIDE ANY TEST",
         "",
@@ -197,8 +195,7 @@ def test_what_setting_up_the_app_and_loading_the_lifecycle_wrote_is_the_runs():
     assert block(written, "stderr:") == ["stderr:", "  the database is slow today"]
 
 
-@cases("-s", "--show-output")
-def test_show_output_lets_everything_through_as_it_is_written(flag):
+def test_show_output_lets_everything_through_as_it_is_written():
     result = run_in_project(
         {
             "tests/lifecycle.py": LIFECYCLE_THAT_WRITES,
@@ -213,12 +210,11 @@ def test_show_output_lets_everything_through_as_it_is_written(flag):
                 "    assert False\n"
             ),
         },
-        flag,
+        "--show-output",
     )
     assert result.exit_code == 1
     assert result.stderr == "to stderr\n"
-    # Between the runner's own, where it was written: a progress dot has
-    # no line of its own.
+    # Where it was written, among what the runner prints itself.
     assert "setting up the run\n" in result.stdout
     assert "in the test that passes\n" in result.stdout
     assert "taking down the run\n" in result.stdout
@@ -574,11 +570,11 @@ def test_a_lifecycle_file_that_cannot_be_used_is_shown_with_what_it_wrote():
     ({"tests/test_it.py": "def test_one():\n    print('x')\n"}, (), 0),
     ({"tests/test_it.py": "def test_one():\n    assert False\n"}, (), 1),
     ({"tests/test_it.py": "def test_one():\n    pass\n"}, ("tests/nope.py",), 2),
-    ({"tests/helper.py": "print('x')\n"}, (), 5),
+    ({"tests/helper.py": "print('x')\n"}, (), 4),
 )
 def test_holding_output_changes_no_exit_code(files, arguments, exit_code):
     assert run_in_project(files, *arguments).exit_code == exit_code
-    assert run_in_project(files, "-s", *arguments).exit_code == exit_code
+    assert run_in_project(files, "--show-output", *arguments).exit_code == exit_code
 
 
 WARNS = (

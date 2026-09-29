@@ -408,7 +408,7 @@ def test_warnings_are_in_the_document():
 
 @cases(
     (("tests/nope.py",), "target_not_found", 2),
-    (("-k", "nothing_is_called_this"), "no_tests_found", 5),
+    (("--match", "nothing_is_called_this"), "no_tests_found", 4),
 )
 def test_a_run_with_nothing_to_run_says_why(arguments, reason, exit_code):
     result = run_in_project(
@@ -451,18 +451,18 @@ def test_the_document_says_what_was_asked_for():
             "tests/test_other.py": "def test_other():\n    assert False\n",
         },
         "tests/test_orders.py",
-        "-k",
+        "--match",
         "order",
         "--tag",
         "checkout",
         "--exclude-tag",
         "slow",
-        "-x",
+        "--fail-fast",
         "--full-values",
     )
     command = document["command"]
     assert command["targets"] == ["tests/test_orders.py"]
-    assert command["keyword"] == "order"
+    assert command["match"] == "order"
     assert command["tags"] == ["checkout"]
     assert command["exclude_tags"] == ["slow"]
     assert command["fail_fast"] is True
@@ -470,7 +470,7 @@ def test_the_document_says_what_was_asked_for():
     assert command["argv"][-1] == "--full-values"
     assert Path(command["directory"], "tests/test_orders.py").is_file()
 
-    # The one test the target, the keyword and the tag left.
+    # The one test the target, the match and the tag left.
     assert document["counts"]["selected"] == 1
     assert [test["name"] for test in document["tests"]] == ["test_order_total"]
 
@@ -484,7 +484,7 @@ def test_tests_after_the_first_failure_are_counted_as_not_run():
                 "def test_c():\n    pass\n"
             )
         },
-        "-x",
+        "--fail-fast",
     )
     assert document["counts"]["failed"] == 1
     assert document["counts"]["not_run"] == 2
@@ -515,9 +515,8 @@ def test_full_values_is_the_documents_too():
 
 
 @cases(
-    (("--json", "-v"), "-v has"),
+    (("--json", "--verbose"), "--verbose"),
     (("--json", "--show-output"), "--show-output"),
-    (("--json", "-s"), "--show-output"),
     (("--list-passed",), "--list-passed says what goes in the --json document"),
 )
 def test_flags_that_cannot_go_together_say_so(arguments, message):

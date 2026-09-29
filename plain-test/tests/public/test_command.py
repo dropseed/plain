@@ -3,6 +3,8 @@ The `plain test` command end to end: a project on disk, run in its own
 process, judged by what it prints and how it exits.
 """
 
+import os
+import pty
 import shutil
 import subprocess
 import sys
@@ -204,11 +206,11 @@ def test_skips_are_counted_and_say_why():
 
 
 def test_verbose_skips_say_why_on_their_own_line():
-    result = run_in_project({"tests/test_skips.py": SKIPPING_TESTS}, "-v")
+    result = run_in_project({"tests/test_skips.py": SKIPPING_TESTS}, "--verbose")
     assert result.exit_code == 0
     lines = result.output.splitlines()
     assert (
-        "SKIPPED tests/test_skips.py::test_decides_for_itself "
+        "skipped tests/test_skips.py::test_decides_for_itself "
         "(No bucket reachable from here)"
     ) in lines
     # Said once, on the test's own line, not again in a list at the end.
@@ -226,19 +228,99 @@ def test_help_lists_the_flags_and_the_target_syntax():
     )
     assert completed.returncode == 0
     for flag in (
-        "-k",
+        "--match",
         "--tag",
         "--exclude-tag",
-        "-x",
         "--fail-fast",
-        "-v",
+        "--verbose",
         "--full-values",
+        "--show-output",
     ):
         assert flag in completed.stdout
     assert "[TARGETS]..." in completed.stdout
     assert "tests/test_signup.py::test_welcome" in completed.stdout
     # The help is what was asked for. No test ran to produce it.
     assert "Collected" not in completed.stdout
+
+
+@cases("-k", "-x", "-v", "-s")
+def test_an_option_has_one_name_and_it_is_the_long_one(short):
+    result = run_in_project(
+        {"tests/test_one.py": "def test_one():\n    assert True\n"}, short
+    )
+    assert result.exit_code == 2
+    assert f"No such option: {short}" in result.output
+    assert "1 passed" not in result.output
+
+
+def test_a_passing_run_prints_what_was_collected_and_what_came_of_it():
+    result = run_in_project(
+        {
+            "tests/test_many.py": (
+                "from plain.test import cases\n"
+                "\n"
+                "@cases(*range(200))\n"
+                "def test_number(number):\n"
+                "    assert number >= 0\n"
+            )
+        }
+    )
+    assert result.exit_code == 0
+    lines = result.output.splitlines()
+    assert lines[:2] == ["Collected 200 tests", ""]
+    assert lines[2].startswith("200 passed in ")
+    assert len(lines) == 3
+
+
+def run_on_a_terminal(directory, *arguments):
+    """What the command writes to stdout when stdout is a terminal."""
+    ours, theirs = pty.openpty()
+    command = subprocess.Popen(
+        [sys.executable, "-m", "plain.test", *arguments],
+        cwd=directory,
+        stdin=subprocess.DEVNULL,
+        stdout=theirs,
+        stderr=subprocess.DEVNULL,
+    )
+    os.close(theirs)
+
+    # Read as it is written: what is left unread when the other end closes
+    # is lost.
+    written = b""
+    while True:
+        try:
+            some = os.read(ours, 65536)
+        except OSError:
+            break  # the other end is closed
+        if not some:
+            break
+        written += some
+    os.close(ours)
+    command.wait()
+    return written.decode()
+
+
+def test_a_terminal_is_shown_how_far_the_run_has_got_and_then_it_is_erased():
+    project = make_project(
+        {
+            "tests/test_it.py": (
+                "def test_one():\n    assert True\n\n"
+                "def test_two():\n    assert False\n"
+            )
+        }
+    )
+    written = run_on_a_terminal(project)
+    erase = "\r\x1b[K"
+    assert f"{erase}1 of 2{erase}2 of 2, 1 failed{erase}" in written
+    # Nothing of it is left: the report starts where the line was.
+    report = written.rpartition(erase)[2]
+    assert "FAILED tests/test_it.py::test_two" in report
+    assert " of 2" not in report
+
+    # One line per test is its own account of how far the run has got.
+    assert erase not in run_on_a_terminal(project, "--verbose")
+    # What is let through is written where the line would be.
+    assert erase not in run_on_a_terminal(project, "--show-output")
 
 
 CASES_WITH_AWKWARD_IDS = (
@@ -283,14 +365,13 @@ def test_every_rerun_command_runs_its_own_test_when_pasted(shell):
 
     rerun_ids = []
     for command in commands:
-        rerun = run_pasted(root, f"{command} -v", shell=shell)
+        rerun = run_pasted(root, command, shell=shell)
         assert "Collected 1 test\n" in rerun.output
         failed_lines = [
             line for line in rerun.output.splitlines() if line.startswith("FAILED ")
         ]
-        # Verbose prints the result line, then the failure block's heading.
-        assert len(failed_lines) == 2
-        rerun_ids.append(failed_lines[1].removeprefix("FAILED "))
+        assert len(failed_lines) == 1
+        rerun_ids.append(failed_lines[0].removeprefix("FAILED "))
 
     assert rerun_ids == [
         "tests/test_price.py::test_price[annual plan]",
@@ -609,6 +690,6 @@ def test_a_case_is_named_for_its_values_where_it_is_reported():
     assert f"FAILED {test}[5-500]" in result.output
     assert f"Re-run: plain test '{test}[5-500]'" in result.output
 
-    rerun = run_runner(project, f"{test}[0.05-5]", "-v")
+    rerun = run_runner(project, f"{test}[0.05-5]", "--verbose")
     assert "Collected 1 test\n" in rerun.output
-    assert f"FAILED  {test}[0.05-5]" in rerun.output
+    assert f"failed  {test}[0.05-5]" in rerun.output

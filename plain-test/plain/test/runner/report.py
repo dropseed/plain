@@ -26,7 +26,7 @@ EXIT_UNUSABLE = 2
 # The run couldn't start: setting up the app or a lifecycle failed. The
 # tests are no more wrong than they were; what they run on isn't there.
 EXIT_SETUP_FAILED = 3
-EXIT_NO_TESTS_FOUND = 5
+EXIT_NO_TESTS_FOUND = 4
 # Stopped from outside, with Ctrl-C. 128 + SIGINT, as a shell reports it.
 EXIT_INTERRUPTED = 130
 
@@ -49,7 +49,8 @@ class Command:
     # to it.
     directory: str
     targets: tuple[str, ...]
-    keyword: str | None
+    # The text `--match` was given.
+    match: str | None
     tags: tuple[str, ...]
     exclude_tags: tuple[str, ...]
     fail_fast: bool

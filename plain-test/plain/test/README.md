@@ -598,29 +598,29 @@ plain test                                      # everything under the current d
 plain test tests/test_views.py                  # one file
 plain test tests/checkout                       # one directory
 plain test tests/test_views.py::test_homepage   # one test
-plain test -k signup                            # tests whose id contains "signup"
+plain test --match signup                       # tests whose id contains "signup"
 plain test --tag slow                           # only tests tagged "slow"
 plain test --exclude-tag slow                   # everything but
-plain test -x                                   # stop at the first failure
-plain test -v                                   # one line per test, with its duration
+plain test --fail-fast                          # stop at the first failure
+plain test --verbose                            # one line per test, with its duration
 plain test --full-values                        # print every value in a failure whole
-plain test -s                                   # let what tests print through as they write it
+plain test --show-output                        # let what tests print through as they write it
 plain test --json                               # one JSON document, when the run is over
 ```
 
-| Flag                  | What it does                                          |
-| --------------------- | ----------------------------------------------------- |
-| `-k TEXT`             | Keep the tests whose id contains `TEXT`               |
-| `--tag NAME`          | Keep the tests with this tag. Repeat it to allow more |
-| `--exclude-tag NAME`  | Drop the tests with this tag. Repeat it to drop more  |
-| `-x`, `--fail-fast`   | Stop at the first failure                             |
-| `-v`, `--verbose`     | Print one line per test                               |
-| `--full-values`       | Print every value and all the output in a failure     |
-| `-s`, `--show-output` | Let what tests print and log through as it's written  |
-| `--json`              | Print the run as [one JSON document](#as-json)        |
-| `--list-passed`       | With `--json`, list the tests that passed too         |
+| Flag                 | What it does                                          |
+| -------------------- | ----------------------------------------------------- |
+| `--match TEXT`       | Keep the tests whose id contains `TEXT`               |
+| `--tag NAME`         | Keep the tests with this tag. Repeat it to allow more |
+| `--exclude-tag NAME` | Drop the tests with this tag. Repeat it to drop more  |
+| `--fail-fast`        | Stop at the first failure                             |
+| `--verbose`          | Print one line per test                               |
+| `--full-values`      | Print every value and all the output in a failure     |
+| `--show-output`      | Let what tests print and log through as it's written  |
+| `--json`             | Print the run as [one JSON document](#as-json)        |
+| `--list-passed`      | With `--json`, list the tests that passed too         |
 
-`plain test --help` prints the same list, and the forms a target can take.
+Each flag has one name. `plain test --help` prints the same list, and the forms a target can take.
 
 Tests run in the same order every time. Within a file, that's the order they're written in.
 
@@ -639,9 +639,9 @@ A target is a path, optionally followed by `::` and a name. You can pass several
 
 Paths are relative to the directory you run from. Quote a target that names a case, since the shell reads `[` and spaces itself. The [re-run command](#failures) a failure prints is already quoted.
 
-`-k` matches against the whole id, which starts with the file's path. So `-k checkout` keeps every test in `tests/checkout/` as well as any test with "checkout" in its name.
+`--match` keeps a test when `TEXT` is somewhere in its id. It's the text as written, not a pattern or an expression, and it's matched against the whole id, which starts with the file's path. So `--match checkout` keeps every test in `tests/checkout/` as well as any test with "checkout" in its name.
 
-Targets, `-k` and the tag flags combine: a test runs when it's inside a target and passes every filter.
+Targets, `--match` and the tag flags combine: a test runs when it's inside a target and passes every filter.
 
 ### Exit codes
 
@@ -651,7 +651,7 @@ Targets, `-k` and the tag flags combine: a test runs when it's inside a target a
 | `1`   | A test failed, or a file couldn't be collected                                                                                                  |
 | `2`   | The command can't be used as given: a target doesn't exist, flags don't go together, or the [project lifecycle](#project-lifecycle) is wrong    |
 | `3`   | [Setting up failed](#a-run-that-couldnt-start), so no test was run: the app couldn't be set up, or a lifecycle couldn't, such as the database's |
-| `5`   | No tests matched                                                                                                                                |
+| `4`   | No tests matched                                                                                                                                |
 | `130` | The run was stopped with Ctrl-C. What had run by then is reported                                                                               |
 
 `1` says the tests need fixing. `3` says what they run on does.
@@ -740,11 +740,12 @@ Only files named `test_*.py` have their [assertions](#assertions) rewritten. An 
 
 ## Reading the output
 
-Each test prints one character as it finishes: `.` passed, `F` failed, `s` skipped. With `-v` each test gets a line of its own:
+A run that passes prints how many tests it found and what came of them, and nothing for each test:
 
 ```
-PASSED  tests/test_cart.py::test_empty_cart (0.012s)
-SKIPPED tests/test_cart.py::test_refund (Waiting on the new billing API)
+Collected 41 tests
+
+41 passed in 0.62s
 ```
 
 The last line counts what happened:
@@ -753,7 +754,14 @@ The last line counts what happened:
 41 passed, 1 failed, 2 skipped, 1 collection errors in 0.62s
 ```
 
-That's all most runs that pass print. What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away. [Warnings](#warnings) are counted and listed once each, and what was [written outside any test](#written-outside-any-test) is printed at the end.
+When stdout is a terminal, one line says how far the run has got while it runs (`12 of 41, 1 failed`). It's written over itself and erased before the report, so nothing of it is left, and it's never written to a pipe or a file. With `--verbose` each test gets a line of its own as it finishes, with its outcome as `--json` spells it:
+
+```
+passed  tests/test_cart.py::test_empty_cart (0.012s)
+skipped tests/test_cart.py::test_refund (Waiting on the new billing API)
+```
+
+What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away. [Warnings](#warnings) are counted and listed once each, and what was [written outside any test](#written-outside-any-test) is printed at the end.
 
 ### Failures
 
@@ -897,7 +905,7 @@ The last 10,000 characters of each stream are kept, and the failure says how muc
     line 4001
 ```
 
-`-s` (`--show-output`) holds nothing: everything is written where it would have been, as it happens, between the progress characters. Use it to watch a test that hangs, or to see what a passing test prints.
+`--show-output` holds nothing: everything is written where it would have been, as it happens. Use it to watch a test that hangs, or to see what a passing test prints.
 
 A run stopped with Ctrl-C reports what it had: the failures so far, and what the test that was running had written.
 
@@ -1122,7 +1130,7 @@ COLLECTION ERROR tests/test_signup.py
 
 ```bash
 plain test --json
-plain test --json tests/test_orders.py -x
+plain test --json tests/test_orders.py --fail-fast
 plain test --json --list-passed
 ```
 
@@ -1140,7 +1148,7 @@ plain test --json --list-passed
         ],
         "directory": "/project",
         "targets": [],
-        "keyword": null,
+        "match": null,
         "tags": [],
         "exclude_tags": [],
         "fail_fast": false,
@@ -1300,7 +1308,7 @@ plain test --json --list-passed
 - **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
 - **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
 
-`--json` takes the same targets and filters as any run. It can't be combined with `-v` or `-s`: there's one document, and nothing else goes to stdout.
+`--json` takes the same targets and filters as any run. It can't be combined with `--verbose` or `--show-output`: there's one document, and nothing else goes to stdout.
 
 A run stopped with Ctrl-C still prints its document. `interrupted` says which test was running and what it had written:
 
@@ -1329,7 +1337,7 @@ A run that couldn't start prints one too, with no tests in it. `reason` says why
 | `"lifecycle_error"`  | `tests/lifecycle.py` can't be used                                             | `2`         |
 | `"target_not_found"` | A target doesn't exist                                                         | `2`         |
 | `"setup_error"`      | The app couldn't be set up, or a lifecycle's `setup_worker()` raised or exited | `3`         |
-| `"no_tests_found"`   | No tests matched                                                               | `5`         |
+| `"no_tests_found"`   | No tests matched                                                               | `4`         |
 | `"interrupted"`      | Ctrl-C, before the first test                                                  | `130`       |
 
 `stdout` and `stderr` are everything that had been written by then, which for a `"setup_error"` is usually where the reason is.
@@ -1733,9 +1741,9 @@ From the standard library. `tempfile.TemporaryDirectory()` gives a directory tha
 
 #### How do I debug a failing test?
 
-Put `breakpoint()` where you want to stop and run the test. The debugger gets the terminal: from the breakpoint until that test is over, output is written as it happens. Calling `pdb.set_trace()` yourself doesn't do that, so use `breakpoint()`, or run with `-s`. Every failure prints the command that runs it again, so you can copy that to run the one test.
+Put `breakpoint()` where you want to stop and run the test. The debugger gets the terminal: from the breakpoint until that test is over, output is written as it happens. Calling `pdb.set_trace()` yourself doesn't do that, so use `breakpoint()`, or run with `--show-output`. Every failure prints the command that runs it again, so you can copy that to run the one test.
 
-To see what a test prints without stopping it, `print()` and make it fail, or run it with `-s`.
+To see what a test prints without stopping it, `print()` and make it fail, or run it with `--show-output`.
 
 #### Does coverage work?
 

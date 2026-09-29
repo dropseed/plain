@@ -103,7 +103,7 @@ def run_custom_checks() -> None:
 
 
 # What `plain test` exits with when it found no tests to run.
-TEST_EXIT_NO_TESTS_FOUND = 5
+TEST_EXIT_NO_TESTS_FOUND = 4
 
 
 def check_tests() -> None:

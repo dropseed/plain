@@ -81,7 +81,7 @@ def document(report: RunReport, *, list_passed: bool) -> dict[str, Any]:
             "argv": list(command.argv),
             "directory": command.directory,
             "targets": list(command.targets),
-            "keyword": command.keyword,
+            "match": command.match,
             "tags": list(command.tags),
             "exclude_tags": list(command.exclude_tags),
             "fail_fast": command.fail_fast,
