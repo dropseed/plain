@@ -37,6 +37,9 @@ class Part:
 
     name: str
     seconds: float
+    # What a lifecycle says its setup spent the time on (`describe_setup`):
+    # `built template (49 migrations)` under `PostgresTestLifecycle`.
+    parts: tuple[Part, ...] = ()
 
 
 @dataclass(frozen=True, kw_only=True)

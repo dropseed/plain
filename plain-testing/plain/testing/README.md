@@ -810,6 +810,7 @@ where the 1.27s went
   lifecycle setup          0.15s
     EmailTestLifecycle     0.00s
     PostgresTestLifecycle  0.15s
+      cloned template      0.04s
   tests                    0.02s
   lifecycle teardown       0.05s
     PostgresTestLifecycle  0.05s
@@ -820,7 +821,7 @@ where the 1.27s went
 
 It's a timeline, in the order things happened. The clock starts when Plain is first imported. What came before that, the interpreter starting and Python's own imports, a process can't time, so the first line is the CPU time it had used by then, which for startup work is close to the same thing. `unaccounted` is what the marks between phases don't cover. Printing the report comes after the last mark and isn't in it.
 
-The parts an app can do something about are under `runtime setup`. A `plain.setup` hook (plain.dev's reads the `.env` files and finds the database) or a package's import that took 50 ms or more gets a line of its own. An import that slow is usually a module importing a client library at the top, which every command then pays for. The rest share the `other imports` line. `lifecycle setup` is each package's [lifecycle](#what-packages-do-for-every-test) by name: for plain.postgres, creating the test database.
+The parts an app can do something about are under `runtime setup`. A `plain.setup` hook (plain.dev's reads the `.env` files and finds the database) or a package's import that took 50 ms or more gets a line of its own. An import that slow is usually a module importing a client library at the top, which every command then pays for. The rest share the `other imports` line. `lifecycle setup` is each package's [lifecycle](#what-packages-do-for-every-test) by name, and under it what the lifecycle says its setup did: plain.postgres says whether it built the [template](../../../plain-postgres/plain/postgres/README.md#the-template) the run's database is cloned from, which the first run of a schema does, or cloned it, which every run after does.
 
 Under a second outside the tests, a passing run is still two lines. The [JSON document](#as-json) has the phases always, as `phases`.
 
@@ -1335,27 +1336,33 @@ plain test --json --list-passed
             "parts": [
                 {
                     "name": "hook dev-setup",
-                    "seconds": 0.3021
+                    "seconds": 0.3021,
+                    "parts": []
                 },
                 {
                     "name": "other hooks (6)",
-                    "seconds": 0.0104
+                    "seconds": 0.0104,
+                    "parts": []
                 },
                 {
                     "name": "settings",
-                    "seconds": 0.0188
+                    "seconds": 0.0188,
+                    "parts": []
                 },
                 {
                     "name": "import app.agents",
-                    "seconds": 0.4013
+                    "seconds": 0.4013,
+                    "parts": []
                 },
                 {
                     "name": "other imports (27)",
-                    "seconds": 0.0296
+                    "seconds": 0.0296,
+                    "parts": []
                 },
                 {
                     "name": "ready()",
-                    "seconds": 0.0084
+                    "seconds": 0.0084,
+                    "parts": []
                 }
             ]
         },
@@ -1378,7 +1385,8 @@ plain test --json --list-passed
             "parts": [
                 {
                     "name": "rewrote 1 file",
-                    "seconds": 0.0117
+                    "seconds": 0.0117,
+                    "parts": []
                 }
             ]
         },
@@ -1389,11 +1397,19 @@ plain test --json --list-passed
             "parts": [
                 {
                     "name": "EmailTestLifecycle",
-                    "seconds": 0.0
+                    "seconds": 0.0,
+                    "parts": []
                 },
                 {
                     "name": "PostgresTestLifecycle",
-                    "seconds": 0.1503
+                    "seconds": 0.1503,
+                    "parts": [
+                        {
+                            "name": "cloned template",
+                            "seconds": 0.0412,
+                            "parts": []
+                        }
+                    ]
                 }
             ]
         },
@@ -1410,11 +1426,13 @@ plain test --json --list-passed
             "parts": [
                 {
                     "name": "PostgresTestLifecycle",
-                    "seconds": 0.0471
+                    "seconds": 0.0471,
+                    "parts": []
                 },
                 {
                     "name": "EmailTestLifecycle",
-                    "seconds": 0.0
+                    "seconds": 0.0,
+                    "parts": []
                 }
             ]
         },

@@ -2,7 +2,8 @@
 Database test lifecycle, registered under the `plain.testing` entry point.
 
 Every test runs against a dedicated test database (created once per run,
-migrated and converged) inside a transaction that rolls back afterward.
+as a clone of a migrated and converged template that stays between runs)
+inside a transaction that rolls back afterward.
 Tests tagged with `@isolated_db` get their own separately-created database
 for the duration of the test instead of a rolled-back transaction — for
 DDL-heavy tests (migrations, convergence) that can't run inside a
@@ -31,6 +32,7 @@ from ..otel import suppress_db_tracing
 from ..query import QuerySet
 from .database import RunDatabases, use_test_database
 from .decorators import ISOLATED_DB_TAG
+from .schema import describe_schema
 
 # A model instance that prints in less than this is printed on one line.
 _ONE_LINE = 80
@@ -101,16 +103,10 @@ class PostgresTestLifecycle(TestLifecycle):
         )
         self._run = run
         with suppress_db_tracing():
-            run.claim()
+            run.claim(schema=describe_schema())
             self._test_database.callback(run.release)
             self._test_database.enter_context(
-                use_test_database(
-                    name=run.shared_name,
-                    made_by=run.record_for_a_database(),
-                    runtime_url=run.runtime_url,
-                    management_url=run.management_url,
-                    verbosity=0,
-                )
+                use_test_database(run=run, name=run.shared_name, verbosity=0)
             )
 
     def teardown_worker(self) -> None:
@@ -118,6 +114,12 @@ class PostgresTestLifecycle(TestLifecycle):
             # Closes the connection the tests shared, drops the database,
             # then gives up the run's claim.
             self._test_database.close()
+
+    def describe_setup(self) -> tuple[tuple[str, float], ...]:
+        # Whether the template was built by this run or cloned, and how long
+        # each took.
+        assert self._run is not None
+        return tuple(self._run.setup_parts)
 
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:
@@ -166,13 +168,7 @@ class PostgresTestLifecycle(TestLifecycle):
         assert run is not None
         test_name = test.id.rpartition("::")[2]
 
-        ctx = use_test_database(
-            name=run.isolated_name(test_name),
-            made_by=run.record_for_a_database(),
-            runtime_url=run.runtime_url,
-            management_url=run.management_url,
-            verbosity=0,
-        )
+        ctx = use_test_database(run=run, name=run.isolated_name(test_name), verbosity=0)
         with suppress_db_tracing():
             ctx.__enter__()
         try:

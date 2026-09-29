@@ -83,7 +83,9 @@ def a_project_with(
     cluster = RecordingCluster()
     remaining = list(listings)
 
-    def read_facts(cluster: object, *, project_name: str) -> list[CleanFacts]:
+    def read_facts(
+        cluster: object, *, project_name: str, current: str, current_schema: str | None
+    ) -> list[CleanFacts]:
         return remaining.pop(0) if len(remaining) > 1 else remaining[0]
 
     def checkouts(project_root: Path) -> tuple[list[Checkout], bool]:

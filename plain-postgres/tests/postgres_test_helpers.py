@@ -17,8 +17,10 @@ from plain.postgres.database_url import (
     parse_database_url,
     replace_database_name,
 )
+from plain.postgres.databases import drop_database, list_databases
 from plain.postgres.db import _db_conn
 from plain.postgres.test import CapturedQueries
+from plain.postgres.test.leftovers import read_template_record
 
 
 @contextmanager
@@ -198,8 +200,28 @@ def make_scratch_app(test_files: dict[str, str]) -> ScratchApp:
     # is the test database while tests run; the environment is as it was.
     url_of_this_run = os.environ["PLAIN_POSTGRES_URL"]
     configured_name = scratch_database_name("app")
-    return ScratchApp(
+    app = ScratchApp(
         root=root,
         configured_url=replace_database_name(url_of_this_run, configured_name),
         configured_name=configured_name,
     )
+    # A run of the app leaves the template its runs clone, for the next
+    # run. There is no next run after this process, so it goes with it.
+    atexit.register(_drop_the_templates_of, app)
+    return app
+
+
+def templates_of(app: ScratchApp) -> list[str]:
+    """The templates of the app's test runs that are on the server now, by
+    the record each carries."""
+    return [
+        database.name
+        for database in list_databases(app.config)
+        if (record := read_template_record(database.comment)) is not None
+        and record.database == app.configured_name
+    ]
+
+
+def _drop_the_templates_of(app: ScratchApp) -> None:
+    for name in templates_of(app):
+        drop_database(app.config, name=name, force=True)

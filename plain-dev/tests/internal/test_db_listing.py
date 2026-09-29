@@ -11,12 +11,23 @@ from plain.dev.postgres.backends import Server
 from plain.dev.postgres.cluster import Cluster, DevDatabase
 from plain.postgres import databases as postgres_databases
 from plain.postgres.databases import DatabaseInfo
-from plain.postgres.test.leftovers import RunRecord
+from plain.postgres.test.leftovers import TEMPLATE_READY, RunRecord, TemplateRecord
 from plain.testing import patch
 
 
 def made_by_a_checkout(path: str) -> str:
     return json.dumps({"checkout": path, "branch": "main", "created_via": "template"})
+
+
+def the_template_of(database: str) -> str:
+    return TemplateRecord(
+        database=database,
+        schema="a" * 64,
+        state=TEMPLATE_READY,
+        directory="/work/plain/example",
+        host="this-machine",
+        pid=4821,
+    ).as_comment()
 
 
 def made_by_a_run_of(database: str) -> str:
@@ -85,6 +96,25 @@ def test_a_test_database_is_the_projects_by_the_database_its_record_names():
     assert found["zz_named_anything"].is_test
     assert found["zz_named_anything"].run_record is not None
     assert found["zz_named_anything"].run_record.database == "example_plain_test"
+
+
+def test_a_template_is_the_projects_by_the_database_its_record_names():
+    found = listed(
+        {
+            "example": None,
+            "test_example_taaaaaaaa": the_template_of("example"),
+            "zz_named_anything": the_template_of("example_plain_test"),
+            "test_another_tbbbbbbbb": the_template_of("another_project"),
+        }
+    )
+
+    assert set(found) == {"example", "test_example_taaaaaaaa", "zz_named_anything"}
+    for name in ("test_example_taaaaaaaa", "zz_named_anything"):
+        assert found[name].is_test
+        assert found[name].run_record is None
+    template = found["zz_named_anything"].template_record
+    assert template is not None
+    assert template.database == "example_plain_test"
 
 
 def test_a_test_database_of_a_database_that_is_gone_is_still_the_projects():

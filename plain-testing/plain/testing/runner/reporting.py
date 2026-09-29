@@ -401,6 +401,8 @@ def phases_text(phases: tuple[Phase, ...]) -> str:
     for phase in phases:
         for part in phase.parts:
             names = max(names, len(part.name) + 2)
+            for inner in part.parts:
+                names = max(names, len(inner.name) + 4)
 
     lines = []
     for phase in phases:
@@ -410,6 +412,10 @@ def phases_text(phases: tuple[Phase, ...]) -> str:
         lines.append(line)
         for part in phase.parts:
             lines.append(f"  {part.name.ljust(names - 2)}  {part.seconds:6.2f}s")
+            for inner in part.parts:
+                lines.append(
+                    f"    {inner.name.ljust(names - 4)}  {inner.seconds:6.2f}s"
+                )
     return "\n".join(lines)
 
 

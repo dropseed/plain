@@ -247,6 +247,7 @@ def list_(as_json: bool) -> None:
                         "current": d.name == current,
                         "is_project_main": d.name == project_name,
                         "is_test": d.is_test,
+                        "is_template": d.template_record is not None,
                     }
                     for d in databases
                 ],
@@ -266,6 +267,10 @@ def list_(as_json: bool) -> None:
         detail = database.checkout or ""
         if database.checkout and not database.checkout_exists:
             detail = click.style(f"{database.checkout} (gone)", fg="yellow")
+        elif database.template_record is not None:
+            detail = click.style(
+                f"(test template of {database.template_record.database})", dim=True
+            )
         elif database.is_test:
             detail = click.style("(test)", dim=True)
         click.echo(
@@ -418,16 +423,38 @@ def drop(name: str, yes: bool, force: bool) -> None:
 
 
 def _read_clean_plan(
-    cluster: Cluster, *, project_root: Path, project_name: str, current: str
+    cluster: Cluster,
+    *,
+    project_root: Path,
+    project_name: str,
+    current: str,
+    current_schema: str | None,
 ) -> CleanPlan:
     checkouts, in_git = project_checkouts(project_root)
     return plan_clean(
-        read_clean_facts(cluster, project_name=project_name),
+        read_clean_facts(
+            cluster,
+            project_name=project_name,
+            current=current,
+            current_schema=current_schema,
+        ),
         project_main=project_name,
         current=current,
         checkouts=checkouts,
         in_git=in_git,
     )
+
+
+def _current_schema() -> str | None:
+    """The digest of the schema this checkout's test databases are built
+    with now, which names their template. `None` when the models or the
+    migration files can't be read, and then the template is left."""
+    from plain.postgres.test.schema import describe_schema
+
+    try:
+        return describe_schema().hash
+    except Exception:
+        return None
 
 
 def _echo_clean_items(items: tuple[CleanItem, ...]) -> None:
@@ -438,10 +465,18 @@ def _echo_clean_items(items: tuple[CleanItem, ...]) -> None:
         click.secho(f"      {item.reason}", dim=True)
 
 
-def _drop_cleaned(cluster: Cluster, item: CleanItem) -> str | None:
+def _drop_cleaned(
+    cluster: Cluster, item: CleanItem, *, current_schema: str | None
+) -> str | None:
     """Drop one database of the plan. Why it was left, if it was."""
     from psycopg import errors
 
+    if item.is_template:
+        return cluster.drop_if_a_stale_template(
+            item.name,
+            current_schema=current_schema,
+            tested_database_is_gone=item.tested_database_is_gone,
+        )
     if item.is_test:
         return cluster.drop_if_a_dead_runs(item.name)
     try:
@@ -472,14 +507,22 @@ def clean(dry_run: bool) -> None:
     names is gone, no checkout of the project is configured to use it, and
     nothing is connected to it. A test database is dropped only if it
     carries the record of the run that made it and that run is dead. The
+    template a database's test runs clone is dropped only if its record
+    says it is of no use now: the schema has changed since it was built,
+    the database it was built for is gone, or the run building it died. The
     project's main database and this checkout's are never dropped.
 
     Nothing is dropped with `FORCE`, so a database something connects to
     between the listing and the drop is left.
     """
     project_root, cluster, project_name, current = _open()
+    current_schema = _current_schema()
     plan = _read_clean_plan(
-        cluster, project_root=project_root, project_name=project_name, current=current
+        cluster,
+        project_root=project_root,
+        project_name=project_name,
+        current=current,
+        current_schema=current_schema,
     )
 
     if plan.drop:
@@ -513,6 +556,7 @@ def clean(dry_run: bool) -> None:
             project_root=project_root,
             project_name=project_name,
             current=current,
+            current_schema=current_schema,
         ).drop
     }
 
@@ -522,7 +566,7 @@ def clean(dry_run: bool) -> None:
         if item.name not in still:
             click.secho(f"  Left {item.name}: it no longer qualifies.", fg="yellow")
             continue
-        left_because = _drop_cleaned(cluster, item)
+        left_because = _drop_cleaned(cluster, item, current_schema=current_schema)
         if left_because:
             click.secho(f"  Left {item.name}: {left_because}.", fg="yellow")
             continue

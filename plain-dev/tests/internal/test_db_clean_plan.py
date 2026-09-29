@@ -271,6 +271,53 @@ def test_a_test_database_is_dropped_on_its_runs_verdict_and_nothing_else():
     assert {item.owner for item in (*plan.drop, *plan.leave)} == {"(test database)"}
 
 
+def a_template(name: str, *, of_no_use: bool, verdict: str) -> CleanFacts:
+    return replace(
+        a_test_database(name, run_is_dead=of_no_use, verdict=verdict),
+        is_template=True,
+    )
+
+
+def test_a_template_is_dropped_on_its_verdict_and_nothing_else():
+    """The verdict is `judge_template`'s; the plan carries it through."""
+    stale = a_template(
+        "test_example_plain_test_fixes_taaaaaaaa",
+        of_no_use=True,
+        verdict="the schema changed since it was built, and a run built a new one",
+    )
+    current = a_template(
+        "test_example_plain_test_fixes_tbbbbbbbb",
+        of_no_use=False,
+        verdict="the template this checkout's test runs clone",
+    )
+    anothers = a_template(
+        "test_example_plain_forms_tcccccccc",
+        of_no_use=False,
+        verdict="the template 'example_plain_forms's test runs clone",
+    )
+
+    plan = plan_for(stale, current, anothers)
+
+    assert dropped(plan) == ["test_example_plain_test_fixes_taaaaaaaa"]
+    assert plan.drop[0].is_template
+    assert plan.drop[0].owner == "(test template)"
+    assert why_left(plan, "test_example_plain_test_fixes_tbbbbbbbb") == (
+        "the template this checkout's test runs clone"
+    )
+    assert "example_plain_forms" in why_left(plan, "test_example_plain_forms_tcccccccc")
+
+
+def test_a_template_a_checkout_is_configured_to_use_is_left():
+    stale = a_template(
+        "test_example_taaaaaaaa", of_no_use=True, verdict="the schema changed"
+    )
+    uses_it = a_checkout("/work/odd/example", database="test_example_taaaaaaaa")
+
+    plan = plan_for(stale, checkouts=[a_checkout(MAIN, database="example"), uses_it])
+
+    assert dropped(plan) == []
+
+
 def test_a_test_database_a_checkout_is_configured_to_use_is_left():
     dead = a_test_database(
         "test_example_r4821", run_is_dead=True, verdict="a test run left it"

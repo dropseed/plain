@@ -53,7 +53,9 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 
 - Each checkout gets its own database derived from the directory name, so
   worktrees never share data. Test databases derive from it too, one per
-  test run, so any number of `plain test` runs can go at once in one checkout.
+  test run, so any number of `plain test` runs can go at once in one checkout,
+  each a clone of a template the first run built and left for the next
+  (`test_<database>_t<schema>`, one per checkout's database).
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
 - `plain db status --json` before diagnosing anything database-shaped: database,

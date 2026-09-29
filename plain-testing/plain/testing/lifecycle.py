@@ -48,6 +48,15 @@ class TestLifecycle:
     def teardown_worker(self) -> None:
         """Called once per run, after the last test."""
 
+    def describe_setup(self) -> tuple[tuple[str, float], ...]:
+        """
+        What `setup_worker()` spent its time on, for the run's report of
+        where its time went: `(("built template (49 migrations)", 0.54),)`.
+        Each is a name and seconds, printed under the lifecycle's own line.
+        Empty when there is nothing worth a line.
+        """
+        return ()
+
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:
         """

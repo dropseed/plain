@@ -190,6 +190,9 @@ def run_tests(
                     Part(
                         name=type(lifecycle).__qualname__,
                         seconds=time.monotonic() - setup_start,
+                        parts=_what_setup_spent_its_time_on(lifecycle)
+                        if setup_failure is None
+                        else (),
                     )
                 )
             started.append(lifecycle)
@@ -253,6 +256,12 @@ def run_tests(
         lifecycle_setup=tuple(lifecycle_setup),
         lifecycle_teardown=tuple(lifecycle_teardown),
         tests_seconds=tests_seconds,
+    )
+
+
+def _what_setup_spent_its_time_on(lifecycle: TestLifecycle) -> tuple[Part, ...]:
+    return tuple(
+        Part(name=name, seconds=seconds) for name, seconds in lifecycle.describe_setup()
     )
 
 

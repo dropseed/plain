@@ -29,14 +29,20 @@ from plain.postgres.databases import (
 from plain.postgres.sources import build_connection_params
 from plain.postgres.test import isolated_db
 from plain.postgres.test.database import RunDatabases, shared_database_name
-from plain.postgres.test.leftovers import RunRecord
+from plain.postgres.test.leftovers import RunRecord, read_template_record
+from plain.postgres.test.schema import SchemaDigest
 from plain.runtime import settings
 from postgres_test_helpers import (
     ScratchApp,
     clean_connection,
     make_scratch_app,
     scratch_database_name,
+    templates_of,
 )
+
+# A run claimed here, in this process, never builds or clones a template:
+# it takes a name and looks at what is there. Any digest will do.
+A_SCHEMA = SchemaDigest(hash="a" * 64, migrations=0)
 
 
 def current_database() -> str:
@@ -176,7 +182,8 @@ def test_no_connection_of_a_run_is_to_the_configured_database():
     connected_to = app.connected_to()
     assert connected_to, "the run made connections, and none were recorded"
     assert app.configured_name not in connected_to
-    start = shared_database_name(app.configured_name, run_token="r")
+    # The run's own databases, and the template it built and cloned.
+    start = shared_database_name(app.configured_name, run_token="")
     assert {name for name in connected_to if not name.startswith(start)} == {"postgres"}
 
 
@@ -212,12 +219,14 @@ def test_slowly():
 
 
 def _test_databases_of(app: ScratchApp) -> list[str]:
-    """The test databases of an app that are on the server now."""
+    """The test databases of an app's runs that are on the server now. Not
+    the template they clone, which stays."""
     start = shared_database_name(app.configured_name, run_token="")
     return [
         database.name
         for database in list_databases(app.config)
         if database.name.startswith(start)
+        and read_template_record(database.comment) is None
     ]
 
 
@@ -228,7 +237,12 @@ def test_runs_at_the_same_moment_each_have_a_database():
     outputs = [run.communicate(timeout=120)[0] for run in runs]
 
     assert [run.returncode for run in runs] == [0, 0, 0], "\n".join(outputs)
-    used = {name for name in app.connected_to() if name != "postgres"}
+    templates = templates_of(app)
+    used = {
+        name
+        for name in app.connected_to()
+        if name != "postgres" and name not in templates
+    }
     assert len(used) == 3, used
     assert app.configured_name not in used
     assert _test_databases_of(app) == []
@@ -245,7 +259,7 @@ def what_a_killed_run_wrote(app: ScratchApp) -> RunRecord:
     """The record of a run of `app` that is gone: nobody holds its lock,
     and its process isn't running."""
     live = RunDatabases(runtime_url=app.configured_url, management_url="")
-    live.claim()
+    live.claim(schema=A_SCHEMA)
     try:
         pid = a_process_id_nothing_has()
         return replace(
@@ -321,7 +335,7 @@ def test_a_database_a_live_run_holds_is_left_alone():
     # A run that is alive, and at the moment nothing is connected to its
     # database: it has created it and not yet connected.
     live = RunDatabases(runtime_url=app.configured_url, management_url="")
-    live.claim()
+    live.claim(schema=A_SCHEMA)
     try:
         # The process that made it isn't running, so the lock is all that
         # says the run is alive.
@@ -453,10 +467,10 @@ def test_a_run_that_ends_gives_its_name_up():
     first = RunDatabases(runtime_url=app.configured_url, management_url="")
     second = RunDatabases(runtime_url=app.configured_url, management_url="")
 
-    first.claim()
+    first.claim(schema=A_SCHEMA)
     try:
         # The same process, so the same process id: the name is taken.
-        second.claim()
+        second.claim(schema=A_SCHEMA)
         try:
             assert second.shared_name != first.shared_name
             assert second.shared_name.startswith(f"{first.shared_name}x")
@@ -465,7 +479,7 @@ def test_a_run_that_ends_gives_its_name_up():
     finally:
         first.release()
 
-    second.claim()
+    second.claim(schema=A_SCHEMA)
     try:
         assert second.shared_name == first.shared_name
         assert not database_exists(app.config, name=second.shared_name)

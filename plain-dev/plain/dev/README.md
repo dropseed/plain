@@ -162,7 +162,7 @@ Every checkout gets its own database, derived from its directory name. Two workt
 | `myapp-feature/`     | `myapp_feature` |
 | `worktrees/fix-bug/` | `myapp_fix_bug` |
 
-Test databases are derived from that name too, and from the run (`test_myapp_feature_r48213`), so test runs at the same moment don't collide: not in different checkouts, and not in one.
+Test databases are derived from that name too, and from the run (`test_myapp_feature_r48213`), so test runs at the same moment don't collide: not in different checkouts, and not in one. Each is a clone of a template the first run built (`test_myapp_feature_tca9feecd`), which stays for the next run: one per checkout's database, named for the schema it was built from.
 
 All of a project's databases live in one Postgres server, shared by every worktree. That's what makes copying between them instant.
 
@@ -238,7 +238,7 @@ A development database is dropped only when all of this is so:
 
 A checkout is gone when its directory is missing and git no longer lists a worktree that held it. A worktree git still lists, with its directory missing, may be on a volume that isn't mounted, so its database is left until `git worktree prune` has run. Outside a git repository the only checkout known is the one you run the command from, and a missing directory counts only when the directory that held it is still there.
 
-A test database is dropped only when it carries the record of the run that made it and that run is dead. [plain.postgres's testing docs](../../plain-postgres/plain/postgres/README.md#the-runs-own-database) have that rule. A database that is only named like a test database is listed and left.
+A test database is dropped only when it carries the record of the run that made it and that run is dead. The template a database's test runs clone is dropped only when its record says it is of no use now: this checkout's schema has changed since it was built, the database it was built for is gone, or the run building it died before it was done. [plain.postgres's testing docs](../../plain-postgres/plain/postgres/README.md#the-runs-own-database) have both rules. A database that is only named like a test database is listed and left.
 
 Nothing is dropped with `FORCE`. If something connects to a database between the listing and the drop, the drop fails and the database stays.
 

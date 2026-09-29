@@ -22,6 +22,7 @@
 - [Tracing](#tracing)
 - [Testing](#testing)
     - [The run's own database](#the-runs-own-database)
+    - [The template](#the-template)
     - [The test database is the only database](#the-test-database-is-the-only-database)
     - [What a failure prints](#what-a-failure-prints)
     - [Tests that can't run in a transaction](#tests-that-cant-run-in-a-transaction)
@@ -2369,8 +2370,10 @@ def test_signup_creates_a_user():
 
 Two things happen around your tests:
 
-- **A test database for the run.** When the run starts, a database is created on the same server, then migrated and converged. It's dropped when the run ends.
+- **A test database for the run.** When the run starts, a database is created on the same server, migrated and converged. It's dropped when the run ends.
 - **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
+
+The database is built once and kept as a template, so a run creates its own by cloning it, which takes a moment whatever the schema. See [the template](#the-template).
 
 The tests share one connection. The rollback undoes what a test did in its transaction: rows, `SET`, temporary tables, and the locks a transaction holds. Session-level advisory locks are released before the next test. What else belongs to the session carries over: a `LISTEN`, a server-side prepared statement. A test that needs a session of its own is [`@isolated_db`](#tests-that-cant-run-in-a-transaction).
 
@@ -2396,6 +2399,27 @@ That is dropping a database the run didn't make, so it is decided narrowly. A da
 It is dropped without `FORCE`, so if something connects in the meantime the drop fails and the database stays. When a database is left in doubt, the run says so in one line and names the command that drops it: `plain db drop <name>`.
 
 If a database already has the name a run needs and doesn't carry that run's record, the run stops without touching it.
+
+### The template
+
+Migrating and converging a database from nothing is most of what a short run costs: half a second for a suite of fifty migrations, more than a second for one with many models. So it is done once. The first run builds the database and keeps it, as a template, and every run after clones it:
+
+```
+test_shop_main_tca9feecd
+```
+
+The template is named for yours and for the schema it was built from: a digest of every migration file and of every model's fields, indexes and constraints as convergence reads them. Change a migration or a model and the next run builds a new template under a new name, and removes the old one, the same way it removes what a killed run left: only on the template's own record, only when nothing is connected to it, and never by its name. One template is kept per database, on the same server, about the size of an empty schema. Its record says it is a template, which database it is for, and which schema, so `plain db list` shows it as one, and `plain db clean` drops it only when its schema is no longer the one this checkout builds, when the database it was built for is gone, or when the run that was building it died before it was done.
+
+A run that finds no template builds it, holding the template's lock so that two runs don't build it at once; a run that finds the lock held waits for the one holding it. The [report of where the run's time went](../../../plain-testing/plain/testing/README.md#where-the-time-went) says which happened:
+
+```
+  lifecycle setup                       0.42s
+    PostgresTestLifecycle               0.42s
+      built template (12 migrations)    0.33s
+      cloned template                   0.04s
+```
+
+An [`@isolated_db`](#tests-that-cant-run-in-a-transaction) test's database is a clone of the template too.
 
 ### The test database is the only database
 
@@ -2462,7 +2486,7 @@ from plain.postgres.test import isolated_db
 def test_convergence_adds_the_index(): ...
 ```
 
-That test gets a database of its own, created and migrated for it and dropped afterwards. It's a whole database setup for one test, so keep it for the tests that need it.
+That test gets a database of its own, cloned from [the template](#the-template) for it and dropped afterwards. It's a database and a session of its own for one test, so keep it for the tests that need it.
 
 ### Setting a query budget
 

@@ -16,6 +16,7 @@ from typing import Any, TextIO
 from .execution import TestResult
 from .failure import CollectionFailure, Failure, where_defined
 from .output_capture import StreamOutput
+from .phases import Part
 from .printing import PrintedValue
 from .report import RunReport
 
@@ -135,14 +136,22 @@ def document(report: RunReport, *, list_passed: bool) -> dict[str, Any]:
                 "name": phase.name,
                 "seconds": round(phase.seconds, 4),
                 "measured": phase.measured,
-                "parts": [
-                    {"name": part.name, "seconds": round(part.seconds, 4)}
-                    for part in phase.parts
-                ],
+                "parts": _parts(phase.parts),
             }
             for phase in report.phases
         ],
     }
+
+
+def _parts(parts: tuple[Part, ...]) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": part.name,
+            "seconds": round(part.seconds, 4),
+            "parts": _parts(part.parts),
+        }
+        for part in parts
+    ]
 
 
 def _test(result: TestResult) -> dict[str, Any]:

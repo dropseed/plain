@@ -17,7 +17,7 @@ from .identity import current_branch
 
 if TYPE_CHECKING:
     from plain.postgres.database_url import DatabaseConfig
-    from plain.postgres.test.leftovers import RunRecord
+    from plain.postgres.test.leftovers import RunRecord, TemplateRecord
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,9 @@ class DevDatabase:
     # What the test run that made it wrote into it. `None` for a database
     # that is only named like a test database.
     run_record: RunRecord | None = None
+    # What the run that built it as the template of a database's test runs
+    # wrote into it. A template is a test database with this instead.
+    template_record: TemplateRecord | None = None
 
     @property
     def checkout_exists(self) -> bool:
@@ -106,6 +109,36 @@ class Cluster:
             )
         return None if verdict.drop else verdict.reason
 
+    def drop_if_a_stale_template(
+        self, name: str, *, current_schema: str | None, tested_database_is_gone: bool
+    ) -> str | None:
+        """Drop the template `name` if it is of no use now. Why it was left,
+        if it was.
+
+        Read again with the template's lock held, and dropped without
+        `FORCE`: see `plain.postgres.test.leftovers`.
+        """
+        from plain.postgres.databases import get_database_comment
+        from plain.postgres.test.leftovers import (
+            drop_if_a_stale_template,
+            maintenance_connection,
+            read_template_record,
+        )
+
+        record = read_template_record(get_database_comment(self.config, name=name))
+        if record is None:
+            return "it carries no record that a test run made it"
+        with maintenance_connection(self.config) as maintenance:
+            verdict = drop_if_a_stale_template(
+                maintenance,
+                self.config,
+                name=name,
+                record=record,
+                current_schema=current_schema,
+                tested_database_is_gone=tested_database_is_gone,
+            )
+        return None if verdict.drop else verdict.reason
+
     # -- metadata ----------------------------------------------------------
 
     def set_metadata(self, name: str, metadata: dict[str, Any]) -> None:
@@ -161,25 +194,32 @@ class Cluster:
 
         Test databases count too. A test run writes a record into each one
         it makes, naming the database it was testing, and one whose record
-        names a database of ours is ours. So is one that is only named like
-        ours (`test_{project}…`) and carries no record, so that it can be
-        seen. Being listed is all a name earns: nothing is dropped for it.
+        names a database of ours is ours. So is the template a database's
+        test runs clone, by the record the run that built it wrote. So is
+        one that is only named like ours (`test_{project}…`) and carries no
+        record, so that it can be seen. Being listed is all a name earns:
+        nothing is dropped for it.
 
         Going the other way — listing everything on the cluster — is wrong for
         the local backend, where one server holds databases we never created.
         """
         from plain.postgres.databases import list_databases
-        from plain.postgres.test.leftovers import read_run_record
+        from plain.postgres.test.leftovers import (
+            read_run_record,
+            read_template_record,
+        )
 
         def named_like_ours(name: str) -> bool:
             return name == project_name or name.startswith(f"{project_name}_")
 
         infos = list_databases(self.config)
         records = {info.name: read_run_record(info.comment) for info in infos}
+        templates = {info.name: read_template_record(info.comment) for info in infos}
         ours = {
             info.name
             for info in infos
             if records[info.name] is None
+            and templates[info.name] is None
             and (
                 "created_via" in (_decode_metadata(info.comment) or {})
                 or named_like_ours(info.name)
@@ -189,9 +229,13 @@ class Cluster:
         databases = []
         for info in infos:
             record = records[info.name]
+            template = templates[info.name]
             if record is not None:
                 is_test = True
                 listed = record.database in ours or named_like_ours(record.database)
+            elif template is not None:
+                is_test = True
+                listed = template.database in ours or named_like_ours(template.database)
             else:
                 # Named like one, and nothing says a checkout made it.
                 is_test = (
@@ -213,6 +257,7 @@ class Cluster:
                     size_bytes=info.size_bytes,
                     is_test=is_test,
                     run_record=record,
+                    template_record=template,
                 )
             )
         return databases

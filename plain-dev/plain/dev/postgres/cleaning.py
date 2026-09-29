@@ -25,8 +25,12 @@ given is listed with the reason: what would be dropped, and what is left.
   missing too, nothing can be told from the path.
 
 **A test database** is dropped only when it carries the record of the run
-that made it and that run is proved dead. `plain.postgres.test.leftovers`
-has that rule, and this module only reports its verdicts.
+that made it and that run is proved dead. **A template**, which a
+database's test runs clone, is dropped only when its record says it is of
+no use now: the schema of this checkout's database has changed since it
+was built, the database it was built for is gone from the server, or the
+run building it died before it was done. `plain.postgres.test.leftovers`
+has both rules, and this module only reports its verdicts.
 
 Outside a git repository the only checkout known is the one the command
 runs from, so "no checkout is configured to use it" can only be checked for
@@ -79,9 +83,15 @@ class CleanFacts:
     connections: int
     is_test: bool
     # For a test database: whether its run is proved dead, and the reason.
-    # Both from `plain.postgres.test.leftovers.judge_leftover`.
+    # Both from `plain.postgres.test.leftovers.judge_leftover`. For a
+    # template (a test database with `is_template` too): whether it is of
+    # no use now, and why, from `judge_template`.
     run_is_dead: bool = False
     run_verdict: str = ""
+    is_template: bool = False
+    # For a template: whether the database it was built for is gone from
+    # the server. Dropping it then needs the same fact.
+    tested_database_is_gone: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,6 +101,8 @@ class CleanItem:
     owner: str
     reason: str
     is_test: bool
+    is_template: bool = False
+    tested_database_is_gone: bool = False
 
 
 @dataclass(frozen=True)
@@ -124,12 +136,16 @@ def plan_clean(
             owner=_owner(facts),
             reason=reason,
             is_test=facts.is_test,
+            is_template=facts.is_template,
+            tested_database_is_gone=facts.tested_database_is_gone,
         )
         (drop if dropping else leave).append(item)
     return CleanPlan(drop=tuple(drop), leave=tuple(leave))
 
 
 def _owner(facts: CleanFacts) -> str:
+    if facts.is_template:
+        return "(test template)"
     if facts.is_test:
         return "(test database)"
     return facts.recorded_checkout or "(no recorded owner)"
@@ -249,20 +265,57 @@ def _checkout_at(root: Path, *, worktree: Path) -> Checkout:
     )
 
 
-def read_clean_facts(cluster: Cluster, *, project_name: str) -> list[CleanFacts]:
+def read_clean_facts(
+    cluster: Cluster,
+    *,
+    project_name: str,
+    current: str,
+    current_schema: str | None,
+) -> list[CleanFacts]:
     """The facts about every database of the project. Reads, and changes
-    nothing: a test database's run lock is asked for and given straight back."""
+    nothing: a test database's run lock is asked for and given straight back.
+
+    `current_schema` is the digest of the schema this checkout's database,
+    `current`, builds its test databases with now, which is what tells its
+    template from a stale one. `None` when it couldn't be worked out, and
+    then the template is left.
+    """
     from plain.postgres.test.leftovers import (
         judge_leftover,
+        judge_template,
         look_at_leftover,
+        look_at_template,
         maintenance_connection,
     )
 
     databases = cluster.list_databases(project_name)
+    names = {database.name for database in databases}
     facts = []
     with maintenance_connection(cluster.config) as maintenance:
         for database in databases:
-            if database.is_test:
+            if database.template_record is not None:
+                template = database.template_record
+                gone = template.database not in names
+                facts.append(
+                    _test_database_facts(
+                        database,
+                        verdict=judge_template(
+                            look_at_template(
+                                maintenance,
+                                cluster.config,
+                                name=database.name,
+                                record=template,
+                            ),
+                            current_schema=current_schema
+                            if template.database == current
+                            else None,
+                            tested_database_is_gone=gone,
+                        ),
+                        is_template=True,
+                        tested_database_is_gone=gone,
+                    )
+                )
+            elif database.is_test:
                 facts.append(
                     _test_database_facts(
                         database,
@@ -296,10 +349,14 @@ def _tested_database(database: DevDatabase) -> str:
 
 
 def _test_database_facts(
-    database: DevDatabase, *, verdict: LeftoverVerdict
+    database: DevDatabase,
+    *,
+    verdict: LeftoverVerdict,
+    is_template: bool = False,
+    tested_database_is_gone: bool = False,
 ) -> CleanFacts:
     reason = verdict.reason
-    if database.run_record is None:
+    if database.run_record is None and database.template_record is None:
         reason += f" (if it is debris: plain db drop {database.name})"
     return CleanFacts(
         name=database.name,
@@ -310,4 +367,6 @@ def _test_database_facts(
         is_test=True,
         run_is_dead=verdict.drop,
         run_verdict=reason,
+        is_template=is_template,
+        tested_database_is_gone=tested_database_is_gone,
     )

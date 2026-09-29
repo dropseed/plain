@@ -32,6 +32,16 @@ the meantime. A failure there means something is using it, and it is left.
 A run's lock goes with its connection to the maintenance database, and a
 connection can be lost while the run lives on. That is why the lock alone
 isn't the proof.
+
+**The template.** A run's database is cloned from a template that an
+earlier run built and left for the rest (`database.py`). A template carries
+a record of its own: which database it is for, the digest of the schema it
+was built from, and whether it is finished. The rule for one is
+`judge_template`, and it is as narrow: a template is dropped only on its
+own record, and only when it is of no use now, which is when the schema has
+changed since it was built, when the database it was built for is gone, or
+when the run building it died before it was finished. While a run is
+building or cloning it, the run holds its lock, and it is left.
 """
 
 import hashlib
@@ -107,9 +117,62 @@ def read_run_record(comment: str | None) -> RunRecord | None:
 
 
 def run_lock_key(run_name: str) -> int:
-    """The advisory lock a run holds, from the name of its shared database."""
+    """The advisory lock a run holds, from the name of its shared database.
+    A template's lock is keyed the same way, by the template's name."""
     digest = hashlib.sha256(f"plain.postgres.test:{run_name}".encode()).digest()
     return int.from_bytes(digest[:8], "big", signed=True)
+
+
+# The key in a database's comment that holds a template's record.
+TEMPLATE_RECORD_KEY = "plain_test_template"
+
+# A template's state: being built, by a run that holds its lock and may die
+# before it is done; or ready, migrated and converged, for runs to clone.
+TEMPLATE_BUILDING = "building"
+TEMPLATE_READY = "ready"
+
+
+@dataclass(frozen=True)
+class TemplateRecord:
+    """What a run writes into the comment of the template it builds."""
+
+    database: str  # the configured database the template is for
+    schema: str  # the digest of what it was built from (`schema.py`)
+    state: str  # TEMPLATE_BUILDING, then TEMPLATE_READY
+    directory: str  # where the run that built it was started
+    host: str
+    pid: int
+    lock: str = LOCK_SCHEME
+
+    def as_comment(self) -> str:
+        return json.dumps({TEMPLATE_RECORD_KEY: asdict(self)})
+
+
+def read_template_record(comment: str | None) -> TemplateRecord | None:
+    """The template record in a database's comment, or `None` when it holds
+    none. As with a run's record, one that can't be read in full is none."""
+    if not comment:
+        return None
+    try:
+        decoded = json.loads(comment)
+    except ValueError:
+        return None
+    if not isinstance(decoded, dict):
+        return None
+    fields = decoded.get(TEMPLATE_RECORD_KEY)
+    if not isinstance(fields, dict):
+        return None
+
+    text_fields = ("database", "schema", "state", "directory", "host", "lock")
+    if set(fields) != {*text_fields, "pid"}:
+        return None
+    if not all(isinstance(fields[name], str) and fields[name] for name in text_fields):
+        return None
+    if fields["state"] not in (TEMPLATE_BUILDING, TEMPLATE_READY):
+        return None
+    if type(fields["pid"]) is not int:
+        return None
+    return TemplateRecord(**fields)
 
 
 @dataclass(frozen=True)
@@ -188,7 +251,121 @@ def _connections(count: int) -> str:
     return "1 connection is" if count == 1 else f"{count} connections are"
 
 
-def process_is_running(record: RunRecord) -> bool | None:
+@dataclass(frozen=True)
+class TemplateFacts:
+    """Everything `judge_template` goes by."""
+
+    name: str
+    record: TemplateRecord | None
+    # The template's lock was asked for and got. False when a run holds it,
+    # building the template or cloning from it, and when it wasn't asked for.
+    lock_is_free: bool
+    connections: int
+    # Whether the process that was building it is running. `None` when it
+    # was on another machine, where that can't be known.
+    process_is_running: bool | None
+
+
+def judge_template(
+    facts: TemplateFacts,
+    *,
+    current_schema: str | None,
+    tested_database_is_gone: bool = False,
+) -> LeftoverVerdict:
+    """
+    Whether `facts.name` is a template of no use now.
+
+    `current_schema` is the digest of the schema the database it is for
+    would be built with now, or `None` when that isn't known here (another
+    checkout's database: its own runs know). `tested_database_is_gone` says
+    the database it was built for is no longer on the server.
+    """
+    record = facts.record
+    if record is None:
+        return LeftoverVerdict(
+            drop=False, reason="it carries no record that a test run made it"
+        )
+    if record.lock != LOCK_SCHEME:
+        return LeftoverVerdict(
+            drop=False,
+            reason=(
+                "the run that built it marks itself alive another way"
+                f" ({record.lock!r}), so whether it is in use can't be told"
+            ),
+            in_doubt=True,
+        )
+    if not facts.lock_is_free:
+        return LeftoverVerdict(
+            drop=False, reason="a run in progress is building it or cloning from it"
+        )
+    if record.state == TEMPLATE_BUILDING:
+        if facts.process_is_running:
+            return LeftoverVerdict(
+                drop=False,
+                reason=(
+                    f"process {record.pid}, which was building it, is running,"
+                    " though it holds no lock"
+                ),
+                in_doubt=True,
+            )
+        if facts.connections:
+            return LeftoverVerdict(
+                drop=False,
+                reason=(
+                    f"{_connections(facts.connections)} open to it, though the run"
+                    " that was building it holds no lock"
+                ),
+                in_doubt=True,
+            )
+        return LeftoverVerdict(
+            drop=True,
+            reason=(
+                f"the run that was building it (process {record.pid}, started in"
+                f" {record.directory}) is gone, and it was never finished"
+            ),
+        )
+    if tested_database_is_gone:
+        if facts.connections:
+            return LeftoverVerdict(
+                drop=False,
+                reason=(
+                    f"{_connections(facts.connections)} open to it, though the"
+                    f" database it was built for, {record.database!r}, is gone"
+                ),
+                in_doubt=True,
+            )
+        return LeftoverVerdict(
+            drop=True,
+            reason=f"the database it was built for, {record.database!r}, is gone",
+        )
+    if current_schema is None:
+        return LeftoverVerdict(
+            drop=False,
+            reason=(
+                f"the template {record.database!r}'s test runs clone; a run of"
+                " that database replaces it when the schema changes"
+            ),
+        )
+    if record.schema == current_schema:
+        return LeftoverVerdict(
+            drop=False, reason="the template this checkout's test runs clone"
+        )
+    if facts.connections:
+        return LeftoverVerdict(
+            drop=False,
+            reason=(
+                f"{_connections(facts.connections)} open to it, though the schema"
+                " has changed since it was built"
+            ),
+            in_doubt=True,
+        )
+    return LeftoverVerdict(
+        drop=True,
+        reason="the schema changed since it was built, and a run built a new one",
+    )
+
+
+def process_is_running(record: RunRecord | TemplateRecord) -> bool | None:
     """Whether the process that wrote `record` is running on this machine."""
     if record.host != socket.gethostname():
         return None
@@ -321,17 +498,106 @@ def drop_if_a_dead_runs(
         return verdict
 
 
+def look_at_template(
+    maintenance: psycopg.Connection,
+    config: DatabaseConfig,
+    *,
+    name: str,
+    record: TemplateRecord | None,
+) -> TemplateFacts:
+    """The facts about one template, read and nothing else. Its lock is
+    asked for and given straight back."""
+    if record is None or record.lock != LOCK_SCHEME:
+        lock_is_free = False
+    else:
+        with _run_lock(maintenance, name, already_held=False) as got_it:
+            lock_is_free = got_it
+    return TemplateFacts(
+        name=name,
+        record=record,
+        lock_is_free=lock_is_free,
+        connections=connection_count(config, name=name),
+        process_is_running=None if record is None else process_is_running(record),
+    )
+
+
+def drop_if_a_stale_template(
+    maintenance: psycopg.Connection,
+    config: DatabaseConfig,
+    *,
+    name: str,
+    record: TemplateRecord,
+    current_schema: str | None,
+    tested_database_is_gone: bool = False,
+) -> LeftoverVerdict:
+    """Drop the template `name` if it is of no use now (`judge_template`).
+
+    `record` is what its comment held when it was listed. Everything is
+    read again here with the template's lock held, so no run starts
+    cloning it in the middle, and it is dropped only if it is still the one
+    that was listed.
+    """
+    if record.lock != LOCK_SCHEME:
+        facts = TemplateFacts(
+            name=name,
+            record=record,
+            lock_is_free=False,
+            connections=0,
+            process_is_running=None,
+        )
+        return judge_template(
+            facts,
+            current_schema=current_schema,
+            tested_database_is_gone=tested_database_is_gone,
+        )
+
+    with _run_lock(maintenance, name, already_held=False) as got_it:
+        now = read_template_record(get_database_comment(config, name=name))
+        if now != record:
+            return LeftoverVerdict(
+                drop=False, reason="it isn't the database that was listed"
+            )
+
+        facts = TemplateFacts(
+            name=name,
+            record=record,
+            lock_is_free=got_it,
+            connections=connection_count(config, name=name),
+            process_is_running=process_is_running(record),
+        )
+        verdict = judge_template(
+            facts,
+            current_schema=current_schema,
+            tested_database_is_gone=tested_database_is_gone,
+        )
+        if not verdict.drop:
+            return verdict
+
+        try:
+            # Not forced, as for a run's database.
+            drop_database(config, name=name, force=False)
+        except errors.ObjectInUse:
+            return LeftoverVerdict(
+                drop=False,
+                reason="something connected to it as it was being dropped",
+                in_doubt=True,
+            )
+        return verdict
+
+
 def remove_what_dead_runs_left(
     maintenance: psycopg.Connection,
     config: DatabaseConfig,
     *,
     tested_database: str,
     held_run: str,
+    current_schema: str,
     say: Callable[[str], None],
 ) -> list[str]:
     """
-    Drop the databases that dead runs of `tested_database` left. The names
-    of those dropped.
+    Drop the databases that dead runs of `tested_database` left, and the
+    templates of `tested_database` that are of no use now. The names of
+    those dropped.
 
     Only a database whose record names `tested_database` is looked at. One
     that is left in doubt gets a line through `say`.
@@ -343,17 +609,29 @@ def remove_what_dead_runs_left(
 
     dropped = []
     for name, comment in rows:
-        record = read_run_record(comment)
-        if record is None or record.database != tested_database:
+        run_record = read_run_record(comment)
+        template_record = read_template_record(comment)
+        if run_record is not None and run_record.database == tested_database:
+            verdict = drop_if_a_dead_runs(
+                maintenance,
+                config,
+                name=name,
+                record=run_record,
+                tested_database=tested_database,
+                held_run=held_run,
+            )
+        elif (
+            template_record is not None and template_record.database == tested_database
+        ):
+            verdict = drop_if_a_stale_template(
+                maintenance,
+                config,
+                name=name,
+                record=template_record,
+                current_schema=current_schema,
+            )
+        else:
             continue
-        verdict = drop_if_a_dead_runs(
-            maintenance,
-            config,
-            name=name,
-            record=record,
-            tested_database=tested_database,
-            held_run=held_run,
-        )
         if verdict.drop:
             dropped.append(name)
         elif verdict.in_doubt:

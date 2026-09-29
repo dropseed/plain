@@ -76,6 +76,48 @@ def test_the_phases_say_what_was_inside_them():
     ]
 
 
+SAYS_WHAT_ITS_SETUP_DID = {
+    "tests/lifecycle.py": (
+        "from plain.testing import TestLifecycle\n"
+        "\n"
+        "\n"
+        "class AppTestLifecycle(TestLifecycle):\n"
+        "    def describe_setup(self):\n"
+        '        return (("warmed the cache", 0.25), ("seeded the index", 0.5))\n'
+    ),
+    **ONE_TEST,
+}
+
+
+def test_a_lifecycle_says_what_its_setup_spent_the_time_on():
+    result = run_in_project(SAYS_WHAT_ITS_SETUP_DID, "--json")
+    assert result.exit_code == 0
+
+    phases = {phase["name"]: phase for phase in json.loads(result.stdout)["phases"]}
+    [set_up] = phases["lifecycle_setup"]["parts"]
+    assert set_up["name"] == "AppTestLifecycle"
+    assert set_up["parts"] == [
+        {"name": "warmed the cache", "seconds": 0.25, "parts": []},
+        {"name": "seeded the index", "seconds": 0.5, "parts": []},
+    ]
+
+    result = run_in_project(SAYS_WHAT_ITS_SETUP_DID, "--verbose")
+    lines = section(result.stdout, "where the ").splitlines()
+    # The lifecycle has a line under setup and another under teardown; the
+    # first is the setup's.
+    lifecycle = next(
+        line for line in lines if line.strip().startswith("AppTestLifecycle")
+    )
+    [warmed] = [line for line in lines if "warmed the cache" in line]
+    # Under the lifecycle's line, one level further in.
+    assert lines.index(warmed) == lines.index(lifecycle) + 1
+    assert (
+        len(warmed) - len(warmed.lstrip())
+        == len(lifecycle) - len(lifecycle.lstrip()) + 2
+    )
+    assert warmed.rstrip().endswith("0.25s")
+
+
 def test_a_run_that_spent_its_time_outside_the_tests_says_where():
     result = run_in_project(SLOW_TO_SET_UP)
     assert result.exit_code == 0
