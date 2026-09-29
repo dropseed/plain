@@ -8,6 +8,9 @@ for the duration of the test instead of a rolled-back transaction — for
 DDL-heavy tests (migrations, convergence) that can't run inside a
 transaction that never commits.
 
+The databases are the run's own, and while one is in use it is the
+configured database for the whole process: see `database.py`.
+
 The rolled-back tests share one connection, opened by the first of them.
 The rollback undoes everything a test did in its transaction. What belongs
 to the session and not to a transaction carries over to the next test: a
@@ -15,10 +18,10 @@ session-level advisory lock, a `LISTEN`, a server-side prepared statement.
 A test that needs a session of its own is `@isolated_db`.
 """
 
-import re
 from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 
+from plain.runtime import settings
 from plain.test import CollectedTest, TestLifecycle
 
 from .. import transaction
@@ -26,8 +29,7 @@ from ..base import Model
 from ..db import get_connection
 from ..otel import suppress_db_tracing
 from ..query import QuerySet
-from ..sources import runtime_pool_source
-from .database import use_test_database
+from .database import RunDatabases, use_test_database
 from .decorators import ISOLATED_DB_TAG
 
 # A model instance that prints in less than this is printed on one line.
@@ -88,22 +90,33 @@ class PostgresTestLifecycle(TestLifecycle):
     required_package = "plain.postgres"
 
     def __init__(self) -> None:
-        # Holds the test database open from setup to teardown.
+        # Holds the run's claim and its shared database, from setup to teardown.
         self._test_database = ExitStack()
+        self._run: RunDatabases | None = None
 
     def setup_worker(self) -> None:
-        # use_test_database installs a direct connection to the test database
-        # via the connection ContextVar; close any existing pool so nothing
-        # keeps handing out connections opened against the runtime URL.
-        runtime_pool_source.close()
+        run = RunDatabases(
+            runtime_url=str(settings.POSTGRES_URL),
+            management_url=str(settings.POSTGRES_MANAGEMENT_URL),
+        )
+        self._run = run
         with suppress_db_tracing():
-            self._test_database.enter_context(use_test_database(verbosity=0, prefix=""))
+            run.claim()
+            self._test_database.callback(run.release)
+            self._test_database.enter_context(
+                use_test_database(
+                    name=run.shared_name,
+                    runtime_url=run.runtime_url,
+                    management_url=run.management_url,
+                    verbosity=0,
+                )
+            )
 
     def teardown_worker(self) -> None:
         with suppress_db_tracing():
-            # Closes the connection the tests shared, then drops the database.
+            # Closes the connection the tests shared, drops the database,
+            # then gives up the run's claim.
             self._test_database.close()
-        runtime_pool_source.close()
 
     @contextmanager
     def around_test(self, test: CollectedTest) -> Generator[None]:
@@ -128,9 +141,12 @@ class PostgresTestLifecycle(TestLifecycle):
             # first statement. Until then, code that opens psycopg's own
             # `connection.transaction()` finds none, begins one itself, and
             # commits it, and what it did outlives the test. So send the
-            # first statement here.
+            # first statement here. The connection was the last test's too,
+            # and a session-level advisory lock is the session's, which a
+            # rollback doesn't release: the statement gives back any that
+            # test left held.
             with get_connection().cursor() as cursor:
-                cursor.execute("SELECT 1")
+                cursor.execute("SELECT pg_advisory_unlock_all()")
 
         try:
             yield
@@ -145,12 +161,16 @@ class PostgresTestLifecycle(TestLifecycle):
                 # costs a hundred times what the rollback does.
 
     def _run_in_isolated_database(self, test: CollectedTest) -> Generator[None]:
+        run = self._run
+        assert run is not None
         test_name = test.id.rpartition("::")[2]
-        prefix = re.sub(r"[^0-9A-Za-z_]+", "_", test_name)
 
-        # Per-test pool, rebuilt against this test's database.
-        runtime_pool_source.close()
-        ctx = use_test_database(verbosity=0, prefix=prefix)
+        ctx = use_test_database(
+            name=run.isolated_name(test_name),
+            runtime_url=run.runtime_url,
+            management_url=run.management_url,
+            verbosity=0,
+        )
         with suppress_db_tracing():
             ctx.__enter__()
         try:
@@ -158,4 +178,3 @@ class PostgresTestLifecycle(TestLifecycle):
         finally:
             with suppress_db_tracing():
                 ctx.__exit__(None, None, None)
-            runtime_pool_source.close()

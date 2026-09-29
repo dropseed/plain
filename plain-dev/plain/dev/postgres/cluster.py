@@ -62,6 +62,20 @@ class Cluster:
 
         return connection_count(self.config, name=name)
 
+    def test_database_in_use(self, name: str) -> bool:
+        """Whether a test database is some run's, right now.
+
+        A run holds a lock for as long as it lives, so this is true from
+        before it creates its database, not only once it has connected.
+        Something connected counts too: a test database named the way they
+        were before runs took a lock has nothing else to go by.
+        """
+        from plain.postgres.test.database import database_is_a_live_runs
+
+        if self.connection_count(name) > 0:
+            return True
+        return database_is_a_live_runs(self.config, name=name)
+
     def create_database(self, name: str, *, template: str | None = None) -> None:
         from plain.postgres.databases import create_database
 

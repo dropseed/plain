@@ -165,23 +165,14 @@ class _ContextVarTrackingMiddleware(DatabaseConnectionMiddleware):
 
 @contextmanager
 def _clean_connection():
-    """Ensure the ContextVar starts empty and clean up any connection afterward."""
+    """Ensure the ContextVar starts empty and clean up any connection afterward.
+
+    A connection a worker thread made (an async view's `asyncio.to_thread`)
+    is the pool's, to the test database, and can't be reached from here.
+    It doesn't have to be: the run drops its database with `FORCE`.
+    """
     with clean_connection():
         yield
-
-    # Async views create connections on worker threads (via asyncio.to_thread)
-    # that we can't reach from this thread. Terminate them from PostgreSQL so
-    # they don't block worker teardown (DROP DATABASE).
-    if has_connection():
-        try:
-            with get_connection().cursor() as cursor:
-                cursor.execute(
-                    "SELECT pg_terminate_backend(pid) "
-                    "FROM pg_stat_activity "
-                    "WHERE datname = current_database() AND pid != pg_backend_pid()"
-                )
-        except Exception:
-            pass
 
 
 @contextmanager

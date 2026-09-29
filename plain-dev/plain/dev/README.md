@@ -160,7 +160,7 @@ Every checkout gets its own database, derived from its directory name. Two workt
 | `myapp-feature/`     | `myapp_feature` |
 | `worktrees/fix-bug/` | `myapp_fix_bug` |
 
-Test databases are derived from that name too (`test_myapp_feature`), so parallel test runs in different checkouts don't collide either.
+Test databases are derived from that name too, and from the run (`test_myapp_feature_r48213`), so test runs at the same moment don't collide: not in different checkouts, and not in one.
 
 All of a project's databases live in one Postgres server, shared by every worktree. That's what makes copying between them instant.
 

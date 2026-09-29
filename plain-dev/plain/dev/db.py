@@ -399,10 +399,11 @@ def clean(yes: bool) -> None:
     - Databases whose recorded checkout directory no longer exists. Forking is a
       full copy, so deleted worktrees leave real disk behind. A database with no
       recorded owner is left alone.
-    - Test databases with no active connections. A normal test run drops its
-      database on exit, so one that's still here — and that nothing is connected
-      to — is left over from a crashed run. One with live connections is a run
-      in progress and is never touched.
+    - Test databases that are no run's. A test run drops its databases when
+      it ends, so one that's still here, that no living run holds and that
+      nothing is connected to, is left over from a run that was killed. One
+      that a run in progress holds is never touched. (The next test run in
+      the checkout removes these too.)
 
     The project's main database is never a candidate, whatever its metadata
     says. It's the fork source for every checkout, so a stale owner path on it
@@ -425,7 +426,7 @@ def clean(yes: bool) -> None:
         for database in databases
         if database.is_test
         and database.name != current
-        and cluster.connection_count(database.name) == 0
+        and not cluster.test_database_in_use(database.name)
     ]
     candidates = orphans + stale_tests
     if not candidates:

@@ -21,6 +21,9 @@
 - [Diagnostics](#diagnostics)
 - [Tracing](#tracing)
 - [Testing](#testing)
+    - [The run's own database](#the-runs-own-database)
+    - [The test database is the only database](#the-test-database-is-the-only-database)
+    - [What a failure prints](#what-a-failure-prints)
     - [Tests that can't run in a transaction](#tests-that-cant-run-in-a-transaction)
     - [Setting a query budget](#setting-a-query-budget)
     - [Reading the queries a block ran](#reading-the-queries-a-block-ran)
@@ -2366,10 +2369,50 @@ def test_signup_creates_a_user():
 
 Two things happen around your tests:
 
-- **A test database for the run.** When the run starts, a database named `test_<your database>` is created on the same server, then migrated and converged. It's dropped when the run ends. One left over from an interrupted run is replaced.
+- **A test database for the run.** When the run starts, a database is created on the same server, then migrated and converged. It's dropped when the run ends.
 - **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
 
-The tests share one connection. The rollback undoes what a test did in its transaction: rows, `SET`, temporary tables, and the locks a transaction holds. What belongs to the session carries over to the next test: a session-level advisory lock, a `LISTEN`, a server-side prepared statement. A test that needs a session of its own is [`@isolated_db`](#tests-that-cant-run-in-a-transaction).
+The tests share one connection. The rollback undoes what a test did in its transaction: rows, `SET`, temporary tables, and the locks a transaction holds. Session-level advisory locks are released before the next test. What else belongs to the session carries over: a `LISTEN`, a server-side prepared statement. A test that needs a session of its own is [`@isolated_db`](#tests-that-cant-run-in-a-transaction).
+
+### The run's own database
+
+The database is named for yours and for the run, with the run's process id:
+
+```
+test_shop_main_r48213
+```
+
+So any number of runs can go at once in one checkout, with nothing to configure. Each creates, uses and drops its own.
+
+A run that was killed leaves its database behind. The next run in that checkout removes it, and so does `plain db clean`. Neither touches the database of a run that is still going. A run holds a lock on the server for as long as it lives, and that is what they go by.
+
+### The test database is the only database
+
+While the tests run, `POSTGRES_URL` is the test database. Nothing in the process reaches your development database by asking for a connection, whatever thread or context it asks from. `POSTGRES_MANAGEMENT_URL`, if you set one, points at the test database too.
+
+Code that starts a thread is where this matters. A thread has no connection to begin with, so it gets one of its own from the pool, to the test database. That connection is not the test's:
+
+- The thread doesn't see what the test wrote, because the test's transaction never commits.
+- What the thread writes is committed, and isn't rolled back with the test.
+
+A test that needs either is [`@isolated_db`](#tests-that-cant-run-in-a-transaction): it commits, so a thread sees its rows, and its database is dropped with everything in it.
+
+```python
+import threading
+
+from plain.postgres.test import isolated_db
+
+
+@isolated_db
+def test_the_importer_sees_the_batch():
+    batch = Batch.query.create(name="march")
+
+    importer = threading.Thread(target=import_batch, args=[batch.id])
+    importer.start()
+    importer.join()
+
+    assert Row.query.count() == 3
+```
 
 The package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
 

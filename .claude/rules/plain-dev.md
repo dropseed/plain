@@ -52,7 +52,8 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 "use this" and turns all of it off.
 
 - Each checkout gets its own database derived from the directory name, so
-  worktrees never share data. Test databases derive from it too.
+  worktrees never share data. Test databases derive from it too, one per
+  test run, so any number of `plain test` runs can go at once in one checkout.
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
 - `plain db status --json` before diagnosing anything database-shaped: database,
@@ -65,8 +66,10 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 - `plain postgres shell` for a psql prompt on the active database; it accepts
   piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect
   data.
-- `plain db clean` drops databases whose checkout directory is gone. Forks are
-  full copies, so deleted worktrees do leave disk behind.
+- `plain db clean` drops databases whose checkout directory is gone, and test
+  databases a killed run left. Forks are full copies, so deleted worktrees do
+  leave disk behind. It lists what it would drop and asks first: read the
+  list before passing `--yes`.
 - One Postgres container per project, started on demand and never removed
   automatically. `plain db server list` shows them all, `plain db server stop`
   frees one up (~76MB each), `plain db server remove` deletes it and its data.
