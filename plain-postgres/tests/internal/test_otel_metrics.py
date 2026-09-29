@@ -12,7 +12,13 @@ from opentelemetry.trace import NoOpTracer
 from plain.postgres import otel as postgres_otel
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source
-from plain.test import capture_metrics, capture_spans, override_settings, patch, raises
+from plain.testing import (
+    capture_metrics,
+    capture_spans,
+    override_settings,
+    patch,
+    raises,
+)
 from psycopg_pool import PoolTimeout
 
 

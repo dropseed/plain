@@ -15,7 +15,7 @@ import psycopg
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source
-from plain.test import raises
+from plain.testing import raises
 from postgres_test_helpers import clean_connection
 
 

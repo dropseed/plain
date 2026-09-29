@@ -13,7 +13,7 @@ from plain.admin.field_refs import FieldRef
 from plain.admin.models import PinnedNavItem
 from plain.admin.views import AdminModelListView
 from plain.postgres import Field, QuerySet, types
-from plain.test import build_request, raises
+from plain.testing import build_request, raises
 
 from plain import postgres
 

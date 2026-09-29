@@ -13,7 +13,7 @@ from plain.cloud.credentials import (
     load,
     save,
 )
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_save_writes_token_to_keyring_and_api_url_to_file():

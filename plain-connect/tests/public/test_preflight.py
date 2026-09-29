@@ -1,5 +1,5 @@
 from plain.connect.preflight import CheckConnectSecretKey
-from plain.test import override_settings
+from plain.testing import override_settings
 
 
 def test_no_warning_when_pageviews_token_not_set():

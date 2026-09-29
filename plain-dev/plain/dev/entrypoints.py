@@ -33,7 +33,7 @@ def setup() -> None:
 
     # Dev services are started for the commands that need them, once there
     # is known to be such a command. This hook runs for `plain tset` too, and
-    # for `plain test` with no plain.test installed, and services started
+    # for `plain test` with no plain.testing installed, and services started
     # for a command that doesn't exist are left running by it.
     when_the_running_command_is_found(auto_start_services)
 

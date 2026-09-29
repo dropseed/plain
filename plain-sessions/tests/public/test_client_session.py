@@ -2,7 +2,7 @@
 
 from plain.runtime import settings
 from plain.sessions.test import get_client_session
-from plain.test import Client
+from plain.testing import Client
 
 
 def test_a_client_without_a_session_gets_one_and_its_cookie() -> None:

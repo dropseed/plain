@@ -1,7 +1,7 @@
 import re
 
-from plain.test import Client, override_settings
-from plain.test.otel import tracer_provider_for_capturing
+from plain.testing import Client, override_settings
+from plain.testing.otel import tracer_provider_for_capturing
 
 
 def install_real_tracing() -> None:

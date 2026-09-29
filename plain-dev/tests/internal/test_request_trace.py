@@ -31,7 +31,7 @@ from plain.dev.request.trace import (
     capture_available,
     capture_trace_spans,
 )
-from plain.test import CapturedSpans, capture_spans, patch
+from plain.testing import CapturedSpans, capture_spans, patch
 
 
 def _query_attributes(sql: str) -> dict[str, str | int]:

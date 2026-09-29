@@ -12,7 +12,7 @@ from app.examples.models.defaults import DefaultsExample
 from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection, types
 from plain.postgres.test import isolated_db
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def test_create_table_inlines_literal_default():

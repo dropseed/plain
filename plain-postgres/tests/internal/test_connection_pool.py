@@ -10,7 +10,7 @@ from plain.postgres.db import (
     return_database_connection,
 )
 from plain.postgres.sources import runtime_pool_source
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 from postgres_test_helpers import clean_connection
 from psycopg_pool import PoolTimeout
 

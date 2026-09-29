@@ -3,7 +3,7 @@
 from app.users.models import User
 from click.testing import CliRunner
 from plain.cli.core import cli
-from plain.test import override_settings
+from plain.testing import override_settings
 
 
 def test_request_as_a_user_is_that_users_request() -> None:

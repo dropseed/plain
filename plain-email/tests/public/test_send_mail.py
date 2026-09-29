@@ -1,6 +1,6 @@
 from plain.email import send_mail, send_mass_mail
 from plain.email.backends.base import BaseEmailBackend
-from plain.test import override_settings
+from plain.testing import override_settings
 
 
 class MinimalBackend(BaseEmailBackend):

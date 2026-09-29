@@ -7,7 +7,7 @@ from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
 from plain.http import HTTPException
-from plain.test import Client, build_request, raises
+from plain.testing import Client, build_request, raises
 from plain.urls import Router, path
 
 

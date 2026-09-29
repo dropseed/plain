@@ -1,7 +1,7 @@
 from app.users.models import User
 from plain.oauth.models import OAuthConnection
 from plain.oauth.preflight import CheckOAuthProviderKeys
-from plain.test import override_settings
+from plain.testing import override_settings
 
 
 def test_oauth_provider_keys_check_pass():

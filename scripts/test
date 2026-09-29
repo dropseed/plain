@@ -15,7 +15,7 @@
 #   --python 3.14  Run with a specific Python version (sets UV_PYTHON)
 ALL_PACKAGES="$(cat <<EOF
 plain
-plain-test
+plain-testing
 plain-dev
 plain-code
 plain-postgres
@@ -93,7 +93,7 @@ for package in $packages; do
     --isolated \
     --package "$package" \
     $WITH \
-    python -m plain.test "$@"
+    python -m plain.testing "$@"
   set +x
 
   cd ../..
@@ -103,7 +103,7 @@ done
 echo
 bold "Testing example"
 cd "example"
-uv run --isolated $WITH python -m plain.test "$@"
+uv run --isolated $WITH python -m plain.testing "$@"
 cd ..
 
 if [ "$run_server" = false ]; then

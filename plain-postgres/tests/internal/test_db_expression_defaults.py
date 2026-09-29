@@ -15,7 +15,7 @@ from app.examples.models.defaults import DBDefaultsExample, DefaultsExample
 from plain.postgres import get_connection
 from plain.postgres.fields import DATABASE_DEFAULT
 from plain.postgres.functions import GenRandomUUID, Now
-from plain.test import raises
+from plain.testing import raises
 
 
 def _column_default(table_name: str, column_name: str) -> str | None:

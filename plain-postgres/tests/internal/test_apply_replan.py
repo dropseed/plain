@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from plain.postgres.cli.migrations import apply
 from plain.postgres.db import get_connection
 from plain.postgres.migrations.recorder import MigrationRecorder
-from plain.test import patch
+from plain.testing import patch
 
 
 def test_apply_replans_after_waiting_on_lock():

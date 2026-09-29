@@ -14,7 +14,7 @@ import psycopg.errors
 from click.testing import CliRunner, Result
 from plain.dev import db
 from plain.dev.postgres.cleaning import Checkout, CleanFacts, OwnerPath
-from plain.test import patch
+from plain.testing import patch
 
 GONE = OwnerPath(exists=False, parent_exists=False)
 

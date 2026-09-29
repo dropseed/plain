@@ -12,7 +12,7 @@ from plain.cloud import cli as cli_module
 from plain.cloud.cli import cli
 from plain.cloud.client import Client
 from plain.cloud.credentials import SERVICE, Credentials, save
-from plain.test import patch
+from plain.testing import patch
 
 
 def make_runner() -> CliRunner:

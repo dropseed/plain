@@ -16,7 +16,7 @@ from plain.postgres.functions import RowNumber
 from plain.postgres.sources import build_connection_params
 from plain.postgres.test import capture_queries, isolated_db
 from plain.postgres.transaction import TransactionManagementError
-from plain.test import cases, raises
+from plain.testing import cases, raises
 from postgres_test_helpers import executed_sql
 from psycopg import NotSupportedError
 

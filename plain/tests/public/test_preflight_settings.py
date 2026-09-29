@@ -2,7 +2,7 @@ import contextlib
 import os
 
 from plain.preflight.settings import CheckUnusedEnvVars
-from plain.test import patch
+from plain.testing import patch
 
 
 @contextlib.contextmanager

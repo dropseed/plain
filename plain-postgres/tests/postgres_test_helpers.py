@@ -148,7 +148,7 @@ class ScratchApp:
         if hold_at_start:
             command = [sys.executable, "-c", _RUN_WHEN_TOLD, *arguments]
         else:
-            command = [sys.executable, "-m", "plain.test", *arguments]
+            command = [sys.executable, "-m", "plain.testing", *arguments]
         return subprocess.Popen(
             command,
             cwd=self.root,
@@ -174,8 +174,8 @@ class ScratchApp:
 _RUN_WHEN_TOLD = (
     "import runpy, sys\n"
     "sys.stdin.readline()\n"
-    "sys.argv[0] = 'plain.test'\n"
-    "runpy.run_module('plain.test', run_name='__main__')\n"
+    "sys.argv[0] = 'plain.testing'\n"
+    "runpy.run_module('plain.testing', run_name='__main__')\n"
 )
 
 

@@ -26,7 +26,7 @@ import plain.runtime
 
 plain.runtime.setup()
 
-from plain.test import Client
+from plain.testing import Client
 
 
 def main() -> None:

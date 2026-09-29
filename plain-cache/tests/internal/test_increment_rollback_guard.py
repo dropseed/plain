@@ -10,7 +10,7 @@ earlier writes and run commit hooks. This pins the mechanism -- the connection's
 import psycopg
 from plain.cache import cache
 from plain.postgres import get_connection
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_failed_increment_marks_transaction_for_rollback():

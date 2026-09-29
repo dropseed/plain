@@ -29,7 +29,7 @@ from plain.postgres.convergence.corrections import (
 from plain.postgres.functions.text import Lower, Upper
 from plain.postgres.introspection import ConType
 from plain.postgres.test import capture_queries, isolated_db
-from plain.test import cases, patch, raises
+from plain.testing import cases, patch, raises
 
 
 def _create_exclusion_constraint(

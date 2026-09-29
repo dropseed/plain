@@ -8,7 +8,7 @@ app that wasn't there.
 
 from plain.cli import core
 from plain.packages import packages_registry
-from plain.test import patch
+from plain.testing import patch
 
 from plain import runtime
 

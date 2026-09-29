@@ -1,4 +1,4 @@
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 
 
 def test_html_page():

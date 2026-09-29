@@ -3,7 +3,7 @@
 plain.dev's setup hook runs for every `plain` command, one that was mistyped
 included, because the CLI can't tell it from a command the app registers
 until the app has loaded. Services the hook started for `plain test`, with no
-plain.test installed to provide the command, were left running after the CLI
+plain.testing installed to provide the command, were left running after the CLI
 said there was no such command.
 """
 
@@ -16,7 +16,7 @@ from plain.cli.runtime import (
 )
 from plain.dev import entrypoints, services
 from plain.dev.services import ServicesSupervisor, auto_start_services
-from plain.test import cases, patch
+from plain.testing import cases, patch
 
 
 class StartedServices:
@@ -94,7 +94,7 @@ def test_services_are_not_started_until_the_command_is_found():
 
 @cases("test", "tset", "request")
 def test_a_command_that_is_never_found_starts_nothing(command):
-    """`plain test` with no plain.test installed is one."""
+    """`plain test` with no plain.testing installed is one."""
     started = StartedServices()
     a, b, c, d, e, f = with_services_to_start(started)
     with a, b, c, d, e, f:
@@ -105,7 +105,7 @@ def test_a_command_that_is_never_found_starts_nothing(command):
 
 
 def test_a_command_found_before_the_hook_runs_has_them_started_at_once():
-    """`python -m plain.test` is the command, and says so before it sets up."""
+    """`python -m plain.testing` is the command, and says so before it sets up."""
     started = StartedServices()
     a, b, c, d, e, f = with_services_to_start(started)
     with a, b, c, d, e, f, running("test"):

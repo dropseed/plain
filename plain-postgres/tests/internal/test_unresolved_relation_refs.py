@@ -10,7 +10,7 @@ from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.state import ModelState, ProjectState
 from plain.postgres.migrations.utils import field_references
 from plain.postgres.registry import ModelsRegistry
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_unresolved_model_is_not_swallowed_by_getattr():

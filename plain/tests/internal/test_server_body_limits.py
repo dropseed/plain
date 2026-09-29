@@ -18,7 +18,7 @@ import h2.errors
 from plain.http import Response
 from plain.runtime import settings
 from plain.server.http.sink import BodyBudget
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 from server_stubs import (
     BodyLengthHandler,
     chunked_request,

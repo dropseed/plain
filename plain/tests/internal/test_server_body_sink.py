@@ -14,7 +14,7 @@ from plain.server.http.sink import (
     BodySink,
     ChunkedDecoder,
 )
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 # ---------------------------------------------------------------------------
 # BodySink

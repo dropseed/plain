@@ -5,7 +5,7 @@ from plain.runtime import settings
 from .core import SessionStore
 
 if TYPE_CHECKING:
-    from plain.test import Client
+    from plain.testing import Client
 
 __all__ = ["get_client_session"]
 

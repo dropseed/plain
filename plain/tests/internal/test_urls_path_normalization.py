@@ -7,7 +7,7 @@ double-slashes before the framework sees them — so the only way to
 exercise the parser's handling of `//foo/` is to call it directly.
 """
 
-from plain.test import cases
+from plain.testing import cases
 from plain.urls.paths import (
     BadPath,
     ParsedPath,

@@ -12,7 +12,7 @@ from plain.postgres.schema_lock import (
     schema_lock,
 )
 from plain.postgres.sources import build_connection_params
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 
 
 def _lock_holder_count() -> int:

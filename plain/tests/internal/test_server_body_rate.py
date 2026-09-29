@@ -12,7 +12,7 @@ import asyncio
 from plain.http import Response
 from plain.server.http import sink
 from plain.server.http.sink import BodyRateFloor
-from plain.test import override_settings, patch, raises
+from plain.testing import override_settings, patch, raises
 from server_stubs import (
     BodyLengthHandler,
     h1_connect,

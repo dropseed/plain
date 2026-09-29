@@ -17,7 +17,7 @@ from plain.postgres.cli.migrations import apply
 from plain.postgres.migrations.exceptions import BadMigrationError
 from plain.postgres.migrations.loader import MigrationLoader
 from plain.postgres.migrations.recorder import MigrationRecorder
-from plain.test import raises
+from plain.testing import raises
 
 SQUASHED = """\
 from plain.postgres import migrations

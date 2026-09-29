@@ -1,7 +1,7 @@
 import click
 from click.testing import CliRunner
 from plain.cli.options import SettingOption
-from plain.test import raises
+from plain.testing import raises
 
 
 @click.command()

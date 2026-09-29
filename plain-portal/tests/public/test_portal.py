@@ -27,7 +27,7 @@ from plain.portal.protocol import (
     make_pong,
     make_relay_url,
 )
-from plain.test import raises
+from plain.testing import raises
 
 # ---------------------------------------------------------------------------
 # 1. Code generation roundtrip

@@ -29,7 +29,7 @@ from plain.internal.handlers.response_lifecycle import (
     ResponseBodyError,
     ResponseLifecycle,
 )
-from plain.test import build_request, raises
+from plain.testing import build_request, raises
 from plain.views import ServerSentEvent, ServerSentEventsView
 from server_stubs import (
     ContextHandler,

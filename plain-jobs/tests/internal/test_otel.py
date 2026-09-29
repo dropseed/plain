@@ -17,7 +17,7 @@ from opentelemetry.trace import SpanKind, StatusCode, get_current_span
 from plain.jobs import Job, otel
 from plain.jobs.registry import register_job
 from plain.jobs.workers import Worker
-from plain.test import (
+from plain.testing import (
     capture_logs,
     capture_metrics,
     capture_spans,

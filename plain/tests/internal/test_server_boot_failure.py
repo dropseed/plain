@@ -14,7 +14,7 @@ import socket
 import threading
 
 from plain.server.workers import boot_failure
-from plain.test import patch
+from plain.testing import patch
 from server_stubs import StubApp
 
 

@@ -1,7 +1,7 @@
 from app.examples.models.iteration import IterationExample
 from plain.postgres import F, QuerySet
 from plain.postgres.test import capture_queries
-from plain.test import raises
+from plain.testing import raises
 
 
 def create_rows():

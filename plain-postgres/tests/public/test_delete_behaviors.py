@@ -37,7 +37,7 @@ from app.examples.models.trees import TreeNode
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
 from plain.postgres.test import capture_queries
-from plain.test import raises
+from plain.testing import raises
 
 
 def _create_parents():

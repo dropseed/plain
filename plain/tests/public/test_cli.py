@@ -4,7 +4,7 @@ from click.testing import CliRunner
 from plain.cli import core
 from plain.cli.core import cli
 from plain.runtime import settings
-from plain.test import patch
+from plain.testing import patch
 from plain.urls.resolvers import _get_cached_resolver
 
 

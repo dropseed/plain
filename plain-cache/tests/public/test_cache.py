@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from plain.cache import cache
 from plain.cache.models import CachedItem
-from plain.test import raises
+from plain.testing import raises
 from plain.utils import timezone
 
 

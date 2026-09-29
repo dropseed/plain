@@ -35,7 +35,7 @@ dev = [
   "plain-sessions",
   "plain-tailwind",
   "plain-templates",
-  "plain-test",
+  "plain-testing",
   "plain-toolbar",
   "plain-tunnel",
   "plain-vendor",
@@ -85,7 +85,7 @@ package = false
 "plain-sessions" = { workspace = true }
 "plain-tailwind" = { workspace = true }
 "plain-templates" = { workspace = true }
-"plain-test" = { workspace = true }
+"plain-testing" = { workspace = true }
 "plain-toolbar" = { workspace = true }
 "plain-tunnel" = { workspace = true }
 "plain-vendor" = { workspace = true }
@@ -127,6 +127,6 @@ extra-paths = [
   "plain-oauthserver/tests",
   "plain-postgres/tests",
   "plain-templates/tests",
-  "plain-test/tests",
+  "plain-testing/tests",
   "example",
 ]

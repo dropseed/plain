@@ -1,6 +1,6 @@
 """Behavior contract — plain-admin list bulk actions.
 
-Drives the ``Actions`` flow end-to-end through ``plain.test.Client``: the POST
+Drives the ``Actions`` flow end-to-end through ``plain.testing.Client``: the POST
 carries ``action_name`` plus ``action_ids`` (comma-joined ids, or ``__all__``
 for the whole filtered view), and ``perform_action`` receives the selected
 objects as a queryset. Assertions are limited to what a user observes — the
@@ -9,7 +9,7 @@ redirect back to the list and the resulting database rows.
 
 from admin_test_helpers import make_admin_client
 from app.users.models import User
-from plain.test import Client
+from plain.testing import Client
 
 LIST_URL = "/admin/p/user"
 

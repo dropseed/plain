@@ -1,4 +1,4 @@
-"""`python -m plain.test` is `plain test`.
+"""`python -m plain.testing` is `plain test`.
 
 plain.dev's setup hook starts the database for a test run, and it has to
 know a test run when it sees one. Started as a module, the arguments are a
@@ -11,7 +11,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from plain.test import cases
+from plain.testing import cases
 
 PROBE = """\
 from plain.dev.utils import running_command
@@ -39,10 +39,10 @@ def run_in_a_project(command: list[str]) -> subprocess.CompletedProcess[str]:
 @cases(
     ["plain", "test"],
     ["plain", "test", "tests/test_probe.py"],
-    ["plain.test"],
-    ["plain.test", "tests/test_probe.py"],
-    ["coverage", "run", "-m", "plain.test"],
-    ["coverage", "run", "-m", "plain.test", "tests/test_probe.py"],
+    ["plain.testing"],
+    ["plain.testing", "tests/test_probe.py"],
+    ["coverage", "run", "-m", "plain.testing"],
+    ["coverage", "run", "-m", "plain.testing", "tests/test_probe.py"],
 )
 def test_however_it_is_started_it_is_the_test_command(command):
     completed = run_in_a_project(command)

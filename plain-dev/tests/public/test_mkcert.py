@@ -5,7 +5,7 @@ from pathlib import Path
 
 from plain.dev import mkcert as mkcert_module
 from plain.dev.mkcert import MkcertManager
-from plain.test import patch
+from plain.testing import patch
 
 
 def test_windows_binary_gets_exe_extension():

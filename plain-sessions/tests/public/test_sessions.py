@@ -1,7 +1,7 @@
 from plain.sessions import SessionNotAvailable, get_request_session
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
-from plain.test import Client, build_request, raises
+from plain.testing import Client, build_request, raises
 
 
 def test_session_created():

@@ -20,7 +20,7 @@ from plain.http import (
     Response,
     StreamingResponse,
 )
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 @cases(204, 304)

@@ -7,7 +7,7 @@ from collections.abc import Generator
 
 import keyring
 import keyring.backend
-from plain.test import patch
+from plain.testing import patch
 
 
 class InMemoryKeyring(keyring.backend.KeyringBackend):

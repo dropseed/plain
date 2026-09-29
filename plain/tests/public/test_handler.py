@@ -9,7 +9,7 @@ from middleware_helpers import (
 from plain.http import Response
 from plain.internal.handlers.base import BaseHandler
 from plain.runtime import settings
-from plain.test import Client, build_request
+from plain.testing import Client, build_request
 from plain.urls.resolvers import _get_cached_resolver
 
 

@@ -11,7 +11,7 @@ The static half -- which of these calls the checker must reject -- lives in
 
 from app.examples.models.defaults import DefaultsExample
 from app.examples.models.relationships import Tag
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_get_by_primary_key():

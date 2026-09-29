@@ -1,6 +1,6 @@
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView
-from plain.test import build_request, override_settings
+from plain.testing import build_request, override_settings
 
 
 def make_asset_view(manifest: AssetsManifest, path: str) -> AssetView:

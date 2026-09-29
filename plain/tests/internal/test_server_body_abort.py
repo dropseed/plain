@@ -14,7 +14,7 @@ import asyncio
 
 from plain.http import Response
 from plain.server.http import h1
-from plain.test import patch
+from plain.testing import patch
 from server_stubs import ResponseHandler, h1_connect, make_worker
 
 

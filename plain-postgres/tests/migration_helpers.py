@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from plain.postgres.migrations.loader import MigrationLoader
-from plain.test import patch
+from plain.testing import patch
 
 TEMP_MIGRATIONS_MODULE = "temp_migrations_under_test"
 

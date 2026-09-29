@@ -6,7 +6,7 @@ from app.examples.models.delete import (
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import QuerySet
 from plain.postgres.test import capture_queries
-from plain.test import raises, skip_test
+from plain.testing import raises, skip_test
 
 
 # Forward foreign key descriptor

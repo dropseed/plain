@@ -1,4 +1,4 @@
-"""The upgrade through the request pipeline, as `plain.test.Client` sees it.
+"""The upgrade through the request pipeline, as `plain.testing.Client` sees it.
 
 What a view author can rely on: a well-formed handshake to a view with
 `websocket()` yields the 101 (with the accept key and the negotiated
@@ -9,7 +9,7 @@ gets its say on the response.
 
 from middleware_helpers import fresh_client
 from plain.runtime import settings
-from plain.test import Client, cases, raises
+from plain.testing import Client, cases, raises
 from plain.views import View
 from websocket_helpers import upgrade_headers
 

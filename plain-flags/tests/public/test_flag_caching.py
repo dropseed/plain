@@ -9,7 +9,7 @@ from plain.flags import Flag
 from plain.flags.exceptions import FlagDisabled
 from plain.flags.models import Flag as FlagModel
 from plain.flags.models import FlagResult
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 
 
 def test_keyed_flag_computes_once_then_caches():

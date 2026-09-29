@@ -7,7 +7,7 @@ from opentelemetry import trace
 from plain.internal.handlers.base import BaseHandler
 from plain.internal.handlers.response_lifecycle import ResponseBodyError
 from plain.runtime import settings
-from plain.test import CapturedSpans, Client, build_request, capture_spans
+from plain.testing import CapturedSpans, Client, build_request, capture_spans
 from plain.urls.resolvers import _get_cached_resolver
 from server_stubs import capture_logger
 

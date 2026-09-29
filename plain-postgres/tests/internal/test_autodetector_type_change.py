@@ -2,7 +2,7 @@ from plain.postgres import types
 from plain.postgres.migrations.autodetector import MigrationAutodetector
 from plain.postgres.migrations.exceptions import MigrationSchemaError
 from plain.postgres.migrations.state import ModelState, ProjectState
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def _state_with(model_state: ModelState) -> ProjectState:

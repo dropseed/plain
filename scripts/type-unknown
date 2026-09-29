@@ -267,7 +267,7 @@ def find_python_files(
     Find all Python files in a directory, excluding certain patterns.
 
     A directory whose name starts with a dot is never looked in. A directory
-    named `test` is source (`plain.test`, a package's `test` helpers); a
+    named `test` is source (a package's `test` helpers); a
     `tests` directory and a file named like a test are left out.
     """
     default_patterns = [

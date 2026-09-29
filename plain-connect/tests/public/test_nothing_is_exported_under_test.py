@@ -71,7 +71,7 @@ def test_spans_can_be_captured_with_an_export_token_set():
     script = (
         SET_UP_AND_REPORT
         + """
-from plain.test import capture_spans
+from plain.testing import capture_spans
 
 with capture_spans() as spans:
     with trace.get_tracer("under-test").start_as_current_span("captured"):

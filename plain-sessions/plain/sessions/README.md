@@ -148,7 +148,7 @@ In a test, [`get_client_session()`](./test.py#get_client_session) gives you the 
 
 ```python
 from plain.sessions.test import get_client_session
-from plain.test import Client
+from plain.testing import Client
 
 
 def test_cart_is_remembered():

@@ -24,7 +24,7 @@ from app.examples.models.upsert import (
     UpsertValueKey,
 )
 from plain.postgres.exceptions import FieldError
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_bulk_upsert_inserts_new_rows_and_sets_pks():

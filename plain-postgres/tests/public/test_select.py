@@ -17,7 +17,7 @@ from plain.postgres import RowQuerySet
 from plain.postgres.aggregates import Count
 from plain.postgres.expressions import F, Value
 from plain.postgres.functions import Lower, Upper
-from plain.test import raises
+from plain.testing import raises
 
 if TYPE_CHECKING:
     # Only ever an annotation here, so the name never exists at runtime.

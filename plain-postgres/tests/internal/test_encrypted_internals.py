@@ -12,7 +12,7 @@ from plain.postgres.fields.encrypted import (
     _encrypt,
     _get_fernet,
 )
-from plain.test import raises
+from plain.testing import raises
 
 
 # Encrypt decrypt functions

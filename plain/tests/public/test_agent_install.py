@@ -11,7 +11,7 @@ from pathlib import Path
 from click.testing import CliRunner
 from plain.cli import agent as agent_module
 from plain.cli.core import cli
-from plain.test import patch
+from plain.testing import patch
 
 
 @contextlib.contextmanager

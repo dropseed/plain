@@ -6,7 +6,7 @@ values that downstream dashboards may filter on.
 """
 
 from plain.flags import Flag
-from plain.test import capture_spans, override_settings
+from plain.testing import capture_spans, override_settings
 
 
 class _KeyedFlag(Flag):

@@ -5,7 +5,7 @@ from app.examples.models.querysets import (
     DefaultQuerySetModel,
 )
 from plain.postgres import QuerySet
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_model_has_default_query_queryset():

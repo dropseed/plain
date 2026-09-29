@@ -197,7 +197,7 @@ def test_sends_email():
     assert outbox[0].to == ["person@example.com"]
 ```
 
-The outbox is emptied before each test, so a test sees only the mail it sent, and the original `EMAIL_BACKEND` is put back when the run ends. There's nothing to configure: the package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner.
+The outbox is emptied before each test, so a test sees only the mail it sent, and the original `EMAIL_BACKEND` is put back when the run ends. There's nothing to configure: the package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner.
 
 Each item in the outbox is the message that was sent, so you can assert on its `subject`, `body`, `to` and the rest.
 

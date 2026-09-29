@@ -1,5 +1,5 @@
 from plain.runtime import settings
-from plain.test import raises
+from plain.testing import raises
 from plain.urls import absolute_url, reverse_absolute
 
 

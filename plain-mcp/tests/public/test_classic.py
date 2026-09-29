@@ -10,7 +10,7 @@ from typing import Any
 
 from mcp_test_helpers import bare_post
 from plain.mcp.views import CLASSIC_PROTOCOL_VERSIONS
-from plain.test import Client, case, cases
+from plain.testing import Client, case, cases
 
 
 def classic_post(

@@ -8,7 +8,7 @@ shortcut.
 
 from app.users.models import User
 from plain.runtime import settings
-from plain.test import Client
+from plain.testing import Client
 
 SESSION_COOKIE = settings.SESSION_COOKIE_NAME
 

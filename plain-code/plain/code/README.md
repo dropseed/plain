@@ -139,7 +139,7 @@ plain code update
 
 #### Why are test files excluded from annotation coverage?
 
-Test files (`test_*.py`, `*_test.py`, and files in a `tests/` directory) are excluded by default because they typically contain many small helper functions where type annotations add noise without providing significant value. A directory named `test` is counted: it is source, like `plain.test` and the `test` module a package ships its test helpers in. If yours holds tests, add it to the `exclude` option in the annotations configuration.
+Test files (`test_*.py`, `*_test.py`, and files in a `tests/` directory) are excluded by default because they typically contain many small helper functions where type annotations add noise without providing significant value. A directory named `test` is counted: it is source, like the `test` module a package ships its test helpers in. If yours holds tests, add it to the `exclude` option in the annotations configuration.
 
 #### How do I check a specific directory?
 

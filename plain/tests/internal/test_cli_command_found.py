@@ -20,7 +20,7 @@ from plain.cli.runtime import (
     the_running_command_was_found,
     when_the_running_command_is_found,
 )
-from plain.test import patch
+from plain.testing import patch
 
 
 @contextmanager

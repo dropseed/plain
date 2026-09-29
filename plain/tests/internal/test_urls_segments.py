@@ -7,7 +7,7 @@ only the user-observable resolution behavior is.
 """
 
 from plain.exceptions import ImproperlyConfigured
-from plain.test import raises
+from plain.testing import raises
 from plain.urls.converters import INT, PATH, STR, UUID
 from plain.urls.segments import (
     Capture,

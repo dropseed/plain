@@ -5,7 +5,7 @@ import re
 from app.users.models import User
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from plain.auth.test import login_client
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 
 TOKEN = "plain_pv_testtoken"
 IDENTITY_KEY = "endpoint-identity-secret"

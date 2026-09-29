@@ -15,7 +15,7 @@ from plain.mcp.views import (
     META_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
 )
-from plain.test import Client
+from plain.testing import Client
 
 
 def _merge_headers(

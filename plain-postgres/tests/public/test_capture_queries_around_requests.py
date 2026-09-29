@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from app.examples.models.relationships import Widget
 from plain.http import Response
 from plain.postgres.test import capture_queries, isolated_db, max_queries
-from plain.test import Client, override_settings, raises
+from plain.testing import Client, override_settings, raises
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import View

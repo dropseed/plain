@@ -8,7 +8,7 @@ tests.
 
 from app.examples.models.delete import ChildCascade, CircA, DeleteParent
 from plain.postgres.exceptions import FieldDoesNotExist, FieldError
-from plain.test import raises
+from plain.testing import raises
 
 # ===========================================================================
 # Forward relation -- accessing the related object.

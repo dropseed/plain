@@ -16,7 +16,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "plain.test<1.0.0",
+  "plain.testing<1.0.0",
   # `plain request --user` logs in through plain.auth, and is tested here.
   "plain.dev<1.0.0",
 ]

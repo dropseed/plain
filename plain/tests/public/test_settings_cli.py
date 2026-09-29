@@ -1,7 +1,7 @@
 from click.testing import CliRunner
 from plain.cli.core import cli
 from plain.runtime import settings
-from plain.test import override_settings
+from plain.testing import override_settings
 
 # Distinctive enough that finding it anywhere in the output means it leaked.
 SECRET_VALUE = "tok_4f9c2e71b8d3"

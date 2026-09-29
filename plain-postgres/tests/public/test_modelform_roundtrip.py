@@ -16,7 +16,7 @@ from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.encrypted import SecretStore
 from app.examples.models.forms import FormsExample
-from plain.test import Client
+from plain.testing import Client
 
 
 def _valid_post_data() -> dict[str, str]:

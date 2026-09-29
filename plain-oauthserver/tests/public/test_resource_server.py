@@ -10,7 +10,7 @@ from oauth_helpers import (
 )
 from plain.oauthserver import validate_access_token
 from plain.oauthserver.models import AuthorizationCode
-from plain.test import Client
+from plain.testing import Client
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"

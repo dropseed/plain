@@ -5,7 +5,7 @@ bodiless statuses (204/304), now that Response refuses the combination.
 from plain.http import HTTPException, NotModifiedResponse, Response
 from plain.internal.handlers.exception import response_for_exception
 from plain.internal.middleware.headers import DefaultHeadersMiddleware
-from plain.test import build_request
+from plain.testing import build_request
 
 
 class _NotModifiedError(HTTPException):

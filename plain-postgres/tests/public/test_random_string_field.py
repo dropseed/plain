@@ -3,7 +3,7 @@
 from app.examples.models.defaults import DBDefaultsExample
 from plain.postgres import RandomStringField, get_connection
 from plain.postgres.functions.random import RandomString
-from plain.test import raises
+from plain.testing import raises
 
 
 # Random string init

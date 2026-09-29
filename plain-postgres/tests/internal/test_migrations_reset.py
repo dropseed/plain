@@ -24,7 +24,7 @@ from plain.postgres.migrations.loader import MigrationLoader
 from plain.postgres.migrations.recorder import MigrationRecorder
 from plain.postgres.migrations.reset import plan_reset, validate_reset
 from plain.postgres.migrations.writer import MigrationWriter
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 REAL_EXAMPLES = Path(__file__).parent.parent / "app" / "examples" / "migrations"
 # Read the real history rather than pinning names, so adding a migration to the

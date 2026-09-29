@@ -9,7 +9,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
 from plain.postgres.test import capture_queries
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_create_unique_constraint():

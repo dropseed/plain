@@ -9,7 +9,7 @@ from .requests import set_request_user
 from .sessions import get_user, login, logout
 
 if TYPE_CHECKING:
-    from plain.test import Client
+    from plain.testing import Client
 
 __all__ = ["login_client", "logout_client"]
 

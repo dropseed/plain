@@ -7,7 +7,7 @@ out.
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import get_connection
 from plain.postgres.migrations.operations.special import RunSQL
-from plain.test import override_settings
+from plain.testing import override_settings
 
 
 def _collect(callback, *, atomic: bool = True) -> list[str]:

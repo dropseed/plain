@@ -9,7 +9,7 @@ from functools import partial
 from typing import Any
 from weakref import WeakKeyDictionary
 
-from plain.test import Captured, CaptureSource
+from plain.testing import Captured, CaptureSource
 
 from ..connection import DatabaseConnection
 from ..db import get_connection

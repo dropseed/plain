@@ -4,7 +4,7 @@ Declarative test decorators for database behavior.
 
 from collections.abc import Callable
 
-from plain.test import tag
+from plain.testing import tag
 
 __all__ = ["isolated_db"]
 

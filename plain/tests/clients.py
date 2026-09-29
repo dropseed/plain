@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 from plain.urls.resolvers import _get_cached_resolver
 
 

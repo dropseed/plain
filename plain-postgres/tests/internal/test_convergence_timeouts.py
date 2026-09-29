@@ -43,7 +43,7 @@ from plain.postgres.convergence.corrections import (
 from plain.postgres.dialect import build_timeout_set_clauses
 from plain.postgres.sources import build_connection_params
 from plain.postgres.test import isolated_db
-from plain.test import override_settings, patch, raises
+from plain.testing import override_settings, patch, raises
 
 # ---- Prelude builder ------------------------------------------------------
 

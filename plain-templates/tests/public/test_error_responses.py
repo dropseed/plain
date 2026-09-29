@@ -9,7 +9,7 @@ default. For URL-resolution failures (no view ever runs), mount
 404 there too.
 """
 
-from plain.test import patch
+from plain.testing import patch
 from templates_test_clients import error_client as _error_client
 
 

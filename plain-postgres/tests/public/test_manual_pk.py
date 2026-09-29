@@ -9,7 +9,7 @@ real rows is exempt -- that path passes `_from_db=True`.
 """
 
 from app.examples.models.querysets import DefaultQuerySetModel
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_constructing_with_id_raises():

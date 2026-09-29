@@ -20,7 +20,7 @@ from plain.jobs.models import (
 )
 from plain.jobs.registry import jobs_registry, register_job
 from plain.jobs.workers import Worker, future_finished_callback
-from plain.test import override_settings, patch, raises
+from plain.testing import override_settings, patch, raises
 from plain.utils import timezone
 
 _aborted_calls: list[JobResult] = []

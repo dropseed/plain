@@ -1,0 +1,108 @@
+"""How the test client turns its body arguments into a request.
+
+The client speaks the same vocabulary as the rest of Plain, and the wire
+format it picks is part of that contract: a view under test should see the
+content type it will see in production.
+"""
+
+from io import BytesIO
+
+from plain.testing import build_request, case, cases, raises
+
+
+def test_form_data_is_urlencoded_without_files():
+    """What a browser sends for a form with no file input."""
+    request = build_request("POST", "/x", form_data={"a": "b", "c": "d"})
+
+    assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
+    assert dict(request.form_data) == {"a": ["b"], "c": ["d"]}
+
+
+def test_empty_form_data_is_still_a_form():
+    request = build_request("POST", "/x", form_data={})
+
+    assert request.headers["Content-Type"] == "application/x-www-form-urlencoded"
+    assert request.body == b""
+
+
+def test_form_data_is_multipart_when_files_are_present():
+    request = build_request(
+        "POST",
+        "/x",
+        form_data={"title": "Report"},
+        files={"upload": BytesIO(b"contents")},
+    )
+
+    assert request.headers["Content-Type"].startswith("multipart/form-data")
+    assert dict(request.form_data) == {"title": ["Report"]}
+    assert request.files["upload"].read() == b"contents"
+
+
+def test_json_data_sets_its_own_content_type():
+    request = build_request("POST", "/x", json_data={"name": "Alice"})
+
+    assert request.headers["Content-Type"] == "application/json"
+    assert request.json_data == {"name": "Alice"}
+
+
+def test_content_type_without_a_body_says_what_to_pass():
+    """An empty body under a content type that promises a parseable one would
+    fail somewhere inside the view instead of here."""
+    with raises(TypeError, match="content_type needs a body"):
+        build_request("POST", "/x", content_type="application/json")
+
+
+def test_content_type_alongside_form_data_is_rejected():
+    with raises(TypeError, match="only applies to a raw body"):
+        build_request("POST", "/x", form_data={"a": "b"}, content_type="text/plain")
+
+
+def test_raw_body_keeps_the_content_type_it_was_given():
+    request = build_request("POST", "/x", body=b"{}", content_type="application/json")
+
+    assert request.headers["Content-Type"] == "application/json"
+    assert request.body == b"{}"
+
+
+@cases(
+    case("text/plain; charset=latin-1", id="with a space"),
+    case("text/plain;charset=latin-1", id="no space"),
+    case('text/plain; charset="latin-1"', id="quoted"),
+    case("text/plain; CHARSET=latin-1", id="uppercase"),
+)
+def test_a_string_body_is_encoded_with_the_charset_it_declares(content_type):
+    request = build_request("POST", "/x", body="café", content_type=content_type)
+
+    # The bytes are in the declared charset, which is what the request
+    # decodes them with.
+    assert request.body == "café".encode("latin-1")
+    assert request.encoding == "latin-1"
+
+
+def test_a_string_body_with_no_charset_is_utf8():
+    request = build_request("POST", "/x", body="café", content_type="text/plain")
+
+    assert request.body == "café".encode()
+
+
+@cases(
+    case(BytesIO(b"zip bytes"), id="a BytesIO"),
+    case(b"zip bytes", id="bytes"),
+    case([BytesIO(b"one"), BytesIO(b"two")], id="a list of files"),
+)
+def test_a_file_in_form_data_is_refused(value):
+    """It would be sent as a text field holding the object's repr."""
+    with raises(TypeError, match="files=") as caught:
+        build_request("POST", "/x", form_data={"archive": value})
+
+    assert "form_data['archive']" in str(caught.exception)
+
+
+def test_a_file_in_form_data_is_refused_beside_files_too():
+    with raises(TypeError, match="files="):
+        build_request(
+            "POST",
+            "/x",
+            form_data={"archive": BytesIO(b"zip bytes")},
+            files={"other": BytesIO(b"more")},
+        )

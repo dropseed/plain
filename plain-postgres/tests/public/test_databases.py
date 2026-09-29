@@ -27,7 +27,7 @@ from plain.postgres.databases import (
     terminate_connections,
 )
 from plain.runtime import settings
-from plain.test import raises
+from plain.testing import raises
 
 # Scratch databases are named per run, not per suite. A fixed prefix means two
 # runs against one cluster — a CI matrix, parallel worktrees — hand out the

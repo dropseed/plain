@@ -3,7 +3,7 @@
 import datetime
 
 from plain.admin.dates import DatetimeRange, DatetimeRangeAliases
-from plain.test import raises
+from plain.testing import raises
 
 
 def _dt(y, m, d, **kw):

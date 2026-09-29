@@ -15,7 +15,7 @@ import socket
 from plain.http import Response
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.test import capture_logs, patch
+from plain.testing import capture_logs, patch
 from server_stubs import ResponseHandler, make_worker
 
 _GET = b"GET / HTTP/1.1\r\nHost: testserver\r\n\r\n"

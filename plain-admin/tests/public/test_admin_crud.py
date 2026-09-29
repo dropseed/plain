@@ -1,7 +1,7 @@
 """Behavior regression baseline — plain-admin object CRUD.
 
 Drives the admin list / detail / create / update / delete views end-to-end
-through ``plain.test.Client`` against a full-CRUD ``AdminViewset`` registered
+through ``plain.testing.Client`` against a full-CRUD ``AdminViewset`` registered
 for the test app's ``User`` model (see ``app/users/admin.py``). Assertions are
 limited to what a browser observes — HTTP status, redirect targets, rendered
 page content, and database rows.
@@ -9,7 +9,7 @@ page content, and database rows.
 
 from admin_test_helpers import make_admin_client
 from app.users.models import User
-from plain.test import Client
+from plain.testing import Client
 
 LIST_URL = "/admin/p/user"
 CREATE_URL = "/admin/p/user/create"

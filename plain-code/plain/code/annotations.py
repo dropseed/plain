@@ -233,8 +233,8 @@ def find_python_files(
         "node_modules",
         # Test files are left out of annotation metrics: a file named like
         # a test, and everything in a `tests` directory. A directory named
-        # `test` is not one of those. It is source: `plain.test` itself,
-        # and the `plain/<package>/test/` helpers a package ships.
+        # `test` is not one of those. It is source: the
+        # `plain/<package>/test/` helpers a package ships.
         "test_*.py",
         "*_test.py",
         "tests",

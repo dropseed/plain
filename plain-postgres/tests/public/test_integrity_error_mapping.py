@@ -6,7 +6,7 @@ from app.examples.models.constraints import ConstraintExample
 from app.examples.models.delete import ChildCascade, DeleteParent
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_constraint_violation_reaching_db_raises_validation_error() -> None:

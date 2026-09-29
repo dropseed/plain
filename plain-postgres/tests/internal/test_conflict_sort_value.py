@@ -18,7 +18,7 @@ from app.examples.models.forms import FormsExample
 from app.examples.models.upsert import UpsertItem, UpsertValueKey
 from plain.exceptions import ValidationError
 from plain.postgres.query import conflict_sort_value
-from plain.test import raises
+from plain.testing import raises
 
 AMOUNT = FormsExample.amount
 RATIO = FormsExample.ratio

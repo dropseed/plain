@@ -22,7 +22,7 @@ from plain.cli.runtime import (
 from plain.dev import dotenv as dotenv_module
 from plain.dev import envkeys as envkeys_module
 from plain.dev import state as state_module
-from plain.test import patch
+from plain.testing import patch
 
 # Env vars that decide what the code under test does. Cleared on entry so a
 # developer's shell (or the test runner's own database URL) can't change an

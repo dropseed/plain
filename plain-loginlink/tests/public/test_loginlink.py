@@ -1,7 +1,7 @@
 """Behavior regression baseline — plain.loginlink passwordless auth.
 
 Drives the request-a-link and follow-a-link flows end-to-end through
-``plain.test.Client``. Assertions cover only browser-observable outcomes —
+``plain.testing.Client``. Assertions cover only browser-observable outcomes —
 HTTP status, redirect targets, login state (probed via the login-gated
 ``/whoami`` view), rendered failure pages, and sent email.
 """
@@ -13,7 +13,7 @@ from app.users.models import User
 from plain.auth.test import login_client
 from plain.email.test import outbox
 from plain.loginlink.links import generate_link_url
-from plain.test import Client, build_request
+from plain.testing import Client, build_request
 
 
 def is_logged_in(client: Client) -> bool:

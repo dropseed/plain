@@ -26,7 +26,7 @@ def count_functions() -> int:
 
 
 def test_a_directory_named_test_is_source():
-    # `plain.test`, and the `test` module a package ships its helpers in.
+    # `plain.testing`, and the `test` module a package ships its helpers in.
     with tempfile.TemporaryDirectory() as tmp, chdir(tmp):
         Path("pyproject.toml").write_text(PYPROJECT)
         Path("shop/test").mkdir(parents=True)

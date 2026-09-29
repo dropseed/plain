@@ -5,7 +5,7 @@ The empty default exists so the field can be added to a populated table."""
 from typing import Any
 
 from plain.postgres import types
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 @cases(

@@ -30,7 +30,7 @@ from plain.postgres.convergence.corrections import (
 )
 from plain.postgres.functions.text import Upper
 from plain.postgres.test import isolated_db
-from plain.test import patch
+from plain.testing import patch
 
 
 # Pass ordering

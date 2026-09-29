@@ -21,7 +21,7 @@ from oauth_helpers import (
 from plain.oauthserver.models import AuthorizationCode
 from plain.postgres.db import get_connection
 from plain.postgres.test import capture_queries, isolated_db
-from plain.test import Client
+from plain.testing import Client
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"

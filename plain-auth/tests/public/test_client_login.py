@@ -6,7 +6,7 @@ from plain.auth.test import login_client, logout_client
 from plain.postgres.test import capture_queries
 from plain.sessions.models import Session
 from plain.sessions.test import get_client_session
-from plain.test import Client
+from plain.testing import Client
 
 
 def test_login_client_makes_every_request_the_users() -> None:

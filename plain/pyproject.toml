@@ -19,7 +19,7 @@ plain = "plain.cli.core:cli"
 
 [dependency-groups]
 dev = [
-  "plain.test<1.0.0",
+  "plain.testing<1.0.0",
   # The tests' app settings require values from `.env.test` — plain.dev's
   # `plain.setup` entrypoint loads it before the CLI dispatches `plain test`.
   "plain.dev<1.0.0",

@@ -9,7 +9,7 @@ encrypt/decrypt primitives are in `tests/internal/test_encrypted_internals.py`.
 from app.examples.models.encrypted import SecretStore
 from plain.postgres import F, Q, types
 from plain.postgres.exceptions import FieldError
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 # Encrypted text field

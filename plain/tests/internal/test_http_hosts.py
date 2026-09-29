@@ -1,5 +1,5 @@
 from plain.internal.middleware.hosts import split_domain_port, validate_host
-from plain.test import cases
+from plain.testing import cases
 
 
 @cases(

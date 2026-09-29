@@ -23,7 +23,7 @@ from plain.dev.postgres.resolve import (
     url_already_configured,
     write_cached_url,
 )
-from plain.test import cases, patch
+from plain.testing import cases, patch
 
 # -- taking over -----------------------------------------------------------
 

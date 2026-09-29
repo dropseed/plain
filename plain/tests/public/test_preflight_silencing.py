@@ -2,7 +2,7 @@ from click.testing import CliRunner
 from plain.cli.preflight import preflight_cli
 from plain.preflight import PreflightCheck, PreflightResult, unused_silenced_results
 from plain.preflight.registry import CheckRegistry
-from plain.test import override_settings, patch
+from plain.testing import override_settings, patch
 
 from plain import preflight
 

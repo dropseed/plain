@@ -1,7 +1,7 @@
 """HTTP-layer tests: MCPView, authentication, transport semantics.
 
 Dispatch and result shapes are tested in test_mcp.py; this file exercises the
-Streamable HTTP transport via plain.test.Client — everything that only has an
+Streamable HTTP transport via plain.testing.Client — everything that only has an
 answer once there's a real request with real headers and a real status code.
 
 `mcp_post` / `mcp_post_raw` (tests/helpers.py) build the body and headers.
@@ -16,7 +16,7 @@ from plain.mcp.views import (
     META_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
 )
-from plain.test import Client, capture_spans
+from plain.testing import Client, capture_spans
 
 
 # Public endpoint

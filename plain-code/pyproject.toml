@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["plain.test<1.0.0"]
+dev = ["plain.testing<1.0.0"]
 
 # Make this available as a standalone command
 # in case plain can't load or something (this can run anyways)

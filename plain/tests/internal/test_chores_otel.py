@@ -2,7 +2,7 @@ from click.testing import CliRunner
 from opentelemetry import trace
 from plain.chores import Chore, register_chore
 from plain.cli.chores import chores
-from plain.test import CapturedSpans, capture_spans
+from plain.testing import CapturedSpans, capture_spans
 
 
 @register_chore

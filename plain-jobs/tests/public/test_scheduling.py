@@ -3,7 +3,7 @@
 import datetime
 
 from plain.jobs.scheduling import Schedule
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_schedule():

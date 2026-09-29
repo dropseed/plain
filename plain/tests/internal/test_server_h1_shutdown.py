@@ -32,7 +32,7 @@ from plain.http import Response
 from plain.internal.handlers.response_lifecycle import ResponseLifecycle
 from plain.server.connection import Connection
 from plain.server.http import h1
-from plain.test import case, cases, patch
+from plain.testing import case, cases, patch
 from server_stubs import (
     BodyLengthHandler,
     StubApp,

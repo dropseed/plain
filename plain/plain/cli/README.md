@@ -241,7 +241,7 @@ Runs core validation checks in order, stopping on first failure:
 3. `plain preflight --quiet`
 4. `plain migrations apply --check` (if DB connected)
 5. `plain migrations create --dry-run --check` (if DB connected)
-6. `plain test` (if `plain.test` is installed)
+6. `plain test` (if `plain.testing` is installed)
 
 Use `--skip-test` to skip tests for faster iteration. A project with no tests passes this step: `plain test` says "No tests found" and the check moves on.
 

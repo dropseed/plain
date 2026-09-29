@@ -20,7 +20,7 @@ from app.examples.models.delete import ChildCascade
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Widget, WidgetTag
 from app.examples.models.upsert import UpsertValueKey
-from plain.test import case, cases
+from plain.testing import case, cases
 
 
 def where_clause(queryset) -> tuple[str, tuple]:

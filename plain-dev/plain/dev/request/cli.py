@@ -18,7 +18,7 @@ from .trace import (
 )
 
 if TYPE_CHECKING:
-    from plain.test import ClientResponse
+    from plain.testing import ClientResponse
 
 _HTTP_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE")
 
@@ -360,7 +360,7 @@ def request(
         # Imported here rather than at the top: plain.dev loads this module
         # to register the command every time `plain` starts, and the client
         # is only worth its import time when a request is actually made.
-        from plain.test import Client
+        from plain.testing import Client
 
         client = Client(headers={"Host": "localhost"})
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import psycopg.errors
 from click.testing import CliRunner, Result
 from plain.dev import db
-from plain.test import patch
+from plain.testing import patch
 
 
 class RecordingCluster:

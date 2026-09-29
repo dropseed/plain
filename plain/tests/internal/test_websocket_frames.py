@@ -33,7 +33,7 @@ from plain.http.websocket_frames import (
     parse_close_payload,
     read_frame,
 )
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 MAX_PAYLOAD = 1024 * 1024
 

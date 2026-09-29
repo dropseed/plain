@@ -27,7 +27,7 @@ from plain.postgres.convergence.corrections import (
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper
 from plain.postgres.test import isolated_db
-from plain.test import patch, raises
+from plain.testing import patch, raises
 
 
 def _create_hash_index(name: str = "examples_indexexample_name_hash_idx") -> None:

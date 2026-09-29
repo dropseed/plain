@@ -1,7 +1,7 @@
 import subprocess
 
 from plain.cli import check as check_module
-from plain.test import cases, patch, raises
+from plain.testing import cases, patch, raises
 
 
 def run_that_exits_with(code):

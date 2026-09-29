@@ -27,7 +27,7 @@ from plain.dev.envkeys import (
     stored_env_key_path,
 )
 from plain.exceptions import ImproperlyConfigured
-from plain.test import cases, patch, raises
+from plain.testing import cases, patch, raises
 
 # --- crypto helpers ---
 

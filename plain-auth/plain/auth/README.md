@@ -180,7 +180,7 @@ When writing tests, you can use [`login_client()`](./test.py#login_client) to si
 
 ```python
 from plain.auth.test import login_client
-from plain.test import Client
+from plain.testing import Client
 
 from app.users.models import User
 

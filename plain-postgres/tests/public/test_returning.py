@@ -22,7 +22,7 @@ from plain.postgres.exceptions import FieldError
 from plain.postgres.sources import build_connection_params
 from plain.postgres.test import capture_queries, isolated_db
 from plain.postgres.transaction import TransactionManagementError
-from plain.test import case, cases, raises
+from plain.testing import case, cases, raises
 from postgres_test_helpers import executed_sql
 
 if TYPE_CHECKING:

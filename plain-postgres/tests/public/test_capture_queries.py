@@ -10,7 +10,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import transaction
 from plain.postgres.otel import suppress_db_tracing
 from plain.postgres.test import CapturedQuery, capture_queries, isolated_db, max_queries
-from plain.test import capture_spans, raises
+from plain.testing import capture_spans, raises
 
 TAG_BY_NAME = (
     'SELECT "examples_tag"."id", "examples_tag"."name" '

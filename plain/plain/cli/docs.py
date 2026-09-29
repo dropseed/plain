@@ -36,7 +36,7 @@ KNOWN_PACKAGES = {
     "plain-start": "Bootstrap a new project from templates",
     "plain-tailwind": "Tailwind CSS without JavaScript or npm",
     "plain-templates": "Render HTML templates using Jinja2",
-    "plain-test": "Write and run tests",
+    "plain-testing": "Write and run tests",
     "plain-toolbar": "Debug toolbar",
     "plain-tunnel": "Remote access to local dev server",
     "plain-vendor": "Vendor CDN scripts and styles",

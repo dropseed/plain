@@ -23,7 +23,7 @@ Preflight (warning):
 """
 
 from plain.exceptions import ImproperlyConfigured
-from plain.test import raises
+from plain.testing import raises
 from plain.urls import Router, include, path
 from plain.views import View
 

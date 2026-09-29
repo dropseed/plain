@@ -4,7 +4,7 @@ import uuid
 
 from plain.postgres import fields as plain_fields
 from plain.postgres.fields.json import JSONField
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def _make_token() -> str:

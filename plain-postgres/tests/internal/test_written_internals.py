@@ -18,7 +18,7 @@ from opentelemetry.trace import SpanKind
 from plain.postgres import written
 from plain.postgres.db import get_connection
 from plain.postgres.test import CapturedQueries, capture_queries
-from plain.test import capture_spans, raises
+from plain.testing import capture_spans, raises
 
 
 @contextmanager

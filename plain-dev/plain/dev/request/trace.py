@@ -353,13 +353,13 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     is neither persisted nor shipped anywhere. The sampler and processors
     are restored on exit.
 
-    This is not `plain.test.capture_spans`, which refuses to run when
-    something other than plain.test installed the process's tracer provider.
+    This is not `plain.testing.capture_spans`, which refuses to run when
+    something other than plain.testing installed the process's tracer provider.
     A test process can promise that; `plain request` runs in the app as it
     is configured for development, where `plain.connect` has usually
     installed its provider already. So this one borrows that provider for
     the block and hands it back. When nothing has installed one, the two
-    share plain.test's, so either can run first.
+    share plain.testing's, so either can run first.
 
     Guard calls with `capture_available()`. For one-shot, single-threaded
     callers such as CLI commands; it mutates process-global tracing state.
@@ -376,7 +376,7 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
         InMemorySpanExporter,
     )
-    from plain.test.otel import tracer_provider_for_capturing
+    from plain.testing.otel import tracer_provider_for_capturing
 
     exporter = InMemorySpanExporter()
 
@@ -384,7 +384,7 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
         # Nothing configured a provider, so one is installed, and the still
         # unresolved proxy tracers bind to it. `set_tracer_provider` is
         # one-shot: this provider stays for the life of the process. It is
-        # plain.test's provider for capturing and not one of our own, so
+        # plain.testing's provider for capturing and not one of our own, so
         # that a `capture_spans()` later in the same process finds a
         # provider it knows and adds to it. A test that runs this command
         # and then captures spans is that process.

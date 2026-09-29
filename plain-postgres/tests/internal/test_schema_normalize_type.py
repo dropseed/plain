@@ -1,7 +1,7 @@
 from plain.postgres import fields
 from plain.postgres.fields.encrypted import EncryptedJSONField, EncryptedTextField
 from plain.postgres.fields.json import JSONField
-from plain.test import cases
+from plain.testing import cases
 
 # Postgres short-form type aliases that should NOT appear in db_type() output.
 _SHORT_ALIASES = {

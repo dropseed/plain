@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from plain.http import Response
 from plain.runtime import settings
-from plain.test import raises
+from plain.testing import raises
 from plain.urls import Router, get_resolver, include, path, reverse
 from plain.urls.exceptions import NoReverseMatch
 from plain.urls.resolvers import _get_cached_resolver

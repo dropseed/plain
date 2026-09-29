@@ -12,7 +12,7 @@ from plain.http import WebSocket, WebSocketClosed
 from plain.http import websocket as websocket_module
 from plain.http.websocket import PING_INTERVAL, PING_TIMEOUT
 from plain.http.websocket_frames import OP_CLOSE, OP_PING, OP_PONG, OP_TEXT
-from plain.test import patch, raises
+from plain.testing import patch, raises
 from server_stubs import StubApp, socketpair_connection
 from websocket_helpers import client_close, client_frame, close_code, read_server_frame
 

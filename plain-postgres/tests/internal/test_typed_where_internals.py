@@ -13,7 +13,7 @@ from app.examples.models.encrypted import SecretStore
 from app.examples.models.relationships import Widget, WidgetTag
 from plain.postgres.expressions import F
 from plain.postgres.fields.base import CONDITION_METHODS, STRING_CONDITION_LOOKUPS
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def test_traversal_hands_back_the_field_itself():

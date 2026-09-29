@@ -2357,7 +2357,7 @@ This is meant for infrastructure code (pollers, metric gauge callbacks, test fix
 With `plain.postgres` installed, every test runs against a test database and leaves nothing behind. There's nothing to set up and nothing to ask for.
 
 ```python
-from plain.test import Client
+from plain.testing import Client
 
 from app.users.models import User
 
@@ -2425,11 +2425,11 @@ def test_the_importer_sees_the_batch():
     assert Row.query.count() == 3
 ```
 
-The package registers this with [plain.test](../../../plain-test/plain/test/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
+The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
 
 ### What a failure prints
 
-When a test fails, the [failure](../../../plain-test/plain/test/README.md#failures) prints the values it had in hand. A model instance is printed with its fields, and a queryset with what it holds:
+When a test fails, the [failure](../../../plain-testing/plain/testing/README.md#failures) prints the values it had in hand. A model instance is printed with its fields, and a queryset with what it holds:
 
 ```
   assert widget.size == "xl"
@@ -2470,7 +2470,7 @@ That test gets a database of its own, created and migrated for it and dropped af
 
 ```python
 from plain.postgres.test import max_queries
-from plain.test import Client
+from plain.testing import Client
 
 
 def test_dashboard_query_budget():
@@ -2503,7 +2503,7 @@ def test_lookup_is_one_query():
     assert "'a@example.com'" in queries[0].sql_with_params
 ```
 
-`queries` is a [capture](../../../plain-test/plain/test/README.md#capturing-what-happened) like the ones `plain.test` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
+`queries` is a [capture](../../../plain-testing/plain/testing/README.md#capturing-what-happened) like the ones `plain.testing` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
 
 | Attribute         | The SQL you get                           | Looks like                 |
 | ----------------- | ----------------------------------------- | -------------------------- |

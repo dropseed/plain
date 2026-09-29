@@ -20,7 +20,7 @@ def set_running_command(name: str | None) -> None:
     it runs before the command does, so it can't ask the command. Whoever
     starts a command says so here first: the `plain` CLI when it dispatches
     one, and an entry point that can be started without the CLI, such as
-    `python -m plain.test`, for itself.
+    `python -m plain.testing`, for itself.
 
     A name is only what was typed. Whether there is such a command is said
     afterwards, with `the_running_command_was_found()`.

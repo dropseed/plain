@@ -4,7 +4,7 @@ import os
 
 from dev_test_helpers import running, sandbox
 from plain.dev.dotenv import load_dotenv_files
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_unset_plain_env_loads_local_and_base():

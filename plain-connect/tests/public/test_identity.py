@@ -4,7 +4,7 @@ import hashlib
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from plain.connect.identity import encrypt_identity
-from plain.test import raises
+from plain.testing import raises
 
 IDENTITY_KEY = "endpoint-identity-secret"
 

@@ -12,7 +12,7 @@ from plain.postgres.constraints import BaseConstraint
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
 from plain.postgres.test import capture_queries
-from plain.test import build_request, cases, patch, raises
+from plain.testing import build_request, cases, patch, raises
 
 
 def _check_constraint() -> CheckConstraint:

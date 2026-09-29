@@ -9,7 +9,7 @@ be swallowed rather than reported. Each of those says so; the assertion is
 
 from plain.http import Request
 from plain.http.multipartparser import MultiPartParser, MultiPartParserError
-from plain.test import cases, raises
+from plain.testing import cases, raises
 from plain.utils.datastructures import MultiValueDict
 
 BOUNDARY = "TeStBoUnDaRy"

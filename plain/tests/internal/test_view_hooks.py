@@ -6,7 +6,7 @@ import logging
 
 from plain.http import Response
 from plain.internal.handlers.exception import response_for_exception
-from plain.test import CapturedLogs, build_request, capture_logs, patch, raises
+from plain.testing import CapturedLogs, build_request, capture_logs, patch, raises
 from plain.views import View
 
 

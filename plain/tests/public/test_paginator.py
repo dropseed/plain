@@ -1,5 +1,5 @@
 from plain.paginator import Paginator
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 @cases(0, -1)

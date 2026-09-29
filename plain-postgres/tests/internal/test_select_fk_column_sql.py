@@ -11,7 +11,7 @@ The user-facing half lives in tests/public/test_select.py.
 
 from app.examples.models.relationships import Widget, WidgetTag
 from plain.postgres.exceptions import FieldError
-from plain.test import raises
+from plain.testing import raises
 
 
 def compiled(queryset):

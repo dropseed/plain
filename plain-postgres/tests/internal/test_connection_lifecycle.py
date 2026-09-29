@@ -27,7 +27,7 @@ from plain.postgres.db import (
 )
 from plain.postgres.middleware import DatabaseConnectionMiddleware
 from plain.runtime import settings
-from plain.test import Client, build_request, override_settings
+from plain.testing import Client, build_request, override_settings
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import ServerSentEvent, ServerSentEventsView, View

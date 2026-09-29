@@ -18,7 +18,7 @@ from plain.dev.postgres.identity import (
     validate_database_name,
     write_pointer,
 )
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def test_truncate_identifier_leaves_short_names_alone():

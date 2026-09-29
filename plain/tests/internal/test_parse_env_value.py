@@ -3,7 +3,7 @@ from typing import Union
 from plain.exceptions import ImproperlyConfigured
 from plain.runtime import Secret
 from plain.runtime.user_settings import _parse_env_value
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_parse_env_value_str_passthrough():

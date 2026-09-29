@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from plain.runtime import settings
 from plain.sessions.models import Session
-from plain.test import Client
+from plain.testing import Client
 from plain.utils import timezone
 
 SESSION_COOKIE = settings.SESSION_COOKIE_NAME

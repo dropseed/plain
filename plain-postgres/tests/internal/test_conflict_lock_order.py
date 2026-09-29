@@ -13,7 +13,7 @@ whole guarantee, and asserting it directly can't flake.
 
 from app.examples.models.upsert import UpsertItem
 from plain.postgres.query import QuerySet
-from plain.test import patch
+from plain.testing import patch
 
 
 def sent_key_runs(items) -> list[list[str]]:

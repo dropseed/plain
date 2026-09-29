@@ -18,7 +18,7 @@ from plain.postgres.test.leftovers import (
     read_run_record,
     run_lock_key,
 )
-from plain.test import case, cases
+from plain.testing import case, cases
 
 
 def a_record(*, database: str = "example_plain_test", run: str = "") -> RunRecord:

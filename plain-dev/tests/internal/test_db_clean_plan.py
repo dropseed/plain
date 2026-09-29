@@ -15,7 +15,7 @@ from plain.dev.postgres.cleaning import (
     OwnerPath,
     plan_clean,
 )
-from plain.test import cases
+from plain.testing import cases
 
 MAIN = "/work/plain/example"
 WORKTREES = "/work/plain/.claude/worktrees"

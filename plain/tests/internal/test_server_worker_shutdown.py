@@ -21,7 +21,7 @@ import socket
 import time
 
 from plain.server.workers.worker import Worker
-from plain.test import capture_logs
+from plain.testing import capture_logs
 from server_stubs import StubHeartbeat, make_worker
 
 

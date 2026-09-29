@@ -1,6 +1,6 @@
 from plain.htmx.views import HTMXView
 from plain.http import Response
-from plain.test import build_request, raises
+from plain.testing import build_request, raises
 
 
 class V(HTMXView):

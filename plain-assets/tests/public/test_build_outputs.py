@@ -24,7 +24,7 @@ from plain.assets.compile import compile_assets
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView
 from plain.runtime import PLAIN_TEMP_PATH
-from plain.test import build_request, patch
+from plain.testing import build_request, patch
 
 
 @contextmanager

@@ -8,7 +8,7 @@ import json
 from io import BytesIO
 
 from plain.http import RawPostDataException, Request
-from plain.test import raises
+from plain.testing import raises
 
 
 def test_a_request_without_a_body_has_an_empty_one():

@@ -31,7 +31,7 @@ from plain.postgres.fields.base import (
     Field,
 )
 from plain.postgres.fields.encrypted import EncryptedField
-from plain.test import case, cases, skip_test
+from plain.testing import case, cases, skip_test
 
 # PEP 681 field specifiers take these names from the *checker*, not from the
 # runtime -- they configure the synthesized constructor. `init=False` on

@@ -6,7 +6,7 @@ from plain.postgres.migrations.migration import Migration
 from plain.postgres.migrations.operations.fields import AddField, RemoveField
 from plain.postgres.migrations.operations.special import RunPython, RunSQL
 from plain.postgres.migrations.recorder import MigrationRecorder
-from plain.test import raises
+from plain.testing import raises
 
 
 def _table_exists(table_name: str) -> bool:

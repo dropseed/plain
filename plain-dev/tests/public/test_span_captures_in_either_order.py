@@ -17,7 +17,7 @@ THE_COMMANDS_CAPTURE_THEN_A_TESTS = """\
 from opentelemetry import trace
 
 from plain.dev.request.trace import capture_trace_spans
-from plain.test import capture_spans
+from plain.testing import capture_spans
 
 tracer = trace.get_tracer("either-order")
 
@@ -36,7 +36,7 @@ A_TESTS_CAPTURE_THEN_THE_COMMANDS = """\
 from opentelemetry import trace
 
 from plain.dev.request.trace import capture_trace_spans
-from plain.test import capture_spans
+from plain.testing import capture_spans
 
 tracer = trace.get_tracer("either-order")
 

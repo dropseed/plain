@@ -16,7 +16,7 @@ from mcp_test_helpers import bare_post, mcp_post, mcp_post_raw
 from opentelemetry import trace
 from plain.mcp.exceptions import INVALID_PARAMS, METHOD_NOT_FOUND
 from plain.mcp.views import META_PROTOCOL_VERSION, PROTOCOL_VERSION
-from plain.test import CapturedLogs, capture_logs, capture_spans
+from plain.testing import CapturedLogs, capture_logs, capture_spans
 
 
 def _rejects(logs: CapturedLogs) -> list[dict[str, Any]]:

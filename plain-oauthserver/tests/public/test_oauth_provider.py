@@ -15,7 +15,7 @@ from plain.oauthserver.models import (
     OAuthApplication,
     RefreshToken,
 )
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"

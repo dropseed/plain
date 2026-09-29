@@ -8,7 +8,7 @@ the interaction between builtin and user-defined middleware.
 
 from middleware_helpers import call_log, fresh_client
 from plain.runtime import settings
-from plain.test import Client
+from plain.testing import Client
 
 
 # Middleware pipeline basics

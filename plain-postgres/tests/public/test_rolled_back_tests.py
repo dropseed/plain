@@ -11,7 +11,7 @@ look at, and is skipped.
 
 from app.examples.models.relationships import Tag
 from plain.postgres import get_connection
-from plain.test import skip_test
+from plain.testing import skip_test
 
 backend_pids: list[int] = []
 changed_the_session = []

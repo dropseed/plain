@@ -10,7 +10,7 @@ from app.examples.models.returning import ReturningEvent
 from plain.postgres.query import QuerySet
 from plain.postgres.sql.constants import CURSOR, MULTI, NO_RESULTS, SINGLE
 from plain.postgres.sql.query import UpdateQuery
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def test_returning_annotations_resolve_at_runtime():

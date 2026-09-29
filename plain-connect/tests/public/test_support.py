@@ -4,7 +4,7 @@ import re
 import time
 
 from plain.connect.identity import sign_render_token
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 
 # Must match the literal endpoint id in tests/app/templates/page.html.
 ENDPOINT_ID = "plain_sf_testid"

@@ -11,7 +11,7 @@ from datetime import timedelta
 from typing import Any
 
 from plain.auth.test import login_client
-from plain.test import Client
+from plain.testing import Client
 from plain.utils import timezone
 
 

@@ -44,7 +44,7 @@ FULLY_TYPED_PATHS = [
     "plain-passwords",
     "plain-sessions",
     "plain-tailwind",
-    "plain-test",
+    "plain-testing",
     "plain-toolbar",
     "plain-tunnel",
     "plain-vendor",

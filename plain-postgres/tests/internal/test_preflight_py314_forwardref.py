@@ -46,7 +46,7 @@ from plain.postgres.preflight.models import (
     foreign_keys_annotated_as_values,
 )
 from plain.postgres.registry import models_registry
-from plain.test import patch, raises
+from plain.testing import patch, raises
 
 from plain import postgres
 

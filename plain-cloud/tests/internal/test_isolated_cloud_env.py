@@ -3,7 +3,7 @@
 import os
 
 from cloud_test_helpers import isolated_cloud_env
-from plain.test import cases, patch
+from plain.testing import cases, patch
 
 
 @cases("PLAIN_CLOUD_TOKEN", "PLAIN_CLOUD_API_URL")

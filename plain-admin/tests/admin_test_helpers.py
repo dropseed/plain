@@ -1,6 +1,6 @@
 from app.users.models import User
 from plain.auth.test import login_client
-from plain.test import Client
+from plain.testing import Client
 
 
 def make_admin_client() -> Client:

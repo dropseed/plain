@@ -11,7 +11,7 @@ from plain.postgres import transaction
 from plain.postgres.db import read_only
 from plain.postgres.test import isolated_db
 from plain.postgres.transaction import TransactionManagementError
-from plain.test import raises
+from plain.testing import raises
 
 
 # Read-only

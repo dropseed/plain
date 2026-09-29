@@ -13,7 +13,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.exceptions import ValidationError
 from plain.postgres import transaction
 from plain.postgres.exceptions import FieldError
-from plain.test import raises
+from plain.testing import raises
 
 # ===========================================================================
 # create()

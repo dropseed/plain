@@ -10,7 +10,7 @@ dependencies = [
   "plain>=0.161.0,<1.0.0",
   "plain.assets>=0.3.0,<1.0.0",
   # `plain request` makes its requests with the test client.
-  "plain.test<1.0.0",
+  "plain.testing<1.0.0",
   "click>=8.0.0",
   "rich",
   "cryptography>=42",
@@ -25,7 +25,7 @@ env = "plain.dev.env:cli"
 [dependency-groups]
 dev = [
   "plain.postgres",
-  # `coverage run -m plain.test` is why the test runner can be started as a
+  # `coverage run -m plain.testing` is why the test runner can be started as a
   # module; a test starts it that way.
   "coverage",
 ]

@@ -16,7 +16,7 @@ from app.examples.models.relationships import Widget
 from app.examples.models.string_conditions import StringConditionsExample
 from plain.postgres import Q
 from plain.postgres.expressions import Exists
-from plain.test import cases, raises
+from plain.testing import cases, raises
 
 
 def test_field_methods_return_q_objects():

@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from clients import slash_client
 from plain.http import Response
 from plain.runtime import settings
-from plain.test import Client
+from plain.testing import Client
 from plain.urls import Router, path
 from plain.urls.resolvers import _get_cached_resolver
 from plain.views import View

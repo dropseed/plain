@@ -50,7 +50,7 @@ The `plain` package includes everything you need to start handling web requests 
 ## Dev Packages
 
 - [plain.dev](/plain-dev/plain/dev/README.md) - A single command for local development.
-- [plain.test](/plain-test/plain/test/README.md) - Write and run tests.
+- [plain.testing](/plain-testing/plain/testing/README.md) - Write and run tests.
 - [plain.code](/plain-code/plain/code/README.md) - Code formatting and linting.
 - [plain.portal](/plain-portal/plain/portal/README.md) - Remote Python shell and file transfer via encrypted tunnel.
 - [plain.tunnel](/plain-tunnel/plain/tunnel/README.md) - Expose your local server to the internet.

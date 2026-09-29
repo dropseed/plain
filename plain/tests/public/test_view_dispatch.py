@@ -1,4 +1,4 @@
-from plain.test import Client
+from plain.testing import Client
 from plain.views import View
 
 

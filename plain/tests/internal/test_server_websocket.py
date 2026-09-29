@@ -22,7 +22,7 @@ from plain.http.websocket_frames import (
     encode_frame,
 )
 from plain.internal.handlers.base import BaseHandler
-from plain.test import CapturedSpans, capture_spans, case, cases, override_settings
+from plain.testing import CapturedSpans, capture_spans, case, cases, override_settings
 from server_stubs import H1Client, capture_logger, h1_connect, make_worker
 from websocket_helpers import (
     UPGRADE_ACCEPT,

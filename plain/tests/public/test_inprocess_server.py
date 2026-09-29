@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from inprocess_routers import caller_value, view_value
 from plain.http import Request, Response
 from plain.server.inprocess import HandledRequest, InProcessServer, SentResponse
-from plain.test import case, cases, override_settings, raises
+from plain.testing import case, cases, override_settings, raises
 from plain.urls.resolvers import _get_cached_resolver
 
 

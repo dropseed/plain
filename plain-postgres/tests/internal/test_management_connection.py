@@ -3,7 +3,7 @@
 from plain.postgres.db import use_management_connection
 from plain.postgres.test import isolated_db
 from plain.runtime import settings
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 
 
 def test_default_management_url_is_empty():

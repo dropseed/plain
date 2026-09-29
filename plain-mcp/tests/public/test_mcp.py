@@ -10,7 +10,7 @@ from plain.mcp.views import (
     META_SERVER_INFO,
     PROTOCOL_VERSION,
 )
-from plain.test import build_request, patch, raises
+from plain.testing import build_request, patch, raises
 
 if TYPE_CHECKING:
     # Only ever an annotation here, so the name never exists at runtime.

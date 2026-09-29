@@ -3,7 +3,7 @@ import random
 from io import BytesIO
 
 from plain.runtime import settings
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 
 BOUNDARY = "TeStBoUnDaRy"
 MULTIPART_CONTENT_TYPE = f"multipart/form-data; boundary={BOUNDARY}"

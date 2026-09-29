@@ -21,7 +21,7 @@ from contextlib import contextmanager
 from clients import error_client
 from opentelemetry.semconv.attributes import url_attributes
 from plain.runtime import settings
-from plain.test import CapturedSpans, Client, capture_logs, capture_spans
+from plain.testing import CapturedSpans, Client, capture_logs, capture_spans
 from plain.urls.resolvers import _get_cached_resolver
 
 

@@ -9,7 +9,7 @@ from plain.email.message import (
     EmailMultiAlternatives,
 )
 from plain.email.test import outbox
-from plain.test import override_settings, raises
+from plain.testing import override_settings, raises
 
 
 def test_message_sets_core_headers():

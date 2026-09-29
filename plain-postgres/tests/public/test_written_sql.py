@@ -18,7 +18,7 @@ from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import UpsertTenant
 from plain.exceptions import ValidationError
 from plain.postgres.test import capture_queries
-from plain.test import patch, raises
+from plain.testing import patch, raises
 
 
 def create_widgets() -> tuple[Widget, Widget]:

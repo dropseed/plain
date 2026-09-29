@@ -1,6 +1,6 @@
 from plain.auth.requests import get_request_user
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
-from plain.test import Client, override_settings
+from plain.testing import Client, override_settings
 
 
 class DummyProvider(OAuthProvider):

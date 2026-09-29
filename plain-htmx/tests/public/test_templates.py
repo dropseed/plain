@@ -1,6 +1,6 @@
 import jinja2
 from plain.htmx.templates import HTMXFragmentExtension, render_template_fragment
-from plain.test import raises
+from plain.testing import raises
 
 
 def make_env():

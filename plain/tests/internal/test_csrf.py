@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from plain.csrf.middleware import CsrfViewMiddleware
-from plain.test import build_request, cases, raises
+from plain.testing import build_request, cases, raises
 
 
 @cases("GET", "HEAD", "OPTIONS")

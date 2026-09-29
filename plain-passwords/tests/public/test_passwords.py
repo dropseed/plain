@@ -1,7 +1,7 @@
 """Behavior regression baseline — plain.passwords authentication views.
 
 Drives login / signup / forgot-password / reset-via-token / change-password
-end-to-end through ``plain.test.Client``. Assertions cover only what a browser
+end-to-end through ``plain.testing.Client``. Assertions cover only what a browser
 observes — HTTP status, redirect targets, login state (probed via the
 login-gated ``/whoami`` view), database rows, and sent email.
 """
@@ -11,7 +11,7 @@ import re
 from app.users.models import User
 from plain.auth.test import login_client
 from plain.email.test import outbox
-from plain.test import Client
+from plain.testing import Client
 
 # Passwords chosen to satisfy PasswordField's default validators
 # (minimum length, not a common password, not entirely numeric).

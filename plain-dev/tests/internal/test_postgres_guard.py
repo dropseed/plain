@@ -14,7 +14,7 @@ from plain.dev.postgres import guard
 from plain.dev.postgres.cluster import Cluster
 from plain.postgres.migrations.exceptions import ResetBoundaryError
 from plain.postgres.migrations.executor import PendingMigrations
-from plain.test import patch
+from plain.testing import patch
 
 
 class FakeCluster:
