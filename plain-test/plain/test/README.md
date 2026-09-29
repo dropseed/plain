@@ -756,6 +756,8 @@ The traceback starts at your test. The runner's own frames are left out.
 
 Under the assert is each part of its expression and what it was, from the outside in: `response.status_code` was `404`, and the `response` it was read from is indented under it. What's written out in the expression (`302`) isn't repeated. See [Assertions](#assertions).
 
+A large value is printed once. When the failure has it again under another name, the second says `<the same as rows>`.
+
 `locals:` is every name the test function had bound when it failed, in the order they were bound, without the ones the assert already printed. It's there for every failure, not only a failed assert, and it's always the test function's own: when the error was raised in something the test called, the traceback shows where and the locals show what the test called it with. A name bound to a module, a class or a function is left out.
 
 The command is quoted wherever a shell would read the id for itself, so you can paste it as it is:
@@ -806,6 +808,30 @@ A single value is printed up to 2,000 characters and a diff up to 60 lines. When
 Run the test again with `--full-values` to print everything.
 
 A value whose `repr` raises doesn't stop the report. It's printed as `<Order: its repr raised ValueError: no total>`, and everything else is printed as usual.
+
+### Secrets
+
+A report is read by whoever reads the run: a terminal, a CI log, an agent. It leaves out what is known to be a secret, and says that it did:
+
+```
+  assert "PAYMENTS_KEY" not in os.environ
+    os.environ = environ(3 names, values withheld: HOME, PATH, PAYMENTS_KEY)
+
+  locals:
+    for_a_subprocess = {'DEBUG': '1', <3 names from the environment>: <values withheld: HOME, PATH, PAYMENTS_KEY>}
+    user = User(id=1, email='a@example.com', password=<withheld>)
+```
+
+| Value                                        | Printed as                                                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `os.environ`                                 | Its names                                                                                                                                         |
+| A dict with items taken from the environment | Its own items, and the names of the ones it took                                                                                                  |
+| The settings                                 | `<Settings "app.settings">`, with no values                                                                                                       |
+| A model instance                             | Its fields, with an encrypted field or a password as `<withheld>`. See [plain.postgres](../../../plain-postgres/plain/postgres/README.md#testing) |
+
+That holds wherever the value is: on its own, or inside a list, a tuple, a dict or a set. It holds in the [JSON document](#as-json) and with `--full-values`.
+
+A secret that is a string like any other by the time the test has it is printed like any other: a local holding `settings.SECRET_KEY`, or `os.environ["PAYMENTS_KEY"]` written in an assert.
 
 ### What the test wrote
 
@@ -1062,7 +1088,8 @@ plain test --json --list-passed
                             "evaluated": true,
                             "value": {
                                 "text": "<dict with 5 keys>",
-                                "cut_characters": 0
+                                "cut_characters": 0,
+                                "same_as": null
                             }
                         }
                     ],
@@ -1087,7 +1114,8 @@ plain test --json --list-passed
                         "name": "items",
                         "value": {
                             "text": "['tea', 'kettle']",
-                            "cut_characters": 0
+                            "cut_characters": 0,
+                            "same_as": null
                         }
                     }
                 ],
@@ -1161,7 +1189,10 @@ plain test --json --list-passed
 - **Every test has the same fields**, whatever came of it. `skip_reason` and `failure` are `null` when there's nothing to say.
 - **A test's `file` and `line`** are where it's defined. **A failure's `file` and `line`** are the statement in the test that failed, or that called what failed. `frames` is the traceback as data, outermost first, down to where the error was raised. A failure that came from a lifecycle, not the test, has `null` for both.
 - **`assert`** is `null` for a failure that wasn't a failed assert. Its `parts` are what the text report prints under the assert: each part of the expression as written, how far inside it is, and what it was. A part Python never evaluated has `evaluated: false` and a `null` value.
-- **A value is an object**: `text` is what the text report prints, and `cut_characters` is how much the cap left off the end of it. `stdout` and `stderr` are the same, with `cut_characters` counting what was left off the start. `--full-values` leaves nothing off either.
+- **A value is an object**: `text` is what the text report prints, and `cut_characters` is how much the cap left off the end of it. `same_as` is `null`, or the name the failure has already printed this value under, and then `text` says so in place of the value. `stdout` and `stderr` are objects too, with `cut_characters` counting what was left off the start. `--full-values` leaves nothing off either.
+- **What's known to be a secret** is left out of every value here as it is from the text report. See [Secrets](#secrets).
+- **`warnings`** has each distinct [warning](#warnings) once. `count` is how many times it was raised, and `first_test`, `file` and `line` are where it was raised first. `counts.warnings` is how many distinct ones there were.
+- **The document's own `stdout` and `stderr`** are what was [written outside any test](#written-outside-any-test). A failure's are what its test wrote.
 - **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead.
 - **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
 - **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
@@ -1260,14 +1291,18 @@ def test_order_total():
 
 That's every kind of expression: a comparison, a chain of them, a call, a membership test, `and`, `or`, `not`, arithmetic, `await`. There's nothing to add to an assert to see what went into it.
 
-A message is for saying why, not for printing values. It comes first:
+A message is for saying why, not for printing values. It's printed where Python prints it, at the end of the traceback:
 
 ```python
 assert items, "the cart should keep what was added before login"
 ```
 
 ```
-  the cart should keep what was added before login
+  Traceback (most recent call last):
+    File "/project/tests/test_cart.py", line 12, in test_cart_survives_login
+      assert items, "the cart should keep what was added before login"
+  AssertionError: the cart should keep what was added before login
+
   assert items
     items = []
 ```
@@ -1384,7 +1419,7 @@ mypackage = "mypackage.test:MyPackageTestLifecycle"
 
 - `setup_worker()` runs once before the first test, and `teardown_worker()` once after the last.
 - `around_test(test)` is a context manager entered around each test. `test` is a [`CollectedTest`](./lifecycle.py#CollectedTest), which you can import from `plain.test` to annotate it. `test.id` is the id the runner prints (`tests/test_cart.py::TestCart::test_add[empty]`), `test.name` is the part after the file (`TestCart::test_add[empty]`), and `test.tags` holds its `@tag` names, so a lifecycle can treat a tagged test differently. That's how `@isolated_db` works.
-- `describe_value(value)` is what a [failure](#failures) prints for a value your package owns, in place of its `repr`. Return `None` for anything that isn't yours. Use it when the `repr` says too little to fix a test by. The text is printed as it is, and a description of several lines is [diffed](#large-values) by line. It's called for the values in a failed assert and in the test's locals, not for what is inside a list or a dict. It must not change anything the test did, or do anything the test didn't: no queries, no requests.
+- `describe_value(value)` is what a [failure](#failures) prints for a value your package owns, in place of its `repr`. Return `None` for anything that isn't yours. Use it when the `repr` says too little to fix a test by. The text is printed as it is, and a description of several lines is [diffed](#large-values) by line. It's called for the values in a failed assert and in the test's locals, and for what's inside them when they're a list, a tuple, a dict or a set. It must not change anything the test did, or do anything the test didn't: no queries, no requests. And it must not print what your package knows to be a [secret](#secrets): a report is read by more than the person who ran the test.
 - `required_package` keeps the lifecycle from loading unless that package is in the app's `INSTALLED_PACKAGES`. An entry point is visible whenever the package is installed in the environment, which is wider than "the app uses it".
 - Lifecycles are entered in the order of their entry point names. The runner creates each one with no arguments.
 

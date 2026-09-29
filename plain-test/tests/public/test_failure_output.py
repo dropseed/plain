@@ -5,6 +5,7 @@ between two large values, and what else the test had in hand.
 Each test runs the command on a project with one failing test in it.
 """
 
+from plain.test import cases
 from plain_test_helpers import block, run_in_project
 
 
@@ -120,14 +121,15 @@ def test_a_chained_comparison_shows_every_side_it_reached():
     ]
 
 
-def test_the_message_is_printed_first():
+def test_the_message_is_printed_once_where_python_prints_it():
     output = failing(
         "def test_total():\n"
         "    total = 41\n"
         "    assert total == 42, 'the total should include shipping'\n"
     )
-    assert block(output, "the total should") == [
-        "the total should include shipping",
+    assert "AssertionError: the total should include shipping" in output
+    assert output.count("the total should include shipping") == 2  # and the source
+    assert block(output, "assert total") == [
         "assert total == 42",
         "  total = 41",
     ]
@@ -460,3 +462,60 @@ def test_the_traceback_and_the_rerun_command_are_still_there():
     assert "Traceback (most recent call last):" in output
     assert "line 3, in test_total" in output
     assert "Re-run: plain test tests/test_it.py::test_total" in output
+
+
+HOLDS_SECRETS = (
+    "import os\n"
+    "\n"
+    "os.environ['PAYMENTS_KEY'] = 'sk_live_FAKESECRET123'\n"
+    "\n"
+    "\n"
+    "def test_environment():\n"
+    "    for_a_subprocess = {**os.environ, 'DEBUG': '1'}\n"
+    "    together = [('the environment', os.environ), for_a_subprocess]\n"
+    "    assert 'PAYMENTS_KEY' not in os.environ\n"
+)
+
+
+@cases((), ("--full-values",), ("--json",), ("--json", "--full-values"))
+def test_the_environment_is_printed_without_its_values(*arguments):
+    output = failing(HOLDS_SECRETS, *arguments)
+    assert "FAKESECRET" not in output
+    # What is printed says that something was left out, and what.
+    assert "values withheld" in output
+    assert "PAYMENTS_KEY" in output
+    assert "DEBUG" in output
+
+
+def test_the_settings_are_printed_without_their_values():
+    result = run_in_project(
+        {
+            "app/settings.py": (
+                "SECRET_KEY = 'FAKESECRET-settings-key'\n"
+                "URLS_ROUTER = 'app.urls.AppRouter'\n"
+            ),
+            "tests/test_it.py": (
+                "from plain.runtime import settings\n"
+                "\n"
+                "\n"
+                "def test_settings():\n"
+                "    configured = settings\n"
+                "    assert settings is None\n"
+            ),
+        },
+        "--full-values",
+    )
+    assert result.exit_code == 1, result.output
+    assert 'settings = <Settings "app.settings">' in result.output
+    assert "FAKESECRET" not in result.output
+
+
+def test_a_value_the_failure_has_twice_is_printed_once():
+    output = failing(
+        "def test_rows():\n"
+        "    rows = [{'id': n, 'name': f'row number {n}'} for n in range(6)]\n"
+        "    again = list(rows)\n"
+        "    assert len(rows) == 7\n"
+    )
+    assert output.count("'name': 'row number 5'") == 1
+    assert block(output, "locals:") == ["locals:", "  again = <the same as rows>"]

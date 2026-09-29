@@ -196,7 +196,11 @@ def _collection_error(failure: CollectionFailure) -> dict[str, Any]:
 
 
 def _value(value: PrintedValue) -> dict[str, Any]:
-    return {"text": value.text, "cut_characters": value.cut_characters}
+    return {
+        "text": value.text,
+        "cut_characters": value.cut_characters,
+        "same_as": value.same_as,
+    }
 
 
 def _stream(stream: StreamOutput) -> dict[str, Any]:

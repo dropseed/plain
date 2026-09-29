@@ -27,6 +27,7 @@ uv run plain test [targets] [options]
 - `raises(ExcType, match=...)` for expected exceptions; the caught exception is `caught.exception`.
 - Bare `assert` everywhere. A failure prints every value inside the expression, a diff of two large values, and the test's locals, so don't add values to the assert: no `assert x == y, f"{x} != {y}"`, no `print()` before it. A message after the comma is for saying why.
 - A value in a failure is cut at 2,000 characters; `--full-values` prints it whole.
+- A failure report withholds what is known to be a secret (`os.environ`'s values, a model's password or encrypted field). A secret held in a plain string is printed, so don't put one in an assert or a local: compare against a value the test made up.
 - Database isolation is automatic (rolled-back transaction per test). DDL-heavy tests use `@isolated_db` from `plain.postgres.test`.
 - Package helpers import from their package, and that package's docs cover them under Testing: `plain.email.test.outbox`, `plain.postgres.test.capture_queries` (each query has `.sql` as sent and `.sql_with_params`; `queries.sql_statements(table=)` to pin statements) / `max_queries`, `plain.auth.test.login_client`, `plain.sessions.test.get_client_session`.
 - Import a shared helper module by its bare name: `tests/helpers.py` is `from helpers import create_user`, from any test file. `from tests.helpers import ...` and relative imports are collection errors.

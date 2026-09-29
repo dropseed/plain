@@ -61,10 +61,9 @@ def failure_text(failure: Failure) -> str:
 
     failed_assert = failure.failed_assert
     if failed_assert is not None:
-        lines = []
-        if failed_assert.message is not None:
-            lines.append(failed_assert.message)
-        lines.append(f"assert {failed_assert.expression}")
+        # The message the test gave is the traceback's last line, just
+        # above.
+        lines = [f"assert {failed_assert.expression}"]
         for part in failed_assert.parts:
             lines.extend(_part_lines(part))
         sections.append("\n".join(lines))

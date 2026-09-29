@@ -172,7 +172,11 @@ def test_a_failure_carries_what_the_text_report_prints_as_data():
             "source": "order",
             "depth": 0,
             "evaluated": True,
-            "value": {"text": "<dict with 5 keys>", "cut_characters": 0},
+            "value": {
+                "text": "<dict with 5 keys>",
+                "cut_characters": 0,
+                "same_as": None,
+            },
         }
     ]
     assert "- 'shipping': 0," in failed_assert["diff"]["lines"]
@@ -180,7 +184,14 @@ def test_a_failure_carries_what_the_text_report_prints_as_data():
     assert failed_assert["diff"]["cut_lines"] == 0
 
     assert failure["locals"] == [
-        {"name": "items", "value": {"text": "['tea', 'kettle']", "cut_characters": 0}}
+        {
+            "name": "items",
+            "value": {
+                "text": "['tea', 'kettle']",
+                "cut_characters": 0,
+                "same_as": None,
+            },
+        }
     ]
     assert failure["stdout"] == {"text": "pricing 2 items\n", "cut_characters": 0}
     assert failure["stderr"] == {"text": "", "cut_characters": 0}
@@ -224,7 +235,7 @@ def test_a_part_that_was_never_evaluated_says_so():
             "source": "rows",
             "depth": 0,
             "evaluated": True,
-            "value": {"text": "[]", "cut_characters": 0},
+            "value": {"text": "[]", "cut_characters": 0, "same_as": None},
         },
         {"source": "rows[0] == 1", "depth": 0, "evaluated": False, "value": None},
     ]
@@ -482,7 +493,11 @@ def test_full_values_is_the_documents_too():
     failure = whole["tests"][0]["failure"]
     assert failure["stdout"] == {"text": "y" * 20_000 + "\n", "cut_characters": 0}
     text_value = failure["assert"]["parts"][1]["value"]
-    assert text_value == {"text": repr("x" * 5_000), "cut_characters": 0}
+    assert text_value == {
+        "text": repr("x" * 5_000),
+        "cut_characters": 0,
+        "same_as": None,
+    }
 
 
 @cases(

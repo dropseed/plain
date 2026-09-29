@@ -10,11 +10,19 @@ raised, and doesn't take the report with it.
 A value is printed by `pprint`, which puts a container that doesn't fit on
 a line one item to a line. A package can print the values it owns better
 than their `repr` does, through its lifecycle's `describe_value()`.
+
+A fourth thing is owed to whoever the report is shown to: it doesn't print
+what is known to be secret. The environment is printed as its names, with
+no values. A package leaves the secrets it owns out of what it describes.
+That is done for a value wherever it is: on its own, or inside a list, a
+tuple, a dict or a set, however far in. A secret that is a string like any
+other by the time the test has it can't be told from one, and is printed.
 """
 
 import difflib
+import os
 import pprint
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, ItemsView, Sequence, ValuesView
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,6 +55,9 @@ class PrintedValue:
     text: str
     # How many characters the cap left out. 0 when `text` is the whole value.
     cut_characters: int = 0
+    # Set when the report has printed this value already, under this name.
+    # `text` says so, and the value isn't printed again.
+    same_as: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -78,16 +89,57 @@ def what_repr_raised(value: object, error: Exception) -> str:
     )
 
 
+class _AlreadyText:
+    """Text printed as it is, where a value's `repr` would have been."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def __repr__(self) -> str:
+        return self.text
+
+
+def _is_the_environments(key: object, item: object) -> bool:
+    return (
+        isinstance(key, str) and isinstance(item, str) and os.environ.get(key) == item
+    )
+
+
+def _names_only(environment: os._Environ) -> str:
+    names = ", ".join(sorted(str(name) for name in environment))
+    return f"environ({_counted(len(environment), 'name')}, values withheld: {names})"
+
+
 class ValuePrinter:
+    """
+    Prints the values of one failure. It remembers what it has printed, so
+    that a large value the failure has in it twice is printed once.
+    """
+
     def __init__(
         self, *, describers: Sequence[Describer] = (), full_values: bool = False
     ) -> None:
         self.describers = describers
         self.full_values = full_values
+        # The text of each large value printed so far, and the name it was
+        # printed under.
+        self._printed_as: dict[str, str] = {}
 
-    def printed(self, value: object) -> PrintedValue:
-        """The value, whole or cut at the cap."""
+    def printed(self, value: object, *, name: str | None = None) -> PrintedValue:
+        """
+        The value, whole or cut at the cap. `name` is what the report calls
+        it: a value printed under a name is not printed again under
+        another, and the second is said to be the same as the first.
+        """
         text = self._whole(value)
+
+        if name is not None and not _is_small(text):
+            first_name = self._printed_as.setdefault(text, name)
+            if first_name != name:
+                return PrintedValue(
+                    text=f"<the same as {first_name}>", same_as=first_name
+                )
+
         if self.full_values or len(text) <= VALUE_CAP:
             return PrintedValue(text=text)
         return PrintedValue(text=text[:VALUE_CAP], cut_characters=len(text) - VALUE_CAP)
@@ -134,16 +186,80 @@ class ValuePrinter:
         )
 
     def _whole(self, value: object, *, sort_dicts: bool = False) -> str:
-        described = self._described(value)
-        if described is not None:
-            return described
+        try:
+            fit_to_print = self._fit_to_print(value, inside=frozenset())
+        except RecursionError:
+            return f"<{type(value).__qualname__}: nested too deeply to print>"
+        if isinstance(fit_to_print, _AlreadyText):
+            return fit_to_print.text
+
         printer = _GuardedPrinter(width=_ONE_LINE, sort_dicts=sort_dicts)
         try:
-            return printer.pformat(value)
+            return printer.pformat(fit_to_print)
         except Exception as error:
             # Not a repr this time: a `__len__` or an `__iter__` that raised
             # while the printer was laying the value out.
             return what_repr_raised(value, error)
+
+    def _fit_to_print(self, value: object, *, inside: frozenset[int]) -> object:
+        """
+        The value as it can be handed to `pprint`: itself, or the text a
+        package describes it by, or a copy of a container with the same
+        done to everything in it.
+        """
+        described = self._described(value)
+        if described is not None:
+            return _AlreadyText(described)
+
+        if isinstance(value, os._Environ):
+            return _AlreadyText(_names_only(value))
+        is_a_view = isinstance(value, ValuesView | ItemsView)
+        if is_a_view and getattr(value, "_mapping", None) is os.environ:
+            kind = type(value).__qualname__
+            return _AlreadyText(f"<{kind} of the environment, withheld>")
+
+        if id(value) in inside:
+            # One that is inside itself is left for `pprint`, which says so.
+            return value
+        inside = inside | {id(value)}
+
+        # A subclass of one of these prints as its own `repr` says, which
+        # isn't the printer's to take apart.
+        if isinstance(value, dict):
+            if type(value) is not dict:
+                return value
+            return self._dict_fit_to_print(value, inside=inside)
+        if isinstance(value, list | tuple | set | frozenset):
+            if type(value) not in (list, tuple, set, frozenset):
+                return value
+            return type(value)(
+                self._fit_to_print(item, inside=inside) for item in value
+            )
+        return value
+
+    def _dict_fit_to_print(self, value: dict, *, inside: frozenset[int]) -> dict:
+        """
+        A dict made from the environment, all of it or some of it, as
+        `{**os.environ, "DEBUG": "1"}` is for a subprocess, is printed
+        without what it took: that is the environment's still. What was
+        taken is said once, by name, after the items that are the dict's
+        own.
+        """
+        fit_to_print: dict[object, object] = {}
+        from_the_environment = []
+        for key, item in value.items():
+            if _is_the_environments(key, item):
+                from_the_environment.append(key)
+            else:
+                fit_to_print[key] = self._fit_to_print(item, inside=inside)
+
+        if from_the_environment:
+            names = ", ".join(sorted(from_the_environment))
+            taken = _counted(len(from_the_environment), "name")
+            fit_to_print[_AlreadyText(f"<{taken} from the environment>")] = (
+                _AlreadyText(f"<values withheld: {names}>")
+            )
+        return fit_to_print
 
     def _described(self, value: object) -> str | None:
         for describe in self.describers:

@@ -367,7 +367,7 @@ def _failed_assert(
             # The diff says what matters about it, in less.
             value = printer.summarized(watched_value.value)
         else:
-            value = printer.printed(watched_value.value)
+            value = printer.printed(watched_value.value, name=watched_value.source)
 
         # `a == b or a == c` has `a` in it twice, and says it once.
         printed = (watched_value.source, value)
@@ -435,7 +435,7 @@ def _locals_of_the_test(
             continue
         if _is_module_class_or_function(value):
             continue
-        values.append(LocalValue(name=name, value=printer.printed(value)))
+        values.append(LocalValue(name=name, value=printer.printed(value, name=name)))
     return tuple(values)
 
 
