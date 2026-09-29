@@ -1296,7 +1296,7 @@ plain test --json --list-passed
 - **What's known to be a secret** is left out of every value here as it is from the text report. See [Secrets](#secrets).
 - **`warnings`** has each distinct [warning](#warnings) once. `count` is how many times it was raised, and `first_test`, `file` and `line` are where it was raised first. `counts.warnings` is how many distinct ones there were.
 - **The document's own `stdout` and `stderr`** are what was [written outside any test](#written-outside-any-test). A failure's are what its test wrote.
-- **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead.
+- **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead. `line` is the line it is about when it is about one, such as an `import pytest`, and null when it is about several.
 - **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
 - **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
 
