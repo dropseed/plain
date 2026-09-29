@@ -29,6 +29,7 @@ def make_manifest() -> AssetsManifest:
 
 
 # Assets manifest
+#
 # Tests for AssetsManifest class.
 def test_manifest_is_immutable_true_for_fingerprinted_path():
     manifest = make_manifest()
@@ -67,6 +68,7 @@ def test_manifest_resolve_returns_none_for_unknown():
 
 
 # Asset view CDN redirect
+#
 # Tests for AssetView.get_cdn_redirect_response()
 def test_cdn_redirect_not_in_manifest_returns_none():
     manifest = make_manifest()
@@ -129,6 +131,7 @@ def test_cdn_redirect_cdn_url_without_trailing_slash():
 
 
 # Asset view local redirect
+#
 # Tests for AssetView.get_redirect_response()
 #
 # Note: We only test the None cases because the redirect case calls reverse()

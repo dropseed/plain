@@ -110,6 +110,7 @@ def test_static_is_still_md5_fingerprinted():
 
 
 # Compile to reload
+#
 # The full assets-side chain: discover → compile → persist → fresh reload,
 # the way production does it (compile writes the manifest, serving reads it).
 def test_compiled_dist_is_immutable_after_reload():
@@ -133,6 +134,7 @@ def test_compiled_dist_is_immutable_after_reload():
 
 
 # Manifest round trip
+#
 # The immutable contract must survive save → load — production compiles the
 # manifest to disk, then AssetView.get_manifest() loads it back to serve.
 def test_already_hashed_immutable_survives_reload():
@@ -156,6 +158,7 @@ def test_already_hashed_immutable_survives_reload():
 
 
 # Dist served immutable
+#
 # Serving side: an already-hashed dist/ file is cached immutable (far-future).
 def test_dist_file_is_immutable():
     manifest = AssetsManifest()

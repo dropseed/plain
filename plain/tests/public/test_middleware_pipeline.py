@@ -10,11 +10,10 @@ from middleware_helpers import call_log, fresh_client
 from plain.runtime import settings
 from plain.test import Client
 
+
 # Middleware pipeline basics
 #
 # Basic pipeline behavior.
-
-
 def test_request_flows_through_to_view():
     """A normal request should reach the view and return its response."""
     client = Client()
@@ -34,8 +33,6 @@ def test_response_has_content_length():
 # Host validation middleware
 #
 # Host validation middleware should reject invalid hosts.
-
-
 def test_valid_host_passes():
     """Requests with valid hosts should pass through."""
     client = Client()
@@ -70,8 +67,6 @@ def test_empty_allowed_hosts_allows_all():
 # Default headers middleware
 #
 # Default headers middleware runs after the view.
-
-
 def test_custom_default_headers_applied():
     """DEFAULT_RESPONSE_HEADERS should be applied to responses."""
     original = settings.DEFAULT_RESPONSE_HEADERS
@@ -104,8 +99,6 @@ def test_view_headers_not_overridden():
 # CSRF middleware
 #
 # CSRF middleware blocks cross-origin unsafe requests.
-
-
 def test_get_requests_pass_csrf():
     """GET requests should always pass CSRF checks."""
     client = Client()
@@ -135,8 +128,6 @@ def test_cross_origin_post_blocked():
 # HTTPS redirect middleware
 #
 # HTTPS redirect middleware.
-
-
 def test_no_https_redirect_when_disabled():
     """When HTTPS_REDIRECT_ENABLED is False, no redirect happens."""
     original = settings.HTTPS_REDIRECT_ENABLED
@@ -166,8 +157,6 @@ def test_https_redirect_when_enabled():
 # Exception handling
 #
 # Exceptions in middleware/views should be caught and converted to responses.
-
-
 def test_view_exception_returns_500():
     """An unhandled exception in a view should return a 500 response."""
     from plain.urls.resolvers import _get_cached_resolver
@@ -202,8 +191,6 @@ def test_middleware_exception_returns_500():
 # Middleware ordering
 #
 # Tests that middleware execute in the correct order.
-
-
 def test_builtin_before_runs_before_user_middleware():
     """
     Builtin before-middleware runs before user middleware.
@@ -290,8 +277,6 @@ def test_short_circuit_middleware_skips_inner():
 # after_response in reverse. after_response ALWAYS runs for any middleware
 # whose before_request completed, even if that middleware (or a later one)
 # short-circuited.
-
-
 def test_short_circuit_skips_outer_after():
     """
     Two-phase behavior: when inner middleware short-circuits by returning
@@ -435,8 +420,6 @@ def test_after_middleware_can_modify_error_response():
 # SSE views
 #
 # Tests for ServerSentEventsView async dispatch and streaming.
-
-
 def test_sse_view_streams_formatted_events():
     """ServerSentEventsView should format and stream events."""
     from plain.urls.resolvers import _get_cached_resolver

@@ -126,6 +126,7 @@ def test_register_rejects_whitespace_smuggled_redirect():
 
 
 # Registration disabled
+#
 # OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION = False locks down DCR.
 def test_registration_disabled_register_returns_403():
     with override_settings(OAUTH_SERVER_ALLOW_DYNAMIC_REGISTRATION=False):

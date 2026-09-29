@@ -18,11 +18,10 @@ from plain.mcp.views import (
 )
 from plain.test import Client, capture_spans
 
+
 # Public endpoint
 #
 # MCP mounted with a trivial allow-all authenticator.
-
-
 def test_post_server_discover() -> None:
     response = mcp_post("/mcp", "server/discover")
     assert response.status_code == 200
@@ -124,8 +123,6 @@ def test_delete_is_not_allowed() -> None:
 #
 # Every request restates its protocol version and the client's
 # capabilities — there is no handshake to establish them once.
-
-
 def _post_with_meta(meta: dict, *, headers: dict[str, str | None] | None = None):
     """POST tools/list with a hand-built `_meta`."""
     return mcp_post_raw(
@@ -191,8 +188,6 @@ def test_meta_is_checked_before_headers() -> None:
 #
 # Every request mirrors its method (and target) into headers so
 # infrastructure can route and authorize without parsing the body.
-
-
 def test_missing_mcp_method_header_rejected() -> None:
     response = mcp_post("/mcp", "tools/list", headers={"Mcp-Method": None})
     assert response.status_code == 400
@@ -346,8 +341,6 @@ def test_removed_methods_are_unknown_methods() -> None:
 #
 # MCPView 5xx responses carry the original exception so observability
 # tooling can record it from the response.
-
-
 def test_unhandled_exception_attaches_response_exception() -> None:
     client = Client(raise_exceptions=False)
     response = mcp_post("/boom", "tools/list", client=client)
@@ -364,8 +357,6 @@ def test_unhandled_exception_attaches_response_exception() -> None:
 # `handle_message` swallows handler failures into a JSON-RPC error with
 # HTTP 200 — the outer HTTP SERVER span sees success and the failure is
 # invisible to OTel-based exception tooling.
-
-
 def test_rpc_method_emits_server_span() -> None:
     with capture_spans() as spans:
         response = mcp_post("/mcp", "tools/list")
@@ -400,8 +391,6 @@ def test_rpc_method_records_error_when_handler_fails() -> None:
 # Authed endpoint
 #
 # MCP mounted with an inline BearerAuth (see tests/app/urls.py).
-
-
 def test_missing_bearer_rejected() -> None:
     response = mcp_post("/authed", "tools/list")
     assert response.status_code == 401

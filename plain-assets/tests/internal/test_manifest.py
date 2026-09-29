@@ -8,6 +8,7 @@ from plain.assets.manifest import AssetsManifest
 
 
 # Already hashed manifest
+#
 # The manifest's third state: terminal AND fingerprinted (immutable), no redirect.
 def test_already_hashed_is_immutable():
     m = AssetsManifest()

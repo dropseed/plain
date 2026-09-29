@@ -173,8 +173,6 @@ def test_handler_bug_is_an_internal_error() -> None:
 # revision never defined. Only the modern `_meta` declaration — or an
 # `MCP-Protocol-Version` header naming `2026-07-28` itself — selects the
 # modern ladder.
-
-
 def test_claude_connector_shape_end_to_end() -> None:
     # The observed sequence: classic initialize (with the extra
     # Mcp-Method header), then tools/list under the negotiated version

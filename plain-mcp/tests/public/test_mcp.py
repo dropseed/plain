@@ -98,8 +98,6 @@ def test_tools_list_empty() -> None:
 #
 # A tool that needs something back from the client can't run for a client
 # that never offered it — that's a protocol mismatch, not a tool failure.
-
-
 def _required_capabilities_mcp() -> MCPView:
     class Summarize(MCPTool):
         """Ask the client's model to summarize something."""
@@ -170,8 +168,6 @@ def test_tools_without_requirements_are_unaffected() -> None:
 #
 # Fields the spec requires on every result, added centrally so custom
 # `rpc_` handlers get them too.
-
-
 def _result_stamping_mcp() -> MCPView:
     class Note(MCPResource):
         uri = "notes://one"
@@ -518,8 +514,6 @@ def test_tool_receives_mcp_reference() -> None:
 # Arguments are validated against the advertised input schema before the
 # tool runs, so bad input becomes a clear tool error (SEP-1303) rather than
 # an opaque failure inside `run()`.
-
-
 def _add_mcp() -> type[MCPView]:
     class Add(MCPTool):
         def __init__(self, a: int, b: int):

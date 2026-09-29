@@ -17,8 +17,6 @@ def _has_server_error(logs: CapturedLogs) -> bool:
 # After response chaining
 #
 # Every non-base after_response override must call super() so mixins compose.
-
-
 def test_two_mixins_both_run():
     class AHeader(View):
         def after_response(self, response: Response) -> Response:
@@ -97,8 +95,6 @@ def test_override_that_skips_super_short_circuits_chain():
 # attachment (the view handled it). Returning a 5xx is treated as a real
 # failure: the framework logs and attaches `response.exception` so subclasses
 # don't each have to. Re-raising defers to the framework error renderer.
-
-
 def test_mapped_4xx_does_not_log_server_error():
     with capture_logs("plain.request") as log:
 

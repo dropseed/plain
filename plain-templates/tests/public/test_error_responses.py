@@ -14,6 +14,7 @@ from templates_test_clients import error_client as _error_client
 
 
 # Plain view falls through to text
+#
 # A plain `View` re-raises; the framework default returns plain text.
 def test_plain_view_404_renders_plain_text():
     with _error_client() as error_client:
@@ -32,6 +33,7 @@ def test_plain_view_500_renders_plain_text():
 
 
 # Template view renders HTML
+#
 # `TemplateView.handle_exception` renders `{status}.html`.
 def test_template_view_404_renders_404_html():
     with _error_client() as error_client:
@@ -57,6 +59,7 @@ def test_template_view_403_without_matching_template_falls_back_to_text():
 
 
 # NotFoundView catch-all
+#
 # `NotFoundView` mounted as `path("<path:_>", ...)` renders `404.html`
 # for unmatched URLs — covering the URL-resolution-failure case that
 # never reaches a user view.
@@ -77,6 +80,7 @@ def test_post_to_unknown_url_is_404_not_405():
 
 
 # Custom HTTP exception subclass
+#
 # User-defined HTTPException subclasses carry their own status_code.
 def test_custom_402_renders_plain_text():
     with _error_client() as error_client:
@@ -87,6 +91,7 @@ def test_custom_402_renders_plain_text():
 
 
 # Render failure falls back to text
+#
 # If `{status}.html` itself raises, the view returns a bare-status
 # response and `response.exception` is stamped by `_respond_to_exception`
 # so observability still records the original failure.

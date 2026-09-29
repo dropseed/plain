@@ -43,8 +43,6 @@ def cleanup_loggers(func):
 # Logging configuration
 #
 # Test that logging configuration sets up loggers correctly.
-
-
 @cleanup_loggers
 def test_configure_logging_basic():
     """Test basic logging configuration."""
@@ -114,8 +112,6 @@ def test_plain_logger_structured_output():
 # Logger formats
 #
 # Test different logging formats work correctly.
-
-
 def _reset_handlers():
     """Reset logging configuration before each test."""
     for logger_name in ["plain", "app"]:
@@ -179,8 +175,6 @@ def test_keyvalue_format_output():
 # PlainLogger
 #
 # Test PlainLogger specific functionality.
-
-
 @cleanup_loggers
 def test_app_logger_instance_and_kwargs():
     """Test PlainLogger instance and kwargs functionality."""
@@ -334,8 +328,6 @@ def test_force_debug_functionality():
 # get_framework_logger
 #
 # Test the get_framework_logger factory function.
-
-
 @cleanup_loggers
 def test_get_framework_logger_auto_name():
     """Test that get_framework_logger() derives name from caller's module."""
@@ -382,8 +374,6 @@ def test_get_framework_logger_structured_output_via_extra():
 # Log levels
 #
 # Test that log levels work correctly.
-
-
 @cleanup_loggers
 def test_log_level_filtering():
     """Test that log levels filter messages correctly."""
