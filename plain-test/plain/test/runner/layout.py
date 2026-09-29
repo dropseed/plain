@@ -20,9 +20,17 @@ class Layout:
 
     def shown(self, path: Path) -> str:
         """A path the way the run's output writes it: relative to the root."""
-        if path.is_relative_to(self.root):
-            return path.relative_to(self.root).as_posix()
-        return str(path)
+        return path_as_shown(path, root=self.root)
+
+
+def path_as_shown(path: Path, *, root: Path) -> str:
+    """
+    A path the way a run's output writes it: relative to `root` when it is
+    under it, and as it was given when it isn't.
+    """
+    if path.is_absolute() and path.is_relative_to(root):
+        return path.relative_to(root).as_posix()
+    return str(path)
 
 
 def find_tests_directory(root: Path) -> Path:

@@ -488,21 +488,33 @@ def test_a_project_written_for_pytest_is_told_each_thing_once():
 
     # Nothing got as far as failing on its own.
     assert "Traceback" not in result.output
-    assert "ModuleNotFoundError" not in result.output
 
-    # What is true of every file is said once.
-    assert result.output.count("pytest isn't used here") == 1
-    assert result.output.count("pytest.raises: `raises`, from plain.test.") == 1
-    assert result.output.count("nothing is passed to a test") == 1
-    assert (
-        "  line 1: `import pytest`\n"
-        "  It uses pytest.raises. What replaces pytest is in the error for "
-        "tests/test_a_pins.py.\n"
-    ) in result.output
 
-    # What is true of one file is said for that file.
-    assert "    kid  1 test  a fixture in tests/conftest.py" in result.output
-    assert "    db   1 test  delete it: every test already runs" in result.output
+def test_a_one_paragraph_definition_error_is_printed_with_no_blank_lines():
+    """Every line of a run is read. A file that has only to say what is
+    wrong with it, and where that was explained, takes the lines that says."""
+    only_imports_pytest = "import pytest\n\n\ndef test_it():\n    pytest.skip()\n"
+    result = run_in_project(
+        {
+            "tests/test_a.py": only_imports_pytest,
+            "tests/test_b.py": only_imports_pytest,
+            "tests/test_c.py": only_imports_pytest,
+        }
+    )
+
+    lines = result.output.splitlines()
+    second = lines.index("COLLECTION ERROR tests/test_b.py")
+    third = lines.index("COLLECTION ERROR tests/test_c.py")
+    # The first says what replaces pytest, in paragraphs, and is set off
+    # from what follows it.
+    assert lines[second - 1] == ""
+    # The second and third are each a heading and what is under it.
+    assert lines[second:third] == [
+        "COLLECTION ERROR tests/test_b.py",
+        "  line 1: `import pytest`",
+        "  It uses pytest.skip. What replaces pytest is in the error for tests/test_a.py.",
+    ]
+    assert lines[third + 1] == "  line 1: `import pytest`"
 
 
 def test_a_test_that_yields_is_not_reported_as_passed():

@@ -246,11 +246,20 @@ class TextReporter:
                     f"SKIPPED {result.test.id} ({result.skip_reason})", fg="yellow"
                 )
 
+        # A definition error that is one paragraph is printed under its
+        # heading with no lines left blank. Eighty files with the same
+        # thing wrong are eighty of these, and every line is read.
+        after_a_short_one = False
         for failure in report.collection_failures:
-            self._print()
+            text = _collection_failure_text(failure)
+            is_short = failure.is_definition_error and "\n\n" not in text
+            if not (is_short and after_a_short_one):
+                self._print()
             self._print(f"COLLECTION ERROR {failure.file}", fg="red", bold=True)
-            self._print()
-            self._print(textwrap.indent(_collection_failure_text(failure), "  "))
+            if not is_short:
+                self._print()
+            self._print(textwrap.indent(text, "  "))
+            after_a_short_one = is_short
 
         for error in run.teardown_errors:
             self._print()

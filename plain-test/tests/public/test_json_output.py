@@ -294,6 +294,20 @@ def test_a_file_that_could_not_be_collected_is_in_the_document():
     assert written_wrongly["traceback"] is None
 
 
+def test_a_definition_error_about_one_line_says_which():
+    document = run_as_json(
+        {
+            "tests/test_billing.py": (
+                "import os\n\nimport pytest\n\n\ndef test_it():\n    pass\n"
+            ),
+        }
+    )
+
+    [error] = document["collection_errors"]
+    assert error["is_definition_error"] is True
+    assert error["line"] == 3
+
+
 def test_a_run_that_could_not_start_prints_a_document_too():
     result = run_in_project(STOPPED_PROJECT, "--json")
     assert result.exit_code == 2

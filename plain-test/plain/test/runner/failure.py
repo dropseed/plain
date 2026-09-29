@@ -22,6 +22,7 @@ from pathlib import Path
 from ..definition import TestDefinitionError
 from . import assertions
 from .collection import CollectionError, RunnableTest
+from .layout import path_as_shown
 from .output_capture import NO_OUTPUT, Output, StreamOutput
 from .printing import Describer, Diff, PrintedValue, ValuePrinter
 
@@ -139,7 +140,7 @@ def describe_collection_error(
             error_type=type(cause).__qualname__,
             message=str(cause),
             traceback=None,
-            line=None,
+            line=cause.line,
             stdout=output.stdout,
             stderr=output.stderr,
         )
@@ -190,11 +191,7 @@ def _line_in_the_file(cause: BaseException, *, path: Path) -> int | None:
 
 def shown_path(filename: str) -> str:
     """A path the way the run's output writes it: relative to where it started."""
-    path = Path(filename)
-    root = Path.cwd()
-    if path.is_absolute() and path.is_relative_to(root):
-        return path.relative_to(root).as_posix()
-    return filename
+    return path_as_shown(Path(filename), root=Path.cwd())
 
 
 def describe_failure(

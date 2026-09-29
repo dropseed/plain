@@ -373,7 +373,9 @@ def test_external_call():
 - [`override_settings`](./overrides.py#override_settings) — set Plain settings for the block, restored on exit
 - [`patch`](./overrides.py#patch) — replace an attribute (or a mapping key, e.g. `os.environ`) for the block
 
-`patch` takes the object and the attribute name, not a dotted string. On exit the target holds what it held before, which isn't always what reading the attribute finds:
+`patch` takes the object and the attribute name, not a dotted string. A target written as a dotted string (`"app.billing.charge_card"`) is still `unittest.mock.patch`. The two work differently and can sit in one file, so import that one as `from unittest import mock` and write `mock.patch(...)`.
+
+On exit the target holds what it held before, which isn't always what reading the attribute finds:
 
 - A class or an instance that only inherited the attribute inherits it again. Nothing is left behind on it.
 - A class gets back the `staticmethod` or `classmethod` it held, not the function that reading it returns.
@@ -1045,10 +1047,11 @@ COLLECTION ERROR tests/test_billing.py
   Everything pytest had and what replaces it: plain docs test --search "Migrating from pytest"
 
 COLLECTION ERROR tests/test_invoices.py
-
   line 1: `import pytest`
   It uses pytest.skip. What replaces pytest is in the error for tests/test_billing.py.
 ```
+
+An error that is one paragraph is printed straight under its heading, with no lines left blank, and so are the ones like it that follow.
 
 The first file's list covers what every file in the run uses, so it is printed once however many files there are. A helper module that imports pytest is named the same way, in the error for the test file that imports the helper.
 

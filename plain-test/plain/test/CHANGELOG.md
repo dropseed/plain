@@ -47,6 +47,7 @@
 - A test that takes fixtures is told what each parameter was: one of pytest's fixtures and what to write instead, or a fixture in a `conftest.py` the run found. A file with more than three such tests says how many.
 - A file that can't be run says everything reading it shows: what it imports, which tests take parameters nothing passes in, which yield, and every decorator that would raise. It said the first kind of problem it met.
 - A `tests/__init__.py` with code in it is a collection error. Nothing runs it.
+- A collection error that is one paragraph is printed under its heading with no blank lines, and in `--json` a definition error about one line has that `line`.
 - A second `@cases` shows a spelling that is right when a list holds tuples, where it suggested `itertools.product`. A case that doesn't fit its test names the parameters it fills and the ones nothing fills.
 - A `conftest.py` above the target is a collection error however the target is written. It was reported for a file and not for a directory.
 - An import from a conftest says to import from the helper module the name moves to. It was told to import the conftest by its bare name.
