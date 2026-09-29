@@ -255,7 +255,8 @@ CASES_WITH_AWKWARD_IDS = (
     "def test_price(number):\n"
     "    assert number == 0\n"
     "\n"
-    "@cases(7, 8)\n"
+    # Lists, which a case can't be named for, so these are numbered.
+    "@cases([7], [8])\n"
     "def test_numbered(number):\n"
     "    assert number == 0\n"
 )
@@ -430,3 +431,25 @@ def test_a_lifecycle_under_the_wrong_name_stops_the_run():
     assert "tests/lifecycles.py mentions TestLifecycle" in result.output
     assert "tests/lifecycle.py\n" in result.output
     assert "test body" not in result.output
+
+
+def test_a_case_is_named_for_its_values_where_it_is_reported():
+    project = make_project(
+        {
+            "tests/test_money.py": (
+                "from plain.test import cases\n"
+                "\n"
+                "@cases(('5', 500), ('0.05', 5))\n"
+                "def test_parses_dollars_into_cents(written, cents):\n"
+                "    assert cents == 0\n"
+            ),
+        }
+    )
+    result = run_runner(project)
+    test = "tests/test_money.py::test_parses_dollars_into_cents"
+    assert f"FAILED {test}[5-500]" in result.output
+    assert f"Re-run: plain test '{test}[5-500]'" in result.output
+
+    rerun = run_runner(project, f"{test}[0.05-5]", "-v")
+    assert "Collected 1 test\n" in rerun.output
+    assert f"FAILED  {test}[0.05-5]" in rerun.output

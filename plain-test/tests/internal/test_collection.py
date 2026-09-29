@@ -96,7 +96,7 @@ def test_cases_expand_with_bound_arguments():
         }
     )
     tests, _ = collect_tests(["."], root=root)
-    assert [t.name for t in tests] == ["test_add[0]", "test_add[1]"]
+    assert [t.name for t in tests] == ["test_add[1-2-3]", "test_add[2-2-4]"]
     for test in tests:
         test.func()  # cases are bound — runnable with no arguments
 
@@ -232,7 +232,7 @@ def test_cases_that_do_not_fit_the_parameters_are_a_collection_error():
     assert "test_add(a, b) doesn't fit its @cases" in message
     assert "case [too many] passes 3 values" in message
     # Its first case fits, and so does every case of the method.
-    assert "case [0]" not in message
+    assert "case [1-2]" not in message
     assert "test_in_class" not in message
 
 
