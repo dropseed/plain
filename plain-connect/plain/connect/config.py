@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from collections.abc import Mapping
 from typing import Any
@@ -83,12 +84,29 @@ class _QualifiedExceptionTypeLoggingHandler(LoggingHandler):
         return attributes
 
 
+def _in_a_test_run() -> bool:
+    """Whether this process is a `plain test` run, or was started by one.
+
+    The test runner sets `PLAIN_TEST_RUNNING` before it sets the app up, and
+    a process a test starts inherits it.
+    """
+    return bool(os.environ.get("PLAIN_TEST_RUNNING"))
+
+
 @register_config
 class Config(PackageConfig):
     package_label = "plainconnect"
 
     def ready(self) -> None:
         if not settings.CONNECT_EXPORT_ENABLED or not settings.CONNECT_EXPORT_TOKEN:
+            return
+
+        if _in_a_test_run():
+            # Nothing a test does is exported, whatever the settings and the
+            # environment say. It is decided here and not in a test
+            # lifecycle because this is where the providers are installed,
+            # and they can't be taken out again: a lifecycle starts after
+            # setup, by which time the exporters would be running.
             return
 
         # Don't capture per-batch OTLP export failures as Sentry events. The OTel

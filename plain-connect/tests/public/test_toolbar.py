@@ -1,6 +1,7 @@
 import re
 
 from plain.test import Client, override_settings
+from plain.test.otel import tracer_provider_for_capturing
 
 
 def install_real_tracing() -> None:
@@ -8,16 +9,13 @@ def install_real_tracing() -> None:
 
     Without an SDK provider, OpenTelemetry hands out no-op spans whose context
     is invalid (all-zero trace id). The toolbar item needs a real trace id to
-    build a link, so the export-link tests opt into this. connect itself only
-    installs a provider when an export token is set at startup, which the test
-    settings don't do.
-    """
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+    build a link, so the export-link tests opt into this. connect itself
+    installs no provider in a test run.
 
-    if isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
-        trace.set_tracer_provider(TracerProvider(sampler=ALWAYS_ON))
+    It is the provider `capture_spans()` uses, so a test that captures spans
+    can run after these.
+    """
+    tracer_provider_for_capturing()
 
 
 def test_no_trace_button_when_export_is_not_configured():
@@ -30,7 +28,8 @@ def test_no_trace_button_when_export_is_not_configured():
 
 
 def test_trace_button_links_to_the_dashboard():
-    # The test suite exports PLAIN_CONNECT_EXPORT_ENABLED=false, so re-enable it.
+    # The setting only decides what the toolbar shows. Nothing is exported
+    # in a test run.
     install_real_tracing()
     with override_settings(
         DEBUG=True, CONNECT_EXPORT_ENABLED=True, CONNECT_EXPORT_TOKEN="test-token"

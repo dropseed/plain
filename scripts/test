@@ -4,11 +4,6 @@
 #
 #  • Installs psycopg database driver wheel on-demand.
 
-# Disable OTLP export during tests. plain-dev's `plain.setup` entrypoint
-# loads .env on every `plain` command, which pulls a real
-# CONNECT_EXPORT_TOKEN into the test process and produces noisy retry output.
-export PLAIN_CONNECT_EXPORT_ENABLED=false
-
 # ---------------------------------------------------------------------------
 # CLI option parsing
 # ---------------------------------------------------------------------------

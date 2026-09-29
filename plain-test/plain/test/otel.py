@@ -61,9 +61,10 @@ def tracer_provider_for_capturing() -> TracerProvider:
     if _tracer_provider_for_capturing is None:
         if not isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
             raise RuntimeError(
-                "A global tracer provider is already installed — disable it "
-                "for tests (e.g. PLAIN_CONNECT_EXPORT_ENABLED=false) so spans "
-                "can be captured."
+                "A global tracer provider is already installed, and not by"
+                " plain.test, so spans can't be captured: whatever installed"
+                " it has to leave it out of a test run. (plain.connect does."
+                " It reads PLAIN_TEST_RUNNING, which `plain test` sets.)"
             )
         provider = TracerProvider()
         trace.set_tracer_provider(provider)
@@ -136,8 +137,11 @@ def _install_test_meter() -> CaptureSource[Metric]:
         metrics.set_meter_provider(provider)
         if metrics.get_meter_provider() is not provider:
             raise RuntimeError(
-                "A global meter provider is already installed — disable it "
-                "for tests so metrics can be captured."
+                "A global meter provider is already installed, and not by"
+                " plain.test, so metrics can't be captured: whatever"
+                " installed it has to leave it out of a test run."
+                " (plain.connect does. It reads PLAIN_TEST_RUNNING, which"
+                " `plain test` sets.)"
             )
 
         # The reader hands over what was recorded since it was last asked,

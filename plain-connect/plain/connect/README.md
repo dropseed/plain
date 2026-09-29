@@ -156,6 +156,10 @@ If a request wasn't sampled for export (see [Sampling](#sampling)), the button s
 
 The OTLP exporters batch and retry automatically. If the endpoint is down, telemetry is dropped after retries — it does not block your application.
 
+#### Is anything exported when I run my tests?
+
+No. In a `plain test` run, and in any process a test starts, plain.connect installs no exporter, whatever `CONNECT_EXPORT_TOKEN` is set to. There's nothing to set in `.env.test`, and [`capture_spans()`](../../../plain-test/plain/test/README.md#spans) works with plain.connect installed.
+
 #### Does this add latency to requests?
 
 No. Trace spans are exported in a background thread via `BatchSpanProcessor`. Metrics are flushed periodically by a background thread. Neither blocks request handling.
