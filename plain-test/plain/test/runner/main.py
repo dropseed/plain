@@ -94,6 +94,7 @@ def main(
       tests/accounts                                a directory
       tests/test_signup.py                          a file
       tests/test_signup.py::test_welcome            a test
+      tests/test_signup.py:42                       the test line 42 is in
       tests/test_signup.py::TestInvites             a class
       tests/test_signup.py::TestInvites::test_sent  a test in a class
       'tests/test_price.py::test_total[annual]'     one case of a test
@@ -195,6 +196,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
     from .output_capture import joined
     from .report import RunReport, StoppedRun
     from .reporting import collection_error_text
+    from .targets import TargetError
 
     # What is written outside any test and any file being collected, a
     # piece at a time as the run gets on.
@@ -292,7 +294,7 @@ def _run(command: Command, *, capture: OutputCapture, reporter: Reporter) -> Run
                 helper_directory=tests_directory if has_tests_directory else None,
                 capture=capture,
             )
-        except FileNotFoundError as e:
+        except TargetError as e:
             return stopped("target_not_found", str(e))
 
         if command.match:

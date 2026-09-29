@@ -6,6 +6,7 @@ uv run plain test [targets] [options]
 
 - `uv run plain test` - Run all tests (from the directory containing `tests/`)
 - `uv run plain test tests/test_x.py::test_name` - Run one test
+- `uv run plain test tests/test_x.py:42` - Run the test line 42 is in, which is what a traceback gives you
 - `uv run plain test --match text` - Run the tests whose id contains the text (as written: not a pattern, not an expression)
 - `uv run plain test --fail-fast` - Stop on first failure
 - `uv run plain test --verbose` - One line per test. Without it a test that passes prints nothing: a run that passes is the collected count and the summary

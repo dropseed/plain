@@ -39,6 +39,7 @@ from .problems import (
     CantBeRunAsWritten,
     ProblemsInAFile,
 )
+from .targets import TargetError, name_of_the_test_at, read_target
 
 __all__ = []
 
@@ -82,8 +83,9 @@ def collect_tests(
     capture: OutputCapture | None = None,
 ) -> tuple[list[RunnableTest], list[CollectionError]]:
     """
-    Collect tests from the given targets (files, directories, or
-    `path::test_name` ids), relative to `root` (default: cwd).
+    Collect tests from the given targets (directories, files, a test by
+    `path::name`, or the test at `path:line`), relative to `root` (default:
+    cwd). A target that can't be used raises `TargetError`.
 
     `exclude_dirs` adds directory names to skip during discovery (e.g. the
     runner excludes the Plain `app` directory in app mode).
@@ -113,16 +115,28 @@ def collect_tests(
     # Every target is found before anything is loaded, so a target that
     # isn't there stops the run before a test file has been run.
     files_of_targets: list[tuple[list[Path], str]] = []
-    for target in targets or ["."]:
-        path_part, _, name_part = target.partition("::")
-        base = (root / path_part).resolve() if path_part not in ("", ".") else root
+    for written in targets or ["."]:
+        target = read_target(written)
+        base = (root / target.path).resolve() if target.path not in ("", ".") else root
+        name_part = target.name
 
         if base.is_file():
             files = [base]
-        elif base.is_dir():
+            if target.line is not None:
+                # None for a file that can't be read, which has an error of
+                # its own to report.
+                name_part = (
+                    name_of_the_test_at(base, line=target.line, written=written) or ""
+                )
+        elif base.is_dir() and target.line is None:
             files = _find_test_files(base, skip_dir_names=skip_dir_names)
+        elif base.is_dir():
+            raise TargetError(
+                f"No test at {written}: {target.path} is a directory, and a"
+                " line is a line of a file."
+            )
         else:
-            raise FileNotFoundError(f"No such test target: {target}")
+            raise TargetError(f"No such test target: {written}")
         files_of_targets.append((files, name_part))
 
     errors: list[CollectionError] = []

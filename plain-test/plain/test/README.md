@@ -597,6 +597,7 @@ plain test                                      # everything under the current d
 plain test tests/test_views.py                  # one file
 plain test tests/checkout                       # one directory
 plain test tests/test_views.py::test_homepage   # one test
+plain test tests/test_views.py:42               # the test line 42 is in
 plain test --match signup                       # tests whose id contains "signup"
 plain test --tag slow                           # only tests tagged "slow"
 plain test --exclude-tag slow                   # everything but
@@ -625,7 +626,7 @@ Tests run in the same order every time. Within a file, that's the order they're 
 
 ### Selecting tests
 
-A target is a path, optionally followed by `::` and a name. You can pass several.
+A target is a path, optionally followed by `::` and a name, or by `:` and a line. You can pass several.
 
 | Target                                     | Runs                                 |
 | ------------------------------------------ | ------------------------------------ |
@@ -635,6 +636,13 @@ A target is a path, optionally followed by `::` and a name. You can pass several
 | `tests/test_views.py::TestCart`            | Every test in that class             |
 | `tests/test_views.py::TestCart::test_add`  | That method                          |
 | `'tests/test_email.py::test_valid[empty]'` | That one case                        |
+| `tests/test_views.py:42`                   | The test line 42 is in               |
+
+A line is any line of the test, from its first decorator to the last line of its body, and with `@cases` every case of the test runs. A traceback gives a file and a line, which is enough to run the test again without knowing its name. A line that's in no test is an error, which names the nearest tests above and below it:
+
+```
+No test at tests/test_views.py:12: line 12 is in no test. It is between test_homepage (lines 5 to 9) and test_about (lines 14 to 20).
+```
 
 Paths are relative to the directory you run from. Quote a target that names a case, since the shell reads `[` and spaces itself. The [re-run command](#failures) a failure prints is already quoted.
 
@@ -1262,7 +1270,7 @@ A run that couldn't start prints one too, with no tests in it. `reason` says why
 | `reason`             | What happened                                                                  | `exit_code` |
 | -------------------- | ------------------------------------------------------------------------------ | ----------- |
 | `"lifecycle_error"`  | `tests/lifecycle.py` can't be used                                             | `2`         |
-| `"target_not_found"` | A target doesn't exist                                                         | `2`         |
+| `"target_not_found"` | A target doesn't exist, or its line is in no test                              | `2`         |
 | `"setup_error"`      | The app couldn't be set up, or a lifecycle's `setup_worker()` raised or exited | `3`         |
 | `"no_tests_found"`   | No tests matched                                                               | `4`         |
 | `"interrupted"`      | Ctrl-C, before the first test                                                  | `130`       |

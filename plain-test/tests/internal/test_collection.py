@@ -6,6 +6,7 @@ from plain.test import TestDefinitionError, patch, raises
 from plain.test.runner.collection import collect_tests
 from plain.test.runner.execution import run_tests
 from plain.test.runner.reporting import collection_error_text
+from plain.test.runner.targets import TargetError
 
 
 def write_tests(files: dict[str, str]) -> Path:
@@ -117,7 +118,7 @@ def test_unimportable_file_reported_without_stopping_collection():
 
 def test_missing_target_raises():
     root = write_tests({"test_x.py": "def test_ok():\n    assert True\n"})
-    with raises(FileNotFoundError):
+    with raises(TargetError, match="No such test target: test_nope.py"):
         collect_tests(["test_nope.py"], root=root)
 
 
