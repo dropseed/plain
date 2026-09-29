@@ -363,10 +363,9 @@ def _tests_directory_search_path() -> list[str]:
     test file imports a helper module by its bare name
     (`from helpers import create_user`). The type checker has to look in the
     same place. It finds `tests/` by itself only when the directory isn't a
-    package, and a project that came from pytest usually has a
-    `tests/__init__.py`, so every one of those imports was reported as
-    unresolved. This adds to any `extra-paths` the project's own ty
-    configuration lists.
+    package, and with a `tests/__init__.py` in it every one of those imports
+    is reported as unresolved. This adds to any `extra-paths` the project's
+    own ty configuration lists.
     """
     if Path("tests").is_dir():
         return ["--extra-search-path", "tests"]

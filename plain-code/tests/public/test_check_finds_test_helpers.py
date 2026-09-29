@@ -42,8 +42,8 @@ def test_both() -> None:
 
 
 def make_tests_directory() -> None:
-    # With an `__init__.py`, as a project that came from pytest has, the type
-    # checker takes `tests` for a package and would look for `tests.helpers`.
+    # With an `__init__.py` in it, the type checker takes `tests` for a
+    # package and would look for `tests.helpers`.
     # Without one it finds the directory by itself.
     Path("tests").mkdir()
     Path("tests/__init__.py").write_text("")

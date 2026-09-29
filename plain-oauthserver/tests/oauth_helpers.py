@@ -1,6 +1,6 @@
 """Shared test helpers.
 
-A uniquely-named module (rather than `conftest`) so type-checking resolves it
+A uniquely-named module so type-checking resolves it
 unambiguously across the workspace's shared test path.
 """
 
