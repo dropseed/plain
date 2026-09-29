@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, Any
 
 from plain.http.request import Request
 from plain.runtime import settings
+from plain.sessions import SessionStore
 from plain.sessions.requests import get_request_session, set_request_session
-from plain.sessions.test import get_client_session
 
 from .requests import set_request_user
 from .sessions import get_user, login, logout
@@ -21,8 +21,7 @@ def login_client(client: Client, user: Any) -> None:
     client makes afterwards is that user's.
     """
     request = Request(method="GET", path="/")
-    # The client's own session, which it gets a cookie for if it had none.
-    set_request_session(request, get_client_session(client))
+    set_request_session(request, _session_of(client))
     login(request, user)
     session = get_request_session(request)
     session.save()
@@ -48,7 +47,22 @@ def login_client(client: Client, user: Any) -> None:
 def logout_client(client: Client) -> None:
     """Log a test client out: end its session and drop its cookies."""
     request = Request(method="GET", path="/")
-    set_request_session(request, get_client_session(client))
+    set_request_session(request, _session_of(client))
     set_request_user(request, get_user(request))
     logout(request)
     client.cookies.clear()
+
+
+def _session_of(client: Client) -> SessionStore:
+    """The session the client's cookie points to, or one that isn't written
+    yet.
+
+    Not `get_client_session()`, which writes a new session so that it can
+    hand the client its cookie. `login()` changes the session's key and
+    `logout()` ends it, so what that wrote would be written over or removed
+    by the next statement.
+    """
+    cookie = client.cookies.get(settings.SESSION_COOKIE_NAME)
+    if cookie:
+        return SessionStore(cookie.value)
+    return SessionStore()
