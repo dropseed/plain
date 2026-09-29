@@ -101,6 +101,16 @@ def document(report: RunReport, *, list_passed: bool) -> dict[str, Any]:
         "collection_errors": [
             _collection_error(failure) for failure in report.collection_failures
         ],
+        # What the collection errors come to: each parameter that tests take
+        # and nothing passes in, over the whole run.
+        "parameters_nothing_passes": [
+            {
+                "name": parameter.name,
+                "tests": parameter.tests,
+                "files": parameter.files,
+            }
+            for parameter in report.parameters_nothing_passes
+        ],
         "warnings": [
             {
                 "category": warning.category,

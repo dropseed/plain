@@ -8,6 +8,10 @@ from pathlib import Path
 
 __all__ = []
 
+# Test modules are named for where they are, under this name, so two files
+# called `test_views.py` in different directories are different modules.
+TEST_MODULES_PACKAGE = "plain_tests"
+
 
 @dataclass(frozen=True, kw_only=True)
 class Layout:
@@ -54,3 +58,30 @@ def import_helper_modules_from(directory: Path) -> None:
     """
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
+
+
+def without_test_module_names(text: str) -> str:
+    """
+    Text with the names test modules are loaded under taken out of it, so
+    that what a test file defines is called what the file calls it.
+
+    A test file is a module named for where it is
+    (`plain_tests.tests.billing.test_refunds`), and Python puts a module's
+    name in front of what it defines: `<plain_tests.tests.billing.
+    test_refunds.FakeGateway object at 0x...>`. Nobody wrote that name, and
+    a report already says which file it is about. This is `<FakeGateway
+    object at 0x...>`.
+    """
+    if TEST_MODULES_PACKAGE not in text:
+        return text
+    names = [
+        name
+        for name, module in sys.modules.items()
+        if name.startswith(f"{TEST_MODULES_PACKAGE}.")
+        and getattr(module, "__file__", None)
+    ]
+    # The longest first: `plain_tests.tests.test_a` is the start of
+    # `plain_tests.tests.test_a_b`.
+    for name in sorted(names, key=len, reverse=True):
+        text = text.replace(f"{name}.", "")
+    return text

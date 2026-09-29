@@ -798,7 +798,7 @@ failed tests/test_signup.py::test_signup_redirects
       response = <ClientResponse status_code=404 of <Response status_code=404, "text/plain; charset=utf-8">>
 
   locals:
-    client = <plain.test.client.Client object at 0x10ac756a0>
+    client = <Client cookies=[]>
     email = 'a@example.com'
 
 Re-run: plain test tests/test_signup.py::test_signup_redirects
@@ -809,6 +809,8 @@ The traceback starts at your test. The runner's own frames are left out.
 Under the assert is each part of its expression and what it was, from the outside in: `response.status_code` was `404`, and the `response` it was read from is indented under it. What's written out in the expression (`302`) isn't repeated. See [Assertions](#assertions).
 
 A large value is printed once. When the failure has it again under another name, the second says `<the same as rows>`.
+
+What your test file defines is called what the file calls it. A `FakeGateway` class in `tests/test_billing.py` prints as `<FakeGateway object at 0x...>`, not under the name the runner loaded the file by.
 
 `locals:` is every name the test function had bound when it failed, in the order they were bound, without the ones the assert already printed. It's there for every failure, not only a failed assert, and it's always the test function's own: when the error was raised in something the test called, the traceback shows where and the locals show what the test called it with. A name bound to a module, a class or a function is left out.
 
@@ -1043,19 +1045,32 @@ collection error tests/test_orders.py
   ...
 ```
 
-What is true of many files is said once. The first file whose tests take parameters carries the paragraph that says what a test takes, and the ones after it say what is wrong with their own file and name the first. Here is what each message is asking for:
+What is true of many files is said once. The first file whose tests take parameters carries the paragraph that says what a test takes, and the ones after it say what is wrong with their own file and name the first.
 
-| Message                                                                                 | What to do                                                                                             |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `test_x(user, plan) takes parameters, and nothing passes them in.`                      | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`             |
-| `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value, for a. Nothing fills b.` | Make that case pass a value for each parameter, in their order                                         |
-| `line 8: TestCart is a class with 3 tests in it.`                                       | Write each of its tests as a function of the file, and what they shared as functions they call         |
-| `test_x() has a yield in it.`                                                           | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper    |
-| `test_x is defined in billing, not in this file.`                                       | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_` |
-| `line 8: test_x has 2 @cases. A test takes one.`                                        | Use one `@cases`, built from both lists, each case one flat tuple. The message shows how               |
-| `line 8: cases() ids must be unique`                                                    | Give the case another name. It is what another case is called, or numbered                             |
-| `line 8: @skip requires a reason`                                                       | Write `@skip("why")`, not a bare `@skip`                                                               |
-| `line 8: @tag requires at least one name`                                               | Write `@tag("slow")`, not a bare `@tag`                                                                |
+When more than one file has tests that take parameters, the run adds them up after the last file's error, the parameter most tests take first:
+
+```
+parameters nothing passes in
+
+  Tests in 2 files take these:
+
+  user    3 tests in 2 files
+  client   1 test in 1 file
+```
+
+Here is what each message is asking for:
+
+| Message                                                                                 | What to do                                                                                                   |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `test_x(user, plan) takes parameters, and nothing passes them in.`                      | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`                   |
+| `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value, for a. Nothing fills b.` | Make that case pass a value for each parameter, in their order                                               |
+| `line 8: TestCart is a class with 3 tests in it.`                                       | Write each of its tests as a function of the file, and what they shared as functions they call               |
+| `test_x() has a yield in it.`                                                           | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper          |
+| `test_x is defined in billing, not in this file.`                                       | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_`       |
+| `line 8: test_x has 2 @cases. A test takes one.`                                        | Use one `@cases`, built from both lists, each case one flat tuple. The message shows how                     |
+| `line 8: cases() ids must be unique`                                                    | Give the case another name. It is what another case is called, or numbered                                   |
+| `line 8: @skip requires a reason`                                                       | Write `@skip("why")`, not a bare `@skip`                                                                     |
+| `line 8: @tag requires at least one name`                                               | Write `@tag("slow")`, not a bare `@tag`                                                                      |
 | `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its path from `tests/` |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
@@ -1218,6 +1233,7 @@ plain test --json --list-passed
             }
         }
     ],
+    "parameters_nothing_passes": [],
     "warnings": [
         {
             "category": "DeprecationWarning",
@@ -1254,6 +1270,25 @@ plain test --json --list-passed
 - **`collection_errors`** have `is_definition_error: true` and no traceback when the file is written in a way the runner can't run. `message` says what to write instead. `line` is the line it is about when it is about one, such as a `@cases()` with no cases in it, and null when it is about several.
 - **Paths are relative** to `command.directory`, where the command was run from. A path outside it is absolute.
 - **`version`** goes up when a field is renamed, removed, or changes what it means. A field being added doesn't change it.
+
+- **`parameters_nothing_passes`** is what the collection errors come to, when tests take parameters and nothing passes them in: each parameter, how many tests across the run take it, and in how many files. The one taken by the most tests is first.
+
+```json
+{
+    "parameters_nothing_passes": [
+        {
+            "name": "user",
+            "tests": 3,
+            "files": 2
+        },
+        {
+            "name": "client",
+            "tests": 1,
+            "files": 1
+        }
+    ]
+}
+```
 
 `--json` takes the same targets and filters as any run. It can't be combined with `--verbose` or `--show-output`: there's one document, and nothing else goes to stdout.
 

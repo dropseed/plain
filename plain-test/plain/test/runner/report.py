@@ -87,6 +87,16 @@ class Counts:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ParameterNothingPasses:
+    """A parameter that tests across the run take and nothing passes in."""
+
+    name: str
+    # How many tests take it, and in how many files.
+    tests: int
+    files: int
+
+
+@dataclass(frozen=True, kw_only=True)
 class RunReport:
     command: Command
     # None when the run ended before any test was run. Then `stopped` says
@@ -99,6 +109,25 @@ class RunReport:
     # setting up the app, setting up the lifecycles and taking them down.
     # Empty for a stopped run, whose `stopped.output` it is.
     output: Output = NO_OUTPUT
+
+    @property
+    def parameters_nothing_passes(self) -> tuple[ParameterNothingPasses, ...]:
+        """
+        Each parameter that tests take and nothing passes in, added up over
+        the run: the one taken by the most tests first. A file's error has
+        that file's. A suite with sixty such files is sixty tables, and this
+        is their total.
+        """
+        tests: dict[str, int] = {}
+        files: dict[str, int] = {}
+        for failure in self.collection_failures:
+            for name, count in failure.parameters:
+                tests[name] = tests.get(name, 0) + count
+                files[name] = files.get(name, 0) + 1
+        return tuple(
+            ParameterNothingPasses(name=name, tests=tests[name], files=files[name])
+            for name in sorted(tests, key=lambda name: (-tests[name], name))
+        )
 
     @property
     def warnings(self) -> tuple[RaisedWarning, ...]:

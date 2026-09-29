@@ -60,6 +60,18 @@ ORDERS_PROJECT = {
     "tests/test_invoices.py": "from billing_helpers import create_invoice\n",
 }
 
+PARAMETERS_PROJECT = {
+    "tests/test_signup.py": (
+        "def test_signup(user, client):\n"
+        "    pass\n"
+        "\n"
+        "\n"
+        "def test_welcome(user):\n"
+        "    pass\n"
+    ),
+    "tests/test_billing.py": "def test_invoice(user):\n    pass\n",
+}
+
 INTERRUPTED_PROJECT = {
     "tests/test_sync.py": (
         "def test_every_page():\n"
@@ -569,6 +581,21 @@ def both(one: Any, other: Any) -> Any:
     return one
 
 
+def test_the_parameters_tests_take_are_added_up_in_the_document():
+    document = run_as_json(PARAMETERS_PROJECT)
+    assert document["outcome"] == "failed"
+    assert document["counts"]["collection_errors"] == 2
+    assert document["parameters_nothing_passes"] == [
+        {"name": "user", "tests": 3, "files": 2},
+        {"name": "client", "tests": 1, "files": 1},
+    ]
+
+
+def test_a_run_whose_tests_take_nothing_has_none_to_add_up():
+    document = run_as_json(ORDERS_PROJECT)
+    assert document["parameters_nothing_passes"] == []
+
+
 def test_the_readme_documents_the_document():
     readme = (Path(plain.test.__file__).parent / "README.md").read_text()
     section = readme.partition("\n### As JSON\n")[2].partition("\n## ")[0]
@@ -578,6 +605,7 @@ def test_the_readme_documents_the_document():
     ]
     whole_document, *parts = examples
     assert [list(part) for part in parts] == [
+        ["parameters_nothing_passes"],
         ["interrupted"],
         ["stopped"],
         ["teardown_errors"],
@@ -589,7 +617,12 @@ def test_the_readme_documents_the_document():
         documented[field] = both(documented[field], shape(part[field]))
 
     printed = shape(run_as_json(ORDERS_PROJECT))
-    for project in (INTERRUPTED_PROJECT, STOPPED_PROJECT, TEARDOWN_PROJECT):
+    for project in (
+        PARAMETERS_PROJECT,
+        INTERRUPTED_PROJECT,
+        STOPPED_PROJECT,
+        TEARDOWN_PROJECT,
+    ):
         printed = both(printed, shape(run_as_json(project)))
 
     assert documented == printed

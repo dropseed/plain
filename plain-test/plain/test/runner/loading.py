@@ -29,14 +29,10 @@ from pathlib import Path
 
 from ..definition import TestDefinitionError
 from . import assertions, problems
-from .layout import Layout
+from .layout import TEST_MODULES_PACKAGE, Layout
 from .problems import CantBeRunAsWritten, ProblemsInAFile, tests_as_written
 
 __all__ = []
-
-# Test modules are named for where they are, under this name, so two files
-# called `test_views.py` in different directories are different modules.
-_TOP_PACKAGE_NAME = "plain_tests"
 
 _CACHE_TAG_PREFIX = "plaintest"
 
@@ -85,8 +81,8 @@ def load_test_module(path: Path, *, layout: Layout) -> types.ModuleType:
 def _module_name_for(path: Path, *, layout: Layout) -> str:
     if path.is_relative_to(layout.root):
         relative = path.relative_to(layout.root)
-        return ".".join([_TOP_PACKAGE_NAME, *relative.with_suffix("").parts])
-    return f"{_TOP_PACKAGE_NAME}.{path.stem}"
+        return ".".join([TEST_MODULES_PACKAGE, *relative.with_suffix("").parts])
+    return f"{TEST_MODULES_PACKAGE}.{path.stem}"
 
 
 def _add_to_its_packages(module: types.ModuleType) -> None:

@@ -26,6 +26,8 @@ from collections.abc import Callable, ItemsView, Sequence, ValuesView
 from dataclasses import dataclass
 from typing import Any
 
+from .layout import without_test_module_names
+
 __all__ = []
 
 # The most of one value a report prints, in characters.
@@ -186,6 +188,9 @@ class ValuePrinter:
         )
 
     def _whole(self, value: object, *, sort_dicts: bool = False) -> str:
+        return without_test_module_names(self._as_python_prints_it(value, sort_dicts))
+
+    def _as_python_prints_it(self, value: object, sort_dicts: bool) -> str:
         try:
             fit_to_print = self._fit_to_print(value, inside=frozenset())
         except RecursionError:

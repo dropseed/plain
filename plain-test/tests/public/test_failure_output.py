@@ -261,6 +261,29 @@ def test_two_dataclasses_are_compared_field_by_field():
     assert "  +        city='Shelbyville'," in diff
 
 
+def test_what_a_test_file_defines_is_called_what_the_file_calls_it():
+    output = failing(
+        "class FakeGateway:\n"
+        "    pass\n"
+        "\n"
+        "\n"
+        "class Declined(Exception):\n"
+        "    pass\n"
+        "\n"
+        "\n"
+        "def test_charge():\n"
+        "    gateway = FakeGateway()\n"
+        "    kinds = [FakeGateway]\n"
+        "    raise Declined(f'by {gateway!r}')\n"
+    )
+    # Not the name the runner loaded the file under, which nobody wrote.
+    assert "plain_tests" not in output
+    assert "  Declined: by <FakeGateway object at 0x" in output
+    locals_printed = block(output, "locals:")
+    assert locals_printed[1].startswith("  gateway = <FakeGateway object at 0x")
+    assert locals_printed[2] == "  kinds = [<class 'FakeGateway'>]"
+
+
 def test_a_failure_that_is_not_an_assert_prints_what_the_test_had():
     output = failing(
         "def test_setting():\n"

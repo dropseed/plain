@@ -22,7 +22,7 @@ from pathlib import Path
 from ..definition import TestDefinitionError
 from . import assertions
 from .collection import CollectionError, RunnableTest
-from .layout import path_as_shown
+from .layout import path_as_shown, without_test_module_names
 from .output_capture import NO_OUTPUT, Output, StreamOutput
 from .printing import Describer, Diff, PrintedValue, ValuePrinter
 
@@ -127,6 +127,9 @@ class CollectionFailure:
     # What loading the file wrote.
     stdout: StreamOutput = NO_OUTPUT.stdout
     stderr: StreamOutput = NO_OUTPUT.stderr
+    # The parameters of its tests that nothing passes in, each with how many
+    # of its tests take it.
+    parameters: tuple[tuple[str, int], ...] = ()
 
 
 def describe_collection_error(
@@ -143,6 +146,7 @@ def describe_collection_error(
             line=cause.line,
             stdout=output.stdout,
             stderr=output.stderr,
+            parameters=tuple(error.parameters.items()),
         )
 
     return CollectionFailure(
@@ -172,7 +176,8 @@ def format_collection_traceback(cause: BaseException) -> str:
         if not tb.tb_frame.f_code.co_filename.startswith(not_the_test_file):
             break
         tb = tb.tb_next
-    return "".join(traceback.format_exception(type(cause), cause, tb)).rstrip()
+    formatted = "".join(traceback.format_exception(type(cause), cause, tb))
+    return without_test_module_names(formatted).rstrip()
 
 
 def _line_in_the_file(cause: BaseException, *, path: Path) -> int | None:
@@ -253,7 +258,7 @@ def failure_that_could_not_be_described(
 
 def _guarded_str(error: BaseException) -> str:
     try:
-        return str(error)
+        return without_test_module_names(str(error))
     except Exception as raised:
         return f"<its str raised {type(raised).__qualname__}: {raised}>"
 
@@ -279,9 +284,11 @@ def _without_the_runners_frames(error: BaseException) -> types.TracebackType | N
 
 def format_traceback(error: BaseException) -> str:
     """Format a traceback with the runner's own frames trimmed off the top."""
-    return "".join(
-        traceback.format_exception(
-            type(error), error, _without_the_runners_frames(error)
+    return without_test_module_names(
+        "".join(
+            traceback.format_exception(
+                type(error), error, _without_the_runners_frames(error)
+            )
         )
     )
 

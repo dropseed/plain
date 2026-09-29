@@ -59,6 +59,9 @@ class CollectionError(Exception):
         self.error = error
         # What loading the file wrote, when the run is holding output.
         self.output = NO_OUTPUT
+        # The parameters of the file's tests that nothing passes in, and how
+        # many of its tests take each. The run adds them up.
+        self.parameters: dict[str, int] = {}
         super().__init__(f"Failed to collect {path}: {error!r}")
 
 
@@ -214,6 +217,8 @@ def _say_each_thing_once(errors: list[CollectionError], *, layout: Layout) -> No
 
         if isinstance(cause, ImportsAnotherWay) and error is importing_another_way[0]:
             sections.append(cause.why)
+
+        error.parameters = dict(cause.tests.parameters)
 
         # Handed on as the one kind of error there is, not as the kind made
         # here to keep what was known.

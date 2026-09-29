@@ -177,6 +177,51 @@ def test_a_test_that_takes_parameters_is_told_what_to_do():
     assert "1 passed, 1 collection errors" in result.output
 
 
+TAKING_PARAMETERS = {
+    "tests/test_signup.py": (
+        "def test_signup(user, client):\n"
+        "    assert True\n"
+        "\n"
+        "def test_welcome(user):\n"
+        "    assert True\n"
+    ),
+    "tests/test_billing.py": "def test_invoice(user, *, order):\n    assert True\n",
+    "tests/test_other.py": "def test_ok():\n    assert True\n",
+}
+
+
+def test_the_parameters_tests_take_are_added_up_over_the_run():
+    result = run_in_project(TAKING_PARAMETERS)
+    assert result.exit_code == 1
+    assert (
+        "parameters nothing passes in\n"
+        "\n"
+        "  Tests in 2 files take these:\n"
+        "\n"
+        "  user    3 tests in 2 files\n"
+        "  client   1 test in 1 file\n"
+        "  order    1 test in 1 file\n"
+    ) in result.output
+    # After every file's own error, and before the summary line.
+    output = result.output
+    assert output.index("collection error tests/test_signup.py") < output.index(
+        "parameters nothing passes in"
+    )
+    assert output.index("parameters nothing passes in") < output.index("1 passed")
+
+
+def test_one_file_has_no_total_beyond_its_own():
+    files = {
+        name: source
+        for name, source in TAKING_PARAMETERS.items()
+        if name != "tests/test_billing.py"
+    }
+    result = run_in_project(files)
+    assert result.exit_code == 1
+    assert "test_signup(user, client) takes parameters" in result.output
+    assert "parameters nothing passes in" not in result.output
+
+
 SKIPPING_TESTS = (
     "from plain.test import skip, skip_test\n"
     "\n"

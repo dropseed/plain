@@ -24,7 +24,7 @@ from .failure import (
 )
 from .output_capture import Output, StreamOutput
 from .printing import FULL_VALUES_FLAG, PrintedValue
-from .report import RunReport
+from .report import ParameterNothingPasses, RunReport
 
 __all__ = []
 
@@ -297,6 +297,25 @@ class TextReporter:
             self._print(textwrap.indent(text, "  "))
             after_a_short_one = is_short
 
+        # Each file's error has the parameters its own tests take. With
+        # more than one such file, this is what they come to.
+        files_taking_parameters = [
+            failure for failure in report.collection_failures if failure.parameters
+        ]
+        if len(files_taking_parameters) > 1:
+            self._print()
+            self._print("parameters nothing passes in", fg="red", bold=True)
+            self._print()
+            self._print(
+                textwrap.indent(
+                    _parameters_text(
+                        report.parameters_nothing_passes,
+                        files=len(files_taking_parameters),
+                    ),
+                    "  ",
+                )
+            )
+
         for error in run.teardown_errors:
             self._print()
             self._print("teardown error", fg="red", bold=True)
@@ -364,6 +383,33 @@ def _warning_text(warning: RaisedWarning) -> str:
         f"  raised {times}, first at {warning.file}:{warning.line}"
         f" in {warning.first_test}"
     )
+
+
+def _parameters_text(
+    parameters: tuple[ParameterNothingPasses, ...], *, files: int
+) -> str:
+    """
+    The parameters tests take across a run, as a table:
+
+        Tests in 63 files take these:
+
+        db       605 tests in 61 files
+        client    96 tests in 12 files
+    """
+    names = max(len(parameter.name) for parameter in parameters)
+    how_many = [
+        "1 test" if parameter.tests == 1 else f"{parameter.tests} tests"
+        for parameter in parameters
+    ]
+    widest = max(len(tests) for tests in how_many)
+
+    lines = [f"Tests in {files} files take these:", ""]
+    for parameter, tests in zip(parameters, how_many, strict=True):
+        in_files = "1 file" if parameter.files == 1 else f"{parameter.files} files"
+        lines.append(
+            f"{parameter.name.ljust(names)}  {tests.rjust(widest)} in {in_files}"
+        )
+    return "\n".join(lines)
 
 
 def _collection_failure_text(failure: CollectionFailure) -> str:
