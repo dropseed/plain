@@ -146,7 +146,29 @@ def test_a_second_cases_raises_instead_of_replacing_the_first():
     cases(1, 2)(test_pairs)
     with raises(TestDefinitionError, match="test_pairs already has @cases") as caught:
         cases("a", "b")(test_pairs)
-    assert "itertools.product" in str(caught.exception)
+    message = str(caught.exception)
+    # The spelling it shows is right whether a list holds values or tuples.
+    assert "@cases(*[(a, b, c) for a in FIRST for b, c in SECOND])" in message
+    assert "one flat tuple" in message
+
+
+def test_the_spelling_a_second_cases_is_told_to_use_passes_flat_cases():
+    """What the message says to write, written: every case is as many
+    values as the test has parameters, whatever the lists held."""
+    first = ["alice", "bob"]
+    second = [("read", True), ("write", False)]
+
+    @cases(*[(a, b, c) for a in first for b, c in second])
+    def test_access(person, action, allowed):
+        pass
+
+    passed = [values for values, _ in getattr(test_access, "__plain_test_cases__")]
+    assert passed == [
+        ("alice", "read", True),
+        ("alice", "write", False),
+        ("bob", "read", True),
+        ("bob", "write", False),
+    ]
 
 
 def test_skip_requires_a_reason():

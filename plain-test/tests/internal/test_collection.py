@@ -231,7 +231,7 @@ def test_cases_that_do_not_fit_the_parameters_are_a_collection_error():
     assert len(errors) == 1
     message = str(errors[0].error)
     assert "test_add(a, b) doesn't fit its @cases" in message
-    assert "case [too many] passes 3 values" in message
+    assert "case [too many] passes 3 values, and the test takes 2: a and b." in message
     # Its first case fits, and so does every case of the method.
     assert "case [1-2]" not in message
     assert "test_in_class" not in message
@@ -254,7 +254,9 @@ def test_a_second_cases_is_a_collection_error():
     assert tests == []
     assert len(errors) == 1
     assert isinstance(errors[0].error, TestDefinitionError)
-    assert "test_pairs already has @cases" in str(errors[0].error)
+    message = str(errors[0].error)
+    assert "line 5: test_pairs has 2 @cases. A test takes one." in message
+    assert "@cases(*[(a, b, c) for a in FIRST for b, c in SECOND])" in message
 
 
 def test_a_decorator_used_wrongly_says_which_line_of_the_file():
@@ -274,7 +276,7 @@ def test_a_decorator_used_wrongly_says_which_line_of_the_file():
     )
     _, errors = collect_tests(["."], root=root)
     assert isinstance(errors[0].error, TestDefinitionError)
-    assert str(errors[0].error) == 'line 6: @skip requires a reason: @skip("why")'
+    assert 'line 6: @skip requires a reason: @skip("why")' in str(errors[0].error)
 
 
 def test_a_definition_error_is_printed_as_its_message():
@@ -1026,3 +1028,137 @@ def test_an_import_from_a_conftest_is_not_told_to_import_the_conftest():
     assert "line 4: `import conftest` imports from a conftest.py" in message
     assert message.count("Import `make_user` from the helper module it moves to") == 3
     assert "should be" not in message
+
+
+def test_a_case_that_passes_too_few_names_what_it_fills_and_what_it_doesnt():
+    root = write_tests(
+        {
+            "test_fit.py": (
+                "from plain.test import case, cases\n"
+                "\n"
+                "\n"
+                '@cases(case("annual", 500, id="annual"), case("monthly", id="monthly"))\n'
+                "def test_price(plan, amount, currency):\n"
+                "    pass\n"
+            )
+        }
+    )
+
+    _, errors = collect_tests(["."], root=root)
+
+    message = str(errors[0].error)
+    assert (
+        "test_price(plan, amount, currency) doesn't fit its @cases: "
+        "case [annual] passes 2 values, for plan and amount. "
+        "Nothing fills currency."
+    ) in message
+    assert (
+        "case [monthly] passes 1 value, for plan. Nothing fills amount and currency."
+    ) in message
+
+
+def test_a_file_written_for_pytest_says_everything_wrong_with_it_at_once():
+    """It imports pytest, its tests take fixtures, and one has two
+    parametrize decorators. Found one at a time, that is three runs."""
+    root = write_tests(
+        {
+            "test_orders.py": (
+                "import pytest\n"
+                "\n"
+                "\n"
+                "def test_total(db, order):\n"
+                "    assert order.total == 5\n"
+                "\n"
+                "\n"
+                '@pytest.mark.parametrize("plan", ["monthly", "annual"])\n'
+                '@pytest.mark.parametrize("amount, currency", [(5, "usd")])\n'
+                "def test_price(db, plan, amount, currency):\n"
+                "    with pytest.raises(ValueError):\n"
+                "        pass\n"
+                "\n"
+                "\n"
+                "def test_steps():\n"
+                "    yield 1\n"
+            )
+        }
+    )
+
+    tests, errors = collect_tests(["."], root=root)
+
+    assert tests == []
+    assert len(errors) == 1
+    message = str(errors[0].error)
+    assert "line 1: `import pytest`" in message
+    assert "pytest.mark.parametrize ×2" in message
+    assert "test_total(db, order) takes parameters" in message
+    assert "test_price(db, plan, amount, currency) takes parameters" in message
+    # What nothing fills is `db` and `order`. `parametrize` fills the rest.
+    assert "db     2 tests  delete it" in message
+    assert "order  1 test" in message
+    assert "plan  " not in message
+    assert "line 10: test_price has 2 parametrize decorators." in message
+    assert "test_steps() has a `yield` in it." in message
+    assert "What replaces what this file uses:" in message
+
+
+def test_every_decorator_that_would_raise_is_reported_not_the_first():
+    root = write_tests(
+        {
+            "test_decorated.py": (
+                "from plain.test import cases, skip, tag\n"
+                "\n"
+                "\n"
+                "@cases(1, 2)\n"
+                "@cases(3, 4)\n"
+                "def test_first(a, b):\n"
+                "    pass\n"
+                "\n"
+                "\n"
+                "@skip\n"
+                "def test_second():\n"
+                "    pass\n"
+                "\n"
+                "\n"
+                "@tag\n"
+                "def test_third():\n"
+                "    pass\n"
+                "\n"
+                "\n"
+                "def test_fourth(db):\n"
+                "    pass\n"
+            )
+        }
+    )
+
+    _, errors = collect_tests(["."], root=root)
+
+    assert len(errors) == 1
+    message = str(errors[0].error)
+    assert "line 6: test_first has 2 @cases. A test takes one." in message
+    assert 'line 10: @skip requires a reason: @skip("why")' in message
+    assert 'line 15: @tag requires at least one name: @tag("slow")' in message
+    assert "test_fourth(db) takes parameters" in message
+
+
+def test_a_decorator_the_reader_doesnt_know_may_pass_the_parameters():
+    """Reading reports what is certain. `mock.patch` passes the test a
+    mock, so its parameter isn't one that nothing fills."""
+    root = write_tests(
+        {
+            "test_patched.py": (
+                "import pytest\n"
+                "from unittest import mock\n"
+                "\n"
+                "\n"
+                '@mock.patch("os.getcwd")\n'
+                "def test_patched(getcwd):\n"
+                "    pass\n"
+            )
+        }
+    )
+
+    _, errors = collect_tests(["."], root=root)
+
+    message = str(errors[0].error)
+    assert "line 1: `import pytest`" in message
+    assert "takes parameters" not in message

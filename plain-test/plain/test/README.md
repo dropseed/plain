@@ -314,17 +314,26 @@ def test_email_validation(email, valid):
 
 That reports as `test_email_validation[no at sign]`. The id sits on the case it names, so adding or reordering cases can't shift the names onto the wrong values. The ids of one test's cases are all different, however each got its id: a name that is what another case is called or numbered raises.
 
-A test takes one `@cases`. A second one raises instead of replacing the first. For every combination of two lists, pass the combinations:
+A test takes one `@cases`. A second one raises instead of replacing the first. Each case is one flat tuple: the test's values, in the order of its parameters. For every combination of two lists, build the cases from both:
 
 ```python
-import itertools
-
 from plain.test import cases
 
+SOURCES = ["kwargs", "object"]
+OPERATIONS = [("insert", 1), ("update", 0)]
 
-@cases(*itertools.product(["kwargs", "object"], ["insert", "update"]))
-def test_write_paths(source, operation): ...
+
+@cases(
+    *[
+        (source, operation, rows_added)
+        for source in SOURCES
+        for operation, rows_added in OPERATIONS
+    ]
+)
+def test_write_paths(source, operation, rows_added): ...
 ```
+
+Each `for` names what one entry of its list holds: a single value, or the values of a tuple. `itertools.product` is right only when every list holds single values. Given a list of tuples it nests them, and each case comes out as `("kwargs", ("insert", 1))`.
 
 ### Skipping from inside a test
 
@@ -981,22 +990,22 @@ Every problem in the file is reported at once. Each parameter is listed with how
 
 What is true of many files is said once. The first file that asks for fixtures carries the paragraph above, and the ones after it say what is wrong with their own file and name the first. Here is what each message is asking for:
 
-| Message                                                            | What to do                                                                                              |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `test_x(db, client) takes parameters, and nothing passes them in.` | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`              |
-| `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value.`    | Make that case pass as many values as the test has parameters                                           |
-| `TestCart::test_add() is a method, and has no self parameter.`     | Add `self`                                                                                              |
-| `test_x() has a yield in it.`                                      | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper     |
-| `UserTests is a unittest.TestCase.`                                | Write a class with no base class, named `Test*`, with plain `assert`                                    |
-| `test_x is defined in billing, not in this file.`                  | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_`  |
-| `line 3: import pytest`                                            | Replace what the file uses from pytest. The message lists each. See [below](#a-file-written-for-pytest) |
-| `line 8: test_x already has @cases.`                               | Use one `@cases`. For every combination of two lists, write `@cases(*itertools.product(FIRST, SECOND))` |
-| `line 8: cases() ids must be unique`                               | Give the case another name. It is what another case is called, or numbered                              |
-| `line 8: @skip requires a reason`                                  | Write `@skip("why")`, not a bare `@skip`                                                                |
-| `line 8: @tag requires at least one name`                          | Write `@tag("slow")`, not a bare `@tag`                                                                 |
-| `from tests.helpers import x should be from helpers import x`      | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
-| `from tests.conftest import x imports from a conftest.py`          | Import it from the helper module it moves to, once the conftest is gone                                 |
-| `conftest.py is a pytest file, ...`                                | Move what the file holds, then delete it. See below                                                     |
+| Message                                                                                 | What to do                                                                                              |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `test_x(db, client) takes parameters, and nothing passes them in.`                      | Remove the parameters. Build what the test needs in its body, or pass values with `@cases`              |
+| `test_x(a, b) doesn't fit its @cases: case [0] passes 1 value, for a. Nothing fills b.` | Make that case pass a value for each parameter, in their order                                          |
+| `TestCart::test_add() is a method, and has no self parameter.`                          | Add `self`                                                                                              |
+| `test_x() has a yield in it.`                                                           | Pass the values it yielded with `@cases`, or move setup and cleanup into a `@contextmanager` helper     |
+| `UserTests is a unittest.TestCase.`                                                     | Write a class with no base class, named `Test*`, with plain `assert`                                    |
+| `test_x is defined in billing, not in this file.`                                       | Define the test in this file, or import what isn't a test under a name that doesn't start with `test_`  |
+| `line 3: import pytest`                                                                 | Replace what the file uses from pytest. The message lists each. See [below](#a-file-written-for-pytest) |
+| `line 8: test_x has 2 @cases. A test takes one.`                                        | Use one `@cases`, built from both lists, each case one flat tuple. The message shows how                |
+| `line 8: cases() ids must be unique`                                                    | Give the case another name. It is what another case is called, or numbered                              |
+| `line 8: @skip requires a reason`                                                       | Write `@skip("why")`, not a bare `@skip`                                                                |
+| `line 8: @tag requires at least one name`                                               | Write `@tag("slow")`, not a bare `@tag`                                                                 |
+| `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
+| `from tests.conftest import x imports from a conftest.py`                               | Import it from the helper module it moves to, once the conftest is gone                                 |
+| `conftest.py is a pytest file, ...`                                                     | Move what the file holds, then delete it. See below                                                     |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
 
@@ -1039,6 +1048,28 @@ COLLECTION ERROR tests/test_invoices.py
 ```
 
 The first file's list covers what every file in the run uses, so it is printed once however many files there are. A helper module that imports pytest is named the same way, in the error for the test file that imports the helper.
+
+A file that can't be run says everything that reading it shows, not only why it can't be run. So a file that imports pytest, takes fixtures and stacks `parametrize` says all three, and is fixed in one go:
+
+```
+COLLECTION ERROR tests/test_billing.py
+
+  line 1: `import pytest`
+  It uses pytest.mark.parametrize ×2, pytest.raises.
+
+  These tests can't be run as written:
+
+    line 10: test_price has 2 parametrize decorators. They become one @cases.
+    test_total(db, order) takes parameters, and nothing passes them in.
+    test_price(db, plan, amount, currency) takes parameters, and nothing passes them in.
+
+    db     2 tests  delete it: every test already runs in a transaction that is rolled back
+    order  1 test  a fixture in tests/conftest.py
+```
+
+The same goes for a file that would stop at a decorator: a second `@cases`, a `@skip` or `@tag` that isn't called. Every one of them in the file is reported, with what else reading the file shows.
+
+Reading reports what it can be sure of. A test under a decorator the runner doesn't know, such as `mock.patch`, may be passed its parameters by it, so nothing is said about them. What only running a file can show (a case with the wrong number of values, a test imported from another module) is reported once the file runs.
 
 A `conftest.py` is reported for every directory that has one, with the fixtures it defines listed by name. It comes before the other collection errors, since the fixtures they ask for were in it:
 
@@ -1592,20 +1623,20 @@ Fixtures:
 
 Marks and helpers:
 
-| pytest                                         | Now                                                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| `pytest.raises(E, match=...)`, `excinfo.value` | `raises(E, match=...)`, `caught.exception`, readable after the block           |
-| `pytest.mark.parametrize("a,b", [...])`        | `@cases((a, b), (a, b))`. A single value is passed bare                        |
-| `pytest.param(..., id="x")`, `ids=[...]`       | `case(..., id="x")` inside `@cases`                                            |
-| the ids pytest made from the values, `[5-500]` | the same, when every value is a string, a number, a boolean, `None` or an enum |
-| stacked `parametrize`                          | one `@cases(*itertools.product(FIRST, SECOND))`                                |
-| `pytest.mark.skip(reason=...)`                 | `@skip("reason")`. The reason is required                                      |
-| `pytest.mark.skipif(condition, ...)`           | `if condition: skip_test("reason")` as the test's first line                   |
-| `pytest.skip("reason")` in a test              | `skip_test("reason")`                                                          |
-| custom marks, `-m slow`                        | `@tag("slow")`, `--tag slow`                                                   |
-| `pytest.mark.xfail`                            | no equivalent. `@skip` it with the reason, or assert the failure with `raises` |
-| `pytest.approx(x, abs=...)`                    | `math.isclose(a, x, abs_tol=...)` inside a bare `assert`                       |
-| `pytest-asyncio`                               | nothing. `async def test_*` runs as written                                    |
+| pytest                                         | Now                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pytest.raises(E, match=...)`, `excinfo.value` | `raises(E, match=...)`, `caught.exception`, readable after the block                   |
+| `pytest.mark.parametrize("a,b", [...])`        | `@cases((a, b), (a, b))`. A single value is passed bare                                |
+| `pytest.param(..., id="x")`, `ids=[...]`       | `case(..., id="x")` inside `@cases`                                                    |
+| the ids pytest made from the values, `[5-500]` | the same, when every value is a string, a number, a boolean, `None` or an enum         |
+| stacked `parametrize`                          | one `@cases(*[(a, b, c) for a in FIRST for b, c in SECOND])`: each case one flat tuple |
+| `pytest.mark.skip(reason=...)`                 | `@skip("reason")`. The reason is required                                              |
+| `pytest.mark.skipif(condition, ...)`           | `if condition: skip_test("reason")` as the test's first line                           |
+| `pytest.skip("reason")` in a test              | `skip_test("reason")`                                                                  |
+| custom marks, `-m slow`                        | `@tag("slow")`, `--tag slow`                                                           |
+| `pytest.mark.xfail`                            | no equivalent. `@skip` it with the reason, or assert the failure with `raises`         |
+| `pytest.approx(x, abs=...)`                    | `math.isclose(a, x, abs_tol=...)` inside a bare `assert`                               |
+| `pytest-asyncio`                               | nothing. `async def test_*` runs as written                                            |
 
 Spans, metrics, logs and queries. Each `capture_*` block hands back a read-only sequence, and it's read after the block ends:
 

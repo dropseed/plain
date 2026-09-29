@@ -76,8 +76,13 @@ def cases(*case_args: Any) -> Callable:
     `test_email_validation[0]`. Wrap a case in `case(..., id="...")` to give
     it a name of its own.
 
-    A test takes one `@cases`. For every combination of two lists, pass the
-    combinations: `@cases(*itertools.product(FIRST, SECOND))`.
+    A test takes one `@cases`, and each case is one flat tuple: the test's
+    values in the order of its parameters. For every combination of two
+    lists, build the cases from both:
+
+        @cases(*[(a, b, c) for a in FIRST for b, c in SECOND])
+
+    Each `for` names what one entry of its list holds.
     """
     entries: list[tuple[tuple[Any, ...], str | None]] = []
     for entry in case_args:
@@ -109,10 +114,16 @@ def cases(*case_args: Any) -> Callable:
             raise TestDefinitionError(
                 f"{name} already has @cases. A second one would "
                 "replace the first, not combine with it. Write the "
-                "combinations as one @cases:\n"
+                "combinations as one @cases. Each case is one flat tuple: "
+                "the test's values, in the order of its parameters.\n"
                 "\n"
-                "    @cases(*itertools.product(FIRST, SECOND))\n"
-                f"    def {name}(first, second): ..."
+                "    @cases(*[(a, b, c) for a in FIRST for b, c in SECOND])\n"
+                f"    def {name}(a, b, c): ...\n"
+                "\n"
+                "Each `for` names what one entry of its list holds: "
+                "`for a in FIRST` when the entries are single values, "
+                "`for b, c in SECOND` when they are tuples. "
+                "(`itertools.product` would nest those: `(a, (b, c))`.)"
             )
         setattr(func, TEST_CASES_ATTRIBUTE, normalized)
         return func

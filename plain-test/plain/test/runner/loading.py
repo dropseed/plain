@@ -28,8 +28,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..definition import TestDefinitionError
-from . import assertions
+from . import assertions, problems
 from .layout import Layout
+from .problems import CantBeRunAsWritten, ProblemsInAFile, tests_as_written
 
 __all__ = []
 
@@ -117,21 +118,31 @@ class TestModuleLoader(importlib.machinery.SourceFileLoader):
         source = importlib.util.decode_source(data)
         tree = ast.parse(source, filename=path)
 
-        problems = import_problems(tree, layout=self.layout)
+        # A file that can't be run says everything reading it shows, about
+        # its imports and about its tests. Run, it would stop at the first
+        # of them, and each would take a run of its own to find.
+        imports = import_problems(tree, layout=self.layout)
+        tests = tests_as_written(tree)
 
-        # Before the file is run, so that it is said even though running
-        # the file would stop at the import, with pytest not installed.
+        # pytest isn't installed, so the import would be where it stopped.
         pytest_import = pytest_import_in(tree)
         if pytest_import is not None:
             raise ImportsPytest(
                 imported_at=pytest_import,
                 uses=pytest_names_used(tree),
-                other_import_problems=problems,
+                other_import_problems=imports,
+                tests=tests,
                 layout=self.layout,
             )
 
-        if problems:
-            raise ImportsAnotherWay(problems, layout=self.layout)
+        if imports:
+            raise ImportsAnotherWay(imports, tests=tests, layout=self.layout)
+
+        if tests.stops_at_a_decorator:
+            raise CantBeRunAsWritten(tests)
+
+        # Anything else wrong with its tests is found by running it and
+        # looking at them, which sees more than reading does.
 
         tree = assertions.rewrite_asserts(tree, source=source)
         # dont_inherit: a test module is compiled with its own __future__
@@ -220,7 +231,7 @@ def _what_rewrites(*, refused_import_name: str | None) -> str:
     passed the check, and what the check refuses depends on the layout.
     """
     digest = hashlib.sha256()
-    for module in (assertions, sys.modules[__name__]):
+    for module in (assertions, problems, sys.modules[__name__]):
         assert module.__file__ is not None
         digest.update(Path(module.__file__).read_bytes())
     digest.update(repr(refused_import_name).encode())
@@ -332,8 +343,16 @@ class ImportsAnotherWay(TestDefinitionError):
     files says why once.
     """
 
-    def __init__(self, problems: list[str], *, layout: Layout) -> None:
+    def __init__(
+        self,
+        problems: list[str],
+        *,
+        layout: Layout,
+        tests: ProblemsInAFile | None = None,
+    ) -> None:
         self.problems = problems
+        # What reading the file showed about its tests.
+        self.tests = tests or ProblemsInAFile()
         helpers_file = layout.shown(layout.helper_directory / "helpers.py")
         self.why = (
             "A helper module is imported by its bare name, whichever\n"
@@ -362,10 +381,13 @@ class ImportsPytest(TestDefinitionError):
         other_import_problems: list[str],
         layout: Layout,
         imported_by: str | None = None,
+        tests: ProblemsInAFile | None = None,
     ) -> None:
         self.imported_at = imported_at
         self.uses = uses
         self.other_import_problems = other_import_problems
+        # What reading the file showed about its tests.
+        self.tests = tests or ProblemsInAFile()
         # The helper module that imports it, when it isn't the test file.
         self.imported_by = imported_by
         super().__init__(
