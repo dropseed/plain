@@ -149,10 +149,28 @@ def schema_lock() -> Iterator[Callable[[], None]]:
             yield verify
         finally:
             _held_by_this_process = False
+            _release(lock_conn)
             # No explicit pg_advisory_unlock: closing the session (the
             # `with psycopg.connect(...)` exit below) releases the lock, and
             # an unlock attempt on a connection that died mid-block would
             # raise here and mask the block's real exception.
+
+
+def _release(lock_conn: psycopg.Connection) -> None:
+    """Give the lock back now, before the session closes.
+
+    Closing the session releases it too, but not at once: Postgres lets go
+    of a session's locks when its backend exits, a moment after the client
+    has disconnected. A command that takes the lock straight after another
+    one finished (the next step of a release, a retry) could find it still
+    held and wait out a whole retry interval.
+
+    A session that has died has released the lock already.
+    """
+    try:
+        lock_conn.execute("SELECT pg_advisory_unlock(%s)", [SCHEMA_LOCK_KEY])
+    except psycopg.Error:
+        pass
 
 
 def _describe_holder(lock_conn: psycopg.Connection) -> str:

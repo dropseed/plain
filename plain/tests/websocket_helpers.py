@@ -10,7 +10,7 @@ from plain.http.websocket_frames import (
     encode_frame,
     read_frame,
 )
-from plain.test.websocket import handshake_headers
+from plain.testing.websocket import handshake_headers
 
 # The RFC 6455 Section 1.3 example key and the accept it must produce.
 UPGRADE_KEY = "dGhlIHNhbXBsZSBub25jZQ=="

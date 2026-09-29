@@ -263,23 +263,23 @@ class TypeLocationFinder(ast.NodeVisitor):
 def find_python_files(
     directory: Path, exclude_patterns: list[str] | None = None
 ) -> list[Path]:
-    """Find all Python files in a directory, excluding certain patterns."""
+    """
+    Find all Python files in a directory, excluding certain patterns.
+
+    A directory whose name starts with a dot is never looked in. A directory
+    named `test` is source (a package's `test` helpers); a
+    `tests` directory and a file named like a test are left out.
+    """
     default_patterns = [
         "__pycache__",
-        ".git",
-        ".venv",
         "venv",
         "env",
-        ".tox",
         "build",
         "dist",
         "*.egg-info",
-        ".mypy_cache",
-        ".pytest_cache",
         "test_*.py",
         "*_test.py",
         "tests",
-        "test",
     ]
 
     patterns = list(default_patterns)
@@ -303,7 +303,11 @@ def find_python_files(
 
     for root, dirs, files in os.walk(directory):
         root_path = Path(root)
-        dirs[:] = [d for d in dirs if not should_exclude(root_path / d)]
+        dirs[:] = [
+            d
+            for d in dirs
+            if not d.startswith(".") and not should_exclude(root_path / d)
+        ]
 
         for file in files:
             if file.endswith(".py"):

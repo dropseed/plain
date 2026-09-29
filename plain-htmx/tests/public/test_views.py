@@ -1,7 +1,6 @@
-import pytest
 from plain.htmx.views import HTMXView
 from plain.http import Response
-from plain.test import RequestFactory
+from plain.testing import build_request, raises
 
 
 class V(HTMXView):
@@ -48,19 +47,19 @@ class FragmentActionView(HTMXView):
 
 
 def test_is_htmx_request():
-    request = RequestFactory().get("/", headers={"HX-Request": "true"})
+    request = build_request("GET", "/", headers={"HX-Request": "true"})
     view = V(request=request)
     assert view.is_htmx_request()
 
 
 def test_plain_hx_fragment():
-    request = RequestFactory().get("/", headers={"Plain-HX-Fragment": "main"})
+    request = build_request("GET", "/", headers={"Plain-HX-Fragment": "main"})
     view = V(request=request)
     assert view.get_htmx_fragment_name() == "main"
 
 
 def test_plain_hx_action():
-    request = RequestFactory().get("/", headers={"Plain-HX-Action": "create"})
+    request = build_request("GET", "/", headers={"Plain-HX-Action": "create"})
     view = V(request=request)
     assert view.get_htmx_action_name() == "create"
 
@@ -71,8 +70,8 @@ def test_unknown_action_returns_no_handler():
     Previously `getattr(self, f"{method}_{action}")` had no default, so
     any client-supplied action that didn't match a method produced a 500.
     """
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "does_not_exist"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "does_not_exist"}
     )
     view = V(request=request)
     assert view.get_request_handler() is None
@@ -80,8 +79,8 @@ def test_unknown_action_returns_no_handler():
 
 def test_non_identifier_action_returns_no_handler():
     """Action strings containing dots, dashes, etc. must not be looked up."""
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "foo.bar"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "foo.bar"}
     )
     view = V(request=request)
     assert view.get_request_handler() is None
@@ -89,8 +88,8 @@ def test_non_identifier_action_returns_no_handler():
 
 def test_non_standard_method_does_not_dispatch():
     """Non-IANA HTTP methods must not be used to invoke view attributes."""
-    request = RequestFactory().generic(
-        "GET_RESPONSE", "/", headers={"HX-Request": "true"}
+    request = build_request(
+        method="GET_RESPONSE", path="/", headers={"HX-Request": "true"}
     )
     view = V(request=request)
     assert view.get_request_handler() is None
@@ -98,8 +97,8 @@ def test_non_standard_method_does_not_dispatch():
 
 def test_action_returning_none_rerenders_template():
     """Action handlers may return None to mean 're-render the template/fragment'."""
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "save"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "save"}
     )
     view = ActionView(request=request)
     response = view.get_response()
@@ -109,8 +108,8 @@ def test_action_returning_none_rerenders_template():
 
 def test_action_returning_response_passes_through():
     """An explicit Response from an action handler is used as-is."""
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "redirect"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "redirect"}
     )
     view = ActionView(request=request)
     response = view.get_response()
@@ -120,7 +119,7 @@ def test_action_returning_response_passes_through():
 
 def test_convert_result_to_response_none_renders_template():
     """convert_result_to_response wraps None by calling render."""
-    request = RequestFactory().post("/", headers={"HX-Request": "true"})
+    request = build_request("POST", "/", headers={"HX-Request": "true"})
     view = ActionView(request=request)
     response = view.convert_result_to_response(None)
     assert isinstance(response, Response)
@@ -128,7 +127,7 @@ def test_convert_result_to_response_none_renders_template():
 
 
 def test_convert_result_to_response_passes_response_through():
-    request = RequestFactory().post("/", headers={"HX-Request": "true"})
+    request = build_request("POST", "/", headers={"HX-Request": "true"})
     view = ActionView(request=request)
     original = Response("custom", status_code=418)
     response = view.convert_result_to_response(original)
@@ -141,8 +140,8 @@ def test_action_with_implicit_return_rerenders():
     This is the dominant ergonomic case — the framework's pitch is that you
     can write a handler that just mutates state and let the framework re-render.
     """
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "implicit"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "implicit"}
     )
     view = ActionView(request=request)
     response = view.get_response()
@@ -153,7 +152,8 @@ def test_action_with_implicit_return_rerenders():
 def test_rerender_observes_fragment_header():
     """When re-rendering on None, render sees the active fragment header
     so fragment-aware rendering still kicks in."""
-    request = RequestFactory().post(
+    request = build_request(
+        "POST",
         "/",
         headers={
             "HX-Request": "true",
@@ -168,9 +168,9 @@ def test_rerender_observes_fragment_header():
 
 def test_invalid_return_type_raises():
     """Returning something that isn't None or Response must fail loudly."""
-    request = RequestFactory().post(
-        "/", headers={"HX-Request": "true", "Plain-HX-Action": "bad_return"}
+    request = build_request(
+        "POST", "/", headers={"HX-Request": "true", "Plain-HX-Action": "bad_return"}
     )
     view = ActionView(request=request)
-    with pytest.raises(TypeError, match="must return a Response or None"):
+    with raises(TypeError, match="must return a Response or None"):
         view.get_response()

@@ -18,7 +18,14 @@ from .postgres.backends import (
     remove_container,
     stop_container,
 )
-from .postgres.cluster import Cluster, DevDatabase
+from .postgres.cleaning import (
+    CleanItem,
+    CleanPlan,
+    plan_clean,
+    project_checkouts,
+    read_clean_facts,
+)
+from .postgres.cluster import Cluster
 from .postgres.identity import (
     InvalidDatabaseName,
     PostgresConfig,
@@ -80,6 +87,21 @@ def _open() -> tuple[Path, Cluster, str, str]:
 
 def _format_size(size_bytes: int) -> str:
     return f"{size_bytes / 1024 / 1024:.1f} MB"
+
+
+def _drop_named(cluster: Cluster, name: str, *, force: bool) -> None:
+    """Drop the database a person named, or say what is using it."""
+    from psycopg import errors
+
+    try:
+        cluster.drop_database(name, force=force)
+    except errors.ObjectInUse:
+        count = cluster.connection_count(name)
+        open_to_it = "1 connection is" if count == 1 else f"{count} connections are"
+        raise click.ClickException(
+            f"{open_to_it} open to {name!r}, so it wasn't dropped. Stop what is"
+            " using it (`plain dev`, a shell), or pass --force to throw it off."
+        ) from None
 
 
 @register_cli("db")
@@ -225,6 +247,7 @@ def list_(as_json: bool) -> None:
                         "current": d.name == current,
                         "is_project_main": d.name == project_name,
                         "is_test": d.is_test,
+                        "is_template": d.template_record is not None,
                     }
                     for d in databases
                 ],
@@ -244,6 +267,10 @@ def list_(as_json: bool) -> None:
         detail = database.checkout or ""
         if database.checkout and not database.checkout_exists:
             detail = click.style(f"{database.checkout} (gone)", fg="yellow")
+        elif database.template_record is not None:
+            detail = click.style(
+                f"(test template of {database.template_record.database})", dim=True
+            )
         elif database.is_test:
             detail = click.style("(test)", dim=True)
         click.echo(
@@ -336,7 +363,10 @@ def use(name: str | None) -> None:
 
 @cli.command()
 @click.option("--yes", "-y", is_flag=True)
-def reset(yes: bool) -> None:
+@click.option(
+    "--force", is_flag=True, help="Throw off whatever is connected to it first."
+)
+def reset(yes: bool, force: bool) -> None:
     """Drop and recreate this checkout's database, empty."""
     project_root, cluster, _, db_name = _open()
     if not yes and not click.confirm(
@@ -344,7 +374,7 @@ def reset(yes: bool) -> None:
     ):
         return
 
-    cluster.drop_database(db_name)
+    _drop_named(cluster, db_name, force=force)
     cluster.create_database(db_name)
     cluster.record_created(
         db_name,
@@ -360,8 +390,11 @@ def reset(yes: bool) -> None:
 @cli.command()
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True)
-def drop(name: str, yes: bool) -> None:
-    """Drop a database."""
+@click.option(
+    "--force", is_flag=True, help="Throw off whatever is connected to it first."
+)
+def drop(name: str, yes: bool, force: bool) -> None:
+    """Drop a database, by its name."""
     project_root, cluster, project_name, db_name = _open()
     name = _valid(name)
     if not cluster.database_exists(name):
@@ -382,72 +415,166 @@ def drop(name: str, yes: bool) -> None:
     elif not yes and not click.confirm(f"Drop {name!r}? This cannot be undone."):
         return
 
-    cluster.drop_database(name)
+    _drop_named(cluster, name, force=force)
     if name == db_name:
         # The cache would otherwise keep pointing at a database that's gone.
         clear_cached_url(project_root)
     click.secho(f"✔ Dropped {name}.", fg="green")
 
 
-@cli.command()
-@click.option("--yes", "-y", is_flag=True)
-def clean(yes: bool) -> None:
-    """Reclaim database debris — orphaned checkouts and stale test databases.
+def _read_clean_plan(
+    cluster: Cluster,
+    *,
+    project_root: Path,
+    project_name: str,
+    current: str,
+    current_schema: str | None,
+) -> CleanPlan:
+    checkouts, in_git = project_checkouts(project_root)
+    return plan_clean(
+        read_clean_facts(
+            cluster,
+            project_name=project_name,
+            current=current,
+            current_schema=current_schema,
+        ),
+        project_main=project_name,
+        current=current,
+        checkouts=checkouts,
+        in_git=in_git,
+    )
 
-    Two kinds of debris get reclaimed:
 
-    - Databases whose recorded checkout directory no longer exists. Forking is a
-      full copy, so deleted worktrees leave real disk behind. A database with no
-      recorded owner is left alone.
-    - Test databases with no active connections. A normal test run drops its
-      database on exit, so one that's still here — and that nothing is connected
-      to — is left over from a crashed run. One with live connections is a run
-      in progress and is never touched.
+def _current_schema(cluster: Cluster) -> str | None:
+    """The digest of the schema this checkout's test databases are built
+    with now, which names their template. `None` when the models or the
+    migration files can't be read, and then the template is left."""
+    from plain.postgres.test.schema import describe_schema, server_version_of
 
-    The project's main database is never a candidate, whatever its metadata
-    says. It's the fork source for every checkout, so a stale owner path on it
-    is a reason to correct the metadata, not to reclaim the disk. A test
-    database can never be the project main — the `test_` prefix rules it out.
-    """
-    _project_root, cluster, project_name, current = _open()
+    try:
+        return describe_schema(server_version=server_version_of(cluster.config)).hash
+    except Exception:
+        return None
 
-    databases = cluster.list_databases(project_name)
-    orphans: list[DevDatabase] = [
-        database
-        for database in databases
-        if database.checkout
-        and not database.checkout_exists
-        and database.name != current
-        and database.name != project_name
-    ]
-    stale_tests: list[DevDatabase] = [
-        database
-        for database in databases
-        if database.is_test
-        and database.name != current
-        and cluster.connection_count(database.name) == 0
-    ]
-    candidates = orphans + stale_tests
-    if not candidates:
-        click.echo("Nothing to clean.")
-        return
 
-    reclaimed = sum(d.size_bytes for d in candidates)
-    click.echo(f"Reclaimable databases ({_format_size(reclaimed)} total):")
-    for database in candidates:
-        detail = "(test database)" if database.is_test else database.checkout
+def _echo_clean_items(items: tuple[CleanItem, ...]) -> None:
+    for item in items:
         click.echo(
-            f"  {database.name:<34} {_format_size(database.size_bytes):>10}  {detail}"
+            f"  {item.name:<34} {_format_size(item.size_bytes):>10}  {item.owner}"
         )
+        click.secho(f"      {item.reason}", dim=True)
 
-    if not yes and not click.confirm("Drop these?"):
+
+def _drop_cleaned(
+    cluster: Cluster, item: CleanItem, *, current_schema: str | None
+) -> str | None:
+    """Drop one database of the plan. Why it was left, if it was."""
+    from psycopg import errors
+
+    if item.is_template:
+        return cluster.drop_if_a_stale_template(
+            item.name,
+            current_schema=current_schema,
+            tested_database_is_gone=item.tested_database_is_gone,
+        )
+    if item.is_test:
+        return cluster.drop_if_a_dead_runs(item.name)
+    try:
+        # Not forced: if something connected since the listing, the database
+        # is somebody's.
+        cluster.drop_database(item.name, force=False)
+    except errors.ObjectInUse:
+        return "something connected to it as it was being dropped"
+    return None
+
+
+@cli.command()
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="List what would be dropped and what would be left, and drop nothing.",
+)
+def clean(dry_run: bool) -> None:
+    """Drop the databases of checkouts that are gone, and of test runs that died.
+
+    Every database of the project is listed first, with the reason it
+    would be dropped or the reason it is left. Then it asks. There is no
+    flag that skips the question: what this drops was named by nobody, and
+    can't be brought back. To drop a database without being asked, name
+    it: `plain db drop NAME --yes`.
+
+    A development database is dropped only if the checkout its metadata
+    names is gone, no checkout of the project is configured to use it, and
+    nothing is connected to it. A test database is dropped only if it
+    carries the record of the run that made it and that run is dead. The
+    template a database's test runs clone is dropped only if its record
+    says it is of no use now: the schema has changed since it was built,
+    the database it was built for is gone, or the run building it died. The
+    project's main database and this checkout's are never dropped.
+
+    Nothing is dropped with `FORCE`, so a database something connects to
+    between the listing and the drop is left.
+    """
+    project_root, cluster, project_name, current = _open()
+    current_schema = _current_schema(cluster)
+    plan = _read_clean_plan(
+        cluster,
+        project_root=project_root,
+        project_name=project_name,
+        current=current,
+        current_schema=current_schema,
+    )
+
+    if plan.drop:
+        reclaimed = sum(item.size_bytes for item in plan.drop)
+        click.secho(
+            f"Would drop {len(plan.drop)} ({_format_size(reclaimed)}):", bold=True
+        )
+        _echo_clean_items(plan.drop)
+    else:
+        click.secho("Nothing to drop.", bold=True)
+    if plan.leave:
+        click.echo()
+        click.secho(f"Leaving {len(plan.leave)}:", bold=True)
+        _echo_clean_items(plan.leave)
+
+    if dry_run or not plan.drop:
         return
 
-    for database in candidates:
-        cluster.drop_database(database.name)
+    click.echo()
+    if not click.confirm(
+        f'Drop the {len(plan.drop)} listed under "Would drop"? This cannot be undone.'
+    ):
+        return
+
+    # The question may have waited a while for its answer. What is dropped
+    # is what was listed and still qualifies now.
+    still = {
+        item.name
+        for item in _read_clean_plan(
+            cluster,
+            project_root=project_root,
+            project_name=project_name,
+            current=current,
+            current_schema=current_schema,
+        ).drop
+    }
+
+    dropped = 0
+    reclaimed = 0
+    for item in plan.drop:
+        if item.name not in still:
+            click.secho(f"  Left {item.name}: it no longer qualifies.", fg="yellow")
+            continue
+        left_because = _drop_cleaned(cluster, item, current_schema=current_schema)
+        if left_because:
+            click.secho(f"  Left {item.name}: {left_because}.", fg="yellow")
+            continue
+        dropped += 1
+        reclaimed += item.size_bytes
+
     click.secho(
-        f"✔ Dropped {len(candidates)}, reclaiming {_format_size(reclaimed)}.",
-        fg="green",
+        f"✔ Dropped {dropped}, reclaiming {_format_size(reclaimed)}.", fg="green"
     )
 
 

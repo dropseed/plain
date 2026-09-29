@@ -1,10 +1,10 @@
-import pytest
 from plain.paginator import Paginator
+from plain.testing import cases, raises
 
 
-@pytest.mark.parametrize("per_page", [0, -1])
+@cases(0, -1)
 def test_raises_for_non_positive_per_page(per_page):
-    with pytest.raises(ValueError, match="per_page must be at least 1"):
+    with raises(ValueError, match="per_page must be at least 1"):
         Paginator([1, 2, 3], per_page)
 
 

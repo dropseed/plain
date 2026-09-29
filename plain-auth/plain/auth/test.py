@@ -1,4 +1,3 @@
-from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 
 from plain.http.request import Request
@@ -10,17 +9,19 @@ from .requests import set_request_user
 from .sessions import get_user, login, logout
 
 if TYPE_CHECKING:
-    from plain.test.client import Client
+    from plain.testing import Client
+
+__all__ = ["login_client", "logout_client"]
 
 
 def login_client(client: Client, user: Any) -> None:
-    """Log a user into a test client."""
+    """Log a user into a test client, without going through a login view.
+
+    Writes the session cookie to `client.cookies`, so every request the
+    client makes afterwards is that user's.
+    """
     request = Request(method="GET", path="/")
-    if client.session:
-        session = client.session
-    else:
-        session = SessionStore()
-    set_request_session(request, session)
+    set_request_session(request, _session_of(client))
     login(request, user)
     session = get_request_session(request)
     session.save()
@@ -44,15 +45,24 @@ def login_client(client: Client, user: Any) -> None:
 
 
 def logout_client(client: Client) -> None:
-    """Log out a user from a test client."""
+    """Log a test client out: end its session and drop its cookies."""
     request = Request(method="GET", path="/")
-    if client.session:
-        session = client.session
-        set_request_session(request, session)
-        user = get_user(request)
-        set_request_user(request, user)
-    else:
-        session = SessionStore()
-        set_request_session(request, session)
+    set_request_session(request, _session_of(client))
+    set_request_user(request, get_user(request))
     logout(request)
-    client.cookies = SimpleCookie()
+    client.cookies.clear()
+
+
+def _session_of(client: Client) -> SessionStore:
+    """The session the client's cookie points to, or one that isn't written
+    yet.
+
+    Not `get_client_session()`, which writes a new session so that it can
+    hand the client its cookie. `login()` changes the session's key and
+    `logout()` ends it, so what that wrote would be written over or removed
+    by the next statement.
+    """
+    cookie = client.cookies.get(settings.SESSION_COOKIE_NAME)
+    if cookie:
+        return SessionStore(cookie.value)
+    return SessionStore()

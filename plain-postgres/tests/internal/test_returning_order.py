@@ -33,7 +33,7 @@ def _returned_keys(keys: list[str]) -> list[str]:
         return [row[0] for row in cursor.fetchall()]
 
 
-def test_returning_order_matches_values_order_under_on_conflict(db):
+def test_returning_order_matches_values_order_under_on_conflict():
     # Seed every other key, so the batch is a shuffled mix of inserts and
     # conflicting updates -- the case where the order could plausibly diverge.
     for index in range(0, ROWS, 2):
@@ -45,7 +45,7 @@ def test_returning_order_matches_values_order_under_on_conflict(db):
     assert _returned_keys(keys) == keys
 
 
-def test_returning_order_matches_values_order_for_plain_inserts(db):
+def test_returning_order_matches_values_order_for_plain_inserts():
     keys = [f"k{index}" for index in range(ROWS)]
     random.Random(1).shuffle(keys)
 

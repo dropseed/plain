@@ -10,7 +10,7 @@ import click
 from plain.runtime import APP_PATH, PLAIN_TEMP_PATH
 
 from .process import Supervisor
-from .utils import has_pyproject_toml
+from .utils import has_pyproject_toml, running_command
 
 
 def auto_start_services() -> None:
@@ -38,11 +38,12 @@ def auto_start_services() -> None:
         "shell",
         "test",
     }
-    if not (service_commands & set(sys.argv)):
+    command = running_command()
+    if command not in service_commands:
         return
 
     # Don't do anything if it looks like a "services" command is being run explicitly
-    if "dev" in sys.argv and (
+    if command == "dev" and (
         "logs" in sys.argv or "services" in sys.argv or "--stop" in sys.argv
     ):
         return

@@ -12,10 +12,11 @@ put and `Atomic.__exit__`'s error recovery drops it instead.
 """
 
 import psycopg
-import pytest
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.sources import runtime_pool_source
+from plain.testing import raises
+from postgres_test_helpers import clean_connection
 
 
 def _terminate_backend(pid: int) -> None:
@@ -36,10 +37,10 @@ def _backend_pid(conn) -> int:
         return row[0]
 
 
-class TestDeadConnectionSelfHeal:
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_closed_connection_replaced_on_next_use(self, setup_db):
-        """A wrapper holding a closed psycopg connection acquires a fresh one."""
+# Dead connection self-heal
+def test_closed_connection_replaced_on_next_use():
+    """A wrapper holding a closed psycopg connection acquires a fresh one."""
+    with clean_connection():
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -56,9 +57,10 @@ class TestDeadConnectionSelfHeal:
         assert conn.connection is not None
         assert not conn.connection.closed
 
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_terminated_backend_errors_once_then_heals(self, setup_db):
-        """A server-side kill fails the in-flight query, then self-heals."""
+
+def test_terminated_backend_errors_once_then_heals():
+    """A server-side kill fails the in-flight query, then self-heals."""
+    with clean_connection():
         conn = get_connection()
         pid = _backend_pid(conn)
 
@@ -66,7 +68,7 @@ class TestDeadConnectionSelfHeal:
 
         # psycopg only detects the dead socket on I/O — the first use fails
         # and marks the connection closed.
-        with pytest.raises(psycopg.OperationalError), conn.cursor() as cursor:
+        with raises(psycopg.OperationalError), conn.cursor() as cursor:
             cursor.execute("SELECT 1")
         assert conn.connection is not None
         assert conn.connection.closed
@@ -77,11 +79,12 @@ class TestDeadConnectionSelfHeal:
             assert cursor.fetchone() == (1,)
         assert _backend_pid(conn) != pid
 
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_dead_connection_not_swapped_mid_atomic(self, setup_db):
-        """Mid-atomic, the dead connection stays put — a silent swap would run
-        the rest of the block outside its transaction. Atomic.__exit__'s error
-        recovery drops it, and the next use heals."""
+
+def test_dead_connection_not_swapped_mid_atomic():
+    """Mid-atomic, the dead connection stays put — a silent swap would run
+    the rest of the block outside its transaction. Atomic.__exit__'s error
+    recovery drops it, and the next use heals."""
+    with clean_connection():
         conn = get_connection()
 
         def killed_mid_atomic() -> None:
@@ -91,7 +94,7 @@ class TestDeadConnectionSelfHeal:
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
 
-        with pytest.raises(psycopg.OperationalError):
+        with raises(psycopg.OperationalError):
             killed_mid_atomic()
 
         # Atomic.__exit__ dropped the dead connection during rollback recovery.
@@ -101,11 +104,12 @@ class TestDeadConnectionSelfHeal:
             cursor.execute("SELECT 1")
             assert cursor.fetchone() == (1,)
 
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_dead_connection_in_nested_atomic(self, setup_db):
-        """Nested atomics: the inner savepoint rollback fails on the dead
-        connection and marks needs_rollback; the outer rollback then fails
-        too and drops the connection. The next use heals."""
+
+def test_dead_connection_in_nested_atomic():
+    """Nested atomics: the inner savepoint rollback fails on the dead
+    connection and marks needs_rollback; the outer rollback then fails
+    too and drops the connection. The next use heals."""
+    with clean_connection():
         conn = get_connection()
 
         def killed_in_nested_atomic() -> None:
@@ -115,7 +119,7 @@ class TestDeadConnectionSelfHeal:
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
 
-        with pytest.raises(psycopg.OperationalError):
+        with raises(psycopg.OperationalError):
             killed_in_nested_atomic()
 
         # The outer Atomic.__exit__ dropped the dead connection.

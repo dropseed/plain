@@ -9,7 +9,7 @@ ship silently.
 Ten fields with ten *distinct* types is what makes that impossible. A
 transposition inside any rung swaps two types in the asserted tuple, and the
 `assert_type` fails. Nothing here runs -- the model is never registered at
-runtime, because pytest doesn't collect this directory.
+runtime, because the test runner does not collect this directory.
 """
 
 from datetime import date, datetime, time, timedelta

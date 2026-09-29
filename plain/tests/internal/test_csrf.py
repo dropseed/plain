@@ -1,110 +1,97 @@
-from typing import Any
 from unittest.mock import patch
 
-import pytest
 from plain.csrf.middleware import CsrfViewMiddleware
-from plain.test import RequestFactory
+from plain.testing import build_request, cases, raises
 
 
-@pytest.mark.parametrize("method", ["GET", "HEAD", "OPTIONS"])
+@cases("GET", "HEAD", "OPTIONS")
 def test_safe_methods_allowed(method):
     """Safe HTTP methods should always be allowed."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.generic(method, "/test/")
+    request = build_request(method, "/test/")
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is True
     assert f"Safe HTTP method: {method}" in reason
 
 
-@pytest.mark.parametrize(
-    ("sec_fetch_site", "expected_allowed", "expected_reason_contains"),
-    [
-        ("same-origin", True, "Same-origin request from Sec-Fetch-Site: same-origin"),
-        ("none", True, "Same-origin request from Sec-Fetch-Site: none"),
-        (
-            "cross-site",
-            False,
-            "Cross-origin request from Sec-Fetch-Site: cross-site",
-        ),
-        (
-            "same-site",
-            False,
-            "Cross-origin request from Sec-Fetch-Site: same-site",
-        ),
-    ],
+@cases(
+    ("same-origin", True, "Same-origin request from Sec-Fetch-Site: same-origin"),
+    ("none", True, "Same-origin request from Sec-Fetch-Site: none"),
+    (
+        "cross-site",
+        False,
+        "Cross-origin request from Sec-Fetch-Site: cross-site",
+    ),
+    (
+        "same-site",
+        False,
+        "Cross-origin request from Sec-Fetch-Site: same-site",
+    ),
 )
 def test_sec_fetch_site_header(
     sec_fetch_site, expected_allowed, expected_reason_contains
 ):
     """Test various Sec-Fetch-Site header values."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Sec-Fetch-Site": sec_fetch_site})
+    request = build_request(
+        "POST", "/test/", headers={"Sec-Fetch-Site": sec_fetch_site}
+    )
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is expected_allowed
     assert expected_reason_contains in reason
 
 
-@pytest.mark.parametrize(
-    ("origin", "trusted_origins", "expected_allowed", "expected_reason_contains"),
-    [
-        # Trusted origins that should be allowed
-        (
-            "https://trusted.example.com",
-            ["https://trusted.example.com"],
-            True,
-            "Trusted origin: https://trusted.example.com",
-        ),
-        (
-            "https://api.example.com:8443",
-            ["https://api.example.com:8443"],
-            True,
-            "Trusted origin: https://api.example.com:8443",
-        ),
-        # Untrusted origins that should continue to host check (and fail)
-        (
-            "https://untrusted.example.com",
-            ["https://trusted.example.com"],
-            False,
-            "does not match Host",
-        ),
-    ],
+@cases(
+    # Trusted origins that should be allowed
+    (
+        "https://trusted.example.com",
+        ["https://trusted.example.com"],
+        True,
+        "Trusted origin: https://trusted.example.com",
+    ),
+    (
+        "https://api.example.com:8443",
+        ["https://api.example.com:8443"],
+        True,
+        "Trusted origin: https://api.example.com:8443",
+    ),
+    # Untrusted origins that should continue to host check (and fail)
+    (
+        "https://untrusted.example.com",
+        ["https://trusted.example.com"],
+        False,
+        "does not match Host",
+    ),
 )
 def test_trusted_origins(
     origin, trusted_origins, expected_allowed, expected_reason_contains
 ):
     """Test trusted origins allow-list functionality."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     with patch("plain.csrf.origin.settings") as mock_settings:
         mock_settings.CSRF_TRUSTED_ORIGINS = trusted_origins
 
-        request = rf.post("/test/", headers={"Origin": origin})
+        request = build_request("POST", "/test/", headers={"Origin": origin})
         allowed, reason = csrf_middleware.should_allow_request(request)
 
         assert allowed is expected_allowed
         assert expected_reason_contains in reason
 
 
-@pytest.mark.parametrize(
-    "headers",
-    [
-        {},  # No headers
-        {"Origin": ""},  # Empty origin header
-    ],
+@cases(
+    {},  # No headers
+    {"Origin": ""},  # Empty origin header
 )
 def test_old_browser_fallback(headers):
     """Requests without proper headers should be allowed (old browsers)."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers=headers)
+    request = build_request("POST", "/test/", headers=headers)
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is True
@@ -114,39 +101,31 @@ def test_old_browser_fallback(headers):
     )
 
 
-@pytest.mark.parametrize(
-    ("origin", "expected_allowed", "expected_reason_contains"),
-    [
-        # Origin matches host - should be allowed
-        (
-            "https://testserver",
-            True,
-            "Same-origin request - Origin https://testserver matches Host testserver",
-        ),
-        (
-            "https://testserver:443",
-            True,
-            "Same-origin request - Origin https://testserver:443 matches Host testserver",
-        ),
-        # Various rejection cases
-        ("null", False, "Null Origin header"),
-        ("https://attacker.com", False, "does not match Host"),
-        ("https://sub.testserver", False, "does not match Host"),
-        ("https://example.com:8080", False, "does not match Host"),
-        ("http://example.com", False, "does not match Host"),
-    ],
+@cases(
+    # Origin matches host - should be allowed
+    (
+        "https://testserver",
+        True,
+        "Same-origin request - Origin https://testserver matches Host testserver",
+    ),
+    (
+        "https://testserver:443",
+        True,
+        "Same-origin request - Origin https://testserver:443 matches Host testserver",
+    ),
+    # Various rejection cases
+    ("null", False, "Null Origin header"),
+    ("https://attacker.com", False, "does not match Host"),
+    ("https://sub.testserver", False, "does not match Host"),
+    ("https://example.com:8080", False, "does not match Host"),
+    ("http://example.com", False, "does not match Host"),
 )
 def test_origin_host_comparison(origin, expected_allowed, expected_reason_contains):
     """Test Origin vs Host header comparison scenarios."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    # Configure request based on the origin
-    request_kwargs: dict[str, Any] = {"headers": {"Origin": origin}}
-    if origin in ("https://testserver:443", "https://testserver"):
-        request_kwargs["secure"] = True
-
-    request = rf.post("/test/", **request_kwargs)
+    # The request goes to https://testserver, so the first two origins match.
+    request = build_request("POST", "/test/", headers={"Origin": origin})
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is expected_allowed
@@ -155,10 +134,9 @@ def test_origin_host_comparison(origin, expected_allowed, expected_reason_contai
 
 def test_invalid_origin_url():
     """Invalid Origin URLs should be rejected."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Origin": "not-a-valid-url"})
+    request = build_request("POST", "/test/", headers={"Origin": "not-a-valid-url"})
     allowed, reason = csrf_middleware.should_allow_request(request)
 
     assert allowed is False
@@ -167,14 +145,13 @@ def test_invalid_origin_url():
 
 def test_sec_fetch_site_priority_over_origin_check():
     """Sec-Fetch-Site should take priority over Origin vs Host check."""
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     # This would normally match (same host) but Sec-Fetch-Site rejects it first
-    request = rf.post(
+    request = build_request(
+        "POST",
         "/test/",
         headers={"Origin": "https://testserver", "Sec-Fetch-Site": "cross-site"},
-        secure=True,
     )
     allowed, reason = csrf_middleware.should_allow_request(request)
 
@@ -182,75 +159,72 @@ def test_sec_fetch_site_priority_over_origin_check():
     assert "Sec-Fetch-Site" in reason
 
 
-@pytest.mark.parametrize(
-    ("exempt_patterns", "test_path", "expected_allowed", "expected_reason_fragment"),
-    [
-        # Basic patterns
-        (
-            [r"^/api/", r"/webhooks/github/"],
-            "/api/users/",
-            True,
-            "matches exempt pattern ^/api/",
-        ),
-        (
-            [r"^/api/", r"/webhooks/github/"],
-            "/webhooks/github/push",
-            True,
-            "matches exempt pattern /webhooks/github/",
-        ),
-        (
-            [r"^/api/", r"/webhooks/github/"],
-            "/admin/users/",
-            False,
-            "does not match Host",
-        ),
-        # Advanced regex patterns
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/api/v1/users/",
-            True,
-            "matches exempt pattern ^/api/v\\d+/",
-        ),
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/api/v2/posts/",
-            True,
-            "matches exempt pattern ^/api/v\\d+/",
-        ),
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/webhooks/github/push",
-            True,
-            "matches exempt pattern /webhooks/.*",
-        ),
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/webhooks/stripe/payment",
-            True,
-            "matches exempt pattern /webhooks/.*",
-        ),
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/health",
-            True,
-            "matches exempt pattern /health$",
-        ),
-        # Edge cases - exact match should not match with suffix
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/health-check",
-            False,
-            "does not match Host",
-        ),
-        (
-            [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
-            "/admin/users/",
-            False,
-            "does not match Host",
-        ),
-        # Empty exempt paths list
-        ([], "/api/users/", False, "does not match Host"),
-    ],
+@cases(
+    # Basic patterns
+    (
+        [r"^/api/", r"/webhooks/github/"],
+        "/api/users/",
+        True,
+        "matches exempt pattern ^/api/",
+    ),
+    (
+        [r"^/api/", r"/webhooks/github/"],
+        "/webhooks/github/push",
+        True,
+        "matches exempt pattern /webhooks/github/",
+    ),
+    (
+        [r"^/api/", r"/webhooks/github/"],
+        "/admin/users/",
+        False,
+        "does not match Host",
+    ),
+    # Advanced regex patterns
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/api/v1/users/",
+        True,
+        "matches exempt pattern ^/api/v\\d+/",
+    ),
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/api/v2/posts/",
+        True,
+        "matches exempt pattern ^/api/v\\d+/",
+    ),
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/webhooks/github/push",
+        True,
+        "matches exempt pattern /webhooks/.*",
+    ),
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/webhooks/stripe/payment",
+        True,
+        "matches exempt pattern /webhooks/.*",
+    ),
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/health",
+        True,
+        "matches exempt pattern /health$",
+    ),
+    # Edge cases - exact match should not match with suffix
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/health-check",
+        False,
+        "does not match Host",
+    ),
+    (
+        [r"^/api/v\d+/", r"/webhooks/.*", r"/health$"],
+        "/admin/users/",
+        False,
+        "does not match Host",
+    ),
+    # Empty exempt paths list
+    ([], "/api/users/", False, "does not match Host"),
 )
 def test_path_based_csrf_exemption(
     exempt_patterns, test_path, expected_allowed, expected_reason_fragment
@@ -266,11 +240,12 @@ def test_path_based_csrf_exemption(
         settings.CSRF_EXEMPT_PATHS = exempt_patterns
 
         # Need to recreate middleware to compile new patterns
-        rf = RequestFactory()
         csrf_middleware = CsrfViewMiddleware()
 
         # Test path with malicious origin to ensure exemption works
-        request = rf.post(test_path, headers={"Origin": "https://attacker.com"})
+        request = build_request(
+            "POST", test_path, headers={"Origin": "https://attacker.com"}
+        )
         allowed, reason = csrf_middleware.should_allow_request(request)
 
         assert allowed is expected_allowed
@@ -282,16 +257,15 @@ def test_path_based_csrf_exemption(
 
 
 def test_request_factory_naturally_bypasses_csrf():
-    """Test that RequestFactory naturally bypasses CSRF due to missing headers.
+    """Test that a built request naturally bypasses CSRF due to missing headers.
 
     This demonstrates why enforce_csrf_checks was removed - it's redundant
     because test clients naturally lack browser headers and thus bypass CSRF anyway.
     """
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
     # Create a POST request with NO Origin or Sec-Fetch-Site headers (typical for test clients)
-    request = rf.post("/test/")
+    request = build_request("POST", "/test/")
 
     # Verify no headers are present
     assert request.headers.get("Origin") is None
@@ -310,14 +284,15 @@ def test_middleware_integration_rejected_request():
     """Rejected requests should raise SuspiciousOperationError400."""
     from plain.http import SuspiciousOperationError400
 
-    rf = RequestFactory()
     csrf_middleware = CsrfViewMiddleware()
 
-    request = rf.post("/test/", headers={"Origin": "https://attacker.com"})
+    request = build_request(
+        "POST", "/test/", headers={"Origin": "https://attacker.com"}
+    )
 
     # Should raise SuspiciousOperationError400
-    with pytest.raises(SuspiciousOperationError400) as exc_info:
+    with raises(SuspiciousOperationError400) as exc_info:
         csrf_middleware.before_request(request)
 
     # Exception message should contain the reason
-    assert "does not match Host" in str(exc_info.value)
+    assert "does not match Host" in str(exc_info.exception)

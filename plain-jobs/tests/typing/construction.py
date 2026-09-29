@@ -1,6 +1,6 @@
 """Constructing a job keeps its own type.
 
-Checker input, not pytest input — see plain-postgres/tests/typing/README.md
+Checker input, not test-runner input — see plain-postgres/tests/typing/README.md
 for how the markers assert.
 """
 

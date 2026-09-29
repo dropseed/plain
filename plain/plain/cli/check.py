@@ -102,6 +102,26 @@ def run_custom_checks() -> None:
             raise SystemExit(result.returncode)
 
 
+# What `plain test` exits with when it found no tests to run.
+TEST_EXIT_NO_TESTS_FOUND = 4
+
+
+def check_tests() -> None:
+    """Run the tests, and let a project that has none through.
+
+    plain.dev depends on plain.testing, so the runner is installed in projects
+    that never wrote a test. It says "No tests found" and exits with a code of
+    its own for that, which is nothing for a check to fail on. A project whose
+    tests fail still fails.
+    """
+    print_event("plain test")
+    result = subprocess.run(["plain", "test"], check=False)
+    if result.returncode == TEST_EXIT_NO_TESTS_FOUND:
+        return
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+
+
 def run_core_checks(*, skip_test: bool = False) -> None:
     """Run core validation checks: custom, code, preflight, migrations, tests."""
 
@@ -119,11 +139,8 @@ def run_core_checks(*, skip_test: bool = False) -> None:
     else:
         click.secho("--> Skipping sync check", bold=True, fg="yellow")
 
-    if not skip_test and find_spec("plain.pytest"):
-        print_event("plain test")
-        result = subprocess.run(["plain", "test"], check=False)
-        if result.returncode != 0:
-            raise SystemExit(result.returncode)
+    if not skip_test and find_spec("plain.testing"):
+        check_tests()
 
 
 @common_command

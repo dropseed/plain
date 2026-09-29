@@ -12,18 +12,13 @@ Sentry PULLAPPROVE5-7N).
 
 import asyncio
 
-import pytest
 from plain.http import Response
 from plain.server.http import h1
+from plain.testing import patch
 from server_stubs import ResponseHandler, h1_connect, make_worker
 
 
-def test_stalled_body_gets_408_without_crashing_handler(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Shrink the per-recv body timeout so the stall is detected quickly.
-    monkeypatch.setattr(h1, "BODY_RECV_TIMEOUT", 0.2)
-
+def test_stalled_body_gets_408_without_crashing_handler() -> None:
     async def scenario() -> None:
         worker = make_worker(
             handler=ResponseHandler(lambda: Response(b"ok", content_type="text/plain"))
@@ -46,4 +41,6 @@ def test_stalled_body_gets_408_without_crashing_handler(
         finally:
             client.teardown()
 
-    asyncio.run(scenario())
+    # Shrink the per-recv body timeout so the stall is detected quickly.
+    with patch(h1, "BODY_RECV_TIMEOUT", 0.2):
+        asyncio.run(scenario())

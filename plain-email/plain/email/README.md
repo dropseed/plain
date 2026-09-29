@@ -175,7 +175,7 @@ When [`plain.toolbar`](../../plain-toolbar/plain/toolbar/README.md) is installed
 
 ### In-memory backend
 
-Captures sent messages in a list instead of delivering them — intended for tests. See [Testing](#testing) for the `mailoutbox` fixture built on it.
+Captures sent messages in a list instead of delivering them — intended for tests. See [Testing](#testing) for the `outbox` built on it.
 
 ```python
 EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
@@ -183,20 +183,23 @@ EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
 
 ## Testing
 
-`plain.email` ships a `mailoutbox` pytest fixture. It routes email to the in-memory backend for the duration of a test and yields the captured messages:
+`plain.email` ships a test lifecycle that routes `EMAIL_BACKEND` to the in-memory backend for the duration of a test run. Import `outbox` to read the captured messages:
 
 ```python
 from plain.email import send_mail
+from plain.email.test import outbox
 
 
-def test_sends_email(mailoutbox):
+def test_sends_email():
     send_mail("Subject", "Body", "from@example.com", ["person@example.com"])
 
-    assert len(mailoutbox) == 1
-    assert mailoutbox[0].to == ["person@example.com"]
+    assert len(outbox) == 1
+    assert outbox[0].to == ["person@example.com"]
 ```
 
-The fixture clears the outbox around each test (so messages never leak between tests) and restores the original `EMAIL_BACKEND` afterward. It registers automatically — no pytest plugin configuration needed.
+The outbox is emptied before each test, so a test sees only the mail it sent, and the original `EMAIL_BACKEND` is put back when the run ends. There's nothing to configure: the package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner.
+
+Each item in the outbox is the message that was sent, so you can assert on its `subject`, `body`, `to` and the rest.
 
 ## FAQs
 

@@ -6,11 +6,11 @@ queryset, the query and the compiler, not anything a user calls.
 
 import typing
 
-import pytest
 from app.examples.models.returning import ReturningEvent
 from plain.postgres.query import QuerySet
 from plain.postgres.sql.constants import CURSOR, MULTI, NO_RESULTS, SINGLE
 from plain.postgres.sql.query import UpdateQuery
+from plain.testing import cases, raises
 
 
 def test_returning_annotations_resolve_at_runtime():
@@ -30,16 +30,16 @@ def _update_query() -> UpdateQuery:
     return query
 
 
-@pytest.mark.parametrize("result_type", [MULTI, SINGLE])
-def test_write_compiler_rejects_row_shaping_result_types(db, result_type):
+@cases(MULTI, SINGLE)
+def test_write_compiler_rejects_row_shaping_result_types(result_type):
     # A write has a rowcount or its RETURNING rows, never a result set --
     # asking for one used to surface as a psycopg "didn't produce records"
     # several frames away.
-    with pytest.raises(AssertionError, match="CURSOR or NO_RESULTS"):
+    with raises(AssertionError, match="CURSOR or NO_RESULTS"):
         _update_query().get_compiler().execute_sql(result_type)
 
 
-@pytest.mark.parametrize("result_type", [CURSOR, NO_RESULTS])
-def test_write_compiler_accepts_the_write_result_types(db, result_type):
+@cases(CURSOR, NO_RESULTS)
+def test_write_compiler_accepts_the_write_result_types(result_type):
     # NO_RESULTS is what UpdateQuery.update_batch uses.
     assert _update_query().get_compiler().execute_sql(result_type) == 0

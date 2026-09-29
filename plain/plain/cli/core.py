@@ -8,6 +8,7 @@ import click
 import plain.runtime
 from click.core import Command, Context
 from plain.exceptions import ImproperlyConfigured
+from plain.packages import packages_registry
 
 from .agent import agent
 from .changelog import changelog
@@ -19,7 +20,7 @@ from .install import install
 from .memory import memory
 from .preflight import preflight_cli
 from .registry import cli_registry
-from .request import request
+from .runtime import set_running_command, the_running_command_was_found
 from .scaffold import create
 from .server import server
 from .settings import settings
@@ -46,7 +47,6 @@ _PLAIN_ENV_DEFAULTS = {
 
 plain_cli.add_command(check)
 plain_cli.add_command(docs)
-plain_cli.add_command(request)
 plain_cli.add_command(memory)
 plain_cli.add_command(agent)
 plain_cli.add_command(preflight_cli)
@@ -122,6 +122,30 @@ class CLIRegistryGroup(click.Group):
         return commands.get(cmd_name)
 
 
+def _raise_if_the_earlier_setup_did_not_finish() -> None:
+    """Tell a runtime that is set up from one that only started to be.
+
+    `setup()` refuses a second call whether or not the first one finished,
+    so "already set up" alone doesn't say the app is loaded. The package
+    registry is ready only once it has. When it isn't, the earlier failure
+    is raised again as what it was, so it is reported the way it would have
+    been had this been the first call.
+    """
+    if packages_registry.ready:
+        return
+
+    if not plain.runtime.APP_PATH.exists():
+        raise plain.runtime.AppPathNotFound(
+            "No app directory found. Are you sure you're in a Plain project?"
+        )
+
+    raise plain.runtime.SetupError(
+        "Plain runtime setup was started earlier in this process and didn't"
+        " finish, so the app isn't loaded. The error that stopped it was"
+        " raised where `plain.runtime.setup()` was first called."
+    )
+
+
 class PlainCommandCollection(click.CommandCollection):
     context_class = PlainContext
 
@@ -145,7 +169,13 @@ class PlainCommandCollection(click.CommandCollection):
         self._setup_attempted = True
 
         try:
-            plain.runtime.setup()
+            try:
+                plain.runtime.setup()
+            except plain.runtime.SetupError:
+                # Already set up — the CLI was invoked in-process by something
+                # that runs setup() itself (a test run, `plain check`). The
+                # registry can still load.
+                _raise_if_the_earlier_setup_did_not_finish()
             self._registry_group = CLIRegistryGroup()
             # Add registry group to sources
             self.sources.insert(0, self._registry_group)
@@ -210,6 +240,21 @@ class PlainCommandCollection(click.CommandCollection):
             err=True,
         )
         sys.exit(1)
+
+    def resolve_command(
+        self, ctx: Context, args: list[str]
+    ) -> tuple[str | None, Command | None, list[str]]:
+        # Said before the command is looked up: looking it up can run
+        # setup(), and the hooks that run there ask which command this is.
+        if args:
+            set_running_command(args[0])
+        name, command, remaining = super().resolve_command(ctx, args)
+        # Said once there is a command by that name. For one that was
+        # mistyped, or whose package isn't installed, nothing that waited to
+        # be started for it is.
+        if command is not None:
+            the_running_command_was_found()
+        return name, command, remaining
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv

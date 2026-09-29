@@ -4,6 +4,7 @@ import contextvars
 import dataclasses
 import inspect
 import time
+from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
@@ -29,6 +30,7 @@ from plain.utils.module_loading import import_string
 from plain.utils.otel import format_exception_type
 
 from .exception import response_for_exception
+from .own_event_loop import run_on_own_event_loop
 from .response_lifecycle import ResponseLifecycle, otel_http_method
 
 if TYPE_CHECKING:
@@ -148,10 +150,10 @@ class BaseHandler:
         # The body is fully received before dispatch, so this span opens
         # after ingest — record what receiving the body cost, or a slow
         # upload reads as a fast view with unhappy users.
-        if request._body_ingest_seconds is not None:
+        if request.body_ingest_seconds is not None:
             span_attributes[HTTP_REQUEST_BODY_SIZE] = request.content_length
             span_attributes["plain.request.body_ingest_seconds"] = round(
-                request._body_ingest_seconds, 6
+                request.body_ingest_seconds, 6
             )
 
         # Start with just the method; updated to "{method} {route}" after
@@ -283,14 +285,10 @@ class BaseHandler:
                 # any ContextVars the view sets (e.g. a DB wrapper via
                 # `get_connection()`) land on request_ctx and are visible
                 # to after_response below.
-                try:
-                    task = asyncio.get_running_loop().create_task(
-                        result.coroutine, context=request_ctx
-                    )
-                    response = await task
-                    self._check_response(response, result.view_class)
-                except Exception as exc:
-                    response = response_for_exception(request, exc)
+                task = asyncio.get_running_loop().create_task(
+                    result.coroutine, context=request_ctx
+                )
+                response = await self._await_async_view(request, result, task)
 
                 response = await self._run_in_executor(
                     executor,
@@ -314,6 +312,93 @@ class BaseHandler:
             started=started,
             executor=executor,
         )
+
+    def handle_in_process(self, request: Request) -> ResponseLifecycle:
+        """Handle a request on the calling thread, with no server.
+
+        The same pipeline as `handle()`, returning the same thing: the
+        response as a `ResponseLifecycle`, not yet read or closed. The
+        caller reads it with `read()`, or runs a websocket from it.
+
+        As in `handle()`, one context is built for the request and every
+        phase runs in it: before-middleware and the view, an async view's
+        coroutine, after-middleware, and then the body the
+        `ResponseLifecycle` sends. What one phase sets, the next sees.
+
+        `handle()` needs an event loop and a thread pool, and the caller
+        here has neither — it is a test, or a command, on an ordinary
+        thread. So three things differ, and nothing else:
+
+        - The request's context starts as a copy of the caller's rather
+          than empty. What the caller set up (a test's database
+          transaction) is what the view sees. What the request sets stays
+          in the request, as it does under a server.
+        - Each phase runs on the calling thread rather than in the
+          executor, and an async view is awaited on an event loop of its
+          own. A sync view uses no loop at all. When the caller is itself
+          running a loop (an `async def` test), a second one can't run on
+          its thread, so the view's loop runs on another thread while the
+          caller waits, still in the request's context.
+        - There is no executor. The `ResponseLifecycle` runs a sync body
+          on the thread that reads it.
+        """
+        assert self._middleware_chain is not None, (
+            "load_middleware() must be called before handle_in_process()"
+        )
+
+        span = self._start_request_span(request)
+        started = time.perf_counter()
+        request_ctx = contextvars.copy_context()
+        # Make the SERVER span current inside `request_ctx`, as `handle()`
+        # does, so every phase and the body nest under it.
+        request_ctx.run(context.attach, trace.set_span_in_context(span))
+
+        try:
+            result = request_ctx.run(self._run_sync_pipeline, request)
+
+            if isinstance(result, _AsyncViewPending):
+                # Drive the coroutine in request_ctx so any ContextVars the
+                # view sets are visible to after_response below.
+                response = run_on_own_event_loop(
+                    self._await_async_view(request, result, result.coroutine),
+                    context=request_ctx,
+                )
+
+                response = request_ctx.run(
+                    self._finish_pipeline, request, response, result.ran_before
+                )
+            else:
+                response = result
+        except BaseException as exc:
+            self._fail_request_span(span, exc)
+            raise
+
+        return self._response_lifecycle(
+            response,
+            request=request,
+            request_context=request_ctx,
+            span=span,
+            started=started,
+            executor=None,
+        )
+
+    async def _await_async_view(
+        self,
+        request: Request,
+        pending: _AsyncViewPending,
+        view_result: Awaitable[Response],
+    ) -> Response:
+        """Await an async view's response, turning what it raises into the
+        error response, as `_run_sync_pipeline` does for a sync view.
+
+        `view_result` is the view's coroutine, or the task driving it.
+        """
+        try:
+            response = await view_result
+            self._check_response(response, pending.view_class)
+        except Exception as exc:
+            response = response_for_exception(request, exc)
+        return response
 
     def _run_sync_pipeline(self, request: Request) -> Response | _AsyncViewPending:
         """Run the entire sync request pipeline on a single thread.

@@ -38,7 +38,6 @@ import sys
 from types import ModuleType
 from typing import Any, ClassVar
 
-import pytest
 from plain.postgres import Field, types
 from plain.postgres.base import Model
 from plain.postgres.preflight.models import (
@@ -47,6 +46,7 @@ from plain.postgres.preflight.models import (
     foreign_keys_annotated_as_values,
 )
 from plain.postgres.registry import models_registry
+from plain.testing import patch, raises
 
 from plain import postgres
 
@@ -79,7 +79,7 @@ def test_this_module_does_not_postpone_annotations():
     class _Probe:
         marker: _NeverDefined  # noqa: F821  # ty: ignore[unresolved-reference]
 
-    with pytest.raises(NameError):
+    with raises(NameError):
         inspect.get_annotations(_Probe)
 
 
@@ -169,12 +169,12 @@ ClassVarAttribute = _class_in_module(
 )
 
 
-def test_classvar_type_checking_only_reference_is_not_a_leak(monkeypatch):
+def test_classvar_type_checking_only_reference_is_not_a_leak():
     """Scoped to just this fixture -- `CheckTypedConstruction` otherwise only
     inspects `models_registry.get_models()`, which none of these unregistered
     fixtures are in."""
-    monkeypatch.setattr(models_registry, "get_models", lambda **_: [ClassVarAttribute])
-    results = CheckTypedConstruction().run()
+    with patch(models_registry, "get_models", lambda **_: [ClassVarAttribute]):
+        results = CheckTypedConstruction().run()
     leaks = [r.fix for r in results if r.id == "postgres.field_leaks_into_constructor"]
     assert leaks == []
 
@@ -184,12 +184,11 @@ def test_classvar_type_checking_only_reference_is_not_a_leak(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_registered_checks_survive_every_fixture(monkeypatch):
+def test_registered_checks_survive_every_fixture():
     """Not a claim about what either check reports -- only that FORWARDREF
     keeps `inspect.get_annotations()` from raising NameError, for every shape
     above, the way `plain preflight` would actually encounter them."""
     fixtures = [FieldWrapped, BareName, ClassVarAttribute]
-    monkeypatch.setattr(models_registry, "get_models", lambda **_: fixtures)
-
-    CheckTypedConstruction().run()
-    CheckForeignKeyAnnotatedAsValue().run()
+    with patch(models_registry, "get_models", lambda **_: fixtures):
+        CheckTypedConstruction().run()
+        CheckForeignKeyAnnotatedAsValue().run()

@@ -11,6 +11,7 @@
     - [Cycling session keys](#cycling-session-keys)
     - [Checking if session is empty](#checking-if-session-is-empty)
 - [Admin interface](#admin-interface)
+- [Testing](#testing)
 - [FAQs](#faqs)
 - [Installation](#installation)
 
@@ -140,6 +141,33 @@ You can view and manage sessions in the admin panel under the "Sessions" section
 - Delete expired or unwanted sessions
 
 The [`SessionAdmin`](./admin.py#SessionAdmin) viewset provides the interface for managing sessions in the admin panel.
+
+## Testing
+
+In a test, [`get_client_session()`](./test.py#get_client_session) gives you the session a test client is using, so you can read what a view stored or set something before a request:
+
+```python
+from plain.sessions.test import get_client_session
+from plain.testing import Client
+
+
+def test_cart_is_remembered():
+    client = Client()
+    client.post("/cart/add/", form_data={"sku": "A-1"})
+
+    session = get_client_session(client)
+    assert session["cart"] == ["A-1"]
+```
+
+If the client has no session yet, one is created and its cookie is set on the client. To change the session, set the value and call `session.save()`:
+
+```python
+session = get_client_session(client)
+session["theme"] = "dark"
+session.save()
+
+response = client.get("/")  # the view sees session["theme"]
+```
 
 ## FAQs
 

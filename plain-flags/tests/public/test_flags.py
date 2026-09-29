@@ -1,7 +1,7 @@
 from plain.flags import Flag
 
 
-def test_flag(db):
+def test_flag():
     class TestFlag(Flag):
         def get_key(self):
             return "test"

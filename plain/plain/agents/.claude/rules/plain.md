@@ -110,9 +110,9 @@ Trace-context-only (not error attribution): template render (`plain-templates`),
 
 **Workflow**: Use `--search <term>` to find which module has what you need, then read the full doc, or run `<name> --search <term>` to print just the matching sections.
 
-Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-pytest, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-toolbar, plain-tunnel, plain-vendor
+Packages: plain, plain-admin, plain-api, plain-assets, plain-auth, plain-cache, plain-code, plain-connect, plain-dev, plain-elements, plain-email, plain-flags, plain-htmx, plain-jobs, plain-loginlink, plain-mcp, plain-portal, plain-postgres, plain-oauth, plain-pages, plain-passwords, plain-scan, plain-sessions, plain-start, plain-tailwind, plain-templates, plain-testing, plain-toolbar, plain-tunnel, plain-vendor
 
-Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, test, urls, utils, views
+Core modules: agents, chores, cli, csrf, forms, http, logs, packages, preflight, runtime, server, urls, utils, views
 
 Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/path>/README.md`
 
@@ -121,14 +121,13 @@ Online docs URL pattern: `https://plainframework.com/docs/<pip-name>/<module/pat
 - `uv run plain check` — run linting, preflight, migration, and test checks (add `--skip-test` for faster iteration)
 - `uv run plain pre-commit` — `check` plus commit-specific steps (custom commands, uv lock, build)
 - `uv run plain shell` — interactive Python REPL with the app configured (`-c "..."` for one-off code, piped stdin works). For standalone scripts, put `import plain.runtime; plain.runtime.setup()` at the top and run with `uv run python script.py`.
-- `uv run plain request /path` — test HTTP request against the dev database (`--user`, `--method`, `--data`, `--header`, `--status`, `--contains`, `--not-contains`). Every response prints a trace summary (duration, span/query counts, each statement with its repeat count and call sites) — one block per request, so a followed redirect chain gets one per hop. Add `--trace` for the complete query list plus the span tree, or `--json` for context-frugal output — response metadata and the full traces, no response body.
 
 ## Debugging and verifying changes
 
 Don't guess at errors — reproduce them first, read the traceback, then fix what it actually says.
 
 - `uv run plain check` — lint, preflight, migration, and test checks in one shot (add `--skip-test` for faster iteration)
-- `uv run plain request /path` — hit a view and see the full error/stacktrace (`--user`, `--status`, `--contains`, `--not-contains`)
+- `uv run plain request /path` — hit a view and see the full error/stacktrace. It comes with plain.dev; its flags are in the Development rule.
 - `uv run plain shell -c "..."` — run a quick snippet to test behavior in isolation
-- `uv run plain test -x -k test_name` — run a specific failing test, stop on first failure
+- `uv run plain test --fail-fast --match test_name` — run a specific failing test, stop on first failure
 - `print()` statements — add them, run the code, read the output, then remove before committing

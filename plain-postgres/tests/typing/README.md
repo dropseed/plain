@@ -1,7 +1,7 @@
 # Typing corpus
 
-Checker input, not pytest input. Nothing here runs; `uv run ty check` reading
-these files _is_ the test, so no file is named `test_*.py` and pytest never
+Checker input, not test-runner input. Nothing here runs; `uv run ty check` reading
+these files _is_ the test, so no file is named `test_*.py` and the test runner never
 collects them.
 
 Most of what typed construction and the typed `where()` API promise is static:

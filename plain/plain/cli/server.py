@@ -80,7 +80,7 @@ def server(
     if workers == 0:
         workers = get_cpu_count()
 
-    from plain.server import ServerApplication
+    from plain.server.app import ServerApplication
 
     ServerApplication(
         bind=list(bind),

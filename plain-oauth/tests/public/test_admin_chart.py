@@ -20,7 +20,7 @@ def _connect(email: str, provider_key: str) -> None:
     )
 
 
-def test_provider_chart_matches_the_grouped_aggregate(db):
+def test_provider_chart_matches_the_grouped_aggregate():
     _connect("a@example.com", "github")
     _connect("b@example.com", "github")
     _connect("c@example.com", "bitbucket")
@@ -40,7 +40,7 @@ def test_provider_chart_matches_the_grouped_aggregate(db):
     assert expected == {"bitbucket": 1, "github": 2}
 
 
-def test_provider_chart_is_empty_without_connections(db):
+def test_provider_chart_is_empty_without_connections():
     data = ProvidersChartCard().get_chart_data()
     assert data["data"]["labels"] == []
     assert data["data"]["datasets"][0]["data"] == []

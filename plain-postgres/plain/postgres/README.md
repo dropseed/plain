@@ -20,6 +20,14 @@
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
 - [Tracing](#tracing)
+- [Testing](#testing)
+    - [The run's own database](#the-runs-own-database)
+    - [The template](#the-template)
+    - [The test database is the only database](#the-test-database-is-the-only-database)
+    - [What a failure prints](#what-a-failure-prints)
+    - [Tests that can't run in a transaction](#tests-that-cant-run-in-a-transaction)
+    - [Setting a query budget](#setting-a-query-budget)
+    - [Reading the queries a block ran](#reading-the-queries-a-block-ran)
 - [Settings](#settings)
 - [FAQs](#faqs)
 - [Installation](#installation)
@@ -2344,6 +2352,208 @@ with suppress_db_tracing():
 ```
 
 This is meant for infrastructure code (pollers, metric gauge callbacks, test fixtures) — not for hiding application queries, which you almost always want visible in traces.
+
+## Testing
+
+With `plain.postgres` installed, every test runs against a test database and leaves nothing behind. There's nothing to set up and nothing to ask for.
+
+```python
+from plain.testing import Client
+
+from app.users.models import User
+
+
+def test_signup_creates_a_user():
+    Client().post("/signup/", form_data={"email": "a@example.com"})
+    assert User.query.count() == 1
+```
+
+Two things happen around your tests:
+
+- **A test database for the run.** When the run starts, a database is created on the same server, migrated and converged. It's dropped when the run ends.
+- **A transaction around each test.** It's rolled back when the test finishes, so no test sees another's rows.
+
+The database is built once and kept as a template, so a run creates its own by cloning it, which takes a moment whatever the schema. See [the template](#the-template).
+
+The tests share one connection. The rollback undoes what a test did in its transaction: rows, `SET`, temporary tables, and the locks a transaction holds. Session-level advisory locks are released before the next test. What else belongs to the session carries over: a `LISTEN`, a server-side prepared statement. A test that needs a session of its own is [`@isolated_db`](#tests-that-cant-run-in-a-transaction).
+
+### The run's own database
+
+The database is named for yours and for the run, with the run's process id:
+
+```
+test_shop_main_r48213
+```
+
+So any number of runs can go at once in one checkout, with nothing to configure. Each creates, uses and drops its own.
+
+A run writes a record into each database it creates, in the database's comment: that a test run made it, which database it was testing, and which run and process. A run that was killed leaves its database behind, and the next run of that database removes it. So does `plain db clean`.
+
+That is dropping a database the run didn't make, so it is decided narrowly. A database is removed only when all of this is so:
+
+- It carries a run's record. A database without one is never touched, whatever it is named: `test_shop` is how `test_shop_api`'s databases start too, and a name proves nothing.
+- The record names the database this run is testing, as a whole value.
+- Nobody holds the lock that run would hold. A run holds a lock on the server for as long as it lives.
+- The process that made it isn't running, and nothing is connected to it.
+
+It is dropped without `FORCE`, so if something connects in the meantime the drop fails and the database stays. When a database is left in doubt, the run says so in one line and names the command that drops it: `plain db drop <name>`.
+
+If a database already has the name a run needs and doesn't carry that run's record, the run stops without touching it.
+
+### The template
+
+Migrating and converging a database from nothing is most of what a short run costs: half a second for a suite of fifty migrations, more than a second for one with many models. So it is done once. The first run builds the database and keeps it, as a template, and every run after clones it:
+
+```
+test_shop_main_tca9feecd
+```
+
+The template is named for yours and for the schema it was built from: a digest of every migration file, of every model's fields, indexes and constraints as convergence reads them, and of the versions of plain.postgres, psycopg and the Postgres server, since a new one of those can change what a build produces with nothing in the project changing. Change a migration or a model and the next run builds a new template under a new name, and removes the old one, the same way it removes what a killed run left: only on the template's own record, only when nothing is connected to it, and never by its name. One template is kept per database, on the same server, about the size of an empty schema. Its record says it is a template, which database it is for, and which schema, so `plain db list` shows it as one, and `plain db clean` drops it only when its schema is no longer the one this checkout builds, when the database it was built for is gone, or when the run that was building it died before it was done.
+
+A run that finds no template builds it, holding the template's lock so that two runs don't build it at once; a run that finds the lock held waits for the one holding it. The [report of where the run's time went](../../../plain-testing/plain/testing/README.md#where-the-time-went) says which happened:
+
+```
+  lifecycle setup                       0.42s
+    PostgresTestLifecycle               0.42s
+      built template (12 migrations)    0.33s
+      cloned template                   0.04s
+```
+
+An [`@isolated_db`](#tests-that-cant-run-in-a-transaction) test's database is a clone of the template too.
+
+### The test database is the only database
+
+While the tests run, `POSTGRES_URL` is the test database. Nothing in the process reaches your development database by asking for a connection, whatever thread or context it asks from. `POSTGRES_MANAGEMENT_URL`, if you set one, points at the test database too.
+
+Code that starts a thread is where this matters. A thread has no connection to begin with, so it gets one of its own from the pool, to the test database. That connection is not the test's:
+
+- The thread doesn't see what the test wrote, because the test's transaction never commits.
+- What the thread writes is committed, and isn't rolled back with the test.
+
+A test that needs either is [`@isolated_db`](#tests-that-cant-run-in-a-transaction): it commits, so a thread sees its rows, and its database is dropped with everything in it.
+
+```python
+import threading
+
+from plain.postgres.test import isolated_db
+
+
+@isolated_db
+def test_the_importer_sees_the_batch():
+    batch = Batch.query.create(name="march")
+
+    importer = threading.Thread(target=import_batch, args=[batch.id])
+    importer.start()
+    importer.join()
+
+    assert Row.query.count() == 3
+```
+
+The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
+
+### What a failure prints
+
+When a test fails, the [failure](../../../plain-testing/plain/testing/README.md#failures) prints the values it had in hand. A model instance is printed with its fields, and a queryset with what it holds:
+
+```
+  assert widget.size == "xl"
+    widget.size = 'm'
+      widget = Widget(id=3, name='bolt', size='m')
+
+  locals:
+    widgets = <QuerySet of Widget, not run: SELECT "examples_widget"."id", "examples_widget"."name", "examples_widget"."size" FROM "examples_widget" WHERE "examples_widget"."size" = %s with ('xl',)>
+```
+
+Printing never runs a query. A queryset that hasn't run is printed as the SQL it would run, and one that has is printed as its rows. A field that was deferred is printed as `<not loaded>`.
+
+A field that holds a secret is printed as `<withheld>`: an [encrypted field](#encrypted-fields), or a password from plain.passwords. A report is read by whoever reads the run.
+
+```
+    account = Account(id=1, name='payments', api_key=<withheld>)
+```
+
+If you write a field type whose value is a secret, say so on the class with `value_is_secret = True`.
+
+### Tests that can't run in a transaction
+
+A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./test/decorators.py#isolated_db):
+
+```python
+from plain.postgres.test import isolated_db
+
+
+@isolated_db
+def test_convergence_adds_the_index(): ...
+```
+
+That test gets a database of its own, cloned from [the template](#the-template) for it and dropped afterwards. It's a database and a session of its own for one test, so keep it for the tests that need it.
+
+### Setting a query budget
+
+[`max_queries`](./test/helpers.py#max_queries) fails the test if the block runs more queries than you allow:
+
+```python
+from plain.postgres.test import max_queries
+from plain.testing import Client
+
+
+def test_dashboard_query_budget():
+    with max_queries(5):
+        Client().get("/dashboard/")
+```
+
+The failure lists every query that ran, so you can see which ones to remove:
+
+```
+AssertionError: Expected at most 5 queries, 6 were executed:
+  SELECT "users_user"."id", "users_user"."email" FROM "users_user" WHERE "users_user"."id" = 1
+  ...
+```
+
+### Reading the queries a block ran
+
+[`capture_queries`](./test/helpers.py#capture_queries) records what the database is asked to do during a block:
+
+```python
+from plain.postgres.test import capture_queries
+
+
+def test_lookup_is_one_query():
+    with capture_queries() as queries:
+        list(User.query.filter(email="a@example.com"))
+
+    assert len(queries) == 1
+    assert queries[0].sql.endswith('WHERE "users_user"."email" = %s')
+    assert "'a@example.com'" in queries[0].sql_with_params
+```
+
+`queries` is a [capture](../../../plain-testing/plain/testing/README.md#capturing-what-happened) like the ones `plain.testing` hands back: a read-only sequence, in the order the queries ran, read after the block ends. Each query carries its SQL twice:
+
+| Attribute         | The SQL you get                           | Looks like                 |
+| ----------------- | ----------------------------------------- | -------------------------- |
+| `sql`             | What was sent, with its `%s` placeholders | `WHERE "email" = %s`       |
+| `sql_with_params` | What ran, with the values filled in       | `WHERE "email" = 'a@b.co'` |
+
+Use `sql` to pin the shape of a statement, where the values would only get in the way. Use `sql_with_params` to check the values one ran with.
+
+To compare against statements written out in the test, `queries.sql_statements()` returns the `sql` of each one with runs of whitespace collapsed to single spaces, so a statement written across several lines compares as one:
+
+```python
+def test_set_many_is_one_statement():
+    with capture_queries() as queries:
+        cache.set_many({"a": 1, "b": 2})
+
+    [statement] = queries.sql_statements()
+    assert statement.startswith('INSERT INTO "plaincache_cacheditem"')
+```
+
+Pass `table="users_user"` to keep only the statements that name that table. The name is matched as a quoted identifier, so `users_user` doesn't match `users_usertag`.
+
+Three things to know about what's counted:
+
+- **Transactions.** Every test runs inside a transaction, so an `atomic()` block in the code under test is a savepoint. `SAVEPOINT` and `RELEASE SAVEPOINT` are statements, and they're in both `queries` and `sql_statements()`. In an [`@isolated_db`](#tests-that-cant-run-in-a-transaction) test the same block is a real `BEGIN` and `COMMIT`. The connection issues those itself, so they're in `queries` (with `is_statement` false) and left out of `sql_statements()`.
+- **Queries the framework runs for itself.** `capture_queries` records at the connection, so it sees every query, including ones that run with tracing turned off inside [`suppress_db_tracing()`](#tracing) and so never appear as spans.
+- **Requests.** A capture around `client.get(...)` holds what the view ran, in an `@isolated_db` test too, where each request takes a connection from the pool and returns it.
 
 ## Settings
 

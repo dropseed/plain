@@ -300,23 +300,20 @@ def _build_http_request(
     server_name, server_port = _resolve_h2_server_address(server, authority, scheme)
     path = _resolve_path(raw_path)
 
-    request = HttpRequest(
+    return HttpRequest(
         method=method,
         path=path,
         headers=headers_dict,
         query_string=query,
+        # The fully-ingested body — never a socket-backed reader, so app
+        # reads can't block on the client.
+        body=stream,
+        body_ingest_seconds=ingest_seconds if received else None,
         server_scheme=scheme,
         server_name=server_name,
         server_port=server_port,
         remote_addr=remote_addr,
     )
-    # The fully-ingested body — never a socket-backed reader, so app
-    # reads can't block on the client.
-    request._stream = stream
-    request._read_started = False
-    if received:
-        request._body_ingest_seconds = ingest_seconds
-    return request
 
 
 def _prepare_stream_request(

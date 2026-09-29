@@ -1,5 +1,6 @@
 from plain.email import send_mail, send_mass_mail
 from plain.email.backends.base import BaseEmailBackend
+from plain.testing import override_settings
 
 
 class MinimalBackend(BaseEmailBackend):
@@ -13,30 +14,28 @@ class MinimalBackend(BaseEmailBackend):
         return len(email_messages)
 
 
-def test_send_mail_with_custom_backend(settings):
-    settings.EMAIL_BACKEND = (
-        f"{MinimalBackend.__module__}.{MinimalBackend.__qualname__}"
-    )
-
-    # This should work even though MinimalBackend doesn't accept username/password
-    count = send_mail(
-        "Subject",
-        "Body",
-        "from@example.com",
-        ["to@example.com"],
-    )
-    assert count == 1
-
-
-def test_send_mass_mail_with_custom_backend(settings):
-    settings.EMAIL_BACKEND = (
-        f"{MinimalBackend.__module__}.{MinimalBackend.__qualname__}"
-    )
-
-    count = send_mass_mail(
-        (
-            ("Subject 1", "Body 1", "from@example.com", ["to@example.com"]),
-            ("Subject 2", "Body 2", "from@example.com", ["to@example.com"]),
+def test_send_mail_with_custom_backend():
+    with override_settings(
+        EMAIL_BACKEND=f"{MinimalBackend.__module__}.{MinimalBackend.__qualname__}"
+    ):
+        # This should work even though MinimalBackend doesn't accept username/password
+        count = send_mail(
+            "Subject",
+            "Body",
+            "from@example.com",
+            ["to@example.com"],
         )
-    )
-    assert count == 2
+        assert count == 1
+
+
+def test_send_mass_mail_with_custom_backend():
+    with override_settings(
+        EMAIL_BACKEND=f"{MinimalBackend.__module__}.{MinimalBackend.__qualname__}"
+    ):
+        count = send_mass_mail(
+            (
+                ("Subject 1", "Body 1", "from@example.com", ["to@example.com"]),
+                ("Subject 2", "Body 2", "from@example.com", ["to@example.com"]),
+            )
+        )
+        assert count == 2
