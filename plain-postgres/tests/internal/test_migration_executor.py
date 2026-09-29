@@ -33,63 +33,63 @@ def _clean_up_table(table_name: str) -> None:
         cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE')
 
 
-class TestMigrationTransactionAtomicity:
-    """Schema changes and migration record are atomic — both commit or both roll back."""
+# Migration transaction atomicity
+#
+# Schema changes and migration record are atomic — both commit or both roll back.
+def test_successful_migration_records_and_applies():
+    """A successful migration commits both schema changes and the migration record."""
+    migration = Migration("test_success", "examples")
+    migration.operations = [
+        RunSQL(sql='CREATE TABLE "test_executor_success" (id bigint PRIMARY KEY)'),
+    ]
 
-    def test_successful_migration_records_and_applies(self):
-        """A successful migration commits both schema changes and the migration record."""
-        migration = Migration("test_success", "examples")
-        migration.operations = [
-            RunSQL(sql='CREATE TABLE "test_executor_success" (id bigint PRIMARY KEY)'),
-        ]
+    executor = MigrationExecutor(get_connection())
+    try:
+        executor.apply_migration(executor.loader.project_state(), migration)
 
-        executor = MigrationExecutor(get_connection())
-        try:
-            executor.apply_migration(executor.loader.project_state(), migration)
+        assert _table_exists("test_executor_success")
+        assert _migration_is_recorded("examples", "test_success")
+    finally:
+        _clean_up_table("test_executor_success")
+        _clean_up_migration_record("examples", "test_success")
 
-            assert _table_exists("test_executor_success")
-            assert _migration_is_recorded("examples", "test_success")
-        finally:
-            _clean_up_table("test_executor_success")
-            _clean_up_migration_record("examples", "test_success")
 
-    def test_failed_migration_rolls_back_both(self):
-        """A failed migration rolls back schema changes and does not record."""
-        migration = Migration("test_failure", "examples")
-        migration.operations = [
-            RunSQL(
-                sql=[
-                    'CREATE TABLE "test_executor_failure" (id bigint PRIMARY KEY)',
-                    "SELECT 1 / 0",  # Division by zero — will fail
-                ]
-            ),
-        ]
+def test_failed_migration_rolls_back_both():
+    """A failed migration rolls back schema changes and does not record."""
+    migration = Migration("test_failure", "examples")
+    migration.operations = [
+        RunSQL(
+            sql=[
+                'CREATE TABLE "test_executor_failure" (id bigint PRIMARY KEY)',
+                "SELECT 1 / 0",  # Division by zero — will fail
+            ]
+        ),
+    ]
 
-        executor = MigrationExecutor(get_connection())
-        with raises(psycopg.errors.DivisionByZero):
-            executor.apply_migration(executor.loader.project_state(), migration)
+    executor = MigrationExecutor(get_connection())
+    with raises(psycopg.errors.DivisionByZero):
+        executor.apply_migration(executor.loader.project_state(), migration)
 
-        # Both the table creation and the migration record should be rolled back
-        assert not _table_exists("test_executor_failure")
-        assert not _migration_is_recorded("examples", "test_failure")
+    # Both the table creation and the migration record should be rolled back
+    assert not _table_exists("test_executor_failure")
+    assert not _migration_is_recorded("examples", "test_failure")
 
-    def test_fake_migration_records_without_schema_changes(self):
-        """A fake migration records the migration without touching the database."""
-        migration = Migration("test_fake", "examples")
-        migration.operations = [
-            RunSQL(sql='CREATE TABLE "test_executor_fake" (id bigint PRIMARY KEY)'),
-        ]
 
-        executor = MigrationExecutor(get_connection())
-        try:
-            executor.apply_migration(
-                executor.loader.project_state(), migration, fake=True
-            )
+def test_fake_migration_records_without_schema_changes():
+    """A fake migration records the migration without touching the database."""
+    migration = Migration("test_fake", "examples")
+    migration.operations = [
+        RunSQL(sql='CREATE TABLE "test_executor_fake" (id bigint PRIMARY KEY)'),
+    ]
 
-            assert not _table_exists("test_executor_fake")
-            assert _migration_is_recorded("examples", "test_fake")
-        finally:
-            _clean_up_migration_record("examples", "test_fake")
+    executor = MigrationExecutor(get_connection())
+    try:
+        executor.apply_migration(executor.loader.project_state(), migration, fake=True)
+
+        assert not _table_exists("test_executor_fake")
+        assert _migration_is_recorded("examples", "test_fake")
+    finally:
+        _clean_up_migration_record("examples", "test_fake")
 
 
 def _backfill_tmp_reach(models_registry, schema_editor):

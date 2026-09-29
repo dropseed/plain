@@ -40,29 +40,31 @@ def test_every_condition_name_gets_the_relation_advice(method):
     assert f"parent.id.{method}(...)" in message
 
 
-class TestEncryptedFieldTraversalBlocked:
-    """An encrypted field's refusals travel with it, because traversal hands
-    back the field itself. The message names the full path, since the prefixed
-    copy carries it as its name."""
+# Encrypted field traversal blocked
+#
+# An encrypted field's refusals travel with it, because traversal hands
+# back the field itself. The message names the full path, since the prefixed
+# copy carries it as its name.
+def _traversed_encrypted_field():
+    # No model in the examples app has an FK to SecretStore, so prefix the
+    # field directly. This is exactly what RelatedFieldRef hands back --
+    # including the source model, the root such a traversal would start
+    # from.
+    return SecretStore._model_meta.get_forward_field("api_key").with_lookup_prefix(
+        "store", DefaultsExample
+    )
 
-    def traversed(self):
-        # No model in the examples app has an FK to SecretStore, so prefix the
-        # field directly. This is exactly what RelatedFieldRef hands back --
-        # including the source model, the root such a traversal would start
-        # from.
-        return SecretStore._model_meta.get_forward_field("api_key").with_lookup_prefix(
-            "store", DefaultsExample
-        )
 
-    @cases(*[m for m in CONDITION_METHODS if m != "is_null"])
-    def test_traversed_condition_raises(self, method):
-        traversed = self.traversed()
-        with raises(TypeError, match=rf"store__api_key.*does not support \.{method}\("):
-            getattr(traversed, method)("x")
+@cases(*[m for m in CONDITION_METHODS if m != "is_null"])
+def test_traversed_condition_raises(method):
+    traversed = _traversed_encrypted_field()
+    with raises(TypeError, match=rf"store__api_key.*does not support \.{method}\("):
+        getattr(traversed, method)("x")
 
-    def test_traversed_is_null_still_works(self):
-        traversed = self.traversed()
-        assert traversed.is_null().children == [("store__api_key__isnull", True)]
+
+def test_traversed_is_null_still_works():
+    traversed = _traversed_encrypted_field()
+    assert traversed.is_null().children == [("store__api_key__isnull", True)]
 
 
 def test_traversal_before_the_target_resolves_says_so():
@@ -118,84 +120,85 @@ def test_string_conditions_compile_like_their_filter_lookup(method, lookup):
     assert _compiled(typed) == _compiled(untyped)
 
 
-class TestComparingAgainstAnotherColumn:
-    """A `Field` on the right-hand side of a comparison is a column
-    reference. `_build_q` turns it into the `F(...)` the ORM already
-    understands, so the two spellings have to compile identically.
+# Comparing against another column
+#
+# A `Field` on the right-hand side of a comparison is a column
+# reference. `_build_q` turns it into the `F(...)` the ORM already
+# understands, so the two spellings have to compile identically.
+#
+# Public half: tests/public/test_typed_where.py.
+def test_compiles_like_the_f_expression():
+    typed = DefaultsExample.query.where(DefaultsExample.priority.lt(DefaultsExample.id))
+    untyped = DefaultsExample.query.filter(priority__lt=F("id"))
 
-    Public half: tests/public/test_typed_where.py.
-    """
-
-    def test_compiles_like_the_f_expression(self):
-        typed = DefaultsExample.query.where(
-            DefaultsExample.priority.lt(DefaultsExample.id)
-        )
-        untyped = DefaultsExample.query.filter(priority__lt=F("id"))
-
-        assert _compiled(typed) == _compiled(untyped)
-
-    def test_a_traversed_column_keeps_its_relation_prefix(self):
-        """A traversed field's `name` already carries the prefix, so both
-        sides of the comparison name the joined column."""
-        typed = WidgetTag.query.where(WidgetTag.widget.name.equals(WidgetTag.tag.name))
-        untyped = WidgetTag.query.filter(widget__name=F("tag__name"))
-
-        assert _compiled(typed) == _compiled(untyped)
-
-    def test_a_nullable_column_on_the_right(self):
-        """The `Field[T | None]` arm. Nothing distinguishes it at runtime --
-        it compiles like any other column reference -- but the checker needs
-        the arm, so the runtime half is pinned here too. Static halves:
-        tests/typing/conditions_value_types.py."""
-        typed = DefaultsExample.query.where(
-            DefaultsExample.name.equals(DefaultsExample.note)
-        )
-        untyped = DefaultsExample.query.filter(name=F("note"))
-
-        assert _compiled(typed) == _compiled(untyped)
-
-    def test_a_right_hand_column_from_another_model_is_rejected(self):
-        """The cross-model guard reads both sides -- a right-hand column from
-        another model resolves against the queried model just as silently as a
-        left-hand one would."""
-        with raises(TypeError, match="Widget.size"):
-            DefaultsExample.query.where(DefaultsExample.name.equals(Widget.size))
-
-    def test_both_sides_are_recorded_as_origins(self):
-        q = DefaultsExample.name.equals(Widget.size)
-        assert q._condition_origins == frozenset(
-            {(DefaultsExample, "name"), (Widget, "size")}
-        )
+    assert _compiled(typed) == _compiled(untyped)
 
 
-class TestAnEncryptedColumnIsRefusedOnEitherSide:
-    """`EncryptedField`'s block lives in its `_build_q`, which only runs on
-    the field the condition was built *from*. A right-hand encrypted column
-    reaches `Field._build_q` instead, so it needs its own refusal.
+def test_a_traversed_column_keeps_its_relation_prefix():
+    """A traversed field's `name` already carries the prefix, so both
+    sides of the comparison name the joined column."""
+    typed = WidgetTag.query.where(WidgetTag.widget.name.equals(WidgetTag.tag.name))
+    untyped = WidgetTag.query.filter(widget__name=F("tag__name"))
 
-    There is no static fix available: `EncryptedField[str]` *is* a
-    `Field[str]`, so it satisfies `equals`'s `Field[T]` arm exactly like any
-    other string column, and the `Never` declarations only shadow the methods
-    called *on* the encrypted field. The runtime hook is the whole guard,
-    which is why these have no corpus counterpart.
-    """
+    assert _compiled(typed) == _compiled(untyped)
 
-    @cases("equals", "not_equal", "gt", "lt")
-    def test_an_encrypted_right_hand_column_is_refused(self, method):
-        # Without the hook this compiled to `name = api_key` -- plaintext
-        # against ciphertext, which matches nothing and says nothing.
-        with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
-            getattr(SecretStore.name, method)(SecretStore.api_key)
 
-    @cases("equals", "not_equal", "gt", "lt")
-    def test_the_mirror_case_is_still_refused(self, method):
-        """The left-hand side was already blocked, by EncryptedField's own
-        `_build_q`. A Field is not a deterministically matchable value."""
-        with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
-            getattr(SecretStore.api_key, method)(SecretStore.name)
+def test_a_nullable_column_on_the_right():
+    """The `Field[T | None]` arm. Nothing distinguishes it at runtime --
+    it compiles like any other column reference -- but the checker needs
+    the arm, so the runtime half is pinned here too. Static halves:
+    tests/typing/conditions_value_types.py."""
+    typed = DefaultsExample.query.where(
+        DefaultsExample.name.equals(DefaultsExample.note)
+    )
+    untyped = DefaultsExample.query.filter(name=F("note"))
 
-    def test_an_ordinary_column_is_unaffected(self):
-        assert (
-            SecretStore.query.where(SecretStore.name.equals(SecretStore.name)).count()
-            == 0
-        )
+    assert _compiled(typed) == _compiled(untyped)
+
+
+def test_a_right_hand_column_from_another_model_is_rejected():
+    """The cross-model guard reads both sides -- a right-hand column from
+    another model resolves against the queried model just as silently as a
+    left-hand one would."""
+    with raises(TypeError, match="Widget.size"):
+        DefaultsExample.query.where(DefaultsExample.name.equals(Widget.size))
+
+
+def test_both_sides_are_recorded_as_origins():
+    q = DefaultsExample.name.equals(Widget.size)
+    assert q._condition_origins == frozenset(
+        {(DefaultsExample, "name"), (Widget, "size")}
+    )
+
+
+# An encrypted column is refused on either side
+#
+# `EncryptedField`'s block lives in its `_build_q`, which only runs on
+# the field the condition was built *from*. A right-hand encrypted column
+# reaches `Field._build_q` instead, so it needs its own refusal.
+#
+# There is no static fix available: `EncryptedField[str]` *is* a
+# `Field[str]`, so it satisfies `equals`'s `Field[T]` arm exactly like any
+# other string column, and the `Never` declarations only shadow the methods
+# called *on* the encrypted field. The runtime hook is the whole guard,
+# which is why these have no corpus counterpart.
+@cases("equals", "not_equal", "gt", "lt")
+def test_an_encrypted_right_hand_column_is_refused(method):
+    # Without the hook this compiled to `name = api_key` -- plaintext
+    # against ciphertext, which matches nothing and says nothing.
+    with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+        getattr(SecretStore.name, method)(SecretStore.api_key)
+
+
+@cases("equals", "not_equal", "gt", "lt")
+def test_the_mirror_case_is_still_refused(method):
+    """The left-hand side was already blocked, by EncryptedField's own
+    `_build_q`. A Field is not a deterministically matchable value."""
+    with raises(TypeError, match=rf"api_key.*does not support \.{method}\("):
+        getattr(SecretStore.api_key, method)(SecretStore.name)
+
+
+def test_an_ordinary_column_is_unaffected():
+    assert (
+        SecretStore.query.where(SecretStore.name.equals(SecretStore.name)).count() == 0
+    )

@@ -204,90 +204,98 @@ def test_select_flat_rejects_more_than_one_column():
         )
 
 
-class TestSelectForeignKeyColumn:
-    """A foreign key's own key column is a local column, so it is selectable.
+# Select foreign key column
+#
+# A foreign key's own key column is a local column, so it is selectable.
+#
+# `WidgetTag.widget.id` is `"widgettag"."widget_id"` — no join, and no
+# nullability the type doesn't already carry. The SQL identity with
+# `values_list("widget")` is pinned in
+# tests/internal/test_select_fk_column_sql.py.
+def create_tagged() -> WidgetTag:
+    widget = Widget.query.create(name="w", size="s")
+    tag = Tag.query.create(name="t")
+    return WidgetTag.query.create(widget=widget, tag=tag)
 
-    `WidgetTag.widget.id` is `"widgettag"."widget_id"` — no join, and no
-    nullability the type doesn't already carry. The SQL identity with
-    `values_list("widget")` is pinned in
-    tests/internal/test_select_fk_column_sql.py.
-    """
 
-    def create_tagged(self) -> WidgetTag:
-        widget = Widget.query.create(name="w", size="s")
-        tag = Tag.query.create(name="t")
-        return WidgetTag.query.create(widget=widget, tag=tag)
+def test_fk_column_flat_selects_the_key_column():
+    tagged = create_tagged()
+    assert list(WidgetTag.query.select(WidgetTag.widget.id, flat=True)) == [
+        tagged.widget.id
+    ]
 
-    def test_flat_selects_the_key_column(self):
-        tagged = self.create_tagged()
-        assert list(WidgetTag.query.select(WidgetTag.widget.id, flat=True)) == [
-            tagged.widget.id
-        ]
 
-    def test_tuple_row_carries_the_key_column(self):
-        tagged = self.create_tagged()
-        assert list(WidgetTag.query.select(WidgetTag.widget.id, WidgetTag.tag.id)) == [
-            (tagged.widget.id, tagged.tag.id)
-        ]
+def test_fk_column_tuple_row_carries_the_key_column():
+    tagged = create_tagged()
+    assert list(WidgetTag.query.select(WidgetTag.widget.id, WidgetTag.tag.id)) == [
+        (tagged.widget.id, tagged.tag.id)
+    ]
 
-    def test_result_type_maps_it_onto_the_column_name(self):
-        tagged = self.create_tagged()
 
-        @dataclass
-        class TagRow:
-            widget_id: int
-            tag_id: int
+def test_fk_column_result_type_maps_it_onto_the_column_name():
+    tagged = create_tagged()
 
-        rows = list(
-            WidgetTag.query.select(
-                WidgetTag.widget.id, WidgetTag.tag.id, result_type=TagRow
-            )
+    @dataclass
+    class TagRow:
+        widget_id: int
+        tag_id: int
+
+    rows = list(
+        WidgetTag.query.select(
+            WidgetTag.widget.id, WidgetTag.tag.id, result_type=TagRow
         )
-        assert rows == [TagRow(widget_id=tagged.widget.id, tag_id=tagged.tag.id)]
+    )
+    assert rows == [TagRow(widget_id=tagged.widget.id, tag_id=tagged.tag.id)]
 
-    def test_result_type_name_must_be_the_column_name(self):
-        """The dataclass field names the column the row holds, `widget_id` --
-        not the relation, and not the `widget__id` lookup path."""
-        self.create_tagged()
 
-        @dataclass
-        class WidgetRow:
-            widget: int
+def test_fk_column_result_type_name_must_be_the_column_name():
+    """The dataclass field names the column the row holds, `widget_id` --
+    not the relation, and not the `widget__id` lookup path."""
+    create_tagged()
 
-        with raises(TypeError, match="'widget_id' does not match"):
-            WidgetTag.query.select(WidgetTag.widget.id, result_type=WidgetRow)
+    @dataclass
+    class WidgetRow:
+        widget: int
 
-    def test_nullable_key_column_comes_back_as_none(self):
-        """A nullable foreign key yields None, which is the key column's own
-        nullability — not something the join introduced."""
-        partner = CircA.query.create(name="a")
-        CircB.query.create(name="paired", partner=partner)
-        CircB.query.create(name="lone")
+    with raises(TypeError, match="'widget_id' does not match"):
+        WidgetTag.query.select(WidgetTag.widget.id, result_type=WidgetRow)
 
-        assert list(
-            CircB.query.order_by("name").select(CircB.partner.id, flat=True)
-        ) == [None, partner.id]
 
-    def test_a_non_key_column_is_still_refused(self):
-        """One hop, but the column lives on the related table."""
-        with raises(TypeError, match=r'values_list\("widget__name"\)'):
-            WidgetTag.query.select(WidgetTag.widget.name)
+def test_fk_column_nullable_key_column_comes_back_as_none():
+    """A nullable foreign key yields None, which is the key column's own
+    nullability — not something the join introduced."""
+    partner = CircA.query.create(name="a")
+    CircB.query.create(name="paired", partner=partner)
+    CircB.query.create(name="lone")
 
-    def test_two_hops_to_a_key_column_are_still_refused(self):
-        """The second hop's key column lives on the related table, not this
-        one, so it really does arrive over a join."""
-        with raises(TypeError, match=r'values_list\("mid_parent__grandparent__id"\)'):
-            Grandchild.query.select(Grandchild.mid_parent.grandparent.id)
+    assert list(CircB.query.order_by("name").select(CircB.partner.id, flat=True)) == [
+        None,
+        partner.id,
+    ]
 
-    def test_many_to_many_hop_is_still_refused(self):
-        """A many-to-many stores its keys in a third table, so its key column
-        is never local to the selecting one."""
-        with raises(TypeError, match=r'values_list\("widget__tags__id"\)'):
-            # The checker stops a hop earlier: a many-to-many is a manager at
-            # class level, with no fields hanging off it.
-            WidgetTag.query.select(
-                WidgetTag.widget.tags.id  # ty: ignore[unresolved-attribute]
-            )
+
+def test_fk_column_a_non_key_column_is_still_refused():
+    """One hop, but the column lives on the related table."""
+    with raises(TypeError, match=r'values_list\("widget__name"\)'):
+        WidgetTag.query.select(WidgetTag.widget.name)
+
+
+def test_fk_column_two_hops_to_a_key_column_are_still_refused():
+    """The second hop's key column lives on the related table, not this
+    one, so it really does arrive over a join."""
+    with raises(TypeError, match=r'values_list\("mid_parent__grandparent__id"\)'):
+        Grandchild.query.select(Grandchild.mid_parent.grandparent.id)
+
+
+def test_fk_column_many_to_many_hop_is_still_refused():
+    """A many-to-many stores its keys in a third table, so its key column
+    is never local to the selecting one."""
+    with raises(TypeError, match=r'values_list\("widget__tags__id"\)'):
+        # The checker stops a hop earlier: a many-to-many is a manager at
+        # class level, with no fields hanging off it.
+        WidgetTag.query.select(
+            WidgetTag.widget.tags.id  # ty: ignore[unresolved-attribute]
+        )
 
 
 @dataclass
@@ -432,85 +440,86 @@ def test_select_result_type_arity_counts_init_vars():
         DefaultsExample.query.select(DefaultsExample.name, result_type=OnlyInitVar)
 
 
-class TestResultTypeParameterKinds:
-    """Parameter kind decides how each value has to be passed. A signature
-    always orders positionals before keyword-onlys, so the row splits at one
-    point -- but the split has to happen, because a positional-only parameter
-    can't be filled by name and a keyword-only one can't be filled by
-    position."""
+# Result type parameter kinds
+#
+# Parameter kind decides how each value has to be passed. A signature
+# always orders positionals before keyword-onlys, so the row splits at one
+# point -- but the split has to happen, because a positional-only parameter
+# can't be filled by name and a keyword-only one can't be filled by
+# position.
+def test_result_type_all_positional():
+    create_rows()
 
-    def test_all_positional(self):
-        create_rows()
+    @dataclass
+    class AllPositional:
+        name: str
+        priority: int
 
-        @dataclass
-        class AllPositional:
-            name: str
-            priority: int
-
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(
-                DefaultsExample.name,
-                DefaultsExample.priority,
-                result_type=AllPositional,
-            )
-            .first()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(
+            DefaultsExample.name,
+            DefaultsExample.priority,
+            result_type=AllPositional,
         )
-        assert result == AllPositional(name="alpha", priority=3)
+        .first()
+    )
+    assert result == AllPositional(name="alpha", priority=3)
 
-    def test_all_keyword_only(self):
-        create_rows()
 
-        @dataclass(kw_only=True)
-        class AllKeyword:
-            name: str
-            priority: int
+def test_result_type_all_keyword_only():
+    create_rows()
 
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(
-                DefaultsExample.name, DefaultsExample.priority, result_type=AllKeyword
-            )
-            .first()
+    @dataclass(kw_only=True)
+    class AllKeyword:
+        name: str
+        priority: int
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, DefaultsExample.priority, result_type=AllKeyword)
+        .first()
+    )
+    assert result == AllKeyword(name="alpha", priority=3)
+
+
+def test_result_type_positional_only_mixed_with_keyword_only():
+    """Neither the all-positional nor the all-keyword call works here."""
+    create_rows()
+
+    @dataclass
+    class Mixed:
+        name: str
+        priority: int
+
+        def __init__(self, name: str, /, *, priority: int) -> None:
+            self.name = name
+            self.priority = priority
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, DefaultsExample.priority, result_type=Mixed)
+        .first()
+    )
+    assert result == Mixed("alpha", priority=3)
+
+
+def test_result_type_positional_or_keyword_mixed_with_keyword_only():
+    create_rows()
+
+    @dataclass
+    class PartlyKwOnly:
+        name: str
+        priority: int = field(kw_only=True)
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(
+            DefaultsExample.name, DefaultsExample.priority, result_type=PartlyKwOnly
         )
-        assert result == AllKeyword(name="alpha", priority=3)
-
-    def test_positional_only_mixed_with_keyword_only(self):
-        """Neither the all-positional nor the all-keyword call works here."""
-        create_rows()
-
-        @dataclass
-        class Mixed:
-            name: str
-            priority: int
-
-            def __init__(self, name: str, /, *, priority: int) -> None:
-                self.name = name
-                self.priority = priority
-
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name, DefaultsExample.priority, result_type=Mixed)
-            .first()
-        )
-        assert result == Mixed("alpha", priority=3)
-
-    def test_positional_or_keyword_mixed_with_keyword_only(self):
-        create_rows()
-
-        @dataclass
-        class PartlyKwOnly:
-            name: str
-            priority: int = field(kw_only=True)
-
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(
-                DefaultsExample.name, DefaultsExample.priority, result_type=PartlyKwOnly
-            )
-            .first()
-        )
-        assert result == PartlyKwOnly(name="alpha", priority=3)
+        .first()
+    )
+    assert result == PartlyKwOnly(name="alpha", priority=3)
 
 
 def test_select_result_type_rejects_a_variadic_constructor():
@@ -527,227 +536,238 @@ def test_select_result_type_rejects_a_variadic_constructor():
         DefaultsExample.query.select(DefaultsExample.name, result_type=Variadic)
 
 
-class TestSelectTwiceIsAlwaysLastWins:
-    """Re-selecting replaces the columns, whatever either side is made of.
-
-    The internal alias a selected expression gets used to restart its counter
-    from 1 on every select(), so a second expression column regenerated the
-    first one's alias and collided with it -- a ValueError blaming "a field on
-    the model" that named neither the real cause nor a real field.
-    """
-
-    def create_ordered(self):
-        # LOWER(name) and UPPER(status) disagree about order, so a test can
-        # tell which one a query actually used.
-        DefaultsExample.query.create(name="zzz", priority=1, status="aaa")
-        DefaultsExample.query.create(name="aaa", priority=2, status="zzz")
-
-    def test_field_then_field(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name)
-            .select(DefaultsExample.priority)
-        )
-        assert list(result) == [(2,), (1,)]
-
-    def test_field_then_expression(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name)
-            .select(Upper("name"))
-        )
-        assert list(result) == [("AAA",), ("ZZZ",)]
-
-    def test_expression_then_field(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"))
-            .select(DefaultsExample.name)
-        )
-        assert list(result) == [("aaa",), ("zzz",)]
-
-    def test_expression_then_same_expression_function(self):
-        """The reported crash: both aliases wanted to be 'upper1'."""
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"))
-            .select(Upper("status"))
-        )
-        assert list(result) == [("ZZZ",), ("AAA",)]
-
-    def test_expression_then_different_expression_function(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"))
-            .select(Lower("status"))
-        )
-        assert list(result) == [("zzz",), ("aaa",)]
-
-    def test_f_then_f(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(F("priority"))
-            .select(F("name"))
-        )
-        assert list(result) == [("aaa",), ("zzz",)]
-
-    def test_mixed_list_then_mixed_list(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name, Upper("status"))
-            .select(DefaultsExample.priority, Lower("name"))
-        )
-        assert list(result) == [(2, "aaa"), (1, "zzz")]
-
-    def test_flat_then_flat(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"), flat=True)
-            .select(Upper("status"), flat=True)
-        )
-        assert list(result) == ["ZZZ", "AAA"]
-
-    def test_expression_then_result_type(self):
-        self.create_ordered()
-
-        @dataclass
-        class NameAndUpper:
-            name: str
-            upper: str
-
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"))
-            .select(DefaultsExample.name, Upper("status"), result_type=NameAndUpper)
-        )
-        assert list(result) == [
-            NameAndUpper(name="aaa", upper="ZZZ"),
-            NameAndUpper(name="zzz", upper="AAA"),
-        ]
-
-    def test_three_selects_in_a_row(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(Upper("name"))
-            .select(Upper("status"))
-            .select(Upper("name"))
-        )
-        assert list(result) == [("AAA",), ("ZZZ",)]
-
-    def test_aggregates_still_work_after_re_selecting(self):
-        self.create_ordered()
-        rows = DefaultsExample.query.select(Upper("name")).select(Upper("status"))
-        assert rows.count() == 2
-        assert rows.exists() is True
+# Select twice is always last wins
+#
+# Re-selecting replaces the columns, whatever either side is made of.
+#
+# The internal alias a selected expression gets used to restart its counter
+# from 1 on every select(), so a second expression column regenerated the
+# first one's alias and collided with it -- a ValueError blaming "a field on
+# the model" that named neither the real cause nor a real field.
+def create_ordered_rows():
+    # LOWER(name) and UPPER(status) disagree about order, so a test can
+    # tell which one a query actually used.
+    DefaultsExample.query.create(name="zzz", priority=1, status="aaa")
+    DefaultsExample.query.create(name="aaa", priority=2, status="zzz")
 
 
-class TestInternalAliasesNeverClobberUserAnnotations:
-    """A selected expression gets an internal alias, and that alias must not
-    land on one the caller already chose -- doing so silently redefines what
-    order_by()/filter() on that name mean."""
-
-    def create_ordered(self):
-        DefaultsExample.query.create(name="zzz", priority=1, status="aaa")
-        DefaultsExample.query.create(name="aaa", priority=2, status="zzz")
-
-    def test_order_by_a_user_annotation_keeps_its_meaning(self):
-        """'upper1' is what the generator would have produced for Upper(...),
-        so an unguarded generator overwrote LOWER(name) with UPPER(status) and
-        silently reversed the order."""
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.annotate(upper1=Lower("name"))
-            .order_by("upper1")
-            .select(DefaultsExample.name, Upper("status"))
-        )
-        assert [row[0] for row in result] == ["aaa", "zzz"]
-
-    def test_filter_on_a_user_annotation_keeps_its_meaning(self):
-        self.create_ordered()
-        result = (
-            DefaultsExample.query.annotate(upper1=Lower("name"))
-            .filter(upper1="aaa")
-            .select(DefaultsExample.name, Upper("status"))
-        )
-        assert list(result) == [("aaa", "ZZZ")]
+def test_reselect_field_then_field():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name)
+        .select(DefaultsExample.priority)
+    )
+    assert list(result) == [(2,), (1,)]
 
 
-class TestColumnsBelongToTheirModel:
-    """`select()`'s half of the guard `where()` carries.
+def test_reselect_field_then_expression():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name)
+        .select(Upper("name"))
+    )
+    assert list(result) == [("AAA",), ("ZZZ",)]
 
-    `Field[T]` carries no model identity, so nothing stops one model's field
-    being handed to another model's `select()`. The name then resolves against
-    the queried model -- silently the wrong column when both have one.
-    `Widget` is the other model here because it also has a `name`.
-    """
 
-    def test_same_model_column_passes(self):
-        create_rows()
-        result = DefaultsExample.query.order_by("name").select(
-            DefaultsExample.name, flat=True
-        )
-        assert list(result) == ["alpha", "beta", "gamma"]
+def test_reselect_expression_then_field():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"))
+        .select(DefaultsExample.name)
+    )
+    assert list(result) == [("aaa",), ("zzz",)]
 
-    def test_other_model_column_raises_although_the_name_exists(self):
-        """The dangerous case: both models have a `name`, so without the check
-        this quietly selected DefaultsExample.name."""
-        create_rows()
-        with raises(TypeError) as excinfo:
-            DefaultsExample.query.select(Widget.name)
-        message = str(excinfo.exception)
-        assert "Widget.name" in message
-        assert "DefaultsExample queryset" in message
 
-    def test_other_model_column_raises_when_the_name_does_not_exist(self):
-        """Previously a FieldError from deep in the compiler."""
-        create_rows()
-        with raises(TypeError, match="Widget.size"):
-            DefaultsExample.query.select(Widget.size)
+def test_reselect_expression_then_same_expression_function():
+    """The reported crash: both aliases wanted to be 'upper1'."""
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"))
+        .select(Upper("status"))
+    )
+    assert list(result) == [("ZZZ",), ("AAA",)]
 
-    def test_traversed_column_rooted_elsewhere_raises_as_cross_model(self):
-        """Being another model's column is the root mistake, so it is named
-        ahead of the traversal refusal -- "select columns on the queried
-        model" would be advice that doesn't help here."""
-        create_rows()
-        with raises(TypeError, match="WidgetTag.widget__name"):
-            DefaultsExample.query.select(WidgetTag.widget.name)
 
-    def test_another_models_key_column_raises_as_cross_model(self):
-        """A foreign key's key column is selectable, but only on the queryset
-        it belongs to -- the guard runs before the column resolves, so it
-        still catches one rooted elsewhere."""
-        create_rows()
-        with raises(TypeError, match="WidgetTag.widget__id"):
-            DefaultsExample.query.select(WidgetTag.widget.id)
+def test_reselect_expression_then_different_expression_function():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"))
+        .select(Lower("status"))
+    )
+    assert list(result) == [("zzz",), ("aaa",)]
 
-    def test_traversed_column_on_its_own_root_still_reports_traversal(self):
-        with raises(TypeError, match="reached through a relation"):
-            WidgetTag.query.select(WidgetTag.widget.name)
 
-    def test_expressions_are_unaffected(self):
-        """An expression takes a string resolved against whatever query it
-        lands in, like filter()'s kwargs -- there is no origin to check."""
-        create_rows()
-        assert list(
-            DefaultsExample.query.order_by("name").select(F("priority"), flat=True)
-        ) == [3, 1, 2]
-        assert list(
-            DefaultsExample.query.order_by("name").select(Upper("name"), flat=True)
-        ) == ["ALPHA", "BETA", "GAMMA"]
+def test_reselect_f_then_f():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name").select(F("priority")).select(F("name"))
+    )
+    assert list(result) == [("aaa",), ("zzz",)]
 
-    def test_mixed_list_with_one_foreign_column_raises(self):
-        create_rows()
-        with raises(TypeError, match="Widget.name"):
-            DefaultsExample.query.select(DefaultsExample.priority, Widget.name)
+
+def test_reselect_mixed_list_then_mixed_list():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name, Upper("status"))
+        .select(DefaultsExample.priority, Lower("name"))
+    )
+    assert list(result) == [(2, "aaa"), (1, "zzz")]
+
+
+def test_reselect_flat_then_flat():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"), flat=True)
+        .select(Upper("status"), flat=True)
+    )
+    assert list(result) == ["ZZZ", "AAA"]
+
+
+def test_reselect_expression_then_result_type():
+    create_ordered_rows()
+
+    @dataclass
+    class NameAndUpper:
+        name: str
+        upper: str
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"))
+        .select(DefaultsExample.name, Upper("status"), result_type=NameAndUpper)
+    )
+    assert list(result) == [
+        NameAndUpper(name="aaa", upper="ZZZ"),
+        NameAndUpper(name="zzz", upper="AAA"),
+    ]
+
+
+def test_reselect_three_selects_in_a_row():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(Upper("name"))
+        .select(Upper("status"))
+        .select(Upper("name"))
+    )
+    assert list(result) == [("AAA",), ("ZZZ",)]
+
+
+def test_reselect_aggregates_still_work_after_re_selecting():
+    create_ordered_rows()
+    rows = DefaultsExample.query.select(Upper("name")).select(Upper("status"))
+    assert rows.count() == 2
+    assert rows.exists() is True
+
+
+# Internal aliases never clobber user annotations
+#
+# A selected expression gets an internal alias, and that alias must not
+# land on one the caller already chose -- doing so silently redefines what
+# order_by()/filter() on that name mean.
+def test_order_by_a_user_annotation_keeps_its_meaning():
+    """'upper1' is what the generator would have produced for Upper(...),
+    so an unguarded generator overwrote LOWER(name) with UPPER(status) and
+    silently reversed the order."""
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.annotate(upper1=Lower("name"))
+        .order_by("upper1")
+        .select(DefaultsExample.name, Upper("status"))
+    )
+    assert [row[0] for row in result] == ["aaa", "zzz"]
+
+
+def test_filter_on_a_user_annotation_keeps_its_meaning():
+    create_ordered_rows()
+    result = (
+        DefaultsExample.query.annotate(upper1=Lower("name"))
+        .filter(upper1="aaa")
+        .select(DefaultsExample.name, Upper("status"))
+    )
+    assert list(result) == [("aaa", "ZZZ")]
+
+
+# Columns belong to their model
+#
+# `select()`'s half of the guard `where()` carries.
+#
+# `Field[T]` carries no model identity, so nothing stops one model's field
+# being handed to another model's `select()`. The name then resolves against
+# the queried model -- silently the wrong column when both have one.
+# `Widget` is the other model here because it also has a `name`.
+def test_column_ownership_same_model_column_passes():
+    create_rows()
+    result = DefaultsExample.query.order_by("name").select(
+        DefaultsExample.name, flat=True
+    )
+    assert list(result) == ["alpha", "beta", "gamma"]
+
+
+def test_column_ownership_other_model_column_raises_although_the_name_exists():
+    """The dangerous case: both models have a `name`, so without the check
+    this quietly selected DefaultsExample.name."""
+    create_rows()
+    with raises(TypeError) as excinfo:
+        DefaultsExample.query.select(Widget.name)
+    message = str(excinfo.exception)
+    assert "Widget.name" in message
+    assert "DefaultsExample queryset" in message
+
+
+def test_column_ownership_other_model_column_raises_when_the_name_does_not_exist():
+    """Previously a FieldError from deep in the compiler."""
+    create_rows()
+    with raises(TypeError, match="Widget.size"):
+        DefaultsExample.query.select(Widget.size)
+
+
+def test_column_ownership_traversed_column_rooted_elsewhere_raises_as_cross_model():
+    """Being another model's column is the root mistake, so it is named
+    ahead of the traversal refusal -- "select columns on the queried
+    model" would be advice that doesn't help here."""
+    create_rows()
+    with raises(TypeError, match="WidgetTag.widget__name"):
+        DefaultsExample.query.select(WidgetTag.widget.name)
+
+
+def test_column_ownership_another_models_key_column_raises_as_cross_model():
+    """A foreign key's key column is selectable, but only on the queryset
+    it belongs to -- the guard runs before the column resolves, so it
+    still catches one rooted elsewhere."""
+    create_rows()
+    with raises(TypeError, match="WidgetTag.widget__id"):
+        DefaultsExample.query.select(WidgetTag.widget.id)
+
+
+def test_column_ownership_traversed_column_on_its_own_root_still_reports_traversal():
+    with raises(TypeError, match="reached through a relation"):
+        WidgetTag.query.select(WidgetTag.widget.name)
+
+
+def test_column_ownership_expressions_are_unaffected():
+    """An expression takes a string resolved against whatever query it
+    lands in, like filter()'s kwargs -- there is no origin to check."""
+    create_rows()
+    assert list(
+        DefaultsExample.query.order_by("name").select(F("priority"), flat=True)
+    ) == [3, 1, 2]
+    assert list(
+        DefaultsExample.query.order_by("name").select(Upper("name"), flat=True)
+    ) == ["ALPHA", "BETA", "GAMMA"]
+
+
+def test_column_ownership_mixed_list_with_one_foreign_column_raises():
+    create_rows()
+    with raises(TypeError, match="Widget.name"):
+        DefaultsExample.query.select(DefaultsExample.priority, Widget.name)
 
 
 def test_select_rejects_a_field_read_off_a_mixin():
@@ -781,215 +801,229 @@ def test_select_alias_skips_a_column_that_looks_like_one():
     assert list(result) == [("real-f1", "a")]
 
 
-class TestMergingRowAndModelQuerysets:
-    """Merging a row-mode queryset with a model-mode one produces a query
-    neither side describes. The guard only looked at the left operand, so
-    `model_qs | row_qs` recursed until the stack ran out."""
+# Merging row and model querysets
+#
+# Merging a row-mode queryset with a model-mode one produces a query
+# neither side describes. The guard only looked at the left operand, so
+# `model_qs | row_qs` recursed until the stack ran out.
+def test_model_or_row_raises():
+    create_rows()
+    with raises(TypeError, match="must involve the same values"):
+        DefaultsExample.query.all() | DefaultsExample.query.select(DefaultsExample.name)
 
-    def test_model_or_row_raises(self):
-        create_rows()
-        with raises(TypeError, match="must involve the same values"):
-            DefaultsExample.query.all() | DefaultsExample.query.select(
-                DefaultsExample.name
-            )
 
-    def test_row_or_model_raises(self):
-        create_rows()
-        with raises(TypeError, match="must involve the same values"):
-            (
-                DefaultsExample.query.select(DefaultsExample.name)
-                | DefaultsExample.query.all()
-            )
-
-    def test_model_and_row_raises(self):
-        create_rows()
-        with raises(TypeError, match="must involve the same values"):
-            DefaultsExample.query.all() & DefaultsExample.query.select(
-                DefaultsExample.name
-            )
-
-    def test_sliced_row_queryset_merges(self):
-        """A sliced left operand is re-expressed as an id subquery, which used
-        to call the public values() and hit select()'s own refusal."""
-        create_rows()
-        r = DefaultsExample.query.order_by("name").select(DefaultsExample.name)
-        assert len(list(r[0:1] | r)) == 3
-        assert len(list(r | r[0:1])) == 3
-
-    def test_different_row_shapes_do_not_merge(self):
-        """Same columns, different rows: tuple, flat and result_type= select
-        identically and differ only in how each row is built, so a merge used
-        to hand back whichever shape the left operand carried."""
-        create_rows()
-
-        @dataclass
-        class NameOnly:
-            name: str
-
-        tuples = DefaultsExample.query.select(DefaultsExample.name)
-        flat = DefaultsExample.query.select(DefaultsExample.name, flat=True)
-        dataclasses_ = DefaultsExample.query.select(
-            DefaultsExample.name, result_type=NameOnly
+def test_row_or_model_raises():
+    create_rows()
+    with raises(TypeError, match="must involve the same values"):
+        (
+            DefaultsExample.query.select(DefaultsExample.name)
+            | DefaultsExample.query.all()
         )
 
-        for left, right in (
-            (dataclasses_, tuples),
-            (tuples, dataclasses_),
-            (tuples, flat),
-            (flat, tuples),
-        ):
-            with raises(TypeError, match="same row shape"):
-                left | right
 
-    def test_matching_row_shapes_still_merge(self):
-        create_rows()
-
-        @dataclass
-        class NameOnly:
-            name: str
-
-        left = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
-        right = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
-        assert len(list(left | right)) == 3
-
-    def test_matching_sides_still_merge(self):
-        create_rows()
-        model = DefaultsExample.query.all() | DefaultsExample.query.all()
-        assert len(list(model)) == 3
-        row = DefaultsExample.query.select(
-            DefaultsExample.name
-        ) | DefaultsExample.query.select(DefaultsExample.name)
-        assert len(list(row)) == 3
+def test_model_and_row_raises():
+    create_rows()
+    with raises(TypeError, match="must involve the same values"):
+        DefaultsExample.query.all() & DefaultsExample.query.select(DefaultsExample.name)
 
 
-class TestSelectTwiceWithExpressions:
-    """`select()` twice is last-wins, and that has to hold for expression
-    columns too. `_values_list` aliases an expression by annotating
-    internally, which used to call the *public* annotate() and so trip
-    RowQuerySet's guard -- a guard meant for callers adding a column to a
-    finished row, not for select() rebuilding one."""
+def test_sliced_row_queryset_merges():
+    """A sliced left operand is re-expressed as an id subquery, which used
+    to call the public values() and hit select()'s own refusal."""
+    create_rows()
+    r = DefaultsExample.query.order_by("name").select(DefaultsExample.name)
+    assert len(list(r[0:1] | r)) == 3
+    assert len(list(r | r[0:1])) == 3
 
-    def test_replacing_fields_with_an_expression(self):
-        create_rows()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name)
-            .select(F("priority"))
+
+def test_different_row_shapes_do_not_merge():
+    """Same columns, different rows: tuple, flat and result_type= select
+    identically and differ only in how each row is built, so a merge used
+    to hand back whichever shape the left operand carried."""
+    create_rows()
+
+    @dataclass
+    class NameOnly:
+        name: str
+
+    tuples = DefaultsExample.query.select(DefaultsExample.name)
+    flat = DefaultsExample.query.select(DefaultsExample.name, flat=True)
+    dataclasses_ = DefaultsExample.query.select(
+        DefaultsExample.name, result_type=NameOnly
+    )
+
+    for left, right in (
+        (dataclasses_, tuples),
+        (tuples, dataclasses_),
+        (tuples, flat),
+        (flat, tuples),
+    ):
+        with raises(TypeError, match="same row shape"):
+            left | right
+
+
+def test_matching_row_shapes_still_merge():
+    create_rows()
+
+    @dataclass
+    class NameOnly:
+        name: str
+
+    left = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
+    right = DefaultsExample.query.select(DefaultsExample.name, result_type=NameOnly)
+    assert len(list(left | right)) == 3
+
+
+def test_matching_sides_still_merge():
+    create_rows()
+    model = DefaultsExample.query.all() | DefaultsExample.query.all()
+    assert len(list(model)) == 3
+    row = DefaultsExample.query.select(
+        DefaultsExample.name
+    ) | DefaultsExample.query.select(DefaultsExample.name)
+    assert len(list(row)) == 3
+
+
+# Select twice with expressions
+#
+# `select()` twice is last-wins, and that has to hold for expression
+# columns too. `_values_list` aliases an expression by annotating
+# internally, which used to call the *public* annotate() and so trip
+# RowQuerySet's guard -- a guard meant for callers adding a column to a
+# finished row, not for select() rebuilding one.
+def test_replacing_fields_with_an_expression():
+    create_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name)
+        .select(F("priority"))
+    )
+    assert list(result) == [(3,), (1,), (2,)]
+
+
+def test_replacing_fields_with_a_flat_expression():
+    create_rows()
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.name)
+        .select(F("priority"), flat=True)
+    )
+    assert list(result) == [3, 1, 2]
+
+
+def test_replacing_fields_with_an_expression_and_result_type():
+    create_rows()
+
+    @dataclass
+    class NameAndExpr:
+        name: str
+        upper: str
+
+    result = (
+        DefaultsExample.query.order_by("name")
+        .select(DefaultsExample.priority)
+        .select(DefaultsExample.name, Upper("name"), result_type=NameAndExpr)
+        .first()
+    )
+    assert result == NameAndExpr(name="alpha", upper="ALPHA")
+
+
+def test_annotate_is_still_refused_for_callers():
+    """The guard the internal path now bypasses is still there."""
+    create_rows()
+    with raises(TypeError, match="Annotate first, then select"):
+        DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
+
+
+# Prefetch and select
+#
+# A prefetch hangs related objects off each result's attributes, and a
+# row has nowhere to put them: it was silently wasted work for tuples and
+# scalars, and an AttributeError for result_type=. Refused in both orders,
+# the same as join().
+def create_widget() -> Widget:
+    w = Widget.query.create(name="w", size="s")
+    tag = Tag.query.create(name="t")
+    w.tags.add(tag)
+    return w
+
+
+def test_select_after_prefetch_raises_in_tuple_mode():
+    create_widget()
+    with raises(TypeError, match="after prefetch"):
+        Widget.query.prefetch("tags").select(Widget.name)
+
+
+def test_select_after_prefetch_raises_in_flat_mode():
+    create_widget()
+    with raises(TypeError, match="after prefetch"):
+        Widget.query.prefetch("tags").select(Widget.name, flat=True)
+
+
+def test_select_after_prefetch_raises_in_result_type_mode():
+    create_widget()
+
+    @dataclass
+    class NameRow:
+        name: str
+
+    with raises(TypeError, match="after prefetch"):
+        Widget.query.prefetch("tags").select(Widget.name, result_type=NameRow)
+
+
+def test_prefetch_after_select_raises():
+    create_widget()
+    with raises(TypeError, match="after select"):
+        Widget.query.select(Widget.name).prefetch("tags")
+
+
+def test_prefetch_without_select_is_unaffected():
+    create_widget()
+    widgets = list(Widget.query.prefetch("tags"))
+    assert [t.name for t in widgets[0].tags.query.all()] == ["t"]
+
+
+# Annotate after select
+#
+# An annotation appends a column, so it would change the row shape out
+# from under the type select() already declared. The supported order is
+# annotate first, then select().
+def test_annotate_after_select_raises():
+    create_rows()
+    with raises(TypeError, match="Annotate first, then select"):
+        DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
+
+
+def test_annotate_after_select_raises_in_result_type_mode():
+    create_rows()
+    with raises(TypeError, match="Annotate first, then select"):
+        DefaultsExample.query.select(
+            DefaultsExample.name, DefaultsExample.priority, result_type=NameStat
+        ).annotate(x=Value(1))
+
+
+def test_annotate_after_select_raises_in_flat_mode():
+    create_rows()
+    with raises(TypeError, match="Annotate first, then select"):
+        DefaultsExample.query.select(DefaultsExample.name, flat=True).annotate(
+            x=Value(1)
         )
-        assert list(result) == [(3,), (1,), (2,)]
-
-    def test_replacing_fields_with_a_flat_expression(self):
-        create_rows()
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.name)
-            .select(F("priority"), flat=True)
-        )
-        assert list(result) == [3, 1, 2]
-
-    def test_replacing_fields_with_an_expression_and_result_type(self):
-        create_rows()
-
-        @dataclass
-        class NameAndExpr:
-            name: str
-            upper: str
-
-        result = (
-            DefaultsExample.query.order_by("name")
-            .select(DefaultsExample.priority)
-            .select(DefaultsExample.name, Upper("name"), result_type=NameAndExpr)
-            .first()
-        )
-        assert result == NameAndExpr(name="alpha", upper="ALPHA")
-
-    def test_annotate_is_still_refused_for_callers(self):
-        """The guard the internal path now bypasses is still there."""
-        create_rows()
-        with raises(TypeError, match="Annotate first, then select"):
-            DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
 
 
-class TestPrefetchAndSelect:
-    """A prefetch hangs related objects off each result's attributes, and a
-    row has nowhere to put them: it was silently wasted work for tuples and
-    scalars, and an AttributeError for result_type=. Refused in both orders,
-    the same as join()."""
-
-    def create_widget(self) -> Widget:
-        w = Widget.query.create(name="w", size="s")
-        tag = Tag.query.create(name="t")
-        w.tags.add(tag)
-        return w
-
-    def test_select_after_prefetch_raises_in_tuple_mode(self):
-        self.create_widget()
-        with raises(TypeError, match="after prefetch"):
-            Widget.query.prefetch("tags").select(Widget.name)
-
-    def test_select_after_prefetch_raises_in_flat_mode(self):
-        self.create_widget()
-        with raises(TypeError, match="after prefetch"):
-            Widget.query.prefetch("tags").select(Widget.name, flat=True)
-
-    def test_select_after_prefetch_raises_in_result_type_mode(self):
-        self.create_widget()
-
-        @dataclass
-        class NameRow:
-            name: str
-
-        with raises(TypeError, match="after prefetch"):
-            Widget.query.prefetch("tags").select(Widget.name, result_type=NameRow)
-
-    def test_prefetch_after_select_raises(self):
-        self.create_widget()
-        with raises(TypeError, match="after select"):
-            Widget.query.select(Widget.name).prefetch("tags")
-
-    def test_prefetch_without_select_is_unaffected(self):
-        self.create_widget()
-        widgets = list(Widget.query.prefetch("tags"))
-        assert [t.name for t in widgets[0].tags.query.all()] == ["t"]
+def test_annotate_before_select_still_works():
+    """The supported order — the annotation is selectable as a column."""
+    create_rows()
+    result = (
+        DefaultsExample.query.annotate(n=Count("id"))
+        .order_by("name")
+        .select(DefaultsExample.name)
+    )
+    assert list(result) == [("alpha",), ("beta",), ("gamma",)]
 
 
-class TestAnnotateAfterSelect:
-    """An annotation appends a column, so it would change the row shape out
-    from under the type select() already declared. The supported order is
-    annotate first, then select()."""
-
-    def test_annotate_after_select_raises(self):
-        create_rows()
-        with raises(TypeError, match="Annotate first, then select"):
-            DefaultsExample.query.select(DefaultsExample.name).annotate(x=Value(1))
-
-    def test_annotate_after_select_raises_in_result_type_mode(self):
-        create_rows()
-        with raises(TypeError, match="Annotate first, then select"):
-            DefaultsExample.query.select(
-                DefaultsExample.name, DefaultsExample.priority, result_type=NameStat
-            ).annotate(x=Value(1))
-
-    def test_annotate_after_select_raises_in_flat_mode(self):
-        create_rows()
-        with raises(TypeError, match="Annotate first, then select"):
-            DefaultsExample.query.select(DefaultsExample.name, flat=True).annotate(
-                x=Value(1)
-            )
-
-    def test_annotate_before_select_still_works(self):
-        """The supported order — the annotation is selectable as a column."""
-        create_rows()
-        result = (
-            DefaultsExample.query.annotate(n=Count("id"))
-            .order_by("name")
-            .select(DefaultsExample.name)
-        )
-        assert list(result) == [("alpha",), ("beta",), ("gamma",)]
-
-    def test_annotate_is_unaffected_on_a_plain_queryset(self):
-        create_rows()
-        assert DefaultsExample.query.annotate(n=Count("id")).count() == 3
+def test_annotate_is_unaffected_on_a_plain_queryset():
+    create_rows()
+    assert DefaultsExample.query.annotate(n=Count("id")).count() == 3
 
 
 def test_get_or_create_after_select_raises():

@@ -16,231 +16,235 @@ from plain.test import capture_metrics, capture_spans, override_settings, patch,
 from psycopg_pool import PoolTimeout
 
 
-class TestQuerySpanAttributes:
-    def test_server_address_on_span(self) -> None:
-        with capture_spans() as otel_spans:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-
-        spans = otel_spans.filter(name="SELECT")
-        assert spans, "no SELECT span captured"
-        attrs = spans[-1].attributes
-        assert attrs is not None
-        assert "server.address" in attrs
-        # Primary semconv attr should match the supplementary network.peer.address.
-        assert attrs["server.address"] == attrs.get("network.peer.address")
-        assert "server.port" in attrs
-        assert attrs["server.port"] == attrs.get("network.peer.port")
-
-    def test_query_spans_carry_the_attributes_trace_readers_rely_on(self) -> None:
-        # `plain request` groups statements by `db.query.text`, splits
-        # transaction bookkeeping out by `db.operation.name`, and classifies
-        # call sites by `code.file.path`. It cannot import this package to
-        # check, so pin the keys here — dropping one silently costs it query
-        # grouping or call sites with nothing failing on that side.
-        with capture_spans() as otel_spans:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-
-        spans = otel_spans.filter(name="SELECT")
-        assert spans, "no SELECT span captured"
-        attrs = spans[-1].attributes
-        assert attrs is not None
-        assert attrs["db.query.text"] == "SELECT 1"
-        assert attrs["db.operation.name"] == "SELECT"
-        assert str(attrs["code.file.path"]).endswith(".py")
-
-    def test_not_recording_skips_stack_walk(self) -> None:
-        # Cheap attributes still build unconditionally (attribute-aware
-        # samplers see them at span creation), but the per-query stack walk
-        # must only happen when the span actually records.
-        stack_walks: list[int] = []
-
-        def counting_code_attributes() -> dict[str, Any]:
-            stack_walks.append(1)
-            return {}
-
-        class StubDb:
-            settings_dict: ClassVar[dict[str, Any]] = {}
-
-        with (
-            patch(postgres_otel, "_get_code_attributes", counting_code_attributes),
-            patch(postgres_otel, "tracer", NoOpTracer()),
-            postgres_otel.db_span(StubDb(), "SELECT 1") as span,  # ty: ignore[invalid-argument-type]
-        ):
-            pass
-
-        assert span is not None
-        assert not span.is_recording()
-        assert not stack_walks
-
-
-class TestReturnedRowsMetric:
-    def test_select_records_returned_rows(self) -> None:
-        with capture_metrics() as otel_metrics:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT generate_series(1, 5)")
-                cursor.fetchall()
-
-        points = otel_metrics.histogram_points("db.client.response.returned_rows")
-        # Histogram points aggregate over collection window; at least one
-        # data point with our operation tag should be present.
-        select_points = otel_metrics.histogram_points(
-            "db.client.response.returned_rows",
-            attributes={"db.operation.name": "SELECT"},
-        )
-        assert select_points, f"no SELECT returned_rows points; got {points}"
-        # Sum across points should reflect the 5 rows we returned.
-        assert sum(p.sum for p in select_points) >= 5
-
-    def test_stream_records_returned_rows(self) -> None:
-        # Streaming uses a server-side cursor where cursor.rowcount is -1; the
-        # count must come from db_span's row_count_provider closure.
-        with capture_metrics() as otel_metrics:
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                list(cursor.stream("SELECT generate_series(1, 7)"))
-
-        points = otel_metrics.histogram_points("db.client.response.returned_rows")
-        select_points = otel_metrics.histogram_points(
-            "db.client.response.returned_rows",
-            attributes={"db.operation.name": "SELECT"},
-        )
-        assert select_points, f"no SELECT returned_rows points; got {points}"
-        assert sum(p.sum for p in select_points) >= 7
-
-    def test_non_select_does_not_record_returned_rows(self) -> None:
+# Query span attributes
+def test_server_address_on_span() -> None:
+    with capture_spans() as otel_spans:
         conn = get_connection()
         with conn.cursor() as cursor:
-            # Table doesn't matter — a BEGIN/COMMIT compiles to COMMIT op.
-            cursor.execute("SELECT 1")  # warm
+            cursor.execute("SELECT 1")
 
-        # Opened after the warm-up query, so its points aren't captured.
-        with capture_metrics() as otel_metrics, conn.cursor() as cursor:
-            cursor.execute("CREATE TEMP TABLE _otel_tmp (v int)")
-            cursor.execute("INSERT INTO _otel_tmp (v) VALUES (1), (2), (3)")
-            cursor.execute("UPDATE _otel_tmp SET v = v + 1")
-            cursor.execute("DELETE FROM _otel_tmp")
-
-        points = otel_metrics.histogram_points("db.client.response.returned_rows")
-        for p in points:
-            assert (p.attributes or {}).get("db.operation.name") == "SELECT", (
-                f"non-SELECT recorded returned_rows: {p.attributes}"
-            )
+    spans = otel_spans.filter(name="SELECT")
+    assert spans, "no SELECT span captured"
+    attrs = spans[-1].attributes
+    assert attrs is not None
+    assert "server.address" in attrs
+    # Primary semconv attr should match the supplementary network.peer.address.
+    assert attrs["server.address"] == attrs.get("network.peer.address")
+    assert "server.port" in attrs
+    assert attrs["server.port"] == attrs.get("network.peer.port")
 
 
-class TestPoolObservables:
-    def test_count_max_idle_pending_observed(self) -> None:
-        # The per-test transaction runs on a connection that bypasses the
-        # runtime pool, so exercise the pool directly.
+def test_query_spans_carry_the_attributes_trace_readers_rely_on() -> None:
+    # `plain request` groups statements by `db.query.text`, splits
+    # transaction bookkeeping out by `db.operation.name`, and classifies
+    # call sites by `code.file.path`. It cannot import this package to
+    # check, so pin the keys here — dropping one silently costs it query
+    # grouping or call sites with nothing failing on that side.
+    with capture_spans() as otel_spans:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+    spans = otel_spans.filter(name="SELECT")
+    assert spans, "no SELECT span captured"
+    attrs = spans[-1].attributes
+    assert attrs is not None
+    assert attrs["db.query.text"] == "SELECT 1"
+    assert attrs["db.operation.name"] == "SELECT"
+    assert str(attrs["code.file.path"]).endswith(".py")
+
+
+def test_not_recording_skips_stack_walk() -> None:
+    # Cheap attributes still build unconditionally (attribute-aware
+    # samplers see them at span creation), but the per-query stack walk
+    # must only happen when the span actually records.
+    stack_walks: list[int] = []
+
+    def counting_code_attributes() -> dict[str, Any]:
+        stack_walks.append(1)
+        return {}
+
+    class StubDb:
+        settings_dict: ClassVar[dict[str, Any]] = {}
+
+    with (
+        patch(postgres_otel, "_get_code_attributes", counting_code_attributes),
+        patch(postgres_otel, "tracer", NoOpTracer()),
+        postgres_otel.db_span(StubDb(), "SELECT 1") as span,  # ty: ignore[invalid-argument-type]
+    ):
+        pass
+
+    assert span is not None
+    assert not span.is_recording()
+    assert not stack_walks
+
+
+# Returned rows metric
+def test_select_records_returned_rows() -> None:
+    with capture_metrics() as otel_metrics:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT generate_series(1, 5)")
+            cursor.fetchall()
+
+    points = otel_metrics.histogram_points("db.client.response.returned_rows")
+    # Histogram points aggregate over collection window; at least one
+    # data point with our operation tag should be present.
+    select_points = otel_metrics.histogram_points(
+        "db.client.response.returned_rows",
+        attributes={"db.operation.name": "SELECT"},
+    )
+    assert select_points, f"no SELECT returned_rows points; got {points}"
+    # Sum across points should reflect the 5 rows we returned.
+    assert sum(p.sum for p in select_points) >= 5
+
+
+def test_stream_records_returned_rows() -> None:
+    # Streaming uses a server-side cursor where cursor.rowcount is -1; the
+    # count must come from db_span's row_count_provider closure.
+    with capture_metrics() as otel_metrics:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            list(cursor.stream("SELECT generate_series(1, 7)"))
+
+    points = otel_metrics.histogram_points("db.client.response.returned_rows")
+    select_points = otel_metrics.histogram_points(
+        "db.client.response.returned_rows",
+        attributes={"db.operation.name": "SELECT"},
+    )
+    assert select_points, f"no SELECT returned_rows points; got {points}"
+    assert sum(p.sum for p in select_points) >= 7
+
+
+def test_non_select_does_not_record_returned_rows() -> None:
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        # Table doesn't matter — a BEGIN/COMMIT compiles to COMMIT op.
+        cursor.execute("SELECT 1")  # warm
+
+    # Opened after the warm-up query, so its points aren't captured.
+    with capture_metrics() as otel_metrics, conn.cursor() as cursor:
+        cursor.execute("CREATE TEMP TABLE _otel_tmp (v int)")
+        cursor.execute("INSERT INTO _otel_tmp (v) VALUES (1), (2), (3)")
+        cursor.execute("UPDATE _otel_tmp SET v = v + 1")
+        cursor.execute("DELETE FROM _otel_tmp")
+
+    points = otel_metrics.histogram_points("db.client.response.returned_rows")
+    for p in points:
+        assert (p.attributes or {}).get("db.operation.name") == "SELECT", (
+            f"non-SELECT recorded returned_rows: {p.attributes}"
+        )
+
+
+# Pool observables
+def test_pool_count_max_idle_pending_observed() -> None:
+    # The per-test transaction runs on a connection that bypasses the
+    # runtime pool, so exercise the pool directly.
+    runtime_pool_source.close()
+    held = runtime_pool_source.acquire()
+    try:
+        # The pool's gauges are read when the capture ends, so it ends
+        # while this connection is still held.
+        with capture_metrics() as otel_metrics:
+            pool = runtime_pool_source._pool
+            assert pool is not None
+            assert pool.get_stats().get("pool_size", 0) >= 1
+    finally:
+        runtime_pool_source.release(held)
         runtime_pool_source.close()
-        held = runtime_pool_source.acquire()
-        try:
-            # The pool's gauges are read when the capture ends, so it ends
-            # while this connection is still held.
-            with capture_metrics() as otel_metrics:
-                pool = runtime_pool_source._pool
-                assert pool is not None
-                assert pool.get_stats().get("pool_size", 0) >= 1
-        finally:
-            runtime_pool_source.release(held)
-            runtime_pool_source.close()
 
-        by_name: dict[str, list[dict[str, Any]]] = {
-            name: [dict(p.attributes or {}) for p in otel_metrics.number_points(name)]
-            for name in (
-                "db.client.connection.count",
-                "db.client.connection.max",
-                "db.client.connection.idle.min",
-                "db.client.connection.idle.max",
-                "db.client.connection.pending_requests",
-            )
-        }
-
-        count_attrs = by_name.get("db.client.connection.count", [])
-        states = {a.get("db.client.connection.state") for a in count_attrs}
-        assert "idle" in states, count_attrs
-        assert "used" in states, count_attrs
-        for a in count_attrs:
-            assert a.get("db.client.connection.pool.name") == "runtime"
-
+    by_name: dict[str, list[dict[str, Any]]] = {
+        name: [dict(p.attributes or {}) for p in otel_metrics.number_points(name)]
         for name in (
+            "db.client.connection.count",
             "db.client.connection.max",
             "db.client.connection.idle.min",
             "db.client.connection.idle.max",
             "db.client.connection.pending_requests",
-        ):
-            attrs_list = by_name.get(name, [])
-            assert attrs_list, f"no observations for {name}"
-            for a in attrs_list:
-                assert a.get("db.client.connection.pool.name") == "runtime"
-
-
-class TestWaitTimeHistogram:
-    def test_wait_time_under_contention(self) -> None:
-        # Rebuild the pool at size 1 so a second concurrent acquire must wait.
-        with capture_metrics() as otel_metrics:
-            runtime_pool_source.close()
-            try:
-                with override_settings(
-                    POSTGRES_POOL_MIN_SIZE=1,
-                    POSTGRES_POOL_MAX_SIZE=1,
-                    POSTGRES_POOL_TIMEOUT=2.0,
-                ):
-                    held = runtime_pool_source.acquire()
-                    release_event = threading.Event()
-
-                    def _second() -> None:
-                        # Will block until `held` is released.
-                        conn = runtime_pool_source.acquire()
-                        runtime_pool_source.release(conn)
-
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                        fut = ex.submit(_second)
-                        # Give the thread time to start blocking on the pool.
-                        threading.Event().wait(0.15)
-                        runtime_pool_source.release(held)
-                        release_event.set()
-                        fut.result(timeout=3.0)
-            finally:
-                runtime_pool_source.close()
-
-        points = otel_metrics.histogram_points("db.client.connection.wait_time")
-        relevant = otel_metrics.histogram_points(
-            "db.client.connection.wait_time",
-            attributes={"db.client.connection.pool.name": "runtime"},
         )
-        assert relevant, f"no wait_time observations; got {points}"
-        # Second acquire waited noticeably.
-        assert max(p.max for p in relevant) >= 0.1
+    }
+
+    count_attrs = by_name.get("db.client.connection.count", [])
+    states = {a.get("db.client.connection.state") for a in count_attrs}
+    assert "idle" in states, count_attrs
+    assert "used" in states, count_attrs
+    for a in count_attrs:
+        assert a.get("db.client.connection.pool.name") == "runtime"
+
+    for name in (
+        "db.client.connection.max",
+        "db.client.connection.idle.min",
+        "db.client.connection.idle.max",
+        "db.client.connection.pending_requests",
+    ):
+        attrs_list = by_name.get(name, [])
+        assert attrs_list, f"no observations for {name}"
+        for a in attrs_list:
+            assert a.get("db.client.connection.pool.name") == "runtime"
 
 
-class TestTimeoutCounter:
-    def test_pool_timeout_increments_counter(self) -> None:
-        with capture_metrics() as otel_metrics:
+# Wait time histogram
+def test_wait_time_histogram_under_contention() -> None:
+    # Rebuild the pool at size 1 so a second concurrent acquire must wait.
+    with capture_metrics() as otel_metrics:
+        runtime_pool_source.close()
+        try:
+            with override_settings(
+                POSTGRES_POOL_MIN_SIZE=1,
+                POSTGRES_POOL_MAX_SIZE=1,
+                POSTGRES_POOL_TIMEOUT=2.0,
+            ):
+                held = runtime_pool_source.acquire()
+                release_event = threading.Event()
+
+                def _second() -> None:
+                    # Will block until `held` is released.
+                    conn = runtime_pool_source.acquire()
+                    runtime_pool_source.release(conn)
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    fut = ex.submit(_second)
+                    # Give the thread time to start blocking on the pool.
+                    threading.Event().wait(0.15)
+                    runtime_pool_source.release(held)
+                    release_event.set()
+                    fut.result(timeout=3.0)
+        finally:
             runtime_pool_source.close()
-            try:
-                with override_settings(
-                    POSTGRES_POOL_MIN_SIZE=1,
-                    POSTGRES_POOL_MAX_SIZE=1,
-                    POSTGRES_POOL_TIMEOUT=0.15,
-                ):
-                    held = runtime_pool_source.acquire()
-                    try:
-                        with raises(PoolTimeout):
-                            runtime_pool_source.acquire()
-                    finally:
-                        runtime_pool_source.release(held)
-            finally:
-                runtime_pool_source.close()
 
-        points = otel_metrics.number_points("db.client.connection.timeouts")
-        relevant = otel_metrics.number_points(
-            "db.client.connection.timeouts",
-            attributes={"db.client.connection.pool.name": "runtime"},
-        )
-        assert relevant, f"no timeouts observations; got {points}"
-        assert sum(p.value for p in relevant) >= 1
+    points = otel_metrics.histogram_points("db.client.connection.wait_time")
+    relevant = otel_metrics.histogram_points(
+        "db.client.connection.wait_time",
+        attributes={"db.client.connection.pool.name": "runtime"},
+    )
+    assert relevant, f"no wait_time observations; got {points}"
+    # Second acquire waited noticeably.
+    assert max(p.max for p in relevant) >= 0.1
+
+
+# Timeout counter
+def test_pool_timeout_increments_counter() -> None:
+    with capture_metrics() as otel_metrics:
+        runtime_pool_source.close()
+        try:
+            with override_settings(
+                POSTGRES_POOL_MIN_SIZE=1,
+                POSTGRES_POOL_MAX_SIZE=1,
+                POSTGRES_POOL_TIMEOUT=0.15,
+            ):
+                held = runtime_pool_source.acquire()
+                try:
+                    with raises(PoolTimeout):
+                        runtime_pool_source.acquire()
+                finally:
+                    runtime_pool_source.release(held)
+        finally:
+            runtime_pool_source.close()
+
+    points = otel_metrics.number_points("db.client.connection.timeouts")
+    relevant = otel_metrics.number_points(
+        "db.client.connection.timeouts",
+        attributes={"db.client.connection.pool.name": "runtime"},
+    )
+    assert relevant, f"no timeouts observations; got {points}"
+    assert sum(p.value for p in relevant) >= 1

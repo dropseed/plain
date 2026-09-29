@@ -33,861 +33,839 @@ from plain.postgres.test import isolated_db
 from plain.test import patch
 
 
-class TestPassOrdering:
-    def test_fixes_sorted_by_pass(self):
-        """plan_convergence() returns items in pass order: rebuild, create indexes,
-        add constraints, validate, drop constraints, drop indexes."""
-        with (
-            patch(
-                Widget.model_options,
-                "indexes",
-                [
-                    *Widget.model_options.indexes,
-                    Index(fields=["name"], name="examples_widget_name_idx"),
-                    Index(fields=["size"], name="examples_widget_size_idx"),
-                ],
-            ),
-            patch(
-                Widget.model_options,
-                "constraints",
-                [
-                    *Widget.model_options.constraints,
-                    CheckConstraint(
-                        check=Q(id__gte=0), name="examples_widget_id_nonneg"
-                    ),
-                    CheckConstraint(
-                        check=Q(id__lte=999999), name="examples_widget_id_max"
-                    ),
-                ],
-            ),
-        ):
-            create_invalid_index("examples_widget_size_idx")
-            execute(
-                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_max"'
-                ' CHECK ("id" <= 999999) NOT VALID'
-            )
-            execute(
-                'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("size")'
-            )
-            execute(
-                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_extra_check" CHECK ("id" >= -1)'
-            )
-
-            items = plan_convergence().executable()
-            correction_types = [type(item.correction) for item in items]
-
-            # All six correction types should be present
-            assert RebuildIndexCorrection in correction_types
-            assert CreateIndexCorrection in correction_types
-            assert AddConstraintCorrection in correction_types
-            assert ValidateConstraintCorrection in correction_types
-            assert DropConstraintCorrection in correction_types
-            assert DropIndexCorrection in correction_types
-
-            # Verify full pass ordering
-            rebuild_idx = max(
-                i for i, t in enumerate(correction_types) if t is RebuildIndexCorrection
-            )
-            create_idx = max(
-                i for i, t in enumerate(correction_types) if t is CreateIndexCorrection
-            )
-            add_con_max = max(
-                i
-                for i, t in enumerate(correction_types)
-                if t is AddConstraintCorrection
-            )
-            validate_min = min(
-                i
-                for i, t in enumerate(correction_types)
-                if t is ValidateConstraintCorrection
-            )
-            validate_max = max(
-                i
-                for i, t in enumerate(correction_types)
-                if t is ValidateConstraintCorrection
-            )
-            drop_con_min = min(
-                i
-                for i, t in enumerate(correction_types)
-                if t is DropConstraintCorrection
-            )
-            drop_con_max = max(
-                i
-                for i, t in enumerate(correction_types)
-                if t is DropConstraintCorrection
-            )
-            drop_idx = min(
-                i for i, t in enumerate(correction_types) if t is DropIndexCorrection
-            )
-
-            assert rebuild_idx < create_idx
-            assert create_idx < add_con_max
-            assert add_con_max < validate_min
-            assert validate_max < drop_con_min
-            assert drop_con_max < drop_idx
-
-
-class TestFixFailureRecovery:
-    @isolated_db
-    def test_failed_fix_continues(self):
-        """A failed correction rolls back, and the next correction still succeeds."""
-        # Add a real constraint to drop
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
-        )
-        assert constraint_exists("examples_widget", "examples_widget_real_check")
-
-        plan_items = [
-            # This one will fail — constraint doesn't exist
-            DropConstraintCorrection(
-                table="examples_widget", name="nonexistent_constraint"
-            ),
-            # This one should still succeed
-            DropConstraintCorrection(
-                table="examples_widget", name="examples_widget_real_check"
-            ),
-        ]
-
-        results = []
-        for correction in plan_items:
-            try:
-                correction.apply()
-                results.append("ok")
-            except Exception:
-                results.append("failed")
-
-        assert results == ["failed", "ok"]
-        assert not constraint_exists("examples_widget", "examples_widget_real_check")
-
-
-class TestAnalyzeModel:
-    """Tests for the unified analysis layer (analyze_model)."""
-
-    def test_rename_detection(self):
-        """A missing index + extra index with same columns is detected as a rename."""
-        with patch(
+# Pass ordering
+def test_fixes_sorted_by_pass():
+    """plan_convergence() returns items in pass order: rebuild, create indexes,
+    add constraints, validate, drop constraints, drop indexes."""
+    with (
+        patch(
             Widget.model_options,
             "indexes",
             [
                 *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_new_idx"),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            rename_drifts = [
-                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
-            ]
-            assert len(rename_drifts) == 1
-            assert rename_drifts[0].old_name == "examples_widget_name_old_idx"
-            assert rename_drifts[0].new_name == "examples_widget_name_new_idx"
-
-            # No separate create or drop drifts
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-                for d in analysis.drifts
-            )
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
-                for d in analysis.drifts
-            )
-
-            # Schema shows the rename as a single index entry
-            renamed = [
-                idx
-                for idx in analysis.indexes
-                if idx.name == "examples_widget_name_new_idx"
-            ]
-            assert len(renamed) == 1
-            assert renamed[0].issue == "rename from examples_widget_name_old_idx"
-            assert renamed[0].drift is not None
-            assert renamed[0].drift.kind == DriftKind.RENAMED
-
-    def test_rename_with_fk_columns(self):
-        """Rename detection resolves model field names to DB column names."""
-        # Model field is "widget", DB column is "widget_id"
-        with patch(
-            WidgetTag.model_options,
-            "indexes",
-            [
-                *WidgetTag.model_options.indexes,
-                Index(fields=["widget"], name="examples_widgettag_widget_new_idx"),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widgettag_widget_old_idx"'
-                ' ON "examples_widgettag" ("widget_id")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, WidgetTag)
-
-            rename_drifts = [
-                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
-            ]
-            assert len(rename_drifts) == 1
-            assert rename_drifts[0].old_name == "examples_widgettag_widget_old_idx"
-            assert rename_drifts[0].new_name == "examples_widgettag_widget_new_idx"
-
-    def test_rename_multi_column(self):
-        """Rename detection works for multi-column indexes."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(
-                    fields=["name", "size"], name="examples_widget_name_size_new_idx"
-                ),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_name_size_old_idx"'
-                ' ON "examples_widget" ("name", "size")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            rename_drifts = [
-                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
-            ]
-            assert len(rename_drifts) == 1
-            assert rename_drifts[0].old_name == "examples_widget_name_size_old_idx"
-            assert rename_drifts[0].new_name == "examples_widget_name_size_new_idx"
-
-    def test_no_rename_when_columns_differ(self):
-        """Different columns means separate create + drop, not a rename."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
+                Index(fields=["name"], name="examples_widget_name_idx"),
                 Index(fields=["size"], name="examples_widget_size_idx"),
             ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            assert any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-                for d in analysis.drifts
-            )
-            assert any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
-                for d in analysis.drifts
-            )
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
-                for d in analysis.drifts
-            )
-
-    def test_no_rename_when_ambiguous(self):
-        """Two missing + two extra with same columns: no rename, all create/drop."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_idx_a"),
-                Index(fields=["name"], name="examples_widget_idx_b"),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_old_a" ON "examples_widget" ("name")'
-            )
-            execute(
-                'CREATE INDEX "examples_widget_old_b" ON "examples_widget" ("name")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
-                for d in analysis.drifts
-            )
-            missing_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-            ]
-            undeclared_drifts = [
-                d
-                for d in analysis.drifts
-                if isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
-            ]
-            assert len(missing_drifts) == 2
-            assert len(undeclared_drifts) == 2
-
-    def test_rename_expression_index(self):
-        """Expression-based indexes are matched by normalized definition."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(Upper("name"), name="examples_widget_name_upper_new_idx"),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_name_upper_old_idx"'
-                ' ON "examples_widget" (UPPER("name"))'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            rename_drifts = [
-                d for d in analysis.drifts if isinstance(d, IndexRenameDrift)
-            ]
-            assert len(rename_drifts) == 1
-            assert rename_drifts[0].old_name == "examples_widget_name_upper_old_idx"
-            assert rename_drifts[0].new_name == "examples_widget_name_upper_new_idx"
-
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
-                for d in analysis.drifts
-            )
-            assert not any(
-                isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
-                for d in analysis.drifts
-            )
-
-    def test_fixable_index_annotated(self):
-        """A missing index has a drift on its IndexStatus."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_idx"),
-            ],
-        ):
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            missing = [
-                idx
-                for idx in analysis.indexes
-                if idx.name == "examples_widget_name_idx"
-            ]
-            assert len(missing) == 1
-            assert missing[0].issue is not None
-            assert missing[0].drift is not None
-            assert missing[0].drift.kind == DriftKind.MISSING
-
-    def test_plan_model_convergence(self):
-        """plan_model_convergence() returns a plan with correct items."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_idx"),
-            ],
-        ):
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Widget).executable()
-
-            assert isinstance(items, list)
-            assert len(items) == 1
-            assert isinstance(items[0].correction, CreateIndexCorrection)
-
-    def test_issue_count(self):
-        """ModelAnalysis.issue_count counts issues correctly."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_idx"),
-            ],
-        ):
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                analysis = analyze_model(conn, cursor, Widget)
-
-            # Missing index = 1 issue
-            assert analysis.issue_count >= 1
-            missing = [
-                idx
-                for idx in analysis.indexes
-                if idx.name == "examples_widget_name_idx"
-            ]
-            assert len(missing) == 1
-            assert missing[0].issue is not None
-
-
-class TestDriftPolicy:
-    """Tests for blocks_sync and DriftKind policy via PlanItem."""
-
-    def test_index_fixes_do_not_block_sync(self):
-        """Index operations (create, rebuild, rename) do not block sync."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_idx"),
-            ],
-        ):
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Widget).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].correction, CreateIndexCorrection)
-            assert items[0].blocks_sync is False
-
-    def test_constraint_add_blocks_sync(self):
-        """Adding a missing constraint blocks sync."""
-        with patch(
+        ),
+        patch(
             Widget.model_options,
             "constraints",
             [
                 *Widget.model_options.constraints,
-                CheckConstraint(
-                    check=Q(id__gte=0),
-                    name="examples_widget_id_nonneg",
-                ),
+                CheckConstraint(check=Q(id__gte=0), name="examples_widget_id_nonneg"),
+                CheckConstraint(check=Q(id__lte=999999), name="examples_widget_id_max"),
             ],
-        ):
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Widget).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].correction, AddConstraintCorrection)
-            assert items[0].blocks_sync is True
-
-    def test_constraint_validate_blocks_sync(self):
-        """Validating a NOT VALID constraint blocks sync."""
-        with patch(
-            Widget.model_options,
-            "constraints",
-            [
-                *Widget.model_options.constraints,
-                CheckConstraint(
-                    check=Q(id__gte=0),
-                    name="examples_widget_id_nonneg",
-                ),
-            ],
-        ):
-            execute(
-                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0) NOT VALID'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Widget).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].correction, ValidateConstraintCorrection)
-            assert items[0].blocks_sync is True
-
-    def test_rename_does_not_block_sync(self):
-        """Renames (index and constraint) do not block sync."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_new_idx"),
-            ],
-        ):
-            execute(
-                'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                items = plan_model_convergence(conn, cursor, Widget).executable()
-
-            assert len(items) == 1
-            assert isinstance(items[0].correction, RenameIndexCorrection)
-            assert items[0].blocks_sync is False
-
-    def test_undeclared_constraint_included_in_plan(self):
-        """Undeclared constraints are auto-dropped."""
+        ),
+    ):
+        create_invalid_index("examples_widget_size_idx")
         execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_test_check" CHECK ("id" >= 0)'
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_max"'
+            ' CHECK ("id" <= 999999) NOT VALID'
+        )
+        execute(
+            'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("size")'
+        )
+        execute(
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_extra_check" CHECK ("id" >= -1)'
         )
 
-        plan = plan_convergence()
-        items = plan.executable()
-        drops = [
-            item
-            for item in items
-            if isinstance(item.correction, DropConstraintCorrection)
-        ]
-        assert len(drops) == 1
-        assert drops[0].blocks_sync is True
+        items = plan_convergence().executable()
+        correction_types = [type(item.correction) for item in items]
 
-    def test_undeclared_index_included_in_plan(self):
-        """Undeclared indexes are auto-dropped."""
+        # All six correction types should be present
+        assert RebuildIndexCorrection in correction_types
+        assert CreateIndexCorrection in correction_types
+        assert AddConstraintCorrection in correction_types
+        assert ValidateConstraintCorrection in correction_types
+        assert DropConstraintCorrection in correction_types
+        assert DropIndexCorrection in correction_types
+
+        # Verify full pass ordering
+        rebuild_idx = max(
+            i for i, t in enumerate(correction_types) if t is RebuildIndexCorrection
+        )
+        create_idx = max(
+            i for i, t in enumerate(correction_types) if t is CreateIndexCorrection
+        )
+        add_con_max = max(
+            i for i, t in enumerate(correction_types) if t is AddConstraintCorrection
+        )
+        validate_min = min(
+            i
+            for i, t in enumerate(correction_types)
+            if t is ValidateConstraintCorrection
+        )
+        validate_max = max(
+            i
+            for i, t in enumerate(correction_types)
+            if t is ValidateConstraintCorrection
+        )
+        drop_con_min = min(
+            i for i, t in enumerate(correction_types) if t is DropConstraintCorrection
+        )
+        drop_con_max = max(
+            i for i, t in enumerate(correction_types) if t is DropConstraintCorrection
+        )
+        drop_idx = min(
+            i for i, t in enumerate(correction_types) if t is DropIndexCorrection
+        )
+
+        assert rebuild_idx < create_idx
+        assert create_idx < add_con_max
+        assert add_con_max < validate_min
+        assert validate_max < drop_con_min
+        assert drop_con_max < drop_idx
+
+
+# Fix failure recovery
+@isolated_db
+def test_failed_fix_continues():
+    """A failed correction rolls back, and the next correction still succeeds."""
+    # Add a real constraint to drop
+    execute(
+        'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
+    )
+    assert constraint_exists("examples_widget", "examples_widget_real_check")
+
+    plan_items = [
+        # This one will fail — constraint doesn't exist
+        DropConstraintCorrection(
+            table="examples_widget", name="nonexistent_constraint"
+        ),
+        # This one should still succeed
+        DropConstraintCorrection(
+            table="examples_widget", name="examples_widget_real_check"
+        ),
+    ]
+
+    results = []
+    for correction in plan_items:
+        try:
+            correction.apply()
+            results.append("ok")
+        except Exception:
+            results.append("failed")
+
+    assert results == ["failed", "ok"]
+    assert not constraint_exists("examples_widget", "examples_widget_real_check")
+
+
+# Analyze model
+#
+# Tests for the unified analysis layer (analyze_model).
+def test_analyze_model_rename_detection():
+    """A missing index + extra index with same columns is detected as a rename."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_new_idx"),
+        ],
+    ):
+        execute(
+            'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        rename_drifts = [d for d in analysis.drifts if isinstance(d, IndexRenameDrift)]
+        assert len(rename_drifts) == 1
+        assert rename_drifts[0].old_name == "examples_widget_name_old_idx"
+        assert rename_drifts[0].new_name == "examples_widget_name_new_idx"
+
+        # No separate create or drop drifts
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+            for d in analysis.drifts
+        )
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+            for d in analysis.drifts
+        )
+
+        # Schema shows the rename as a single index entry
+        renamed = [
+            idx
+            for idx in analysis.indexes
+            if idx.name == "examples_widget_name_new_idx"
+        ]
+        assert len(renamed) == 1
+        assert renamed[0].issue == "rename from examples_widget_name_old_idx"
+        assert renamed[0].drift is not None
+        assert renamed[0].drift.kind == DriftKind.RENAMED
+
+
+def test_analyze_model_rename_with_fk_columns():
+    """Rename detection resolves model field names to DB column names."""
+    # Model field is "widget", DB column is "widget_id"
+    with patch(
+        WidgetTag.model_options,
+        "indexes",
+        [
+            *WidgetTag.model_options.indexes,
+            Index(fields=["widget"], name="examples_widgettag_widget_new_idx"),
+        ],
+    ):
+        execute(
+            'CREATE INDEX "examples_widgettag_widget_old_idx"'
+            ' ON "examples_widgettag" ("widget_id")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, WidgetTag)
+
+        rename_drifts = [d for d in analysis.drifts if isinstance(d, IndexRenameDrift)]
+        assert len(rename_drifts) == 1
+        assert rename_drifts[0].old_name == "examples_widgettag_widget_old_idx"
+        assert rename_drifts[0].new_name == "examples_widgettag_widget_new_idx"
+
+
+def test_analyze_model_rename_multi_column():
+    """Rename detection works for multi-column indexes."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name", "size"], name="examples_widget_name_size_new_idx"),
+        ],
+    ):
+        execute(
+            'CREATE INDEX "examples_widget_name_size_old_idx"'
+            ' ON "examples_widget" ("name", "size")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        rename_drifts = [d for d in analysis.drifts if isinstance(d, IndexRenameDrift)]
+        assert len(rename_drifts) == 1
+        assert rename_drifts[0].old_name == "examples_widget_name_size_old_idx"
+        assert rename_drifts[0].new_name == "examples_widget_name_size_new_idx"
+
+
+def test_analyze_model_no_rename_when_columns_differ():
+    """Different columns means separate create + drop, not a rename."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["size"], name="examples_widget_size_idx"),
+        ],
+    ):
         execute(
             'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
         )
 
-        plan = plan_convergence()
-        items = plan.executable()
-        drops = [
-            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        assert any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+            for d in analysis.drifts
+        )
+        assert any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+            for d in analysis.drifts
+        )
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            for d in analysis.drifts
+        )
+
+
+def test_analyze_model_no_rename_when_ambiguous():
+    """Two missing + two extra with same columns: no rename, all create/drop."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_idx_a"),
+            Index(fields=["name"], name="examples_widget_idx_b"),
+        ],
+    ):
+        execute('CREATE INDEX "examples_widget_old_a" ON "examples_widget" ("name")')
+        execute('CREATE INDEX "examples_widget_old_b" ON "examples_widget" ("name")')
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.RENAMED
+            for d in analysis.drifts
+        )
+        missing_drifts = [
+            d
+            for d in analysis.drifts
+            if isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
         ]
-        assert len(drops) == 1
-        assert drops[0].blocks_sync is False
-
-    def test_can_auto_correct_for_missing(self):
-        """can_auto_correct returns True for missing indexes and constraints."""
-        idx = Index(fields=["name"], name="examples_widget_name_idx")
-        assert can_auto_correct(
-            IndexModelDrift(table="t", index=idx, model=Widget, kind=DriftKind.MISSING)
-        )
-        constraint = CheckConstraint(
-            check=Q(id__gte=0), name="examples_widget_id_check"
-        )
-        assert can_auto_correct(
-            ConstraintModelDrift(
-                table="t", constraint=constraint, model=Widget, kind=DriftKind.MISSING
-            )
-        )
-
-    def test_can_auto_correct_false_for_changed_constraint(self):
-        """can_auto_correct returns False for changed constraint definitions."""
-        constraint = CheckConstraint(
-            check=Q(id__gte=0), name="examples_widget_id_check"
-        )
-        drift = ConstraintModelDrift(
-            table="t", constraint=constraint, model=Widget, kind=DriftKind.CHANGED
-        )
-        assert not can_auto_correct(drift)
-
-
-class TestConvergencePlan:
-    def test_executable_includes_undeclared_drops(self):
-        """Undeclared objects are included in executable items."""
-        execute(
-            'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
-        )
-
-        plan = plan_convergence()
-        items = plan.executable()
-        drops = [
-            item for item in items if isinstance(item.correction, DropIndexCorrection)
+        undeclared_drifts = [
+            d
+            for d in analysis.drifts
+            if isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
         ]
-        assert len(drops) == 1
+        assert len(missing_drifts) == 2
+        assert len(undeclared_drifts) == 2
 
-    def test_has_work_includes_undeclared(self):
-        """has_work() counts undeclared drops."""
+
+def test_analyze_model_rename_expression_index():
+    """Expression-based indexes are matched by normalized definition."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(Upper("name"), name="examples_widget_name_upper_new_idx"),
+        ],
+    ):
         execute(
-            'CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")'
+            'CREATE INDEX "examples_widget_name_upper_old_idx"'
+            ' ON "examples_widget" (UPPER("name"))'
         )
 
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        rename_drifts = [d for d in analysis.drifts if isinstance(d, IndexRenameDrift)]
+        assert len(rename_drifts) == 1
+        assert rename_drifts[0].old_name == "examples_widget_name_upper_old_idx"
+        assert rename_drifts[0].new_name == "examples_widget_name_upper_new_idx"
+
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.MISSING
+            for d in analysis.drifts
+        )
+        assert not any(
+            isinstance(d, IndexDrift) and d.kind == DriftKind.UNDECLARED
+            for d in analysis.drifts
+        )
+
+
+def test_analyze_model_fixable_index_annotated():
+    """A missing index has a drift on its IndexStatus."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_idx"),
+        ],
+    ):
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        missing = [
+            idx for idx in analysis.indexes if idx.name == "examples_widget_name_idx"
+        ]
+        assert len(missing) == 1
+        assert missing[0].issue is not None
+        assert missing[0].drift is not None
+        assert missing[0].drift.kind == DriftKind.MISSING
+
+
+def test_analyze_model_plan_model_convergence():
+    """plan_model_convergence() returns a plan with correct items."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_idx"),
+        ],
+    ):
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Widget).executable()
+
+        assert isinstance(items, list)
+        assert len(items) == 1
+        assert isinstance(items[0].correction, CreateIndexCorrection)
+
+
+def test_analyze_model_issue_count():
+    """ModelAnalysis.issue_count counts issues correctly."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_idx"),
+        ],
+    ):
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            analysis = analyze_model(conn, cursor, Widget)
+
+        # Missing index = 1 issue
+        assert analysis.issue_count >= 1
+        missing = [
+            idx for idx in analysis.indexes if idx.name == "examples_widget_name_idx"
+        ]
+        assert len(missing) == 1
+        assert missing[0].issue is not None
+
+
+# Drift policy
+#
+# Tests for blocks_sync and DriftKind policy via PlanItem.
+def test_index_fixes_do_not_block_sync():
+    """Index operations (create, rebuild, rename) do not block sync."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_idx"),
+        ],
+    ):
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Widget).executable()
+
+        assert len(items) == 1
+        assert isinstance(items[0].correction, CreateIndexCorrection)
+        assert items[0].blocks_sync is False
+
+
+def test_constraint_add_blocks_sync():
+    """Adding a missing constraint blocks sync."""
+    with patch(
+        Widget.model_options,
+        "constraints",
+        [
+            *Widget.model_options.constraints,
+            CheckConstraint(
+                check=Q(id__gte=0),
+                name="examples_widget_id_nonneg",
+            ),
+        ],
+    ):
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Widget).executable()
+
+        assert len(items) == 1
+        assert isinstance(items[0].correction, AddConstraintCorrection)
+        assert items[0].blocks_sync is True
+
+
+def test_constraint_validate_blocks_sync():
+    """Validating a NOT VALID constraint blocks sync."""
+    with patch(
+        Widget.model_options,
+        "constraints",
+        [
+            *Widget.model_options.constraints,
+            CheckConstraint(
+                check=Q(id__gte=0),
+                name="examples_widget_id_nonneg",
+            ),
+        ],
+    ):
+        execute(
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0) NOT VALID'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Widget).executable()
+
+        assert len(items) == 1
+        assert isinstance(items[0].correction, ValidateConstraintCorrection)
+        assert items[0].blocks_sync is True
+
+
+def test_rename_does_not_block_sync():
+    """Renames (index and constraint) do not block sync."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_new_idx"),
+        ],
+    ):
+        execute(
+            'CREATE INDEX "examples_widget_name_old_idx" ON "examples_widget" ("name")'
+        )
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            items = plan_model_convergence(conn, cursor, Widget).executable()
+
+        assert len(items) == 1
+        assert isinstance(items[0].correction, RenameIndexCorrection)
+        assert items[0].blocks_sync is False
+
+
+def test_undeclared_constraint_included_in_plan():
+    """Undeclared constraints are auto-dropped."""
+    execute(
+        'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_test_check" CHECK ("id" >= 0)'
+    )
+
+    plan = plan_convergence()
+    items = plan.executable()
+    drops = [
+        item for item in items if isinstance(item.correction, DropConstraintCorrection)
+    ]
+    assert len(drops) == 1
+    assert drops[0].blocks_sync is True
+
+
+def test_undeclared_index_included_in_plan():
+    """Undeclared indexes are auto-dropped."""
+    execute('CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")')
+
+    plan = plan_convergence()
+    items = plan.executable()
+    drops = [item for item in items if isinstance(item.correction, DropIndexCorrection)]
+    assert len(drops) == 1
+    assert drops[0].blocks_sync is False
+
+
+def test_can_auto_correct_for_missing():
+    """can_auto_correct returns True for missing indexes and constraints."""
+    idx = Index(fields=["name"], name="examples_widget_name_idx")
+    assert can_auto_correct(
+        IndexModelDrift(table="t", index=idx, model=Widget, kind=DriftKind.MISSING)
+    )
+    constraint = CheckConstraint(check=Q(id__gte=0), name="examples_widget_id_check")
+    assert can_auto_correct(
+        ConstraintModelDrift(
+            table="t", constraint=constraint, model=Widget, kind=DriftKind.MISSING
+        )
+    )
+
+
+def test_can_auto_correct_false_for_changed_constraint():
+    """can_auto_correct returns False for changed constraint definitions."""
+    constraint = CheckConstraint(check=Q(id__gte=0), name="examples_widget_id_check")
+    drift = ConstraintModelDrift(
+        table="t", constraint=constraint, model=Widget, kind=DriftKind.CHANGED
+    )
+    assert not can_auto_correct(drift)
+
+
+# Convergence plan
+def test_convergence_plan_executable_includes_undeclared_drops():
+    """Undeclared objects are included in executable items."""
+    execute('CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")')
+
+    plan = plan_convergence()
+    items = plan.executable()
+    drops = [item for item in items if isinstance(item.correction, DropIndexCorrection)]
+    assert len(drops) == 1
+
+
+def test_convergence_plan_has_work_includes_undeclared():
+    """has_work() counts undeclared drops."""
+    execute('CREATE INDEX "examples_widget_extra_idx" ON "examples_widget" ("name")')
+
+    plan = plan_convergence()
+    assert plan.has_work()
+
+
+def test_convergence_plan_has_work_counts_forward_fixes():
+    """has_work() sees forward plan_items."""
+    with patch(
+        Widget.model_options,
+        "indexes",
+        [
+            *Widget.model_options.indexes,
+            Index(fields=["name"], name="examples_widget_name_idx"),
+        ],
+    ):
         plan = plan_convergence()
         assert plan.has_work()
 
-    def test_has_work_counts_forward_fixes(self):
-        """has_work() sees forward plan_items."""
-        with patch(
-            Widget.model_options,
-            "indexes",
-            [
-                *Widget.model_options.indexes,
-                Index(fields=["name"], name="examples_widget_name_idx"),
-            ],
-        ):
-            plan = plan_convergence()
-            assert plan.has_work()
 
-    def test_blocked_for_changed_constraint(self):
-        """Changed constraint definition appears in plan.blocked."""
-        with patch(
-            Widget.model_options,
-            "constraints",
-            [
-                *Widget.model_options.constraints,
-                CheckConstraint(
-                    check=Q(id__gte=1),
-                    name="examples_widget_id_nonneg",
-                ),
-            ],
-        ):
-            execute(
-                'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0)'
-            )
-
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                plan = plan_model_convergence(conn, cursor, Widget)
-
-            assert len(plan.blocked) == 1
-            assert isinstance(plan.blocked[0].drift, ConstraintDrift)
-            assert plan.blocked[0].drift.kind == DriftKind.CHANGED
-            assert plan.blocked[0].correction is None
-            assert plan.blocked[0].guidance is not None
-
-
-class TestExecutePlan:
-    @isolated_db
-    def test_collects_results(self):
-        """execute_plan() collects SQL from successful items."""
-        execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
-        correction = DropIndexCorrection(
-            table="examples_widget", name="examples_widget_temp_idx"
-        )
-        drift = IndexUndeclaredDrift(
-            table="examples_widget",
-            name="examples_widget_temp_idx",
-        )
-        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
-
-        result = execute_plan([item])
-
-        assert result.applied == 1
-        assert result.failed == 0
-        assert result.ok
-        assert len(result.results) == 1
-        assert result.results[0].ok
-        assert "examples_widget_temp_idx" in (result.results[0].sql or "")
-
-    @isolated_db
-    def test_handles_failure(self):
-        """execute_plan() captures errors without raising."""
-        correction = DropConstraintCorrection(
-            table="examples_widget", name="nonexistent"
-        )
-        drift = ConstraintNameDrift(
-            kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
-        )
-        item = PlanItem(drift=drift, correction=correction)
-
-        result = execute_plan([item])
-
-        assert result.applied == 0
-        assert result.failed == 1
-        assert not result.ok
-        assert result.results[0].error is not None
-
-    @isolated_db
-    def test_continues_after_failure(self):
-        """A failed item doesn't block subsequent items."""
+def test_convergence_plan_blocked_for_changed_constraint():
+    """Changed constraint definition appears in plan.blocked."""
+    with patch(
+        Widget.model_options,
+        "constraints",
+        [
+            *Widget.model_options.constraints,
+            CheckConstraint(
+                check=Q(id__gte=1),
+                name="examples_widget_id_nonneg",
+            ),
+        ],
+    ):
         execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
+            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_id_nonneg" CHECK ("id" >= 0)'
         )
 
-        items = [
-            PlanItem(
-                drift=ConstraintNameDrift(
-                    kind=DriftKind.UNDECLARED,
-                    table="examples_widget",
-                    name="nonexistent",
-                ),
-                correction=DropConstraintCorrection(
-                    table="examples_widget", name="nonexistent"
-                ),
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            plan = plan_model_convergence(conn, cursor, Widget)
+
+        assert len(plan.blocked) == 1
+        assert isinstance(plan.blocked[0].drift, ConstraintDrift)
+        assert plan.blocked[0].drift.kind == DriftKind.CHANGED
+        assert plan.blocked[0].correction is None
+        assert plan.blocked[0].guidance is not None
+
+
+# Execute plan
+@isolated_db
+def test_execute_plan_collects_results():
+    """execute_plan() collects SQL from successful items."""
+    execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
+    correction = DropIndexCorrection(
+        table="examples_widget", name="examples_widget_temp_idx"
+    )
+    drift = IndexUndeclaredDrift(
+        table="examples_widget",
+        name="examples_widget_temp_idx",
+    )
+    item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
+
+    result = execute_plan([item])
+
+    assert result.applied == 1
+    assert result.failed == 0
+    assert result.ok
+    assert len(result.results) == 1
+    assert result.results[0].ok
+    assert "examples_widget_temp_idx" in (result.results[0].sql or "")
+
+
+@isolated_db
+def test_execute_plan_handles_failure():
+    """execute_plan() captures errors without raising."""
+    correction = DropConstraintCorrection(table="examples_widget", name="nonexistent")
+    drift = ConstraintNameDrift(
+        kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
+    )
+    item = PlanItem(drift=drift, correction=correction)
+
+    result = execute_plan([item])
+
+    assert result.applied == 0
+    assert result.failed == 1
+    assert not result.ok
+    assert result.results[0].error is not None
+
+
+@isolated_db
+def test_execute_plan_continues_after_failure():
+    """A failed item doesn't block subsequent items."""
+    execute(
+        'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
+    )
+
+    items = [
+        PlanItem(
+            drift=ConstraintNameDrift(
+                kind=DriftKind.UNDECLARED,
+                table="examples_widget",
+                name="nonexistent",
             ),
-            PlanItem(
-                drift=ConstraintNameDrift(
-                    kind=DriftKind.UNDECLARED,
-                    table="examples_widget",
-                    name="examples_widget_real_check",
-                ),
-                correction=DropConstraintCorrection(
-                    table="examples_widget", name="examples_widget_real_check"
-                ),
+            correction=DropConstraintCorrection(
+                table="examples_widget", name="nonexistent"
             ),
-        ]
-
-        result = execute_plan(items)
-
-        assert result.applied == 1
-        assert result.failed == 1
-        assert not constraint_exists("examples_widget", "examples_widget_real_check")
-
-    @isolated_db
-    def test_summary(self):
-        """ConvergenceResult.summary formats correctly."""
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
-        )
-
-        items = [
-            PlanItem(
-                drift=ConstraintNameDrift(
-                    kind=DriftKind.UNDECLARED,
-                    table="examples_widget",
-                    name="nonexistent",
-                ),
-                correction=DropConstraintCorrection(
-                    table="examples_widget", name="nonexistent"
-                ),
+        ),
+        PlanItem(
+            drift=ConstraintNameDrift(
+                kind=DriftKind.UNDECLARED,
+                table="examples_widget",
+                name="examples_widget_real_check",
             ),
-            PlanItem(
-                drift=ConstraintNameDrift(
-                    kind=DriftKind.UNDECLARED,
-                    table="examples_widget",
-                    name="examples_widget_real_check",
-                ),
-                correction=DropConstraintCorrection(
-                    table="examples_widget", name="examples_widget_real_check"
-                ),
+            correction=DropConstraintCorrection(
+                table="examples_widget", name="examples_widget_real_check"
             ),
-        ]
+        ),
+    ]
 
-        result = execute_plan(items)
+    result = execute_plan(items)
 
-        assert result.summary == "1 applied, 1 failed."
-
-    @isolated_db
-    def test_result_item_reference(self):
-        """CorrectionResult.item references the PlanItem."""
-        execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
-        correction = DropIndexCorrection(
-            table="examples_widget", name="examples_widget_temp_idx"
-        )
-        drift = IndexUndeclaredDrift(
-            table="examples_widget",
-            name="examples_widget_temp_idx",
-        )
-        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
-
-        result = execute_plan([item])
-
-        assert result.results[0].item is item
+    assert result.applied == 1
+    assert result.failed == 1
+    assert not constraint_exists("examples_widget", "examples_widget_real_check")
 
 
-class TestSyncPolicy:
-    """Tests for blocks_sync and ok_for_sync semantics."""
+@isolated_db
+def test_execute_plan_summary():
+    """ConvergenceResult.summary formats correctly."""
+    execute(
+        'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_real_check" CHECK ("id" >= 0)'
+    )
 
-    @isolated_db
-    def test_blocking_failure_fails_sync(self):
-        """A failed constraint correction (blocks_sync=True) makes ok_for_sync False."""
-        correction = DropConstraintCorrection(
-            table="examples_widget", name="nonexistent"
-        )
-        drift = ConstraintNameDrift(
-            kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
-        )
-        item = PlanItem(drift=drift, correction=correction, blocks_sync=True)
-
-        result = execute_plan([item])
-
-        assert not result.ok
-        assert not result.ok_for_sync
-        assert len(result.blocking_failures) == 1
-        assert result.non_blocking_failures == []
-
-    @isolated_db
-    def test_non_blocking_failure_passes_sync(self):
-        """A failed index correction (blocks_sync=False) keeps ok_for_sync True."""
-        correction = CreateIndexCorrection(
-            table="examples_widget",
-            index=Index(fields=["name"], name="examples_widget_will_fail_idx"),
-            model=Widget,
-        )
-        drift = IndexModelDrift(
-            table="examples_widget",
-            index=correction.index,
-            model=Widget,
-            kind=DriftKind.MISSING,
-        )
-        item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
-
-        # Create it first so the CONCURRENTLY create will fail (duplicate)
-        execute(
-            'CREATE INDEX "examples_widget_will_fail_idx" ON "examples_widget" ("name")'
-        )
-
-        result = execute_plan([item])
-
-        assert not result.ok
-        assert result.ok_for_sync
-        assert result.blocking_failures == []
-        assert len(result.non_blocking_failures) == 1
-
-    @isolated_db
-    def test_mixed_failures(self):
-        """Blocking + non-blocking failures: ok_for_sync reflects only blocking."""
-        execute(
-            'CREATE INDEX "examples_widget_will_fail_idx" ON "examples_widget" ("name")'
-        )
-
-        index = Index(fields=["name"], name="examples_widget_will_fail_idx")
-        items = [
-            # Non-blocking: will fail (duplicate index)
-            PlanItem(
-                drift=IndexModelDrift(
-                    table="examples_widget",
-                    index=index,
-                    model=Widget,
-                    kind=DriftKind.MISSING,
-                ),
-                correction=CreateIndexCorrection(
-                    table="examples_widget", index=index, model=Widget
-                ),
-                blocks_sync=False,
+    items = [
+        PlanItem(
+            drift=ConstraintNameDrift(
+                kind=DriftKind.UNDECLARED,
+                table="examples_widget",
+                name="nonexistent",
             ),
-            # Blocking: will fail (nonexistent constraint)
-            PlanItem(
-                drift=ConstraintNameDrift(
-                    kind=DriftKind.UNDECLARED,
-                    table="examples_widget",
-                    name="nonexistent",
-                ),
-                correction=DropConstraintCorrection(
-                    table="examples_widget", name="nonexistent"
-                ),
-                blocks_sync=True,
+            correction=DropConstraintCorrection(
+                table="examples_widget", name="nonexistent"
             ),
-        ]
+        ),
+        PlanItem(
+            drift=ConstraintNameDrift(
+                kind=DriftKind.UNDECLARED,
+                table="examples_widget",
+                name="examples_widget_real_check",
+            ),
+            correction=DropConstraintCorrection(
+                table="examples_widget", name="examples_widget_real_check"
+            ),
+        ),
+    ]
 
-        result = execute_plan(items)
+    result = execute_plan(items)
 
-        assert not result.ok
-        assert not result.ok_for_sync
-        assert len(result.blocking_failures) == 1
-        assert len(result.non_blocking_failures) == 1
+    assert result.summary == "1 applied, 1 failed."
 
-    @isolated_db
-    def test_all_success_passes_sync(self):
-        """All items succeeding means ok_for_sync is True."""
-        execute(
-            'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_temp" CHECK ("id" >= 0)'
-        )
-        correction = DropConstraintCorrection(
-            table="examples_widget", name="examples_widget_temp"
-        )
-        drift = ConstraintNameDrift(
-            kind=DriftKind.UNDECLARED,
-            table="examples_widget",
-            name="examples_widget_temp",
-        )
-        item = PlanItem(drift=drift, correction=correction)
 
-        result = execute_plan([item])
+@isolated_db
+def test_execute_plan_result_item_reference():
+    """CorrectionResult.item references the PlanItem."""
+    execute('CREATE INDEX "examples_widget_temp_idx" ON "examples_widget" ("name")')
+    correction = DropIndexCorrection(
+        table="examples_widget", name="examples_widget_temp_idx"
+    )
+    drift = IndexUndeclaredDrift(
+        table="examples_widget",
+        name="examples_widget_temp_idx",
+    )
+    item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
 
-        assert result.ok
-        assert result.ok_for_sync
+    result = execute_plan([item])
 
-    def test_empty_result_passes_sync(self):
-        """No items executed means ok_for_sync is True."""
-        result = execute_plan([])
-        assert result.ok_for_sync
+    assert result.results[0].item is item
+
+
+# Sync policy
+#
+# Tests for blocks_sync and ok_for_sync semantics.
+@isolated_db
+def test_sync_policy_blocking_failure_fails_sync():
+    """A failed constraint correction (blocks_sync=True) makes ok_for_sync False."""
+    correction = DropConstraintCorrection(table="examples_widget", name="nonexistent")
+    drift = ConstraintNameDrift(
+        kind=DriftKind.UNDECLARED, table="examples_widget", name="nonexistent"
+    )
+    item = PlanItem(drift=drift, correction=correction, blocks_sync=True)
+
+    result = execute_plan([item])
+
+    assert not result.ok
+    assert not result.ok_for_sync
+    assert len(result.blocking_failures) == 1
+    assert result.non_blocking_failures == []
+
+
+@isolated_db
+def test_sync_policy_non_blocking_failure_passes_sync():
+    """A failed index correction (blocks_sync=False) keeps ok_for_sync True."""
+    correction = CreateIndexCorrection(
+        table="examples_widget",
+        index=Index(fields=["name"], name="examples_widget_will_fail_idx"),
+        model=Widget,
+    )
+    drift = IndexModelDrift(
+        table="examples_widget",
+        index=correction.index,
+        model=Widget,
+        kind=DriftKind.MISSING,
+    )
+    item = PlanItem(drift=drift, correction=correction, blocks_sync=False)
+
+    # Create it first so the CONCURRENTLY create will fail (duplicate)
+    execute(
+        'CREATE INDEX "examples_widget_will_fail_idx" ON "examples_widget" ("name")'
+    )
+
+    result = execute_plan([item])
+
+    assert not result.ok
+    assert result.ok_for_sync
+    assert result.blocking_failures == []
+    assert len(result.non_blocking_failures) == 1
+
+
+@isolated_db
+def test_sync_policy_mixed_failures():
+    """Blocking + non-blocking failures: ok_for_sync reflects only blocking."""
+    execute(
+        'CREATE INDEX "examples_widget_will_fail_idx" ON "examples_widget" ("name")'
+    )
+
+    index = Index(fields=["name"], name="examples_widget_will_fail_idx")
+    items = [
+        # Non-blocking: will fail (duplicate index)
+        PlanItem(
+            drift=IndexModelDrift(
+                table="examples_widget",
+                index=index,
+                model=Widget,
+                kind=DriftKind.MISSING,
+            ),
+            correction=CreateIndexCorrection(
+                table="examples_widget", index=index, model=Widget
+            ),
+            blocks_sync=False,
+        ),
+        # Blocking: will fail (nonexistent constraint)
+        PlanItem(
+            drift=ConstraintNameDrift(
+                kind=DriftKind.UNDECLARED,
+                table="examples_widget",
+                name="nonexistent",
+            ),
+            correction=DropConstraintCorrection(
+                table="examples_widget", name="nonexistent"
+            ),
+            blocks_sync=True,
+        ),
+    ]
+
+    result = execute_plan(items)
+
+    assert not result.ok
+    assert not result.ok_for_sync
+    assert len(result.blocking_failures) == 1
+    assert len(result.non_blocking_failures) == 1
+
+
+@isolated_db
+def test_sync_policy_all_success_passes_sync():
+    """All items succeeding means ok_for_sync is True."""
+    execute(
+        'ALTER TABLE "examples_widget" ADD CONSTRAINT "examples_widget_temp" CHECK ("id" >= 0)'
+    )
+    correction = DropConstraintCorrection(
+        table="examples_widget", name="examples_widget_temp"
+    )
+    drift = ConstraintNameDrift(
+        kind=DriftKind.UNDECLARED,
+        table="examples_widget",
+        name="examples_widget_temp",
+    )
+    item = PlanItem(drift=drift, correction=correction)
+
+    result = execute_plan([item])
+
+    assert result.ok
+    assert result.ok_for_sync
+
+
+def test_sync_policy_empty_result_passes_sync():
+    """No items executed means ok_for_sync is True."""
+    result = execute_plan([])
+    assert result.ok_for_sync

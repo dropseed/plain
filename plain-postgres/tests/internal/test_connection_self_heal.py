@@ -37,91 +37,94 @@ def _backend_pid(conn) -> int:
         return row[0]
 
 
-class TestDeadConnectionSelfHeal:
-    def test_closed_connection_replaced_on_next_use(self):
-        """A wrapper holding a closed psycopg connection acquires a fresh one."""
-        with clean_connection():
-            conn = get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
+# Dead connection self-heal
+def test_closed_connection_replaced_on_next_use():
+    """A wrapper holding a closed psycopg connection acquires a fresh one."""
+    with clean_connection():
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
 
-            # Simulate the aftermath of a server-side close: the wrapper still
-            # holds a psycopg connection whose pgconn status is BAD.
-            assert conn.connection is not None
-            conn.connection.close()
-            assert conn.connection.closed
+        # Simulate the aftermath of a server-side close: the wrapper still
+        # holds a psycopg connection whose pgconn status is BAD.
+        assert conn.connection is not None
+        conn.connection.close()
+        assert conn.connection.closed
 
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                assert cursor.fetchone() == (1,)
-            assert conn.connection is not None
-            assert not conn.connection.closed
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)
+        assert conn.connection is not None
+        assert not conn.connection.closed
 
-    def test_terminated_backend_errors_once_then_heals(self):
-        """A server-side kill fails the in-flight query, then self-heals."""
-        with clean_connection():
-            conn = get_connection()
-            pid = _backend_pid(conn)
 
-            _terminate_backend(pid)
+def test_terminated_backend_errors_once_then_heals():
+    """A server-side kill fails the in-flight query, then self-heals."""
+    with clean_connection():
+        conn = get_connection()
+        pid = _backend_pid(conn)
 
-            # psycopg only detects the dead socket on I/O — the first use fails
-            # and marks the connection closed.
-            with raises(psycopg.OperationalError), conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-            assert conn.connection is not None
-            assert conn.connection.closed
+        _terminate_backend(pid)
 
-            # The next use discards the dead connection and acquires a fresh one.
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                assert cursor.fetchone() == (1,)
-            assert _backend_pid(conn) != pid
+        # psycopg only detects the dead socket on I/O — the first use fails
+        # and marks the connection closed.
+        with raises(psycopg.OperationalError), conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        assert conn.connection is not None
+        assert conn.connection.closed
 
-    def test_dead_connection_not_swapped_mid_atomic(self):
-        """Mid-atomic, the dead connection stays put — a silent swap would run
-        the rest of the block outside its transaction. Atomic.__exit__'s error
-        recovery drops it, and the next use heals."""
-        with clean_connection():
-            conn = get_connection()
+        # The next use discards the dead connection and acquires a fresh one.
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)
+        assert _backend_pid(conn) != pid
 
-            def killed_mid_atomic() -> None:
-                with transaction.atomic():
-                    pid = _backend_pid(conn)
-                    _terminate_backend(pid)
-                    with conn.cursor() as cursor:
-                        cursor.execute("SELECT 1")
 
-            with raises(psycopg.OperationalError):
-                killed_mid_atomic()
+def test_dead_connection_not_swapped_mid_atomic():
+    """Mid-atomic, the dead connection stays put — a silent swap would run
+    the rest of the block outside its transaction. Atomic.__exit__'s error
+    recovery drops it, and the next use heals."""
+    with clean_connection():
+        conn = get_connection()
 
-            # Atomic.__exit__ dropped the dead connection during rollback recovery.
-            assert conn.connection is None
+        def killed_mid_atomic() -> None:
+            with transaction.atomic():
+                pid = _backend_pid(conn)
+                _terminate_backend(pid)
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
 
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                assert cursor.fetchone() == (1,)
+        with raises(psycopg.OperationalError):
+            killed_mid_atomic()
 
-    def test_dead_connection_in_nested_atomic(self):
-        """Nested atomics: the inner savepoint rollback fails on the dead
-        connection and marks needs_rollback; the outer rollback then fails
-        too and drops the connection. The next use heals."""
-        with clean_connection():
-            conn = get_connection()
+        # Atomic.__exit__ dropped the dead connection during rollback recovery.
+        assert conn.connection is None
 
-            def killed_in_nested_atomic() -> None:
-                with transaction.atomic(), transaction.atomic():
-                    pid = _backend_pid(conn)
-                    _terminate_backend(pid)
-                    with conn.cursor() as cursor:
-                        cursor.execute("SELECT 1")
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)
 
-            with raises(psycopg.OperationalError):
-                killed_in_nested_atomic()
 
-            # The outer Atomic.__exit__ dropped the dead connection.
-            assert conn.connection is None
+def test_dead_connection_in_nested_atomic():
+    """Nested atomics: the inner savepoint rollback fails on the dead
+    connection and marks needs_rollback; the outer rollback then fails
+    too and drops the connection. The next use heals."""
+    with clean_connection():
+        conn = get_connection()
 
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                assert cursor.fetchone() == (1,)
+        def killed_in_nested_atomic() -> None:
+            with transaction.atomic(), transaction.atomic():
+                pid = _backend_pid(conn)
+                _terminate_backend(pid)
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+
+        with raises(psycopg.OperationalError):
+            killed_in_nested_atomic()
+
+        # The outer Atomic.__exit__ dropped the dead connection.
+        assert conn.connection is None
+
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            assert cursor.fetchone() == (1,)

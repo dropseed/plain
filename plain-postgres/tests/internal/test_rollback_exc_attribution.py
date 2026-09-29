@@ -37,46 +37,47 @@ def _fail_in_savepointless_block(sql: str) -> None:
         _execute(sql)
 
 
-class TestRollbackExcAttribution:
-    @isolated_db
-    def test_broken_transaction_not_attributed_to_prior_transaction(self):
-        conn = get_connection()
+# Rollback exception attribution
+@isolated_db
+def test_broken_transaction_not_attributed_to_prior_transaction():
+    conn = get_connection()
 
-        # Transaction 1: a caught failure through the Model.create()/update()
-        # path sets rollback_exc, which is not cleared when the block ends.
-        with transaction.atomic(), raises(psycopg.errors.UndefinedTable):
-            _fail_in_savepoint_via_mark("SELECT * FROM txn1_missing_table")
+    # Transaction 1: a caught failure through the Model.create()/update()
+    # path sets rollback_exc, which is not cleared when the block ends.
+    with transaction.atomic(), raises(psycopg.errors.UndefinedTable):
+        _fail_in_savepoint_via_mark("SELECT * FROM txn1_missing_table")
 
-        # rollback_exc lingers on the reused wrapper until the next outermost
-        # atomic() block clears it (documents the leak this test guards).
-        assert conn.rollback_exc is not None
-        assert "txn1_missing_table" in str(conn.rollback_exc)
+    # rollback_exc lingers on the reused wrapper until the next outermost
+    # atomic() block clears it (documents the leak this test guards).
+    assert conn.rollback_exc is not None
+    assert "txn1_missing_table" in str(conn.rollback_exc)
 
-        # Transaction 2: unrelated work that breaks the transaction via a
-        # savepoint-less nested block, then runs another query.
-        with transaction.atomic():
-            with raises(psycopg.errors.UndefinedTable):
-                _fail_in_savepointless_block("SELECT * FROM txn2_missing_table")
+    # Transaction 2: unrelated work that breaks the transaction via a
+    # savepoint-less nested block, then runs another query.
+    with transaction.atomic():
+        with raises(psycopg.errors.UndefinedTable):
+            _fail_in_savepointless_block("SELECT * FROM txn2_missing_table")
 
-            with raises(transaction.TransactionManagementError) as caught:
-                _execute("SELECT 1")
+        with raises(transaction.TransactionManagementError) as caught:
+            _execute("SELECT 1")
 
-        cause = caught.exception.__cause__
-        # The regression: the cause must not be transaction 1's exception.
-        assert "txn1_missing_table" not in str(cause)
-        # And it should be transaction 2's actual failure.
-        assert cause is not None
-        assert "txn2_missing_table" in str(cause)
+    cause = caught.exception.__cause__
+    # The regression: the cause must not be transaction 1's exception.
+    assert "txn1_missing_table" not in str(cause)
+    # And it should be transaction 2's actual failure.
+    assert cause is not None
+    assert "txn2_missing_table" in str(cause)
 
-    @isolated_db
-    def test_clean_outermost_atomic_starts_without_a_cause(self):
-        conn = get_connection()
 
-        # Leave a stale rollback_exc behind, as transaction 1 above does.
-        with transaction.atomic(), raises(psycopg.errors.UndefinedTable):
-            _fail_in_savepoint_via_mark("SELECT * FROM stale_table")
-        assert conn.rollback_exc is not None
+@isolated_db
+def test_clean_outermost_atomic_starts_without_a_cause():
+    conn = get_connection()
 
-        # Entering a fresh outermost block clears it.
-        with transaction.atomic():
-            assert conn.rollback_exc is None
+    # Leave a stale rollback_exc behind, as transaction 1 above does.
+    with transaction.atomic(), raises(psycopg.errors.UndefinedTable):
+        _fail_in_savepoint_via_mark("SELECT * FROM stale_table")
+    assert conn.rollback_exc is not None
+
+    # Entering a fresh outermost block clears it.
+    with transaction.atomic():
+        assert conn.rollback_exc is None

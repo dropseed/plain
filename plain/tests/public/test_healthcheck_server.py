@@ -106,112 +106,116 @@ def _send_request(port: int, raw_request: bytes) -> bytes:
 # ---------------------------------------------------------------------------
 # Unit tests: extract_request_path
 # ---------------------------------------------------------------------------
+#
+# Unit tests for the pure path-extraction function used by the health check.
 
 
-class TestExtractRequestPath:
-    """Unit tests for the pure path-extraction function used by the health check."""
+def test_extract_request_path_simple_get():
+    assert (
+        extract_request_path(b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n") == b"/health"
+    )
 
-    def test_simple_get(self):
-        assert (
-            extract_request_path(b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n")
-            == b"/health"
-        )
 
-    def test_strips_query_string(self):
-        assert (
-            extract_request_path(b"GET /health?ok=1 HTTP/1.1\r\nHost: x\r\n\r\n")
-            == b"/health"
-        )
+def test_extract_request_path_strips_query_string():
+    assert (
+        extract_request_path(b"GET /health?ok=1 HTTP/1.1\r\nHost: x\r\n\r\n")
+        == b"/health"
+    )
 
-    def test_root_path(self):
-        assert extract_request_path(b"GET / HTTP/1.1\r\nHost: x\r\n\r\n") == b"/"
 
-    def test_deep_path(self):
-        assert (
-            extract_request_path(b"GET /a/b/c HTTP/1.1\r\nHost: x\r\n\r\n") == b"/a/b/c"
-        )
+def test_extract_request_path_root_path():
+    assert extract_request_path(b"GET / HTTP/1.1\r\nHost: x\r\n\r\n") == b"/"
 
-    def test_post_method(self):
-        assert (
-            extract_request_path(b"POST /submit HTTP/1.1\r\nHost: x\r\n\r\n")
-            == b"/submit"
-        )
 
-    def test_empty_data(self):
-        assert extract_request_path(b"") == b""
+def test_extract_request_path_deep_path():
+    assert extract_request_path(b"GET /a/b/c HTTP/1.1\r\nHost: x\r\n\r\n") == b"/a/b/c"
 
-    def test_malformed_no_space(self):
-        assert extract_request_path(b"BADREQUEST\r\n\r\n") == b""
 
-    def test_no_crlf(self):
-        assert extract_request_path(b"GET /ok HTTP/1.1") == b""
+def test_extract_request_path_post_method():
+    assert (
+        extract_request_path(b"POST /submit HTTP/1.1\r\nHost: x\r\n\r\n") == b"/submit"
+    )
+
+
+def test_extract_request_path_empty_data():
+    assert extract_request_path(b"") == b""
+
+
+def test_extract_request_path_malformed_no_space():
+    assert extract_request_path(b"BADREQUEST\r\n\r\n") == b""
+
+
+def test_extract_request_path_no_crlf():
+    assert extract_request_path(b"GET /ok HTTP/1.1") == b""
 
 
 # ---------------------------------------------------------------------------
 # Integration tests: real TCP server with handle_connection
 # ---------------------------------------------------------------------------
+#
+# Start a real asyncio TCP server and verify health check responses over the wire.
 
 
-class TestHealthCheckIntegration:
-    """Start a real asyncio TCP server and verify health check responses over the wire."""
+def test_healthcheck_returns_200_ok():
+    async def _run() -> bytes:
+        server, port = await _start_healthcheck_server("/_health")
+        async with server:
+            return await asyncio.to_thread(
+                _send_request,
+                port,
+                b"GET /_health HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
 
-    def test_healthcheck_returns_200_ok(self):
-        async def _run() -> bytes:
-            server, port = await _start_healthcheck_server("/_health")
-            async with server:
-                return await asyncio.to_thread(
-                    _send_request,
-                    port,
-                    b"GET /_health HTTP/1.1\r\nHost: localhost\r\n\r\n",
-                )
+    resp = asyncio.run(_run())
+    assert b"HTTP/1.1 200 OK" in resp
+    assert b"Content-Type: text/plain" in resp
+    assert resp.endswith(b"ok")
 
-        resp = asyncio.run(_run())
-        assert b"HTTP/1.1 200 OK" in resp
-        assert b"Content-Type: text/plain" in resp
-        assert resp.endswith(b"ok")
 
-    def test_healthcheck_ignores_query_string(self):
-        async def _run() -> bytes:
-            server, port = await _start_healthcheck_server("/_health")
-            async with server:
-                return await asyncio.to_thread(
-                    _send_request,
-                    port,
-                    b"GET /_health?ready=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
-                )
+def test_healthcheck_ignores_query_string():
+    async def _run() -> bytes:
+        server, port = await _start_healthcheck_server("/_health")
+        async with server:
+            return await asyncio.to_thread(
+                _send_request,
+                port,
+                b"GET /_health?ready=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            )
 
-        resp = asyncio.run(_run())
-        assert b"HTTP/1.1 200 OK" in resp
+    resp = asyncio.run(_run())
+    assert b"HTTP/1.1 200 OK" in resp
 
-    def test_non_healthcheck_path_not_intercepted(self):
-        """A request to a different path should NOT get the health check response."""
 
-        async def _run() -> bytes:
-            server, port = await _start_healthcheck_server("/_health")
-            async with server:
-                return await asyncio.to_thread(
-                    _send_request,
-                    port,
-                    b"GET /other HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-                )
+def test_non_healthcheck_path_not_intercepted():
+    """A request to a different path should NOT get the health check response."""
 
-        resp = asyncio.run(_run())
-        # /other proceeds into the normal pipeline where the stub worker
-        # has no handler — it will error or close. The key assertion is
-        # that it does NOT return the health check response.
-        assert b"HTTP/1.1 200 OK\r\n" not in resp
+    async def _run() -> bytes:
+        server, port = await _start_healthcheck_server("/_health")
+        async with server:
+            return await asyncio.to_thread(
+                _send_request,
+                port,
+                b"GET /other HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            )
 
-    def test_disabled_when_path_empty(self):
-        """When healthcheck_path is empty, /_health is not intercepted."""
+    resp = asyncio.run(_run())
+    # /other proceeds into the normal pipeline where the stub worker
+    # has no handler — it will error or close. The key assertion is
+    # that it does NOT return the health check response.
+    assert b"HTTP/1.1 200 OK\r\n" not in resp
 
-        async def _run() -> bytes:
-            server, port = await _start_healthcheck_server("")
-            async with server:
-                return await asyncio.to_thread(
-                    _send_request,
-                    port,
-                    b"GET /_health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-                )
 
-        resp = asyncio.run(_run())
-        assert b"HTTP/1.1 200 OK\r\n" not in resp
+def test_disabled_when_path_empty():
+    """When healthcheck_path is empty, /_health is not intercepted."""
+
+    async def _run() -> bytes:
+        server, port = await _start_healthcheck_server("")
+        async with server:
+            return await asyncio.to_thread(
+                _send_request,
+                port,
+                b"GET /_health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+            )
+
+    resp = asyncio.run(_run())
+    assert b"HTTP/1.1 200 OK\r\n" not in resp
