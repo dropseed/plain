@@ -45,6 +45,9 @@
 - A test file that imports pytest is a collection error that says where, what the file uses from pytest, and what replaces each. It was a `ModuleNotFoundError` traceback.
 - A collection error that many files share says what they share once. The first file carries it, and the rest say what is wrong with their own file. A `conftest.py` is reported before the files that used it.
 - A test that takes fixtures is told what each parameter was: one of pytest's fixtures and what to write instead, or a fixture in a `conftest.py` the run found. A file with more than three such tests says how many.
+- A file that can't be run says everything reading it shows: what it imports, which tests take parameters nothing passes in, which yield, and every decorator that would raise. It said the first kind of problem it met.
+- A `tests/__init__.py` with code in it is a collection error. Nothing runs it.
+- A second `@cases` shows a spelling that is right when a list holds tuples, where it suggested `itertools.product`. A case that doesn't fit its test names the parameters it fills and the ones nothing fills.
 - A `conftest.py` above the target is a collection error however the target is written. It was reported for a file and not for a directory.
 - An import from a conftest says to import from the helper module the name moves to. It was told to import the conftest by its bare name.
 - An assert with a starred subscript (`grid[*position]`) is rewritten into code that compiles. The file it was in couldn't be collected.
@@ -60,6 +63,7 @@ Replace the dev dependency and move the tests off pytest. Assertions don't chang
 - Run `plain agent install`, so that the project's own rule files say how tests are written now. Until then `.claude/rules/plain-test.md` still says to use pytest fixtures.
 - Run `plain test`. A half-migrated suite says what is left, each thing once: each `conftest.py` with the fixtures it defines, each file that imports pytest with what it uses and what replaces it, and each file whose tests still take fixtures with what every parameter was.
 - Move what each `conftest.py` holds, then delete the file. Fixtures tests ask for become functions in a helper module such as `tests/helpers.py`. Autouse fixtures that protected every test become `tests/lifecycle.py`.
+- Delete `tests/__init__.py`. `tests/` isn't a package: a test file is loaded on its own and a helper module is imported by its bare name. An empty one does no harm. One with code in it is a collection error, since nothing would run the code.
 - Import helper modules by their bare names: `from helpers import create_user`, not `from tests.helpers import ...` or `from .helpers import ...`, and nothing from `conftest`.
 - A case's id is its values again, as pytest named it: `test_price[5-500]`. A `-k` or a target written against a numbered id (`test_price[0]`) needs the new one.
 - `plain request` now comes from `plain.dev`, not Plain itself. Nothing to change if `plain.dev` is in your dev dependencies, which it is in a project made with `plain-start`. The command, its flags and its output are the same.

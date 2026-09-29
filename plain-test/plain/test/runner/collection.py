@@ -145,6 +145,12 @@ def collect_tests(
     conftest_files = list(dict.fromkeys(conftest_files))
     fixtures_in_conftests: dict[str, str] = {}
     errors: list[CollectionError] = []
+
+    init_file = layout.helper_directory / "__init__.py"
+    if _has_code_nothing_runs(init_file):
+        message = _tests_is_not_a_package_message(init_file, layout=layout)
+        errors.append(CollectionError(init_file, TestDefinitionError(message)))
+
     for conftest_file in conftest_files:
         fixtures, autouse_fixtures = _fixture_names(conftest_file)
         shown = layout.shown(conftest_file)
@@ -328,6 +334,43 @@ def _conftest_files_above(target: Path, *, root: Path) -> list[Path]:
         for directory in reversed(directories)
         if (directory / _CONFTEST_FILE_NAME).is_file()
     ]
+
+
+def _has_code_nothing_runs(init_file: Path) -> bool:
+    """
+    Whether the tests directory has an `__init__.py` with code in it.
+
+    The tests directory is not imported as a package: a test file is loaded
+    on its own, and a helper module by its bare name. So nothing runs the
+    file. One with nothing in it, or a docstring, is left alone: it does no
+    harm, and lets no import work that wouldn't without it.
+    """
+    try:
+        tree = ast.parse(init_file.read_text(), filename=str(init_file))
+    except OSError:
+        return False  # there isn't one
+    except SyntaxError:
+        return True
+    is_a_docstring = lambda node: (
+        isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
+    return any(not is_a_docstring(node) for node in tree.body)
+
+
+def _tests_is_not_a_package_message(init_file: Path, *, layout: Layout) -> str:
+    directory = layout.shown(init_file.parent)
+    shown = layout.shown(init_file)
+    lifecycle_file = layout.shown(layout.helper_directory / "lifecycle.py")
+    directory = "The tests directory" if directory == "." else f"{directory}/"
+    return (
+        f"{shown} has code in it, and nothing runs it. {directory} is not\n"
+        "a package here: a test file is loaded on its own, and a helper\n"
+        "module is imported by its bare name. Move what the file does to a\n"
+        "helper module the tests call, or to a TestLifecycle in\n"
+        f"{lifecycle_file} if every test needs it. Then delete the file."
+    )
 
 
 def _conftest_message(

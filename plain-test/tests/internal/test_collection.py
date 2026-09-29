@@ -1162,3 +1162,43 @@ def test_a_decorator_the_reader_doesnt_know_may_pass_the_parameters():
     message = str(errors[0].error)
     assert "line 1: `import pytest`" in message
     assert "takes parameters" not in message
+
+
+_A_TEST = "def test_one():\n    assert True\n"
+
+
+def test_a_tests_init_file_with_code_in_it_is_reported_once():
+    """Nothing imports the tests directory as a package, so nothing runs it."""
+    root = write_tests(
+        {
+            "tests/__init__.py": "import os\n\nos.environ['SEEDED'] = '1'\n",
+            "tests/test_first.py": _A_TEST,
+            "tests/test_second.py": _A_TEST,
+        }
+    )
+
+    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+
+    assert [test.id for test in tests] == [
+        "tests/test_first.py::test_one",
+        "tests/test_second.py::test_one",
+    ]
+    assert [error.path for error in errors] == [(root / "tests/__init__.py").resolve()]
+    message = str(errors[0].error)
+    assert "tests/__init__.py has code in it, and nothing runs it." in message
+    assert "tests/lifecycle.py" in message
+    assert "delete the file" in message
+
+
+@cases(
+    case("", id="empty"),
+    case('"""The tests."""\n', id="a docstring"),
+    case("# nothing here\n", id="a comment"),
+)
+def test_a_tests_init_file_with_nothing_to_run_is_left_alone(source):
+    root = write_tests({"tests/__init__.py": source, "tests/test_first.py": _A_TEST})
+
+    tests, errors = collect_tests(["."], root=root, helper_directory=root / "tests")
+
+    assert len(tests) == 1
+    assert errors == []

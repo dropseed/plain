@@ -730,6 +730,8 @@ It's the only way to import one. `from tests.helpers import ...` and a relative 
 
 `tests/` comes first on the import path, so a helper module named like an installed package takes its place. Give a helper module a name nothing else has.
 
+`tests/` is not a package, so it needs no `__init__.py`. Nothing imports the directory, and nothing would run the file. An empty one is left alone. One with code in it is a [collection error](#collection-errors), since the code would never run.
+
 There are no fixtures and no `conftest.py`: a test gets what it needs by calling for it. A `conftest.py` is a collection error, anywhere under the tests and in any directory above the target you passed.
 
 Only files named `test_*.py` have their [assertions](#assertions) rewritten. An `assert` in a helper module fails as a bare `AssertionError`, without the values inside it.
@@ -1006,6 +1008,7 @@ What is true of many files is said once. The first file that asks for fixtures c
 | `from tests.helpers import x should be from helpers import x`                           | Write the import the message gives. A [helper module](#shared-helpers) is imported by its bare name     |
 | `from tests.conftest import x imports from a conftest.py`                               | Import it from the helper module it moves to, once the conftest is gone                                 |
 | `conftest.py is a pytest file, ...`                                                     | Move what the file holds, then delete it. See below                                                     |
+| `tests/__init__.py has code in it, and nothing runs it.`                                | Move what it does to a helper module, or to `tests/lifecycle.py`. Then delete the file                  |
 
 Each of those is the runner telling you a test is written in a way it can't run, so it prints the message and nothing else. They're all one error, [`TestDefinitionError`](./definition.py#TestDefinitionError).
 
