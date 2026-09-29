@@ -1,5 +1,7 @@
+import functools
 import json
 import re
+from collections.abc import Callable
 from dataclasses import replace
 from functools import cached_property
 from http import HTTPStatus
@@ -162,6 +164,56 @@ class ClientResponse:
         )
 
 
+def _takes_keywords_after_the_path[**P, R](
+    verb: Callable[P, R],
+) -> Callable[P, R]:
+    """For the client's verbs: say which keyword, when data is passed by
+    position.
+
+    `client.post("/login", {"email": ...})` is how a test client is usually
+    called, and here everything after the path is a keyword. Python's own
+    message for it is "post() takes 2 positional arguments but 3 were
+    given", which doesn't say what to write.
+
+    The verbs keep the signatures they're written with. This only looks at
+    how many arguments came by position.
+    """
+
+    @functools.wraps(verb)
+    def checked(*args: P.args, **kwargs: P.kwargs) -> R:
+        # The client itself, and the path.
+        if len(args) > 2:
+            # The verb's own name: `functools.wraps` gave it to this function.
+            name = checked.__name__
+            if name in ("get", "head", "options"):
+                keywords = "`query_params=` for the query string"
+                example = f'client.{name}("/path", query_params={{...}})'
+            else:
+                keywords = (
+                    "`form_data=` for a form, `json_data=` for JSON, or"
+                    " `body=` with `content_type=` for anything else"
+                )
+                example = f'client.{name}("/path", form_data={{...}})'
+            raise TypeError(
+                f"client.{name}() takes the path, and keywords after it."
+                f" What was passed second goes in by name: {keywords}."
+                f" For example: {example}"
+            )
+        return verb(*args, **kwargs)
+
+    return checked
+
+
+# Names a test client is often expected to have, and what to write here.
+_WHAT_TO_WRITE_FOR = {
+    "force_login": "`login_client(client, user)`, from plain.auth.test",
+    "login": "`login_client(client, user)`, from plain.auth.test",
+    "logout": "`logout_client(client)`, from plain.auth.test",
+    "session": "`get_client_session(client)`, from plain.sessions.test",
+    "trace": '`client.request("TRACE", path)`',
+}
+
+
 class Client:
     """
     A client for making requests against the app without running a server.
@@ -199,6 +251,24 @@ class Client:
     def cookies(self) -> SimpleCookie:
         """The cookies sent with every request, updated by every response."""
         return self._cookies
+
+    def __getattr__(self, name: str) -> Any:
+        # Only reached for a name the client doesn't have.
+        what_to_write = _WHAT_TO_WRITE_FOR.get(name)
+        if what_to_write is not None:
+            raise AttributeError(
+                f"The test client has no `{name}`. Write {what_to_write}."
+            )
+        raise AttributeError(
+            f"The test client has no `{name}`. It makes requests (`get`,"
+            " `head`, `options`, `post`, `put`, `patch`, `delete`,"
+            " `request`, `websocket`) and keeps `cookies`."
+        )
+
+    def __repr__(self) -> str:
+        # The cookies' names and not their values: a session key is a
+        # credential, and this is printed in failure reports.
+        return f"<Client cookies={sorted(self._cookies)}>"
 
     def request(
         self,
@@ -299,6 +369,7 @@ class Client:
         """Run a Request through the app and wrap what came back."""
         return self._sent(self._handle(request))
 
+    @_takes_keywords_after_the_path
     def get(
         self,
         path: str,
@@ -316,6 +387,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def head(
         self,
         path: str,
@@ -333,6 +405,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def options(
         self,
         path: str,
@@ -350,6 +423,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def post(
         self,
         path: str,
@@ -377,6 +451,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def put(
         self,
         path: str,
@@ -404,6 +479,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def patch(
         self,
         path: str,
@@ -431,6 +507,7 @@ class Client:
             follow_redirects=follow_redirects,
         )
 
+    @_takes_keywords_after_the_path
     def delete(
         self,
         path: str,

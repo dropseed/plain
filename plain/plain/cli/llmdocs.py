@@ -314,7 +314,13 @@ class LLMDocs:
             return False
 
         def format_decorators(decorator_list: list[ast.expr], prefix: str) -> list[str]:
-            return [f"{prefix}@{ast.unparse(d)}" for d in decorator_list]
+            # A decorator whose name starts with an underscore is the
+            # module's own business, as a function named that way is.
+            return [
+                f"{prefix}@{ast.unparse(d)}"
+                for d in decorator_list
+                if not ast.unparse(d).startswith("_")
+            ]
 
         def process_node(node: ast.AST, indent: int = 0) -> list[str]:
             is_top_level = indent == 0

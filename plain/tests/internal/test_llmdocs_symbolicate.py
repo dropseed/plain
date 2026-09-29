@@ -21,6 +21,10 @@ class Thing:
     def name(self) -> str:
         return self.id
 
+    @_checks_its_arguments
+    def send(self, to: str) -> None:
+        pass
+
     def _hidden(self) -> None:
         pass
 
@@ -45,8 +49,16 @@ def test_annotated_attributes_are_listed_with_their_annotation():
         "    tags: tuple[str, ...] = ()",
         "    plain_default = 1",
         "    def name(self)",
+        "    def send(self, to: str)",
     ]
 
 
 def test_an_annotated_module_variable_is_listed_when_it_is_public():
     assert symbolicate({"public_setting"}) == ["public_setting: int = 3"]
+
+
+def test_a_private_decorator_is_left_out_and_a_public_one_is_listed():
+    lines = symbolicate({"Thing"})
+
+    assert "@dataclass(frozen=True)" in lines
+    assert "    @_checks_its_arguments" not in lines
