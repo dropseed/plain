@@ -353,12 +353,13 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     is neither persisted nor shipped anywhere. The sampler and processors
     are restored on exit.
 
-    This is not `plain.test.capture_spans`, which owns the process's tracer
-    provider and refuses to run when something else installed one. A test
-    process can promise that; `plain request` runs in the app as it is
-    configured for development, where `plain.connect` has usually installed
-    its provider already. So this one borrows that provider for the block
-    and hands it back.
+    This is not `plain.test.capture_spans`, which refuses to run when
+    something other than plain.test installed the process's tracer provider.
+    A test process can promise that; `plain request` runs in the app as it
+    is configured for development, where `plain.connect` has usually
+    installed its provider already. So this one borrows that provider for
+    the block and hands it back. When nothing has installed one, the two
+    share plain.test's, so either can run first.
 
     Guard calls with `capture_available()`. For one-shot, single-threaded
     callers such as CLI commands; it mutates process-global tracing state.
@@ -375,18 +376,19 @@ def capture_trace_spans() -> Generator[InMemorySpanExporter]:
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
         InMemorySpanExporter,
     )
+    from plain.test.otel import tracer_provider_for_capturing
 
     exporter = InMemorySpanExporter()
 
     if isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
-        # Nothing configured a provider — install a bare one so the still
+        # Nothing configured a provider, so one is installed, and the still
         # unresolved proxy tracers bind to it. `set_tracer_provider` is
-        # one-shot, so this provider stays for the life of the process, but
-        # the `finally` below strips its processors, leaving it inert. This
-        # branch is only reached when no OTel package is installed at all:
-        # plain.connect installs a provider during app startup, before any
-        # CLI command runs.
-        trace.set_tracer_provider(TracerProvider())
+        # one-shot: this provider stays for the life of the process. It is
+        # plain.test's provider for capturing and not one of our own, so
+        # that a `capture_spans()` later in the same process finds a
+        # provider it knows and adds to it. A test that runs this command
+        # and then captures spans is that process.
+        tracer_provider_for_capturing()
 
     # From here a real provider exists either way — capture by mutating it.
     provider = cast(TracerProvider, trace.get_tracer_provider())

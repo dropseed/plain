@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         Metric,
         NumberDataPoint,
     )
-    from opentelemetry.sdk.trace import ReadableSpan
+    from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
     from opentelemetry.sdk.trace.export import SpanExportResult
     from opentelemetry.trace import SpanKind
     from opentelemetry.util.types import AttributeValue
@@ -34,12 +34,47 @@ __all__ = ["CapturedMetrics", "CapturedSpans", "capture_metrics", "capture_spans
 _span_source: CaptureSource[ReadableSpan] | None = None
 _metric_source: CaptureSource[Metric] | None = None
 
+# The tracer provider installed here, for capturing. The process has one
+# global provider and it can be set once, so whoever needs one for capturing
+# gets it from `tracer_provider_for_capturing()`.
+_tracer_provider_for_capturing: TracerProvider | None = None
+
+
+def tracer_provider_for_capturing() -> TracerProvider:
+    """
+    The process's tracer provider, as long as it is one installed here.
+
+    Installs it the first time it's asked for, when nothing has installed
+    one, and returns the same provider after that. It starts with no span
+    processors: it records nothing until a capture adds its own.
+
+    Raises when the provider in place was installed by something else.
+    `set_tracer_provider` is one-shot, so a second one would be ignored
+    without a word, every capture would come up empty, and what the tests
+    do would be exported to wherever that provider sends it.
+    """
+    global _tracer_provider_for_capturing
+
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+
+    if _tracer_provider_for_capturing is None:
+        if not isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
+            raise RuntimeError(
+                "A global tracer provider is already installed — disable it "
+                "for tests (e.g. PLAIN_CONNECT_EXPORT_ENABLED=false) so spans "
+                "can be captured."
+            )
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+        _tracer_provider_for_capturing = provider
+
+    return _tracer_provider_for_capturing
+
 
 def _install_test_tracer() -> CaptureSource[ReadableSpan]:
     global _span_source
     if _span_source is None:
-        from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import (
             SimpleSpanProcessor,
             SpanExportResult,
@@ -64,19 +99,9 @@ def _install_test_tracer() -> CaptureSource[ReadableSpan]:
         exporter = SpanExporterForCaptures()
         source = CaptureSource(read=exporter.get_finished_spans, clear=exporter.clear)
 
-        provider = TracerProvider()
+        # Raises when the provider in place isn't ours to add to.
+        provider = tracer_provider_for_capturing()
         provider.add_span_processor(SimpleSpanProcessor(exporter))
-        trace.set_tracer_provider(provider)
-        if trace.get_tracer_provider() is not provider:
-            # set_tracer_provider is one-shot: if another provider was
-            # installed first (e.g. plain.connect exporting for real), the
-            # call is silently ignored and every capture would come up empty
-            # — while test traffic exports to the real backend. Fail loudly.
-            raise RuntimeError(
-                "A global tracer provider is already installed — disable it "
-                "for tests (e.g. PLAIN_CONNECT_EXPORT_ENABLED=false) so spans "
-                "can be captured."
-            )
         _span_source = source
     return _span_source
 
