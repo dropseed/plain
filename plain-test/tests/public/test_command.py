@@ -117,8 +117,11 @@ def test_a_bare_skip_says_which_line():
 
 
 def test_the_runner_reads_no_env_files_itself():
-    # plain.dev loads `.env.test` for every command, from its setup hook.
-    # This suite runs without plain.dev installed, so nothing loads it.
+    # Env files are plain.dev's to load, from its setup hook, and the ones
+    # it loads are the ones for PLAIN_ENV. So with PLAIN_ENV set to
+    # something else, `.env.test` is read by nothing, whether or not
+    # plain.dev is installed where this suite runs: unless the runner reads
+    # it itself.
     result = run_in_project(
         {
             ".env.test": "RUNNER_DOTENV_PROBE=loaded\n",
@@ -126,10 +129,26 @@ def test_the_runner_reads_no_env_files_itself():
                 "import os\n"
                 "\n"
                 "def test_env():\n"
-                "    assert os.environ['PLAIN_ENV'] == 'test'\n"
+                "    assert os.environ['PLAIN_ENV'] == 'staging'\n"
                 "    assert 'RUNNER_DOTENV_PROBE' not in os.environ\n"
             ),
-        }
+        },
+        environment={"PLAIN_ENV": "staging"},
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_plain_env_is_test_unless_it_was_set():
+    result = run_in_project(
+        {
+            "tests/test_env.py": (
+                "import os\n"
+                "\n"
+                "def test_env():\n"
+                "    assert os.environ['PLAIN_ENV'] == 'test'\n"
+            ),
+        },
+        environment={"PLAIN_ENV": None},
     )
     assert result.exit_code == 0, result.output
 

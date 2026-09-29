@@ -108,11 +108,74 @@ def test_setup_failure_tears_down_completed_lifecycles():
     a = RecordingLifecycle("a", log)
     b = RecordingLifecycle("b", log, fail_setup=True)
 
-    try:
-        run_tests([make_test(lambda: None)], lifecycles=[a, b])
-    except RuntimeError:
-        pass
+    run = run_tests([make_test(lambda: log.append("test"))], lifecycles=[a, b])
     assert log == ["setup:a", "teardown:a"]
+
+    # It is the run's to report, and no test was run.
+    assert run.results == []
+    assert run.setup_failure is not None
+    assert run.setup_failure.lifecycle == "RecordingLifecycle"
+    assert run.setup_failure.error_type == "RuntimeError"
+    assert run.setup_failure.error_message == "b setup failed"
+    assert run.setup_failure.traceback.endswith("RuntimeError: b setup failed\n")
+
+
+def test_a_lifecycle_that_exits_being_set_up_is_a_setup_failure():
+    class Exits(TestLifecycle):
+        def setup_worker(self):
+            raise SystemExit(2)
+
+    run = run_tests([make_test(lambda: None)], lifecycles=[Exits()])
+    assert run.results == []
+    assert run.setup_failure is not None
+    assert run.setup_failure.error_type == "SystemExit"
+    assert run.setup_failure.error_message == "2"
+
+
+def test_a_warning_is_kept_once_with_how_often_and_where_first():
+    import warnings
+
+    def warns():
+        for _ in range(3):
+            warnings.warn("the old way", DeprecationWarning, stacklevel=1)
+
+    def warns_too():
+        warnings.warn("the old way", DeprecationWarning, stacklevel=2)
+        warnings.warn("another", UserWarning, stacklevel=1)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("always")
+        run = run_tests(
+            [
+                make_test(warns, id="t.py::test_warns"),
+                make_test(lambda: warns_too(), id="t.py::test_warns_too"),
+                make_test(lambda: None, id="t.py::test_quiet"),
+            ],
+            lifecycles=[],
+        )
+
+    assert run.ok
+    assert [(w.category, w.message, w.count, w.first_test) for w in run.warnings] == [
+        ("DeprecationWarning", "the old way", 4, "t.py::test_warns"),
+        ("UserWarning", "another", 1, "t.py::test_warns_too"),
+    ]
+    # The line the warning is about.
+    assert all(w.file.endswith("test_runner.py") for w in run.warnings)
+
+
+def test_a_test_that_turns_warnings_into_errors_still_does():
+    import warnings
+
+    def strict():
+        warnings.simplefilter("error")
+        warnings.warn("the old way", DeprecationWarning, stacklevel=1)
+
+    run = run_tests([make_test(strict)], lifecycles=[])
+    (result,) = run.results
+    assert result.outcome == "failed"
+    assert result.failure is not None
+    assert result.failure.error_type == "DeprecationWarning"
+    assert run.warnings == []
 
 
 def test_teardown_failure_does_not_skip_other_teardowns():

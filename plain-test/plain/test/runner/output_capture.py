@@ -62,6 +62,21 @@ class Output:
 NO_OUTPUT = Output(stdout=StreamOutput(text=""), stderr=StreamOutput(text=""))
 
 
+def joined(outputs: list[Output]) -> Output:
+    """Several outputs as one, each stream in the order the outputs are in."""
+    return Output(
+        stdout=_joined_stream([output.stdout for output in outputs]),
+        stderr=_joined_stream([output.stderr for output in outputs]),
+    )
+
+
+def _joined_stream(streams: list[StreamOutput]) -> StreamOutput:
+    return StreamOutput(
+        text="".join(stream.text for stream in streams),
+        cut_characters=sum(stream.cut_characters for stream in streams),
+    )
+
+
 class _HeldDescriptor:
     """One of the process's output descriptors, pointed at a file."""
 
@@ -181,12 +196,12 @@ class OutputCapture:
         if self.show_output:
             return
 
-        # An error on its way out of the runner is about to be printed by
-        # Python, with nothing of the runner's left to print what was held
-        # before it. So it is printed here, as it was written.
-        held = NO_OUTPUT
-        if error is not None and not isinstance(error, SystemExit):
-            held = self.take()
+        # The run reports what it held, and leaves nothing here. Something
+        # is left only when the run was left without reporting: an error in
+        # the runner itself, or code that wrote its reason and called
+        # `sys.exit()`. Nothing of the runner's is left to print it then, so
+        # it is printed here.
+        held = self.take()
 
         sys.breakpointhook = self._previous_breakpoint_hook  # ty: ignore[invalid-assignment]
         if self._fault_handler_was_enabled:
@@ -205,10 +220,7 @@ class OutputCapture:
         self.real_stderr = sys.stderr
 
         if held:
-            sys.stdout.write(held.stdout.text)
-            sys.stdout.flush()
-            sys.stderr.write(held.stderr.text)
-            sys.stderr.flush()
+            _print_what_nothing_reported(held)
 
     def take(self) -> Output:
         """What has been written since the last `take()` or `discard()`."""
@@ -277,6 +289,23 @@ class OutputCapture:
             "\nbreakpoint(): output is let through until this test is over.\n"
         )
         self.real_stderr.flush()
+
+
+def _print_what_nothing_reported(held: Output) -> None:
+    """
+    To stderr, both streams: stdout is where `--json` writes its document,
+    and a run that ended this way has no document to write.
+    """
+    for name, stream in (("stdout", held.stdout), ("stderr", held.stderr)):
+        if not stream.text:
+            continue
+        sys.stderr.write(f"Written to {name} before the run ended:\n")
+        if stream.cut_characters:
+            sys.stderr.write(f"... {stream.cut_characters:,} characters before this\n")
+        sys.stderr.write(stream.text)
+        if not stream.text.endswith("\n"):
+            sys.stderr.write("\n")
+    sys.stderr.flush()
 
 
 def _file_that_appends() -> tuple[IO[bytes], str | None]:

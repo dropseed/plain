@@ -5,7 +5,9 @@ Test execution: drives lifecycles around each collected test.
 import asyncio
 import dataclasses
 import inspect
+import sys
 import time
+import warnings
 from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -18,8 +20,9 @@ from .failure import (
     describe_failure,
     failure_that_could_not_be_described,
     format_traceback,
+    shown_path,
 )
-from .output_capture import Output, OutputCapture
+from .output_capture import NO_OUTPUT, Output, OutputCapture
 
 __all__ = []
 
@@ -57,12 +60,53 @@ class TeardownError:
 
 
 @dataclass
+class SetupFailure:
+    """
+    A lifecycle that didn't get through `setup_worker()`: it raised, or it
+    wrote its reason and called `sys.exit()`. No test was run.
+    """
+
+    # The lifecycle's class: "PostgresTestLifecycle".
+    lifecycle: str
+    # "ValueError", or "SystemExit" for one that exited.
+    error_type: str
+    error_message: str
+    # Formatted, with the runner's own frames taken off the top.
+    traceback: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class RaisedWarning:
+    """A warning tests raised, however many times and in however many tests."""
+
+    # "DeprecationWarning"
+    category: str
+    message: str
+    # How many times it was raised, in all the tests that raised it.
+    count: int
+    # The first test that raised it, and the line of code it was about
+    # then. The file is relative to where the run started, when it is under
+    # there.
+    first_test: str
+    file: str
+    line: int
+
+
+@dataclass
 class TestRun:
     results: list[TestResult]
     duration: float
     # Set when Ctrl-C stopped the run. The tests after it were not run.
     interrupted: InterruptedTest | None = None
     teardown_errors: list[TeardownError] = field(default_factory=list)
+    # Set when the lifecycles couldn't be set up. No test was run.
+    setup_failure: SetupFailure | None = None
+    # What the lifecycles wrote being set up, before the first test, and
+    # being taken down, after the last. It is no test's.
+    setup_output: Output = NO_OUTPUT
+    teardown_output: Output = NO_OUTPUT
+    # Each distinct warning once, in the order first raised.
+    warnings: list[RaisedWarning] = field(default_factory=list)
 
     @property
     def passed(self) -> list[TestResult]:
@@ -106,6 +150,9 @@ def run_tests(
     results: list[TestResult] = []
     interrupted = None
     teardown_errors = []
+    setup_failure = None
+    setup_output = NO_OUTPUT
+    raised_warnings = _RaisedWarnings()
 
     # Track which lifecycles actually set up, so a failure partway through
     # setup still tears down the ones that completed (e.g. drops the test
@@ -113,19 +160,34 @@ def run_tests(
     started: list[TestLifecycle] = []
     try:
         for lifecycle in lifecycles:
-            lifecycle.setup_worker()
+            try:
+                lifecycle.setup_worker()
+            except KeyboardInterrupt:
+                raise
+            except BaseException as error:
+                # SystemExit too: code that can't set up writes why and
+                # calls `sys.exit()`, as creating the test database does
+                # when the server can't be reached.
+                setup_failure = SetupFailure(
+                    lifecycle=type(lifecycle).__qualname__,
+                    error_type=type(error).__qualname__,
+                    error_message=str(error),
+                    traceback=format_traceback(error),
+                )
+                break
             started.append(lifecycle)
 
         # What setting up wrote is the run's, not the first test's.
-        capture.discard()
+        setup_output = capture.take()
 
-        for test in tests:
+        for test in tests if setup_failure is None else ():
             try:
                 result = _run_one(
                     test,
                     lifecycles=lifecycles,
                     full_values=full_values,
                     capture=capture,
+                    raised_warnings=raised_warnings,
                 )
             except KeyboardInterrupt:
                 interrupted = InterruptedTest(test=test, output=capture.take())
@@ -140,7 +202,9 @@ def run_tests(
             # One lifecycle's teardown failure shouldn't skip the others.
             try:
                 lifecycle.teardown_worker()
-            except Exception as error:
+            except KeyboardInterrupt:
+                raise
+            except BaseException as error:
                 teardown_errors.append(
                     TeardownError(
                         traceback=format_traceback(error), output=capture.take()
@@ -152,10 +216,75 @@ def run_tests(
         duration=time.monotonic() - run_start,
         interrupted=interrupted,
         teardown_errors=teardown_errors,
+        setup_failure=setup_failure,
+        setup_output=setup_output,
+        # What a teardown that raised wrote is with its error.
+        teardown_output=capture.take(),
+        warnings=raised_warnings.each_once(),
     )
 
 
+class _RaisedWarnings:
+    """The warnings a run's tests raised, each distinct one kept once."""
+
+    def __init__(self) -> None:
+        # The same warning is the same kind saying the same thing, wherever
+        # it is raised from: a deprecated function called from two hundred
+        # places is one thing to fix. A dict keeps the order they were first
+        # raised in.
+        self._raised: dict[tuple[str, str], RaisedWarning] = {}
+
+    def add(self, raised: list[warnings.WarningMessage], *, test: RunnableTest) -> None:
+        for warning in raised:
+            category = warning.category.__qualname__
+            message = str(warning.message)
+            key = (category, message)
+            before = self._raised.get(key)
+            if before is None:
+                self._raised[key] = RaisedWarning(
+                    category=category,
+                    message=message,
+                    count=1,
+                    first_test=test.id,
+                    file=shown_path(warning.filename),
+                    line=warning.lineno,
+                )
+            else:
+                self._raised[key] = dataclasses.replace(before, count=before.count + 1)
+
+    def each_once(self) -> list[RaisedWarning]:
+        return list(self._raised.values())
+
+
 def _run_one(
+    test: RunnableTest,
+    *,
+    lifecycles: list[TestLifecycle],
+    full_values: bool,
+    capture: OutputCapture,
+    raised_warnings: _RaisedWarnings,
+) -> TestResult:
+    """
+    Warnings the test raises are kept for the run to count, whatever comes
+    of the test. Python would have written each to stderr, where a passing
+    test's is thrown away with the rest of what it wrote.
+    """
+    with warnings.catch_warnings(record=True) as raised:
+        # Python ignores a DeprecationWarning unless it is raised by the
+        # script being run, which a test never is. A test run is where a
+        # deprecation is wanted: it says what to change before it breaks.
+        # With `-W` or PYTHONWARNINGS the filters are as they were given.
+        if not sys.warnoptions:
+            warnings.simplefilter("always", DeprecationWarning)
+            warnings.simplefilter("always", PendingDeprecationWarning)
+        result = _run_one_with_its_lifecycles(
+            test, lifecycles=lifecycles, full_values=full_values, capture=capture
+        )
+    raised_warnings.add(raised, test=test)
+    return result
+
+
+def _run_one_with_its_lifecycles(
     test: RunnableTest,
     *,
     lifecycles: list[TestLifecycle],

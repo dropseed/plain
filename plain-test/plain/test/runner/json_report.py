@@ -94,15 +94,31 @@ def document(report: RunReport, *, list_passed: bool) -> dict[str, Any]:
             "skipped": counts.skipped,
             "not_run": counts.not_run,
             "collection_errors": counts.collection_errors,
+            "warnings": counts.warnings,
         },
         "tests_listed": "all" if list_passed else "failed_and_skipped",
         "tests": tests,
         "collection_errors": [
             _collection_error(failure) for failure in report.collection_failures
         ],
+        "warnings": [
+            {
+                "category": warning.category,
+                "message": warning.message,
+                "count": warning.count,
+                "first_test": warning.first_test,
+                "file": warning.file,
+                "line": warning.line,
+            }
+            for warning in report.warnings
+        ],
         "stopped": stopped,
         "interrupted": interrupted,
         "teardown_errors": teardown_errors,
+        # What was written outside any test: setting up the app and the
+        # lifecycles, and taking them down. A stopped run's is in `stopped`.
+        "stdout": _stream(report.output.stdout),
+        "stderr": _stream(report.output.stderr),
     }
 
 

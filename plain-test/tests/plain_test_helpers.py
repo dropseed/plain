@@ -3,7 +3,9 @@ Running the `plain test` command on a project made for one test: a project
 on disk, run in its own process, judged by what it prints and how it exits.
 """
 
+import atexit
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,10 +22,21 @@ class CommandResult:
     stderr: str = ""
 
 
+def _directory_for_this_run() -> Path:
+    """
+    A new temporary directory, removed when this run of the tests is over.
+    A test is handed the directory and not a `with` block to make it in, so
+    that a project can be run more than once, by more than one command.
+    """
+    directory = tempfile.mkdtemp(prefix="plain-test-project-")
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    return Path(directory)
+
+
 def make_project(files: dict[str, str]) -> Path:
     # resolve(): on macOS the temp directory is a symlink, and the runner
     # prints the path it resolved.
-    root = Path(tempfile.mkdtemp()).resolve()
+    root = _directory_for_this_run().resolve()
     for name, source in files.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,15 +45,28 @@ def make_project(files: dict[str, str]) -> Path:
 
 
 def run_runner(
-    directory: Path, *arguments: str, typed: str | None = None
+    directory: Path,
+    *arguments: str,
+    typed: str | None = None,
+    environment: dict[str, str | None] | None = None,
 ) -> CommandResult:
     """
     Run `python -m plain.test` from a directory. `typed` is what the command
-    reads from stdin, as if someone had typed it.
+    reads from stdin, as if someone had typed it. `environment` is what the
+    command's environment has that this one doesn't: a name with a value is
+    set, and a name with None is taken out.
     """
+    child_environment = dict(os.environ)
+    for name, value in (environment or {}).items():
+        if value is None:
+            child_environment.pop(name, None)
+        else:
+            child_environment[name] = value
+
     completed = subprocess.run(
         [sys.executable, "-m", "plain.test", *arguments],
         cwd=directory,
+        env=child_environment,
         capture_output=True,
         text=True,
         check=False,
@@ -56,9 +82,14 @@ def run_runner(
 
 
 def run_in_project(
-    files: dict[str, str], *arguments: str, typed: str | None = None
+    files: dict[str, str],
+    *arguments: str,
+    typed: str | None = None,
+    environment: dict[str, str | None] | None = None,
 ) -> CommandResult:
-    return run_runner(make_project(files), *arguments, typed=typed)
+    return run_runner(
+        make_project(files), *arguments, typed=typed, environment=environment
+    )
 
 
 def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
@@ -66,7 +97,7 @@ def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
     Run a command line the way pasting it into a terminal would: a shell
     reads it, and `plain` is whatever is on the PATH.
     """
-    bin_directory = Path(tempfile.mkdtemp())
+    bin_directory = _directory_for_this_run()
     plain_command = bin_directory / "plain"
     plain_command.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m plain "$@"\n')
     plain_command.chmod(0o755)
@@ -83,6 +114,23 @@ def run_pasted(directory: Path, command: str, *, shell: str) -> CommandResult:
         exit_code=completed.returncode,
         output=completed.stdout + completed.stderr,
     )
+
+
+def section(output: str, heading: str) -> str:
+    """
+    One section of a report: from the line that starts with `heading`
+    (`FAILED tests/test_it.py::test_x`, `WRITTEN OUTSIDE ANY TEST`) to the
+    next line that isn't indented, which is the next section's heading.
+    """
+    lines = output.splitlines()
+    starts = [n for n, line in enumerate(lines) if line.startswith(heading)]
+    assert starts, f"no line starts with {heading!r} in:\n{output}"
+    found = [lines[starts[0]]]
+    for line in lines[starts[0] + 1 :]:
+        if line and not line.startswith(" "):
+            break
+        found.append(line)
+    return "\n".join(found)
 
 
 def block(output: str, heading: str) -> list[str]:

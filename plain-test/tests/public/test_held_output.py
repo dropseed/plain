@@ -6,7 +6,7 @@ Each test runs the command on a project made for it.
 """
 
 from plain.test import cases
-from plain_test_helpers import block, run_in_project
+from plain_test_helpers import block, run_in_project, section
 
 WRITES_EVERY_WAY = (
     "import logging\n"
@@ -145,15 +145,56 @@ def test_what_a_lifecycle_writes_around_a_test_is_that_tests():
         }
     )
     assert result.exit_code == 1
-    # What setting the run up wrote is the run's, not the first test's.
-    assert block(result.stdout, "stdout:") == [
+    failure = section(result.stdout, "FAILED tests/test_it.py::test_fails")
+    assert block(failure, "stdout:") == [
         "stdout:",
         "  entering",
         "  in the test",
         "  exiting",
     ]
-    assert "setting up the run" not in result.output
-    assert "taking down the run" not in result.output
+    # What setting the run up and taking it down wrote is the run's, not
+    # the first test's or the last's.
+    assert "the run" not in failure
+    assert block(section(result.stdout, "WRITTEN OUTSIDE ANY TEST"), "stdout:") == [
+        "stdout:",
+        "  setting up the run",
+        "  taking down the run",
+    ]
+
+
+def test_what_is_written_outside_any_test_is_printed_when_every_test_passes():
+    result = run_in_project(
+        {
+            "tests/lifecycle.py": LIFECYCLE_THAT_WRITES,
+            "tests/test_it.py": "def test_passes():\n    print('in the test')\n",
+        }
+    )
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert result.stdout.splitlines()[:-1] == [
+        "Collected 1 test",
+        ".",
+        "",
+        "WRITTEN OUTSIDE ANY TEST",
+        "",
+        "  stdout:",
+        "    setting up the run",
+        "    taking down the run",
+        "",
+    ]
+
+
+def test_what_setting_up_the_app_and_loading_the_lifecycle_wrote_is_the_runs():
+    result = run_in_project(
+        {
+            "tests/lifecycle.py": "import sys\n\nprint('the database is slow today', file=sys.stderr)\n"
+            + LIFECYCLE_THAT_WRITES,
+            "tests/test_it.py": "def test_passes():\n    pass\n",
+        }
+    )
+    assert result.exit_code == 0
+    written = section(result.stdout, "WRITTEN OUTSIDE ANY TEST")
+    assert block(written, "stderr:") == ["stderr:", "  the database is slow today"]
 
 
 @cases("-s", "--show-output")
@@ -293,7 +334,8 @@ def test_a_run_stopped_with_ctrl_c_prints_what_it_has():
     assert result.exit_code == 130
     assert "FAILED tests/test_it.py::test_a_fails" in result.stdout
     assert "INTERRUPTED tests/test_it.py::test_b_is_stopped" in result.stdout
-    assert block(result.stdout, "stdout:") == [
+    interrupted = section(result.stdout, "INTERRUPTED tests/test_it.py")
+    assert block(interrupted, "stdout:") == [
         "stdout:",
         "  entering",
         "  got this far",
@@ -398,24 +440,99 @@ def test_what_loading_a_file_wrote_is_printed_with_its_collection_error():
     assert "loading the file that loads" not in result.output
 
 
-def test_an_error_in_the_runner_itself_loses_nothing():
+SETUP_THAT_RAISES = (
+    "from plain.test import TestLifecycle\n"
+    "\n"
+    "\n"
+    "class AppTestLifecycle(TestLifecycle):\n"
+    "    def setup_worker(self):\n"
+    "        print('connecting to the database')\n"
+    "        raise RuntimeError('no database')\n"
+)
+
+SETUP_THAT_EXITS = (
+    "import sys\n"
+    "\n"
+    "from plain.test import TestLifecycle\n"
+    "\n"
+    "\n"
+    "class AppTestLifecycle(TestLifecycle):\n"
+    "    def setup_worker(self):\n"
+    "        print('Got an error creating the test database', file=sys.stderr)\n"
+    "        sys.exit(2)\n"
+)
+
+
+def test_a_lifecycle_that_cannot_be_set_up_is_reported_with_what_it_wrote():
     result = run_in_project(
         {
-            "tests/lifecycle.py": (
-                "from plain.test import TestLifecycle\n"
-                "\n"
-                "\n"
-                "class AppTestLifecycle(TestLifecycle):\n"
-                "    def setup_worker(self):\n"
-                "        print('about to fail')\n"
-                "        raise RuntimeError('no database')\n"
+            "tests/lifecycle.py": SETUP_THAT_RAISES,
+            "tests/test_it.py": "def test_one():\n    pass\n",
+        }
+    )
+    assert result.exit_code == 3
+    assert result.stderr.splitlines()[0] == (
+        "AppTestLifecycle.setup_worker() raised RuntimeError: no database"
+    )
+    # Where it was raised, without the runner's own steps above it.
+    assert "tests/lifecycle.py" in result.stderr
+    assert "plain/test/runner" not in result.stderr
+    assert block(result.stderr, "stdout:") == [
+        "stdout:",
+        "  connecting to the database",
+    ]
+    assert result.stderr.splitlines()[-1] == "No test was run."
+    assert result.stdout == "Collected 1 test\n"
+
+
+def test_a_lifecycle_that_exits_while_being_set_up_is_not_a_silent_run():
+    # What creating the test database does when the server can't be
+    # reached: it writes why to stderr and calls `sys.exit(2)`.
+    result = run_in_project(
+        {
+            "tests/lifecycle.py": SETUP_THAT_EXITS,
+            "tests/test_it.py": "def test_one():\n    pass\n",
+        }
+    )
+    assert result.exit_code == 3
+    assert result.stderr.splitlines()[0] == (
+        "AppTestLifecycle.setup_worker() exited, with 2."
+    )
+    assert block(result.stderr, "stderr:") == [
+        "stderr:",
+        "  Got an error creating the test database",
+    ]
+    assert result.stderr.splitlines()[-1] == "No test was run."
+
+
+def test_an_app_that_cannot_be_set_up_is_reported_with_what_it_wrote():
+    result = run_in_project(
+        {
+            "app/settings.py": (
+                "print('reading the settings')\n"
+                "raise RuntimeError('PAYMENTS_URL must be set')\n"
             ),
             "tests/test_it.py": "def test_one():\n    pass\n",
         }
     )
-    assert result.exit_code == 1
-    assert "about to fail" in result.stdout
-    assert "RuntimeError: no database" in result.stderr
+    assert result.exit_code == 3
+    assert "Setting up the app raised RuntimeError: PAYMENTS_URL must be set" in (
+        result.stderr
+    )
+    assert block(result.stderr, "stdout:") == ["stdout:", "  reading the settings"]
+    assert result.stderr.splitlines()[-1] == "No test was run."
+    assert result.stdout == ""
+
+
+def test_code_that_exits_while_a_file_is_loaded_loses_nothing():
+    result = run_in_project(
+        {
+            "tests/test_it.py": (
+                "import sys\n\nprint('this machine has no license')\nsys.exit(4)\n"
+            ),
+        }
+    )
+    assert "this machine has no license" in result.output
 
 
 def test_a_lifecycle_that_fails_being_taken_down_is_reported():
@@ -462,3 +579,54 @@ def test_a_lifecycle_file_that_cannot_be_used_is_shown_with_what_it_wrote():
 def test_holding_output_changes_no_exit_code(files, arguments, exit_code):
     assert run_in_project(files, *arguments).exit_code == exit_code
     assert run_in_project(files, "-s", *arguments).exit_code == exit_code
+
+
+WARNS = (
+    "import warnings\n"
+    "\n"
+    "\n"
+    "def old_price():\n"
+    "    warnings.warn('old_price() is going away', DeprecationWarning, stacklevel=2)\n"
+    "\n"
+    "\n"
+    "def test_a_warns():\n"
+    "    old_price()\n"
+    "    old_price()\n"
+    "\n"
+    "\n"
+    "def test_b_warns_too():\n"
+    "    old_price()\n"
+    "    warnings.warn('the till is empty', RuntimeWarning, stacklevel=1)\n"
+    "\n"
+    "\n"
+    "def test_c_is_quiet():\n"
+    "    pass\n"
+)
+
+
+def test_warnings_are_counted_and_listed_once_each():
+    result = run_in_project({"tests/test_it.py": WARNS})
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    # Once, however many places and tests it was raised from.
+    assert section(result.stdout, "WARNINGS").splitlines() == [
+        "WARNINGS",
+        "",
+        "  DeprecationWarning: old_price() is going away",
+        (
+            "    raised 3 times, first at tests/test_it.py:9"
+            " in tests/test_it.py::test_a_warns"
+        ),
+        "  RuntimeWarning: the till is empty",
+        (
+            "    raised once, first at tests/test_it.py:15"
+            " in tests/test_it.py::test_b_warns_too"
+        ),
+    ]
+    assert result.stdout.splitlines()[-1].startswith("3 passed, 2 warnings in ")
+
+
+def test_a_run_with_no_warnings_says_nothing_of_them():
+    result = run_in_project({"tests/test_it.py": "def test_one():\n    pass\n"})
+    assert "WARNINGS" not in result.output
+    assert "warning" not in result.stdout.splitlines()[-1]

@@ -15,11 +15,15 @@ from plain.test import cases
 from plain_test_helpers import CommandResult, run_in_project
 
 ORDERS = (
+    "import warnings\n"
+    "\n"
     "from plain.test import skip, tag\n"
     "\n"
     "\n"
     "def price(items):\n"
     "    print(f'pricing {len(items)} items')\n"
+    "    if not items:\n"
+    "        warnings.warn('An order with no items is going away', DeprecationWarning)\n"
     "    return {\n"
     "        'items': items,\n"
     "        'currency': 'USD',\n"
@@ -125,6 +129,7 @@ def test_a_passing_run_prints_the_document_and_nothing_else():
         "skipped": 0,
         "not_run": 0,
         "collection_errors": 0,
+        "warnings": 0,
     }
     # Counted, not listed.
     assert document["tests_listed"] == "failed_and_skipped"
@@ -142,13 +147,13 @@ def test_a_failure_says_where_without_anything_being_read_out_of_a_string():
     assert test["tags"] == ["checkout"]
     assert test["outcome"] == "failed"
     # Where the test is defined, from its first decorator.
-    assert (test["file"], test["line"]) == ("tests/test_orders.py", 15)
+    assert (test["file"], test["line"]) == ("tests/test_orders.py", 19)
 
     failure = test["failure"]
     # The statement that failed.
-    assert (failure["file"], failure["line"]) == ("tests/test_orders.py", 19)
+    assert (failure["file"], failure["line"]) == ("tests/test_orders.py", 23)
     assert failure["frames"] == [
-        {"file": "tests/test_orders.py", "line": 19, "function": "test_order_total"}
+        {"file": "tests/test_orders.py", "line": 23, "function": "test_order_total"}
     ]
     assert failure["error_type"] == "AssertionError"
     assert failure["rerun_command"] == (
@@ -179,7 +184,7 @@ def test_a_failure_carries_what_the_text_report_prints_as_data():
     ]
     assert failure["stdout"] == {"text": "pricing 2 items\n", "cut_characters": 0}
     assert failure["stderr"] == {"text": "", "cut_characters": 0}
-    assert "line 19, in test_order_total" in failure["traceback"]
+    assert "line 23, in test_order_total" in failure["traceback"]
 
 
 def test_a_failure_raised_below_the_test_has_the_tests_line_and_every_frame():
@@ -290,6 +295,90 @@ def test_a_run_that_could_not_start_prints_a_document_too():
     assert document["stopped"]["reason"] == "lifecycle_error"
     assert "doesn't define a TestLifecycle subclass" in document["stopped"]["message"]
     assert document["stopped"]["stdout"]["text"] == "loading the lifecycle\n"
+
+
+SETUP_FAILS_PROJECT = {
+    "tests/lifecycle.py": (
+        "from plain.test import TestLifecycle\n"
+        "\n"
+        "\n"
+        "class AppTestLifecycle(TestLifecycle):\n"
+        "    def setup_worker(self):\n"
+        "        print('warning printed during setup')\n"
+        "        raise ValueError('POSTGRES_URL must be set')\n"
+    ),
+    "tests/test_one.py": "def test_one():\n    pass\n",
+}
+
+
+def test_a_run_that_could_not_be_set_up_prints_a_document_that_says_why():
+    result = run_in_project(SETUP_FAILS_PROJECT, "--json")
+    assert result.exit_code == 3
+    assert result.stderr == ""
+
+    document = document_of(result)
+    assert document["outcome"] == "stopped"
+    assert document["exit_code"] == 3
+    # No test is reported as run.
+    assert document["tests"] == []
+    assert document["counts"]["passed"] == 0
+    stopped = document["stopped"]
+    assert stopped["reason"] == "setup_error"
+    assert stopped["message"] == (
+        "AppTestLifecycle.setup_worker() raised ValueError: POSTGRES_URL must be set"
+    )
+    assert stopped["traceback"].endswith("ValueError: POSTGRES_URL must be set\n")
+    assert stopped["stdout"]["text"] == "warning printed during setup\n"
+
+
+def test_what_was_written_outside_any_test_is_in_the_document():
+    document = run_as_json(
+        {
+            "tests/lifecycle.py": (
+                "import sys\n"
+                "\n"
+                "from plain.test import TestLifecycle\n"
+                "\n"
+                "\n"
+                "class AppTestLifecycle(TestLifecycle):\n"
+                "    def setup_worker(self):\n"
+                "        print('created the database')\n"
+                "\n"
+                "    def teardown_worker(self):\n"
+                "        print('dropped it', file=sys.stderr)\n"
+            ),
+            "tests/test_one.py": "def test_one():\n    print('in the test')\n",
+        }
+    )
+    assert document["outcome"] == "passed"
+    assert document["stdout"] == {"text": "created the database\n", "cut_characters": 0}
+    assert document["stderr"] == {"text": "dropped it\n", "cut_characters": 0}
+
+
+def test_warnings_are_in_the_document():
+    document = run_as_json(
+        {
+            "tests/test_it.py": (
+                "import warnings\n"
+                "\n"
+                "\n"
+                "def test_warns():\n"
+                "    for _ in range(2):\n"
+                "        warnings.warn('going away', DeprecationWarning, stacklevel=1)\n"
+            )
+        }
+    )
+    assert document["counts"]["warnings"] == 1
+    assert document["warnings"] == [
+        {
+            "category": "DeprecationWarning",
+            "message": "going away",
+            "count": 2,
+            "first_test": "tests/test_it.py::test_warns",
+            "file": "tests/test_it.py",
+            "line": 6,
+        }
+    ]
 
 
 @cases(

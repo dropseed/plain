@@ -627,13 +627,16 @@ Targets, `-k` and the tag flags combine: a test runs when it's inside a target a
 
 ### Exit codes
 
-| Code  | Meaning                                                                                                 |
-| ----- | ------------------------------------------------------------------------------------------------------- |
-| `0`   | Every test that ran passed. Skipped tests don't change this                                             |
-| `1`   | A test failed, or a file couldn't be collected                                                          |
-| `2`   | The run couldn't start: a target doesn't exist, or the [project lifecycle](#project-lifecycle) is wrong |
-| `5`   | No tests matched                                                                                        |
-| `130` | The run was stopped with Ctrl-C. What had run by then is reported                                       |
+| Code  | Meaning                                                                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`   | Every test that ran passed. Skipped tests and warnings don't change this                                                                        |
+| `1`   | A test failed, or a file couldn't be collected                                                                                                  |
+| `2`   | The command can't be used as given: a target doesn't exist, flags don't go together, or the [project lifecycle](#project-lifecycle) is wrong    |
+| `3`   | [Setting up failed](#a-run-that-couldnt-start), so no test was run: the app couldn't be set up, or a lifecycle couldn't, such as the database's |
+| `5`   | No tests matched                                                                                                                                |
+| `130` | The run was stopped with Ctrl-C. What had run by then is reported                                                                               |
+
+`1` says the tests need fixing. `3` says what they run on does.
 
 ### Environment
 
@@ -724,7 +727,7 @@ The last line counts what happened:
 41 passed, 1 failed, 2 skipped, 1 collection errors in 0.62s
 ```
 
-That's all a run that passes prints. What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away.
+That's all most runs that pass print. What a test prints or logs is held while it runs: a test that fails has it printed [with its failure](#what-the-test-wrote), and a test that passes has it thrown away. [Warnings](#warnings) are counted and listed once each, and what was [written outside any test](#written-outside-any-test) is printed at the end.
 
 ### Failures
 
@@ -831,7 +834,7 @@ Re-run: plain test tests/test_orders.py::test_order_total
 
 It's held however it was written: `print()`, a log handler, a subprocess the test started, a C extension. What a test reads for itself stays the test's, so `contextlib.redirect_stdout`, `capture_logs`, a `CliRunner` and a subprocess with its own pipes all work as they do anywhere.
 
-A test's output starts when its [lifecycles](#project-lifecycle) enter and ends when they've exited, so what `around_test()` writes on the way in and out belongs to the test. What's written before the first test, while the app is set up and the test database is made, belongs to no test and isn't printed.
+A test's output starts when its [lifecycles](#project-lifecycle) enter and ends when they've exited, so what `around_test()` writes on the way in and out belongs to the test. What's written before the first test, while the app is set up and the test database is made, belongs to no test. It's printed [on its own](#written-outside-any-test).
 
 The last 10,000 characters of each stream are kept, and the failure says how much came before them. `--full-values` prints all of it:
 
@@ -855,6 +858,57 @@ INTERRUPTED tests/test_sync.py::test_every_page
 
 Interrupted: 12 passed, 30 not run in 4.18s
 ```
+
+### Warnings
+
+A warning a test raises is counted, whether the test passes or fails. Each distinct warning is listed once, with how many times it was raised and where it was raised first:
+
+```
+WARNINGS
+
+  DeprecationWarning: old_price() is going away
+    raised 3 times, first at tests/test_orders.py:9 in tests/test_orders.py::test_order_total
+
+41 passed, 1 warning in 0.62s
+```
+
+A warning is the same warning when it's the same kind saying the same thing, wherever it's raised from. A deprecated function called from two hundred places is one line.
+
+`DeprecationWarning` and `PendingDeprecationWarning` are shown, which Python leaves out unless the script being run raises them. Pass `-W` to Python, or set `PYTHONWARNINGS`, and the filters are as you gave them. A test that turns warnings into errors (`warnings.simplefilter("error")`) still does, and a test that catches its own still catches them.
+
+### Written outside any test
+
+What's written while the app is set up, while the lifecycles are set up before the first test, and while they're taken down after the last, belongs to no test. It's printed after the run, whether the run passed or not:
+
+```
+WRITTEN OUTSIDE ANY TEST
+
+  stderr:
+    Managed Postgres unavailable: is Docker running?
+
+41 passed in 0.62s
+```
+
+Most runs write nothing there, and print nothing for it. What a test file writes while it's loaded isn't here: it's thrown away, unless the file [couldn't be collected](#collection-errors).
+
+### A run that couldn't start
+
+When the app can't be set up, or a lifecycle's `setup_worker()` raises or exits, no test is run. The run says what failed and what had been written by then, and exits `3`:
+
+```
+PostgresTestLifecycle.setup_worker() exited, with 2.
+
+  Traceback (most recent call last):
+    ...
+  SystemExit: 2
+
+  stderr:
+    Got an error creating the test database: connection refused
+
+No test was run.
+```
+
+This goes to stderr, and stdout has only `Collected 41 tests`. The lifecycles that had been set up before the one that failed are taken down again.
 
 ### Skipped tests
 
@@ -948,7 +1002,7 @@ plain test --json --list-passed
     "version": 1,
     "outcome": "failed",
     "exit_code": 1,
-    "duration": 0.0021,
+    "duration": 0.0024,
     "command": {
         "argv": [
             "plain",
@@ -969,36 +1023,37 @@ plain test --json --list-passed
         "failed": 1,
         "skipped": 1,
         "not_run": 0,
-        "collection_errors": 1
+        "collection_errors": 1,
+        "warnings": 1
     },
     "tests_listed": "failed_and_skipped",
     "tests": [
         {
             "id": "tests/test_orders.py::test_order_total",
             "file": "tests/test_orders.py",
-            "line": 15,
+            "line": 19,
             "name": "test_order_total",
             "tags": [
                 "checkout"
             ],
             "outcome": "failed",
-            "duration": 0.0014,
+            "duration": 0.0021,
             "skip_reason": null,
             "failure": {
                 "error_type": "AssertionError",
                 "error_message": "",
                 "file": "tests/test_orders.py",
-                "line": 19,
-                "traceback": "Traceback (most recent call last):\n  File \"/project/tests/test_orders.py\", line 19, in test_order_total\n    assert order == {\n    ...<5 lines>...\n    }\nAssertionError\n",
+                "line": 23,
+                "traceback": "Traceback (most recent call last):\n  File \"/project/tests/test_orders.py\", line 23, in test_order_total\n    assert order == {\n    ...<5 lines>...\n    }\nAssertionError\n",
                 "frames": [
                     {
                         "file": "tests/test_orders.py",
-                        "line": 19,
+                        "line": 23,
                         "function": "test_order_total"
                     }
                 ],
                 "assert": {
-                    "expression": "order == {\n    \"items\": [\"tea\", \"kettle\"],\n    \"currency\": \"USD\",\n    \"subtotal\": 40,\n    \"shipping\": 2,\n    \"total\": 42,\n}",
+                    "expression": "order == {\n    'items': ['tea', 'kettle'],\n    'currency': 'USD',\n    'subtotal': 40,\n    'shipping': 2,\n    'total': 42,\n}",
                     "message": null,
                     "parts": [
                         {
@@ -1050,7 +1105,7 @@ plain test --json --list-passed
         {
             "id": "tests/test_orders.py::test_refund",
             "file": "tests/test_orders.py",
-            "line": 28,
+            "line": 32,
             "name": "test_refund",
             "tags": [],
             "outcome": "skipped",
@@ -1077,9 +1132,27 @@ plain test --json --list-passed
             }
         }
     ],
+    "warnings": [
+        {
+            "category": "DeprecationWarning",
+            "message": "An order with no items is going away",
+            "count": 1,
+            "first_test": "tests/test_orders.py::test_empty_order",
+            "file": "tests/test_orders.py",
+            "line": 9
+        }
+    ],
     "stopped": null,
     "interrupted": null,
-    "teardown_errors": []
+    "teardown_errors": [],
+    "stdout": {
+        "text": "",
+        "cut_characters": 0
+    },
+    "stderr": {
+        "text": "",
+        "cut_characters": 0
+    }
 }
 ```
 
@@ -1115,7 +1188,17 @@ A run stopped with Ctrl-C still prints its document. `interrupted` says which te
 }
 ```
 
-A run that couldn't start prints one too, with no tests in it. `reason` is `"lifecycle_error"`, `"target_not_found"` or `"no_tests_found"`:
+A run that couldn't start prints one too, with no tests in it. `reason` says why, and `exit_code` follows from it:
+
+| `reason`             | What happened                                                                  | `exit_code` |
+| -------------------- | ------------------------------------------------------------------------------ | ----------- |
+| `"lifecycle_error"`  | `tests/lifecycle.py` can't be used                                             | `2`         |
+| `"target_not_found"` | A target doesn't exist                                                         | `2`         |
+| `"setup_error"`      | The app couldn't be set up, or a lifecycle's `setup_worker()` raised or exited | `3`         |
+| `"no_tests_found"`   | No tests matched                                                               | `5`         |
+| `"interrupted"`      | Ctrl-C, before the first test                                                  | `130`       |
+
+`stdout` and `stderr` are everything that had been written by then, which for a `"setup_error"` is usually where the reason is.
 
 ```json
 {
@@ -1135,7 +1218,7 @@ A run that couldn't start prints one too, with no tests in it. `reason` is `"lif
 }
 ```
 
-An error in the runner itself is the one thing that isn't a document: it's a traceback on stderr, and the command exits `1`.
+Two things aren't a document. An error in the runner itself is a traceback on stderr, and the command exits `1`. A test file that calls `sys.exit()` while it's loaded ends the run with the code it gave. Either way what had been written is printed to stderr first, and stdout is left empty.
 
 `teardown_errors` has an entry for each lifecycle that raised while being taken down, after the last test:
 

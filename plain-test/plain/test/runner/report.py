@@ -10,19 +10,33 @@ work out again.
 
 from dataclasses import dataclass
 
-from .execution import TestRun
+from .execution import RaisedWarning, TestRun
 from .failure import CollectionFailure
 from .output_capture import NO_OUTPUT, Output
 
 __all__ = []
 
 EXIT_PASSED = 0
+# A test failed, or a file couldn't be collected.
 EXIT_FAILED = 1
-# The run couldn't start: the command was given something it can't use.
-EXIT_STOPPED = 2
+# The command was given something it can't use: a target that isn't there,
+# flags that don't go together, a `tests/lifecycle.py` that declares no
+# lifecycle.
+EXIT_UNUSABLE = 2
+# The run couldn't start: setting up the app or a lifecycle failed. The
+# tests are no more wrong than they were; what they run on isn't there.
+EXIT_SETUP_FAILED = 3
 EXIT_NO_TESTS_FOUND = 5
 # Stopped from outside, with Ctrl-C. 128 + SIGINT, as a shell reports it.
 EXIT_INTERRUPTED = 130
+
+EXIT_CODE_OF_A_STOPPED_RUN = {
+    "lifecycle_error": EXIT_UNUSABLE,
+    "target_not_found": EXIT_UNUSABLE,
+    "setup_error": EXIT_SETUP_FAILED,
+    "no_tests_found": EXIT_NO_TESTS_FOUND,
+    "interrupted": EXIT_INTERRUPTED,
+}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -46,11 +60,12 @@ class Command:
 class StoppedRun:
     """Why a run ended before any test was run."""
 
-    # "lifecycle_error", "target_not_found" or "no_tests_found"
+    # "lifecycle_error", "target_not_found", "setup_error", "no_tests_found"
+    # or "interrupted"
     reason: str
     message: str
     traceback: str | None = None
-    # What had been written by then.
+    # What had been written by then, outside any file being collected.
     output: Output = NO_OUTPUT
 
 
@@ -66,6 +81,8 @@ class Counts:
     # was interrupted is one of them.
     not_run: int
     collection_errors: int
+    # Distinct warnings, not how many times each was raised.
+    warnings: int
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -77,6 +94,14 @@ class RunReport:
     stopped: StoppedRun | None
     collection_failures: tuple[CollectionFailure, ...]
     selected: int
+    # What was written outside any test and any file being collected:
+    # setting up the app, setting up the lifecycles and taking them down.
+    # Empty for a stopped run, whose `stopped.output` it is.
+    output: Output = NO_OUTPUT
+
+    @property
+    def warnings(self) -> tuple[RaisedWarning, ...]:
+        return tuple(self.run.warnings) if self.run is not None else ()
 
     @property
     def counts(self) -> Counts:
@@ -89,6 +114,7 @@ class RunReport:
                 skipped=0,
                 not_run=self.selected,
                 collection_errors=len(self.collection_failures),
+                warnings=0,
             )
         return Counts(
             selected=self.selected,
@@ -97,6 +123,7 @@ class RunReport:
             skipped=len(run.skipped),
             not_run=self.selected - len(run.results),
             collection_errors=len(self.collection_failures),
+            warnings=len(run.warnings),
         )
 
     @property
@@ -114,9 +141,7 @@ class RunReport:
     @property
     def exit_code(self) -> int:
         if self.stopped is not None:
-            if self.stopped.reason == "no_tests_found":
-                return EXIT_NO_TESTS_FOUND
-            return EXIT_STOPPED
+            return EXIT_CODE_OF_A_STOPPED_RUN[self.stopped.reason]
         return {
             "passed": EXIT_PASSED,
             "failed": EXIT_FAILED,

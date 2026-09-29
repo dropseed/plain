@@ -13,6 +13,7 @@ uv run plain test [targets] [options]
 - `uv run plain test --full-values` - Print every value in a failure whole
 - `uv run plain test --json` - One JSON document on stdout when the run is over: counts, and for each failure its file and line, the values inside the assert, the diff, the test's locals, what it wrote, and the re-run command. Passing tests are counted, not listed (`--list-passed` lists them)
 - `uv run plain test -s` - Let what tests print and log through as it's written. Without it output is held: a failing test's is printed with its failure, a passing test's is thrown away
+- Exit codes: `0` passed, `1` a test failed or a file couldn't be collected, `2` the command can't be used as given, `3` setting up failed and no test was run (the database can't be reached: fix that, not the tests), `5` no tests matched, `130` interrupted
 
 ## Writing tests
 

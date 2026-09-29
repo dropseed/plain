@@ -14,7 +14,7 @@ from typing import TextIO
 import click
 
 from ..definition import TestDefinitionError
-from .execution import TestResult
+from .execution import RaisedWarning, TeardownError, TestResult
 from .failure import (
     AssertedPart,
     CollectionFailure,
@@ -24,7 +24,7 @@ from .failure import (
 )
 from .output_capture import Output, StreamOutput
 from .printing import FULL_VALUES_FLAG, PrintedValue
-from .report import RunReport, StoppedRun
+from .report import RunReport
 
 __all__ = []
 
@@ -191,8 +191,10 @@ class TextReporter:
                 self._print()
                 self._dots_on_line = 0
 
-    def _stopped(self, stopped: StoppedRun) -> None:
+    def _stopped(self, report: RunReport) -> None:
         """The run ended before any test was run."""
+        stopped = report.stopped
+        assert stopped is not None
         if stopped.reason == "no_tests_found":
             self._print(stopped.message, fg="yellow")
             return
@@ -200,14 +202,26 @@ class TextReporter:
         self._print_error(stopped.message, fg="red")
         if stopped.traceback is not None:
             self._print_error()
-            self._print_error(textwrap.indent(stopped.traceback, "  "))
+            self._print_error(textwrap.indent(stopped.traceback.rstrip(), "  "))
         for section in output_sections(stopped.output):
             self._print_error()
             self._print_error(textwrap.indent(section, "  "))
 
+        # The lifecycles that had been set up were taken down again.
+        if report.run is not None:
+            for error in report.run.teardown_errors:
+                self._print_error()
+                self._print_error("TEARDOWN ERROR", fg="red")
+                self._print_error()
+                self._print_error(textwrap.indent(_teardown_error_text(error), "  "))
+
+        if stopped.reason == "setup_error":
+            self._print_error()
+            self._print_error("No test was run.", fg="red")
+
     def finished(self, report: RunReport) -> None:
         if report.stopped is not None:
-            self._stopped(report.stopped)
+            self._stopped(report)
             return
 
         run = report.run
@@ -243,13 +257,26 @@ class TextReporter:
             self._print()
             self._print("TEARDOWN ERROR", fg="red", bold=True)
             self._print()
-            sections = [error.traceback.rstrip(), *output_sections(error.output)]
-            self._print(textwrap.indent("\n\n".join(sections), "  "))
+            self._print(textwrap.indent(_teardown_error_text(error), "  "))
 
         if run.interrupted is not None:
             self._print()
             self._print(f"INTERRUPTED {run.interrupted.test.id}", fg="red", bold=True)
             for section in output_sections(run.interrupted.output):
+                self._print()
+                self._print(textwrap.indent(section, "  "))
+
+        if report.warnings:
+            self._print()
+            self._print("WARNINGS", fg="yellow", bold=True)
+            self._print()
+            for warning in report.warnings:
+                self._print(textwrap.indent(_warning_text(warning), "  "))
+
+        if report.output:
+            self._print()
+            self._print("WRITTEN OUTSIDE ANY TEST", bold=True)
+            for section in output_sections(report.output):
                 self._print()
                 self._print(textwrap.indent(section, "  "))
 
@@ -269,12 +296,30 @@ class TextReporter:
             parts.append(f"{counts.collection_errors} collection errors")
         if counts.not_run:
             parts.append(f"{counts.not_run} not run")
+        if counts.warnings:
+            plural = "" if counts.warnings == 1 else "s"
+            parts.append(f"{counts.warnings} warning{plural}")
         line = f"{', '.join(parts)} in {run.duration:.2f}s"
         if run.interrupted is not None:
             line = f"Interrupted: {line}"
 
         self._print()
         self._print(line, fg="green" if report.exit_code == 0 else "red", bold=True)
+
+
+def _teardown_error_text(error: TeardownError) -> str:
+    sections = [error.traceback.rstrip(), *output_sections(error.output)]
+    return "\n\n".join(sections)
+
+
+def _warning_text(warning: RaisedWarning) -> str:
+    """The warning, and under it how often it was raised and where first."""
+    times = "once" if warning.count == 1 else f"{warning.count:,} times"
+    return (
+        f"{warning.category}: {warning.message}\n"
+        f"  raised {times}, first at {warning.file}:{warning.line}"
+        f" in {warning.first_test}"
+    )
 
 
 def _collection_failure_text(failure: CollectionFailure) -> str:
