@@ -103,7 +103,7 @@ class PostgresTestLifecycle(TestLifecycle):
         )
         self._run = run
         with suppress_db_tracing():
-            run.claim(schema=describe_schema())
+            run.claim(schema=describe_schema(server_version=run.server_version()))
             self._test_database.callback(run.release)
             self._test_database.enter_context(
                 use_test_database(run=run, name=run.shared_name, verbosity=0)

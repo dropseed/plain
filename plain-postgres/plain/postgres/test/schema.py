@@ -13,7 +13,10 @@ import hashlib
 import sys
 from dataclasses import dataclass
 
+import psycopg
 from plain.postgres import __version__ as plain_postgres_version
+from plain.postgres.database_url import DatabaseConfig
+from plain.postgres.databases import maintenance_cursor
 from plain.postgres.migrations.loader import MigrationLoader
 from plain.postgres.migrations.migration import Migration
 from plain.postgres.migrations.serializer import serializer_factory
@@ -30,16 +33,22 @@ class SchemaDigest:
     migrations: int  # how many migration files go into it
 
 
-def describe_schema() -> SchemaDigest:
+def describe_schema(*, server_version: str) -> SchemaDigest:
     """
-    A digest of everything a test database is built from: the version of
-    plain.postgres that builds it, every migration file's contents, and
-    every model's fields and options, serialized the way a migration file
-    would write them, so that a callable default is named and not printed
-    with its address.
+    A digest of everything a test database is built from: the versions of
+    plain.postgres and psycopg that build it and of the Postgres server
+    that holds it (`server_version`, from `read_server_version`), every
+    migration file's contents, and every model's fields and options,
+    serialized the way a migration file would write them, so that a
+    callable default is named and not printed with its address.
+
+    The versions are in it because a new one can change what a build
+    produces with no file in the project changing.
     """
     digest = hashlib.sha256()
     digest.update(f"plain.postgres {plain_postgres_version}\n".encode())
+    digest.update(f"psycopg {psycopg.__version__}\n".encode())
+    digest.update(f"postgres {server_version}\n".encode())
 
     loader = MigrationLoader(None, ignore_no_migrations=True)
     assert loader.disk_migrations is not None
@@ -64,6 +73,21 @@ def describe_schema() -> SchemaDigest:
             digest.update(f"  {option} = {_serialized(value)}\n".encode())
 
     return SchemaDigest(hash=digest.hexdigest(), migrations=len(loader.disk_migrations))
+
+
+def read_server_version(connection: psycopg.Connection) -> str:
+    """The Postgres server's version, as `SHOW server_version` gives it."""
+    row = connection.execute("SHOW server_version").fetchone()
+    assert row is not None
+    return row[0]
+
+
+def server_version_of(config: DatabaseConfig) -> str:
+    """The version of the server `config` connects to."""
+    with maintenance_cursor(config) as cursor:
+        row = cursor.execute("SHOW server_version").fetchone()
+        assert row is not None
+        return row[0]
 
 
 def _source_of(migration: Migration) -> bytes:

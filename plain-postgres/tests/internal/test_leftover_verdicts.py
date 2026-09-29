@@ -25,6 +25,7 @@ from plain.postgres.test.leftovers import (
     read_template_record,
     run_lock_key,
 )
+from plain.postgres.test.schema import describe_schema
 from plain.testing import case, cases
 
 
@@ -435,3 +436,18 @@ def a_template_comment_with(**changes: object) -> str:
 )
 def test_what_is_not_a_whole_template_record_is_no_record(comment):
     assert read_template_record(comment) is None
+
+
+# ---------------------------------------------------------------------------
+# The schema digest
+# ---------------------------------------------------------------------------
+
+
+def test_a_different_server_version_is_a_different_schema():
+    """The same files and models build something else on another server."""
+    on_16 = describe_schema(server_version="16.4")
+    on_17 = describe_schema(server_version="17.2")
+
+    assert on_16.hash != on_17.hash
+    assert on_16.migrations == on_17.migrations
+    assert describe_schema(server_version="16.4") == on_16

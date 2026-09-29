@@ -445,14 +445,14 @@ def _read_clean_plan(
     )
 
 
-def _current_schema() -> str | None:
+def _current_schema(cluster: Cluster) -> str | None:
     """The digest of the schema this checkout's test databases are built
     with now, which names their template. `None` when the models or the
     migration files can't be read, and then the template is left."""
-    from plain.postgres.test.schema import describe_schema
+    from plain.postgres.test.schema import describe_schema, server_version_of
 
     try:
-        return describe_schema().hash
+        return describe_schema(server_version=server_version_of(cluster.config)).hash
     except Exception:
         return None
 
@@ -516,7 +516,7 @@ def clean(dry_run: bool) -> None:
     between the listing and the drop is left.
     """
     project_root, cluster, project_name, current = _open()
-    current_schema = _current_schema()
+    current_schema = _current_schema(cluster)
     plan = _read_clean_plan(
         cluster,
         project_root=project_root,

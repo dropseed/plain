@@ -93,7 +93,7 @@ from .leftovers import (
     remove_what_dead_runs_left,
     run_lock_key,
 )
-from .schema import SchemaDigest
+from .schema import SchemaDigest, read_server_version
 
 TEST_DATABASE_PREFIX = "test_"
 
@@ -183,6 +183,11 @@ class RunDatabases:
         self.setup_parts: list[tuple[str, float]] = []
         self._maintenance: psycopg.Connection | None = None
 
+    def server_version(self) -> str:
+        """The version of the server the run's databases are on, which is
+        part of what they are built from (`describe_schema`)."""
+        return read_server_version(self._maintenance_connection())
+
     def claim(self, *, schema: SchemaDigest) -> None:
         """Take a name for this run, and remove what dead runs left here.
 
@@ -190,10 +195,7 @@ class RunDatabases:
         (`describe_schema()`), which names the template they are cloned
         from.
         """
-        maintenance_config: DatabaseConfig = {**self.config, "DATABASE": "postgres"}
-        self._maintenance = psycopg.connect(
-            **build_connection_params(maintenance_config), autocommit=True
-        )
+        self._maintenance = self._maintenance_connection()
         self.schema = schema
         self.template_name = template_database_name(self.base_name, schema=schema.hash)
 
@@ -323,6 +325,16 @@ class RunDatabases:
                 time.perf_counter() - started,
             )
         )
+
+    def _maintenance_connection(self) -> psycopg.Connection:
+        """The run's connection to the maintenance database, opened the
+        first time it is asked for and held until `release()`."""
+        if self._maintenance is None:
+            maintenance_config: DatabaseConfig = {**self.config, "DATABASE": "postgres"}
+            self._maintenance = psycopg.connect(
+                **build_connection_params(maintenance_config), autocommit=True
+            )
+        return self._maintenance
 
     def _try_lock(self, shared_name: str) -> bool:
         assert self._maintenance is not None
