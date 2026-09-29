@@ -244,6 +244,8 @@ An exception in a view or a middleware becomes the app's error response, as it d
 
 A request has a context of its own, as it does under a server, and every part of it runs there: middleware, the view, and the response body. That context starts as a copy of the caller's, so a value the caller set in a `ContextVar`, like an open database transaction, is what the request sees. What the request sets stays in the request.
 
+`handle()` and `send()` are ordinary calls, from a coroutine too. An async view or an async streaming body runs on an event loop of its own. When the calling thread is already running a loop, that loop runs on another thread, in the request's context, and the caller waits for it.
+
 A server loads the app's middleware at its first request and keeps it. Create a new `InProcessServer` to pick up a changed `MIDDLEWARE` setting.
 
 ### WebSockets

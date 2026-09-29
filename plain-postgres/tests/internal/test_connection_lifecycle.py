@@ -358,6 +358,34 @@ class TestAsyncViewConnectionLifecycle:
                 f"Async view should create exactly 1 connection, got {count[0]}"
             )
 
+    async def test_an_async_test_shares_its_connection_with_an_async_view(self):
+        """
+        An `async def` test is already on a running loop, so the view's
+        loop runs on another thread while the test waits. The request's
+        context is still a copy of the test's, so the view's query goes to
+        the test's connection, inside the test's transaction.
+        """
+        with _clean_connection(), _test_router():
+            get_connection()
+
+            with _patched_init_counter() as count:
+                response = _fresh_client().get("/async-db-query")
+
+            assert response.status_code == 200
+            assert response.body == b"1"
+            assert count[0] == 0
+
+    async def test_an_async_test_reads_an_sse_view(self):
+        with _clean_connection(), _test_router():
+            get_connection()
+
+            with _patched_init_counter() as count:
+                response = _fresh_client().get("/sse-db-query")
+
+            assert response.status_code == 200
+            assert "data: 1\n\n" in response.text
+            assert count[0] == 0
+
     def test_sse_view_db_access_via_to_thread(self):
         """
         An SSE view that accesses the DB via asyncio.to_thread() during

@@ -30,6 +30,7 @@ from plain.utils.module_loading import import_string
 from plain.utils.otel import format_exception_type
 
 from .exception import response_for_exception
+from .own_event_loop import run_on_own_event_loop
 from .response_lifecycle import ResponseLifecycle, otel_http_method
 
 if TYPE_CHECKING:
@@ -334,9 +335,10 @@ class BaseHandler:
           in the request, as it does under a server.
         - Each phase runs on the calling thread rather than in the
           executor, and an async view is awaited on an event loop of its
-          own. A sync view uses no loop at all, which is what lets an
-          async caller (where a second loop can't run) make a request to
-          a sync view.
+          own. A sync view uses no loop at all. When the caller is itself
+          running a loop (an `async def` test), a second one can't run on
+          its thread, so the view's loop runs on another thread while the
+          caller waits, still in the request's context.
         - There is no executor. The `ResponseLifecycle` runs a sync body
           on the thread that reads it.
         """
@@ -357,11 +359,10 @@ class BaseHandler:
             if isinstance(result, _AsyncViewPending):
                 # Drive the coroutine in request_ctx so any ContextVars the
                 # view sets are visible to after_response below.
-                with asyncio.Runner() as runner:
-                    response = runner.run(
-                        self._await_async_view(request, result, result.coroutine),
-                        context=request_ctx,
-                    )
+                response = run_on_own_event_loop(
+                    self._await_async_view(request, result, result.coroutine),
+                    context=request_ctx,
+                )
 
                 response = request_ctx.run(
                     self._finish_pipeline, request, response, result.ran_before

@@ -182,6 +182,67 @@ def test_a_sync_view_can_be_requested_from_inside_an_event_loop():
     assert sent.body == b"Hello, world!"
 
 
+# An `async def` test is a coroutine on a running loop, and a thread runs one
+# loop at a time. A request it makes to async code used to fail with
+# "Runner.run() cannot be called from a running event loop", leaving a loop
+# open and the view's coroutine never awaited.
+
+
+async def test_an_async_view_can_be_requested_from_an_async_test():
+    with in_process_router():
+        sent = InProcessServer().handle(get("/async")).send()
+
+    assert sent.status_code == 200
+    assert sent.body == b"from an async view"
+
+
+async def test_an_async_streaming_body_can_be_read_from_an_async_test():
+    with in_process_router():
+        sent = InProcessServer().handle(get("/async-stream")).send()
+
+    assert sent.body == b"one two"
+
+
+async def test_an_async_view_that_raises_is_the_error_response_in_an_async_test():
+    with in_process_router():
+        sent = InProcessServer().handle(get("/async-raises")).send()
+
+    assert sent.status_code == 500
+    assert isinstance(sent.response.exception, RuntimeError)
+
+
+async def test_an_async_view_sees_the_async_tests_context():
+    token = caller_value.set("set by the async test")
+    try:
+        with in_process_router():
+            sent = InProcessServer().handle(get("/async-caller-value")).send()
+    finally:
+        caller_value.reset(token)
+
+    assert sent.body == b"set by the async test"
+
+
+async def test_what_an_async_view_sets_is_seen_by_the_rest_of_its_request_in_an_async_test():
+    with (
+        in_process_router(),
+        override_settings(MIDDLEWARE=["inprocess_routers.ViewValueMiddleware"]),
+    ):
+        sent = InProcessServer().handle(get("/async-sets-view-value")).send()
+
+    assert sent.response.headers["X-View-Value"] == "set by the async view"
+    assert sent.body == b"set by the async view"
+    # And it stayed in the request.
+    assert view_value.get() == "unset"
+
+
+async def test_the_async_tests_own_loop_is_still_running_afterwards():
+    with in_process_router():
+        InProcessServer().handle(get("/async")).send()
+
+    # The test's loop is the one still running, and it still works.
+    assert await asyncio.sleep(0, result="still here") == "still here"
+
+
 def test_middleware_is_loaded_at_the_first_request():
     server = InProcessServer()
 

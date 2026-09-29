@@ -91,6 +91,13 @@ class AsyncView(View):
         return Response("from an async view")
 
 
+class AsyncCallerValueView(View):
+    """Answers with what the caller's context holds when an async view runs."""
+
+    async def get(self) -> Response:  # ty: ignore[invalid-method-override]
+        return Response(caller_value.get())
+
+
 class AsyncRaisingView(View):
     async def get(self) -> Response:  # ty: ignore[invalid-method-override]
         raise RuntimeError("async view boom")
@@ -115,6 +122,7 @@ class InProcessRouter(Router):
         path("caller-value-stream", CallerValueStreamView, name="caller_value_stream"),
         path("async", AsyncView, name="async"),
         path("async-raises", AsyncRaisingView, name="async_raises"),
+        path("async-caller-value", AsyncCallerValueView, name="async_caller_value"),
         path("async-stream", AsyncStreamView, name="async_stream"),
         path("sets-view-value", SetsViewValueView, name="sets_view_value"),
         path(

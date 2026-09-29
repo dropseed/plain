@@ -45,6 +45,8 @@ from plain.http import (
 from plain.logs import get_framework_logger
 from plain.utils.otel import format_exception_type
 
+from .own_event_loop import run_on_own_event_loop
+
 if TYPE_CHECKING:
     from plain.http import Request
 
@@ -376,7 +378,8 @@ class ResponseLifecycle:
 
         The test client's driver: the same lifecycle as `send()` without a
         server. A sync body's chunks run here, in the request context; an
-        async body runs on an event loop of its own. A body that raises
+        async body runs on an event loop of its own, which is on another
+        thread when this one is already running a loop. A body that raises
         partway is handled as the server handles it (logged, recorded on
         the span, set as `response.exception`), and the chunks before it
         are returned.
@@ -387,7 +390,7 @@ class ResponseLifecycle:
         )
 
         if isinstance(response, AsyncStreamingResponse):
-            return asyncio.run(self._read_async(consume=consume))
+            return run_on_own_event_loop(self._read_async(consume=consume))
 
         chunks: list[bytes] = []
         try:
