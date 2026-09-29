@@ -45,6 +45,7 @@ from .envkeys import (
     KEY_LINE_NAMES,
     resolve_env_key,
 )
+from .utils import running_command
 
 __all__ = ["load_dotenv", "load_dotenv_files", "parse_dotenv"]
 
@@ -152,10 +153,16 @@ def load_dotenv_files(*, decrypt: bool = True) -> None:
     deferred: dict[str, Binding] = {}
     directives: dict[str, Binding] = {}
 
+    # A test run prints what its tests did, and is read line by line by
+    # whoever ran it. Which files were loaded is the same on every run, and
+    # `plain env` says where each name came from.
+    says_what_it_loads = running_command() != "test"
+
     for path in dotenv_ladder(plain_env):
-        if _load_dotenv_deferring_encrypted(
+        loaded = _load_dotenv_deferring_encrypted(
             path, override=False, deferred=deferred, directives=directives
-        ):
+        )
+        if loaded and says_what_it_loads:
             click.secho(f"Loading {path}...", dim=True, italic=True, err=True)
 
     _directives = directives

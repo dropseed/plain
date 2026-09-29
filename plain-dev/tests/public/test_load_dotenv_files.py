@@ -2,7 +2,7 @@ import contextlib
 import io
 import os
 
-from dev_test_helpers import sandbox
+from dev_test_helpers import running, sandbox
 from plain.dev.dotenv import load_dotenv_files
 from plain.test import raises
 
@@ -99,3 +99,28 @@ def test_load_notice_goes_to_stderr():
             load_dotenv_files()
         assert out.getvalue() == ""
         assert ".env" in err.getvalue()
+
+
+def test_a_command_is_told_which_files_were_loaded():
+    with sandbox() as box, running("preflight"):
+        box.write(".env", "BASE=from-env\n")
+
+        with contextlib.redirect_stderr(io.StringIO()) as written:
+            load_dotenv_files()
+
+        assert written.getvalue() == "Loading .env...\n"
+
+
+def test_a_test_run_is_not_told_which_files_were_loaded():
+    """Its output is what its tests did. The files still load."""
+    with sandbox() as box, running("test"):
+        os.environ["PLAIN_ENV"] = "test"
+        box.write(".env", "BASE=from-env\n")
+        box.write(".env.test", "ONLY_IN_TESTS=yes\n")
+
+        with contextlib.redirect_stderr(io.StringIO()) as written:
+            load_dotenv_files()
+
+        assert written.getvalue() == ""
+        assert os.environ["BASE"] == "from-env"
+        assert os.environ["ONLY_IN_TESTS"] == "yes"

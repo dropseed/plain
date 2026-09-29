@@ -292,6 +292,8 @@ Add `.env.local` and `.env.*.local` to your `.gitignore` (not `.env*`, which wou
 
 Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you and loads `.env.test*` through this ladder.
 
+A command says which files it loaded, on stderr (`Loading .env.dev...`). `plain test` doesn't: a test run's output is what its tests did.
+
 ### Encrypted values
 
 Secrets can be committed in `.env.dev` as encrypted values, so a fresh checkout (or a hosted agent) gets every dev credential from git and only needs one key:
