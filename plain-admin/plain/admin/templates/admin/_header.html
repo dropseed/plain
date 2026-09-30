@@ -55,11 +55,15 @@
                     aria-controls="user-menu-popover"
                     class="flex items-center cursor-pointer"
                 >
-                    {% set avatar_url = user.get_avatar_url() if user.get_avatar_url is defined else None %}
+                    {# While impersonating, this menu still acts on the real
+                       account (App Settings, Log out), so it shows the
+                       impersonator — not the user being impersonated. #}
+                    {% set account_user = impersonator or user %}
+                    {% set avatar_url = account_user.get_avatar_url() if account_user.get_avatar_url is defined else None %}
                     {% if avatar_url %}
                         <img
                             src="{{ avatar_url }}"
-                            alt="{{ user }}"
+                            alt="{{ account_user }}"
                             class="w-7 h-7 rounded-full"
                         />
                     {% else %}
@@ -90,6 +94,16 @@
                     <div role="separator"></div>
                     {% endif %}
                     <div role="menu">
+                        {% if impersonator %}
+                        <div class="px-2 py-1.5 text-xs text-admin-muted-foreground">
+                            Impersonating <span class="font-medium text-admin-foreground">{{ user }}</span>
+                        </div>
+                        <a role="menuitem" href="{{ url('admin:impersonate:stop') }}">
+                            <admin.Icon name="x-octagon" />
+                            Stop impersonating
+                        </a>
+                        <div role="separator"></div>
+                        {% endif %}
                         {% include "admin/user_menu_items.html" ignore missing %}
                         <a role="menuitem" href="{{ url('admin:settings') }}">
                             <admin.Icon name="gear" />
