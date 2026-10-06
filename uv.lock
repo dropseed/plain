@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [manifest]
@@ -730,7 +730,7 @@ wheels = [
 
 [[package]]
 name = "plain"
-version = "0.165.0"
+version = "0.166.0"
 source = { editable = "plain" }
 dependencies = [
     { name = "click" },

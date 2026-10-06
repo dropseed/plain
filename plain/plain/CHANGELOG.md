@@ -1,5 +1,32 @@
 # plain changelog
 
+## [0.166.0](https://github.com/dropseed/plain/releases/plain@0.166.0) (2026-10-06)
+
+### What's changed
+
+- `plain.test` is no longer part of Plain. What it held is [`plain.testing`](https://pypi.org/project/plain.testing/), a package of its own and a dev dependency: the `Client`, the request vocabulary, `override_settings`, `patch`, `raises`, the captures, and the `plain test` command. `from plain.test import Client` becomes `from plain.testing import Client` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain request` moved to `plain.dev`. The command, its flags and its output are the same, and it needs `plain.dev` installed ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `Request(body=...)`: a request can be constructed with its body, as `bytes` or a stream to read it from, and the server and the test client build one the same way. `Request(...).body` is `b""` when none was given, where it raised. `body_ingest_seconds` is a constructor argument and a public attribute, where the server stamped a private one ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain.server.inprocess`: `InProcessServer().handle(request).send()` handles a request on the calling thread, with no socket and no worker, through the same handler and response lifecycle the server runs, and returns what would have been sent. An accepted WebSocket upgrade is served with `serve_websocket()`. Importing `plain.server` no longer loads the server itself; `ServerApplication` is imported from `plain.server.app` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Response bodies are sent inside the request context. A streaming body used to run on the event loop after `handle()` returned, outside the request's `contextvars.Context`: a slow sync generator stalled unrelated requests, and the generator got a different database connection than the view, which pinned pool connections to idle keep-alive clients until the pool ran out. `handle()` now returns a `ResponseLifecycle` that owns the response until it is closed. Sync chunks run on the thread pool in the request's context, async chunks in one context-bound task, the closers run once in that context, and the SERVER span and `http.server.request.duration` cover sending the body, so a body that fails partway is recorded on the span. Sync streams send their headers with the first chunk (`yield b""` flushes them early); file-like `StreamingResponse` bodies are read as data arrives; `FileResponse` reads 64 KB blocks, where it read 4 KB. `response.request_context` is gone ([70476eeb61](https://github.com/dropseed/plain/commit/70476eeb61))
+- `ServerSentEventsView` closes `stream()` when the client leaves, so the generator's cleanup (an unsubscribe, an `async with`) runs before the request closes instead of being left to the garbage collector ([cb77520251](https://github.com/dropseed/plain/commit/cb77520251))
+- `plain check` runs `plain test` when `plain.testing` is installed, and a project with no tests passes the step: the runner's exit code `4` ("no tests found") is let through, where pytest's `5` failed the check ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain settings get` masks a secret setting's value and says so; `--reveal` prints the real value. Asking for a setting that doesn't exist exits 1 ([e590770c10](https://github.com/dropseed/plain/commit/e590770c10))
+- `plain agent install` goes by what the files hold, not when they were written, and names each rule and skill it wrote or removed. Comparing modification times meant a fresh checkout, with every file dated today, never received a package's older rule text and was told it was up to date ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain docs <name> --api` shows annotated attributes (dataclass fields, model fields), which had been left out, and leaves out decorators whose name starts with an underscore ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain.cli.runtime` gained `set_running_command()`, `get_running_command()` and `when_the_running_command_is_found()`, so code that runs during setup can ask which command is running and defer work until the command is known to exist. The CLI sets the name before it looks the command up ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain.runtime.setup_timing` records how long each `plain.setup` hook, the settings, and each package's import took (`SetupTiming`), and `PLAIN_IMPORTED_AT` / `CPU_SECONDS_BEFORE_PLAIN` mark where the process started. `plain test` prints it as the report of where a run's time went ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Command output leaves out color when `PLAIN_TEST_RUNNING` is set, where it read `PYTEST_CURRENT_TEST` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Signatures are read without evaluating annotations (`annotationlib.Format.FORWARDREF`), so a forward reference in a view or handler signature doesn't fail under deferred annotations ([83c1194474](https://github.com/dropseed/plain/commit/83c1194474))
+
+### Upgrade instructions
+
+- Move the test suite from pytest to `plain.testing`: `uv add plain.testing --dev`, remove `plain.pytest`, `pytest` and every `pytest-*` plugin, and change `from plain.test import ...` to `from plain.testing import ...`. The complete migration guide, step by step, is in the [`plain.testing` pull request](https://github.com/dropseed/plain/pull/130).
+- `plain request` needs `plain.dev` as a dev dependency, which it is in a project made with `plain-start`.
+- Anything that set `Request._stream` or read `Request._body_ingest_seconds` passes `Request(body=...)` and reads `request.body_ingest_seconds`. Anything that read `response.request_context` has nothing to read: the body and the closers already run in the request's context.
+- `from plain.server import ServerApplication` becomes `from plain.server.app import ServerApplication`.
+- Code that checked `PYTEST_CURRENT_TEST` to know it was under test checks `PLAIN_TEST_RUNNING`.
+
 ## [0.165.0](https://github.com/dropseed/plain/releases/plain@0.165.0) (2026-09-21)
 
 ### What's changed
