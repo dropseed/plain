@@ -1,5 +1,25 @@
 # plain-postgres changelog
 
+## [0.123.0](https://github.com/dropseed/plain/releases/plain-postgres@0.123.0) (2026-10-06)
+
+### What's changed
+
+- The test helpers moved from `plain.postgres.test` to `plain.postgres.testing`, to match the package they serve. `plain.postgres.test.pytest` is gone, and with it the `db` and `isolated_db` fixtures: every test runs in a rolled-back transaction with nothing asked for, and `@isolated_db` is a decorator for a test that can't (migrations, convergence, what happens at commit), which gets a database of its own for the test. The package registers this with `plain.testing` through a `TestLifecycle` entry point, where it registered a pytest plugin ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- A test run has databases of its own, named for the configured database and the run (`test_shop_main_r48213`), so any number of runs can go at once in one checkout. Each is a clone of a template (`test_shop_main_tca9feecd`) that the first run creates, migrates and converges and leaves for the rest, named by a digest of every migration file, every model as convergence reads it, and the plain-postgres, psycopg and Postgres versions. A run writes a record into each database it makes; a killed run's databases are dropped by the next run only by that record, when the run is proved dead, never by name, and never with `FORCE` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- While the tests run, `POSTGRES_URL` is the test database for the whole process, every thread and context. A thread started by the code under test used to connect to the development database ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `capture_queries` hands back a read-only sequence, read after the block. Each query has `.sql` as sent, with its placeholders, and `.sql_with_params` with the values filled in; `queries.sql_statements(table=)` lists statements with whitespace collapsed, kept to one table. `max_queries` and `capture_queries` nest, and a capture around a request sees what the request did ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- A failed test's report prints a model instance with its fields and a queryset as the SQL it would run, or its rows, without running a query. `Field.value_is_secret` says the field holds a secret and is printed as `<withheld>`; encrypted fields set it, and a field type of your own can ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `schema_lock()` releases its advisory lock before closing the session. Postgres frees a session's locks a moment after the client disconnects, so the next acquisition could wait out a whole retry interval ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- The tests that roll back share one connection, opened by the first of them ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Expression and queryset result-type signatures are read without evaluating annotations, so a forward reference in them works under deferred annotations ([83c1194474](https://github.com/dropseed/plain/commit/83c1194474))
+
+### Upgrade instructions
+
+- Change `from plain.postgres.test import ...` to `from plain.postgres.testing import ...`.
+- Remove the `db` and `isolated_db` parameters from tests. A test that was `def test_x(isolated_db):` becomes `@isolated_db` over `def test_x():`.
+- `queries[0]["sql"]` is `queries[0].sql_with_params`; `queries[0].sql` is the statement as sent.
+- Remove any `pytest11` or `conftest.py` setup that pointed at the test database; the run creates and drops its own.
+
 ## [0.122.0](https://github.com/dropseed/plain/releases/plain-postgres@0.122.0) (2026-09-21)
 
 ### What's changed

@@ -1338,7 +1338,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-postgres"
-version = "0.122.0"
+version = "0.123.0"
 source = { editable = "plain-postgres" }
 dependencies = [
     { name = "plain" },
