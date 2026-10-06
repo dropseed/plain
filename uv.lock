@@ -917,7 +917,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-code"
-version = "0.27.0"
+version = "0.28.0"
 source = { editable = "plain-code" }
 dependencies = [
     { name = "httpx" },

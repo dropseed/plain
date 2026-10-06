@@ -1,5 +1,17 @@
 # plain-code changelog
 
+## [0.28.0](https://github.com/dropseed/plain/releases/plain-code@0.28.0) (2026-10-06)
+
+### What's changed
+
+- `plain code check` passes the project's `tests/` directory to the type checker as a search path, so a test file's `from helpers import create_user` resolves to `tests/helpers.py` the way it does under `plain test`, with nothing to configure ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Annotation coverage no longer leaves out a directory named `test`, which took every package's `test/` helpers out of the count; test files and `tests/` directories are still left out, and a directory whose name starts with a dot is never looked in ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- The `PT` (pytest style) lint rules are no longer in the default ruff rule set ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-code@0.27.0) (2026-09-21)
 
 ### What's changed
