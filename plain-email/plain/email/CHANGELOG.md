@@ -1,5 +1,15 @@
 # plain-email changelog
 
+## [0.23.0](https://github.com/dropseed/plain/releases/plain-email@0.23.0) (2026-10-06)
+
+### What's changed
+
+- `plain.email.testing.outbox` replaces the `mailoutbox` pytest fixture. During a test run `EMAIL_BACKEND` is the in-memory backend and the outbox is emptied before each test, with nothing asked for: the package registers an `EmailTestLifecycle` with `plain.testing`. `plain.email.test.pytest` is gone ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- `def test_sends_email(mailoutbox):` becomes `def test_sends_email():` with `from plain.email.testing import outbox` at the top of the file, and `mailoutbox` in the body becomes `outbox`.
+
 ## [0.22.0](https://github.com/dropseed/plain/releases/plain-email@0.22.0) (2026-09-21)
 
 ### What's changed
