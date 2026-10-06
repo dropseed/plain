@@ -1,5 +1,23 @@
 # plain-dev changelog
 
+## [0.71.0](https://github.com/dropseed/plain/releases/plain-dev@0.71.0) (2026-10-06)
+
+### What's changed
+
+- `plain request` lives here now, moved from core. The command, its flags and its output are the same. It makes its requests with the `plain.testing` client against the dev database, `--user` needs `plain.auth`, and nothing it does is exported to Plain Cloud while it runs. `plain.dev` depends on `plain.testing` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- With no database URL configured, each `plain test` run gets a test database of its own, named for the checkout's database and the run (`test_myapp_feature_r48213`), so any number of runs can go at once in one checkout and no suffix on `PLAIN_POSTGRES_URL` is needed to keep them apart. Each is a clone of a template the first run migrated and converged and left for the next (`test_myapp_feature_tca9feecd`), one per checkout's database; a changed migration or model is a new template ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain db clean --dry-run` lists every database of the project with the reason it would be dropped or is left. `plain db clean` prints the same lists, asks, and then drops; there is no flag that skips the question. A development database is dropped only when its checkout is gone and no checkout is configured to use it, which goes by what each checkout uses now and not by who the metadata says made it. A test database is dropped only when it carries the record of the run that made it and that run is proved dead; a template only when its record says it is of no use. Nothing is dropped with `FORCE` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- `plain db drop` and `plain db reset` stop when something is connected to the database and say what; `--force` throws the connections off. `plain db list` marks test templates ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Dev services are started once the command is known to exist. A mistyped command, or `plain test` with no `plain.testing` installed, starts none ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- A test run doesn't print which `.env` files it loaded: a run's output is what its tests did ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+- Requires `plain>=0.166.0` ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- `plain db clean --yes` is gone. Run `plain db clean --dry-run`, read it, then `plain db clean`.
+- Upgrade `plain.postgres` to 0.123.0 alongside: the `plain db` commands read the records test runs write from `plain.postgres.testing`.
+- A suffix added to `PLAIN_POSTGRES_URL` to keep parallel test runs apart can be removed.
+
 ## [0.70.0](https://github.com/dropseed/plain/releases/plain-dev@0.70.0) (2026-09-21)
 
 ### What's changed
