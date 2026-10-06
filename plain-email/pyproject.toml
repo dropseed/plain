@@ -10,7 +10,7 @@ dependencies = ["plain>=0.143.0,<1.0.0", "plain.templates>=0.1.0,<1.0.0"]
 
 # Test lifecycle discovered by plain.testing
 [project.entry-points."plain.testing"]
-"email" = "plain.email.test.lifecycle:EmailTestLifecycle"
+"email" = "plain.email.testing.lifecycle:EmailTestLifecycle"
 
 [dependency-groups]
 dev = ["plain.testing<1.0.0"]

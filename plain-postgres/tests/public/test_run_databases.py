@@ -27,10 +27,10 @@ from plain.postgres.databases import (
     set_database_comment,
 )
 from plain.postgres.sources import build_connection_params
-from plain.postgres.test import isolated_db
-from plain.postgres.test.database import RunDatabases, shared_database_name
-from plain.postgres.test.leftovers import RunRecord, read_template_record
-from plain.postgres.test.schema import SchemaDigest
+from plain.postgres.testing import isolated_db
+from plain.postgres.testing.database import RunDatabases, shared_database_name
+from plain.postgres.testing.leftovers import RunRecord, read_template_record
+from plain.postgres.testing.schema import SchemaDigest
 from plain.runtime import settings
 from postgres_test_helpers import (
     ScratchApp,
@@ -125,7 +125,7 @@ import threading
 
 from plain.postgres import get_connection
 from plain.postgres.db import _db_conn, use_management_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 def current_database(connection=None):
@@ -399,7 +399,7 @@ def test_a_run_writes_its_record_into_the_databases_it_makes():
 import json
 
 from plain.postgres import get_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 def the_record():

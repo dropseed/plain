@@ -391,7 +391,7 @@ def request(
                 raise SystemExit(1)
 
             try:
-                from plain.auth.test import login_client
+                from plain.auth.testing import login_client
             except ImportError:
                 raise click.UsageError("plain.auth is required to use --user")
 

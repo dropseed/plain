@@ -1,7 +1,7 @@
 """Tests for the in-memory email backend and the ``outbox`` list."""
 
 from plain.email import send_mail
-from plain.email.test import outbox
+from plain.email.testing import outbox
 
 
 def test_outbox_captures_sent_email():

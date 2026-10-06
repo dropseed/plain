@@ -1,7 +1,7 @@
 from app.users.models import User
 from plain.admin.views.base import AdminView
 from plain.admin.views.registry import registry
-from plain.auth.test import login_client
+from plain.auth.testing import login_client
 from plain.testing import Client, override_settings
 
 

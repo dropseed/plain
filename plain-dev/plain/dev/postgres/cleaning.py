@@ -29,7 +29,7 @@ that made it and that run is proved dead. **A template**, which a
 database's test runs clone, is dropped only when its record says it is of
 no use now: the schema of this checkout's database has changed since it
 was built, the database it was built for is gone from the server, or the
-run building it died before it was done. `plain.postgres.test.leftovers`
+run building it died before it was done. `plain.postgres.testing.leftovers`
 has both rules, and this module only reports its verdicts.
 
 Outside a git repository the only checkout known is the one the command
@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING
 from .identity import _run_git, resolve_database_name
 
 if TYPE_CHECKING:
-    from plain.postgres.test.leftovers import LeftoverVerdict
+    from plain.postgres.testing.leftovers import LeftoverVerdict
 
     from .cluster import Cluster, DevDatabase
 
@@ -83,7 +83,7 @@ class CleanFacts:
     connections: int
     is_test: bool
     # For a test database: whether its run is proved dead, and the reason.
-    # Both from `plain.postgres.test.leftovers.judge_leftover`. For a
+    # Both from `plain.postgres.testing.leftovers.judge_leftover`. For a
     # template (a test database with `is_template` too): whether it is of
     # no use now, and why, from `judge_template`.
     run_is_dead: bool = False
@@ -280,7 +280,7 @@ def read_clean_facts(
     template from a stale one. `None` when it couldn't be worked out, and
     then the template is left.
     """
-    from plain.postgres.test.leftovers import (
+    from plain.postgres.testing.leftovers import (
         judge_leftover,
         judge_template,
         look_at_leftover,

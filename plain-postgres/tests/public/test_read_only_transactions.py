@@ -9,7 +9,7 @@ import psycopg.errors
 from app.examples.models.iteration import IterationExample
 from plain.postgres import transaction
 from plain.postgres.db import read_only
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.postgres.transaction import TransactionManagementError
 from plain.testing import raises
 

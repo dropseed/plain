@@ -517,7 +517,7 @@ def route_of(spans: CapturedSpans) -> str:
     return str(server_span.attributes["http.route"])
 ```
 
-All three are a [`Captured`](./captured.py#Captured), and a package that ships its own capture helper builds on the same class so it reads the same way. [`capture_queries`](../../../plain-postgres/plain/postgres/README.md#testing) in `plain.postgres.test` is one.
+All three are a [`Captured`](./captured.py#Captured), and a package that ships its own capture helper builds on the same class so it reads the same way. [`capture_queries`](../../../plain-postgres/plain/postgres/README.md#testing) in `plain.postgres.testing` is one.
 
 A helper makes a `Captured` and calls its `finish(items)` when the block ends. When every capture of a kind reads from one list that grows as things happen, a [`CaptureSource`](./captured.py#CaptureSource) does that for you, and is what makes the captures nest:
 
@@ -1747,7 +1747,7 @@ Everything about testing is in this one package, and it's a dev dependency. Noth
 ```toml
 # plain-postgres/pyproject.toml
 [project.entry-points."plain.testing"]
-postgres = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
+postgres = "plain.postgres.testing.lifecycle:PostgresTestLifecycle"
 ```
 
 An entry point is a string in `pyproject.toml`, so a package declares its lifecycle without depending on this one.

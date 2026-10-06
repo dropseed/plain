@@ -1,5 +1,5 @@
 """Auth and sessions are separate packages, and their test helpers ship with
-them: `plain.auth.test`, `plain.sessions.test`. `plain.testing` imports neither,
+them: `plain.auth.testing`, `plain.sessions.testing`. `plain.testing` imports neither,
 and its client carries no method that would need to."""
 
 import ast

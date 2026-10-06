@@ -2,10 +2,10 @@
 
 from app.users.models import User
 from plain.auth.requests import get_request_user
-from plain.auth.test import login_client, logout_client
-from plain.postgres.test import capture_queries
+from plain.auth.testing import login_client, logout_client
+from plain.postgres.testing import capture_queries
 from plain.sessions.models import Session
-from plain.sessions.test import get_client_session
+from plain.sessions.testing import get_client_session
 from plain.testing import Client
 
 

@@ -119,7 +119,7 @@ def read_run_record(comment: str | None) -> RunRecord | None:
 def run_lock_key(run_name: str) -> int:
     """The advisory lock a run holds, from the name of its shared database.
     A template's lock is keyed the same way, by the template's name."""
-    digest = hashlib.sha256(f"plain.postgres.test:{run_name}".encode()).digest()
+    digest = hashlib.sha256(f"plain.postgres.testing:{run_name}".encode()).digest()
     return int.from_bytes(digest[:8], "big", signed=True)
 
 

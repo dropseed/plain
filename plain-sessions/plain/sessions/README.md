@@ -144,10 +144,10 @@ The [`SessionAdmin`](./admin.py#SessionAdmin) viewset provides the interface for
 
 ## Testing
 
-In a test, [`get_client_session()`](./test.py#get_client_session) gives you the session a test client is using, so you can read what a view stored or set something before a request:
+In a test, [`get_client_session()`](./testing.py#get_client_session) gives you the session a test client is using, so you can read what a view stored or set something before a request:
 
 ```python
-from plain.sessions.test import get_client_session
+from plain.sessions.testing import get_client_session
 from plain.testing import Client
 
 

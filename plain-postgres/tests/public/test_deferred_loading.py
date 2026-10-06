@@ -6,7 +6,7 @@ that access costs -- so a future change shows up as a diff to these tests.
 """
 
 from app.examples.models.relationships import Tag, Widget, WidgetTag
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 
 def test_only_defers_unlisted_fields():

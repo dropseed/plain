@@ -9,8 +9,8 @@ login-gated ``/whoami`` view), database rows, and sent email.
 import re
 
 from app.users.models import User
-from plain.auth.test import login_client
-from plain.email.test import outbox
+from plain.auth.testing import login_client
+from plain.email.testing import outbox
 from plain.testing import Client
 
 # Passwords chosen to satisfy PasswordField's default validators

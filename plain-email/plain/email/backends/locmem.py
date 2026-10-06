@@ -3,7 +3,7 @@
 Messages handed to ``send_messages`` are appended to the module-level
 ``outbox`` list instead of being delivered. During test runs the email test
 lifecycle routes ``EMAIL_BACKEND`` here and clears ``outbox`` around each
-test — import it via ``plain.email.test``.
+test — import it via ``plain.email.testing``.
 """
 
 from typing import TYPE_CHECKING

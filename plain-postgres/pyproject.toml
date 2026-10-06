@@ -13,7 +13,7 @@ dependencies = ["plain>=0.157.0,<1.0.0", "psycopg>=3.2", "psycopg-pool>=3.2"]
 
 # Test lifecycle discovered by plain.testing
 [project.entry-points."plain.testing"]
-"postgres" = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
+"postgres" = "plain.postgres.testing.lifecycle:PostgresTestLifecycle"
 
 [dependency-groups]
 dev = [

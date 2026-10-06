@@ -18,7 +18,7 @@ from plain.postgres.databases import (
     get_database_comment,
     set_database_comment,
 )
-from plain.postgres.test.leftovers import TEMPLATE_BUILDING, read_template_record
+from plain.postgres.testing.leftovers import TEMPLATE_BUILDING, read_template_record
 from postgres_test_helpers import ScratchApp, make_scratch_app, templates_of
 
 A_TEST = {"tests/test_one.py": "def test_one():\n    pass\n"}
@@ -149,7 +149,7 @@ def test_an_isolated_test_gets_a_clone_of_the_template_too():
         {
             "tests/test_isolated.py": (
                 "from plain.postgres import get_connection\n"
-                "from plain.postgres.test import isolated_db\n"
+                "from plain.postgres.testing import isolated_db\n"
                 "\n"
                 "\n"
                 "@isolated_db\n"

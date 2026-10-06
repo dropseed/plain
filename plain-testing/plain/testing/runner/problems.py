@@ -223,7 +223,7 @@ class CantBeRunAsWritten(TestDefinitionError):
 _PASSES_NOTHING = (
     "plain.testing.skip",
     "plain.testing.tag",
-    "plain.postgres.test.isolated_db",
+    "plain.postgres.testing.isolated_db",
 )
 
 _CASES = "plain.testing.cases"

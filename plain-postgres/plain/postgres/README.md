@@ -2435,7 +2435,7 @@ A test that needs either is [`@isolated_db`](#tests-that-cant-run-in-a-transacti
 ```python
 import threading
 
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 @isolated_db
@@ -2449,7 +2449,7 @@ def test_the_importer_sees_the_batch():
     assert Row.query.count() == 3
 ```
 
-The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.test`.
+The package registers this with [plain.testing](../../../plain-testing/plain/testing/README.md#what-packages-do-for-every-test), the test runner. The helpers below are in `plain.postgres.testing`.
 
 ### What a failure prints
 
@@ -2476,10 +2476,10 @@ If you write a field type whose value is a secret, say so on the class with `val
 
 ### Tests that can't run in a transaction
 
-A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./test/decorators.py#isolated_db):
+A test about migrations, convergence, or what happens at commit can't run inside a transaction that never commits. Mark it with [`@isolated_db`](./testing/decorators.py#isolated_db):
 
 ```python
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 @isolated_db
@@ -2490,10 +2490,10 @@ That test gets a database of its own, cloned from [the template](#the-template) 
 
 ### Setting a query budget
 
-[`max_queries`](./test/helpers.py#max_queries) fails the test if the block runs more queries than you allow:
+[`max_queries`](./testing/helpers.py#max_queries) fails the test if the block runs more queries than you allow:
 
 ```python
-from plain.postgres.test import max_queries
+from plain.postgres.testing import max_queries
 from plain.testing import Client
 
 
@@ -2512,10 +2512,10 @@ AssertionError: Expected at most 5 queries, 6 were executed:
 
 ### Reading the queries a block ran
 
-[`capture_queries`](./test/helpers.py#capture_queries) records what the database is asked to do during a block:
+[`capture_queries`](./testing/helpers.py#capture_queries) records what the database is asked to do during a block:
 
 ```python
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 
 def test_lookup_is_one_query():

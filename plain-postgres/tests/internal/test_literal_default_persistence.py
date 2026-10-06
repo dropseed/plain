@@ -11,7 +11,7 @@ short-circuits on allow_null and default differences.
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import fields as plain_fields
 from plain.postgres import get_connection, types
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.testing import cases, raises
 
 

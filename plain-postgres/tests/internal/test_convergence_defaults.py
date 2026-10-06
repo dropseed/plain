@@ -19,7 +19,7 @@ from plain.postgres.convergence.corrections import (
     SetColumnDefaultCorrection,
     SetNotNullCorrection,
 )
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 # Column default detection

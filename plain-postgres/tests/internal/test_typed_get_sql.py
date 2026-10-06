@@ -9,7 +9,7 @@ The behavioral contract lives in `tests/public/test_typed_get.py`.
 """
 
 from app.examples.models.defaults import DefaultsExample
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 
 def statement_for(build):

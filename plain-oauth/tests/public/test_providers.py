@@ -2,7 +2,7 @@ import datetime
 
 from app.users.models import User
 from plain.auth.requests import get_request_user
-from plain.auth.test import login_client
+from plain.auth.testing import login_client
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
 from plain.testing import Client, override_settings, raises

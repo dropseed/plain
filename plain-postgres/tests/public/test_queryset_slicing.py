@@ -1,6 +1,6 @@
 from app.examples.models.iteration import IterationExample
 from plain.postgres import F, QuerySet
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises
 
 

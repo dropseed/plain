@@ -23,7 +23,7 @@ from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
 from plain.postgres.sources import build_connection_params
-from plain.postgres.test import capture_queries, isolated_db
+from plain.postgres.testing import capture_queries, isolated_db
 from plain.testing import case, cases, raises
 
 

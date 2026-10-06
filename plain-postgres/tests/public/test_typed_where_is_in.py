@@ -20,7 +20,7 @@ from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.forms import FormsExample
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres.expressions import F
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises
 from postgres_test_helpers import executed_sql
 

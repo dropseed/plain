@@ -17,7 +17,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.returning import ReturningEvent
 from app.examples.models.upsert import UpsertTenant
 from plain.exceptions import ValidationError
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import patch, raises
 
 

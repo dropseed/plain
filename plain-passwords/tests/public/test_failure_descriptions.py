@@ -1,7 +1,7 @@
 """What a failure report prints for a user: everything but the password."""
 
 from app.users.models import User
-from plain.postgres.test.lifecycle import PostgresTestLifecycle
+from plain.postgres.testing.lifecycle import PostgresTestLifecycle
 
 
 def test_a_password_is_not_printed_with_the_user_it_belongs_to():

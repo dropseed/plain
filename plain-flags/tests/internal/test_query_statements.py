@@ -12,7 +12,7 @@ get_or_create() path -- they are pinned here only so the counts stay honest.
 
 from plain.flags import Flag
 from plain.flags.models import Flag as FlagModel
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 
 class _PinnedFlag(Flag):

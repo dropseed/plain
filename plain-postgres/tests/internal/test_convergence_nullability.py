@@ -17,7 +17,7 @@ from plain.postgres.convergence.corrections import (
     DropNotNullCorrection,
     SetNotNullCorrection,
 )
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 # Not null detection

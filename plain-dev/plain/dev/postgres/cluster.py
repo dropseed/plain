@@ -17,7 +17,7 @@ from .identity import current_branch
 
 if TYPE_CHECKING:
     from plain.postgres.database_url import DatabaseConfig
-    from plain.postgres.test.leftovers import RunRecord, TemplateRecord
+    from plain.postgres.testing.leftovers import RunRecord, TemplateRecord
 
 
 @dataclass(frozen=True)
@@ -87,10 +87,10 @@ class Cluster:
         Why it was left, if it was.
 
         Everything about it is read again, with its run's lock held, and it
-        is dropped without `FORCE`: see `plain.postgres.test.leftovers`.
+        is dropped without `FORCE`: see `plain.postgres.testing.leftovers`.
         """
         from plain.postgres.databases import get_database_comment
-        from plain.postgres.test.leftovers import (
+        from plain.postgres.testing.leftovers import (
             drop_if_a_dead_runs,
             maintenance_connection,
             read_run_record,
@@ -116,10 +116,10 @@ class Cluster:
         if it was.
 
         Read again with the template's lock held, and dropped without
-        `FORCE`: see `plain.postgres.test.leftovers`.
+        `FORCE`: see `plain.postgres.testing.leftovers`.
         """
         from plain.postgres.databases import get_database_comment
-        from plain.postgres.test.leftovers import (
+        from plain.postgres.testing.leftovers import (
             drop_if_a_stale_template,
             maintenance_connection,
             read_template_record,
@@ -204,7 +204,7 @@ class Cluster:
         the local backend, where one server holds databases we never created.
         """
         from plain.postgres.databases import list_databases
-        from plain.postgres.test.leftovers import (
+        from plain.postgres.testing.leftovers import (
             read_run_record,
             read_template_record,
         )

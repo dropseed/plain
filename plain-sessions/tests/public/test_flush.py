@@ -5,7 +5,7 @@ and flush() must not go to the database at all. A store with a saved key
 deletes that row. Either way the store ends up empty with no key.
 """
 
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
 

@@ -9,7 +9,7 @@ has to get right, the ones that went wrong among them.
 import json
 from dataclasses import replace
 
-from plain.postgres.test.leftovers import (
+from plain.postgres.testing.leftovers import (
     LOCK_SCHEME,
     RECORD_KEY,
     TEMPLATE_BUILDING,
@@ -25,7 +25,7 @@ from plain.postgres.test.leftovers import (
     read_template_record,
     run_lock_key,
 )
-from plain.postgres.test.schema import describe_schema
+from plain.postgres.testing.schema import describe_schema
 from plain.testing import case, cases
 
 

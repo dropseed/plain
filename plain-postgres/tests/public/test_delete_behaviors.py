@@ -36,7 +36,7 @@ from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.trees import TreeNode
 from plain.exceptions import ValidationError
 from plain.postgres import transaction, types
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises
 
 

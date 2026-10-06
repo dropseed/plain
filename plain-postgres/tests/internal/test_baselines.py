@@ -26,7 +26,7 @@ from plain.postgres.migrations.migration import Migration
 from plain.postgres.migrations.recorder import MigrationRecorder
 from plain.postgres.migrations.writer import MigrationWriter
 from plain.postgres.preflight.database import CheckPrunableMigrations
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises
 
 # The last migration the test database has recorded for `examples`, a name

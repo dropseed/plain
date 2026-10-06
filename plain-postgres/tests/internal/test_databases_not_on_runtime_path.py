@@ -111,6 +111,6 @@ def test_databases_module_is_unreachable_from_runtime() -> None:
 
 def test_test_harness_may_use_databases() -> None:
     """The test harness is the sanctioned in-package consumer."""
-    path = PACKAGE_ROOT / "test" / "database.py"
-    imported = _imported_modules(path, "plain.postgres.test.database")
+    path = PACKAGE_ROOT / "testing" / "database.py"
+    imported = _imported_modules(path, "plain.postgres.testing.database")
     assert FORBIDDEN_MODULE in imported

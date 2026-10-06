@@ -11,7 +11,7 @@ from plain.postgres import CheckConstraint, Q, UniqueConstraint
 from plain.postgres.constraints import BaseConstraint
 from plain.postgres.expressions import F
 from plain.postgres.forms import ModelForm
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import build_request, cases, patch, raises
 
 

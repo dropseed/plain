@@ -11,7 +11,7 @@ from plain.dev.postgres.backends import Server
 from plain.dev.postgres.cluster import Cluster, DevDatabase
 from plain.postgres import databases as postgres_databases
 from plain.postgres.databases import DatabaseInfo
-from plain.postgres.test.leftovers import TEMPLATE_READY, RunRecord, TemplateRecord
+from plain.postgres.testing.leftovers import TEMPLATE_READY, RunRecord, TemplateRecord
 from plain.testing import patch
 
 

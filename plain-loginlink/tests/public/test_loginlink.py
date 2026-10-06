@@ -10,8 +10,8 @@ import re
 from urllib.parse import urlsplit
 
 from app.users.models import User
-from plain.auth.test import login_client
-from plain.email.test import outbox
+from plain.auth.testing import login_client
+from plain.email.testing import outbox
 from plain.loginlink.links import generate_link_url
 from plain.testing import Client, build_request
 

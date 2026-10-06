@@ -5,7 +5,7 @@ from app.examples.models.delete import (
 )
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.postgres import QuerySet
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises, skip_test
 
 

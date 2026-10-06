@@ -5,7 +5,7 @@ Packages that participate in testing subclass TestLifecycle and register it
 under the `plain.testing` entry point group:
 
     [project.entry-points."plain.testing"]
-    postgres = "plain.postgres.test.lifecycle:PostgresTestLifecycle"
+    postgres = "plain.postgres.testing.lifecycle:PostgresTestLifecycle"
 
 The runner discovers and drives lifecycles; packages never import the runner.
 """

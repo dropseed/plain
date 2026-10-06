@@ -1,7 +1,7 @@
 """Tests for POSTGRES_MANAGEMENT_URL and use_management_connection()."""
 
 from plain.postgres.db import use_management_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.runtime import settings
 from plain.testing import override_settings, raises
 

@@ -176,7 +176,7 @@ class Client:
     Client objects are stateful — they keep the cookies (and so the session)
     that responses set, for the lifetime of the Client instance. `cookies` is
     that jar: logging a client in is writing the session cookie to it, which
-    is what `plain.auth.test.login_client` does.
+    is what `plain.auth.testing.login_client` does.
 
     `headers` are sent with every request. `raise_exceptions=False` keeps an
     exception the app raised as the 5xx response it became, on

@@ -8,7 +8,7 @@ from plain.email.message import (
     EmailMessage,
     EmailMultiAlternatives,
 )
-from plain.email.test import outbox
+from plain.email.testing import outbox
 from plain.testing import override_settings, raises
 
 

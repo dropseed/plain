@@ -15,7 +15,7 @@ from plain.postgres.convergence.corrections import (
     SetStorageParameterCorrection,
 )
 from plain.postgres.introspection.schema import _fetch_raw_reloptions
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 
 
 def _table_reloptions(table: str) -> tuple[list[str] | None, list[str] | None]:

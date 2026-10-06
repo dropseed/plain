@@ -2,7 +2,7 @@
 database is, and whose, is read from the record in it."""
 
 from plain.postgres.dialect import MAX_NAME_LENGTH
-from plain.postgres.test.database import (
+from plain.postgres.testing.database import (
     isolated_database_name,
     legacy_database_name,
     shared_database_name,

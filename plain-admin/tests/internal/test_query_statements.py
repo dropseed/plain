@@ -13,7 +13,7 @@ whether it should have.
 from admin_test_helpers import make_admin_client
 from app.users.models import User
 from plain.admin.models import PinnedNavItem
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 LIST_URL = "/admin/p/user"
 LIST_VIEW_SLUG = "app_users_admin_useradmin_listview"

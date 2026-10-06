@@ -16,7 +16,7 @@ from plain.cache.models import CachedItem
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
-from plain.postgres.test import capture_queries, isolated_db
+from plain.postgres.testing import capture_queries, isolated_db
 
 
 def assert_is_the_set_many_statement(sql: str) -> None:

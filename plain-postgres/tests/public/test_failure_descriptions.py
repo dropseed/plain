@@ -5,8 +5,8 @@ do it: a query the report ran is one the failing test never did.
 """
 
 from app.examples.models.relationships import Widget
-from plain.postgres.test import capture_queries
-from plain.postgres.test.lifecycle import PostgresTestLifecycle
+from plain.postgres.testing import capture_queries
+from plain.postgres.testing.lifecycle import PostgresTestLifecycle
 
 
 def describe(value: object) -> str | None:

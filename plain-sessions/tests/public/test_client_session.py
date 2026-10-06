@@ -1,7 +1,7 @@
 """Reading and writing a test client's session from the test."""
 
 from plain.runtime import settings
-from plain.sessions.test import get_client_session
+from plain.sessions.testing import get_client_session
 from plain.testing import Client
 
 

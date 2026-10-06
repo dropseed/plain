@@ -176,10 +176,10 @@ The [`AuthViewMixin`](./views.py#AuthViewMixin) provides:
 
 ## Testing with authenticated users
 
-When writing tests, you can use [`login_client()`](./test.py#login_client) to simulate an authenticated user:
+When writing tests, you can use [`login_client()`](./testing.py#login_client) to simulate an authenticated user:
 
 ```python
-from plain.auth.test import login_client
+from plain.auth.testing import login_client
 from plain.testing import Client
 
 from app.users.models import User
@@ -196,10 +196,10 @@ def test_profile_view():
 
 It writes the session cookie to the client, so every request the client makes afterwards is that user's. Nothing goes through your login view.
 
-[`logout_client()`](./test.py#logout_client) ends the session and drops the client's cookies:
+[`logout_client()`](./testing.py#logout_client) ends the session and drops the client's cookies:
 
 ```python
-from plain.auth.test import login_client, logout_client
+from plain.auth.testing import login_client, logout_client
 
 # ... after logging in
 logout_client(client)

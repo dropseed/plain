@@ -8,7 +8,7 @@ unique constraint that produces a realistic ValidationError on duplicate create.
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 from plain.testing import raises
 
 

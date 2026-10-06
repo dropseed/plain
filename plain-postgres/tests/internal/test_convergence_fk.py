@@ -31,7 +31,7 @@ from plain.postgres.convergence.corrections import (
     SetConstraintNotDeferrableCorrection,
     ValidateConstraintCorrection,
 )
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.postgres.utils import generate_fk_constraint_name
 
 

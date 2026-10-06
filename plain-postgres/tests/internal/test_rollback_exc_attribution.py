@@ -14,7 +14,7 @@ rollback.
 import psycopg
 from plain.postgres import transaction
 from plain.postgres.db import get_connection
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.testing import raises
 
 

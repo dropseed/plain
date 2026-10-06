@@ -29,7 +29,7 @@ from plain.postgres.convergence.corrections import (
     ValidateConstraintCorrection,
 )
 from plain.postgres.functions.text import Upper
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.testing import patch
 
 

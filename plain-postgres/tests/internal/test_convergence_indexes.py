@@ -26,7 +26,7 @@ from plain.postgres.convergence.corrections import (
 )
 from plain.postgres.db import read_only
 from plain.postgres.functions.text import Upper
-from plain.postgres.test import isolated_db
+from plain.postgres.testing import isolated_db
 from plain.testing import patch, raises
 
 

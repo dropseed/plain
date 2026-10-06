@@ -23,7 +23,7 @@ from contextlib import contextmanager
 from plain.jobs.models import JobRequest
 from plain.jobs.workers import Worker
 from plain.postgres.db import get_connection
-from plain.postgres.test import capture_queries, isolated_db
+from plain.postgres.testing import capture_queries, isolated_db
 from plain.testing import capture_spans
 from plain.utils import timezone
 

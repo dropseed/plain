@@ -187,7 +187,7 @@ EMAIL_BACKEND = "plain.email.backends.locmem.EmailBackend"
 
 ```python
 from plain.email import send_mail
-from plain.email.test import outbox
+from plain.email.testing import outbox
 
 
 def test_sends_email():

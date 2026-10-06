@@ -17,7 +17,7 @@ from datetime import timedelta
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
-from plain.postgres.test import capture_queries, isolated_db
+from plain.postgres.testing import capture_queries, isolated_db
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
 from plain.utils import timezone

@@ -1,5 +1,5 @@
 from app.examples.models.iteration import IterationExample
-from plain.postgres.test import capture_queries
+from plain.postgres.testing import capture_queries
 
 
 def test_repr_does_not_execute_sql_when_unevaluated():

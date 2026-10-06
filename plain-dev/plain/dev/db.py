@@ -449,7 +449,7 @@ def _current_schema(cluster: Cluster) -> str | None:
     """The digest of the schema this checkout's test databases are built
     with now, which names their template. `None` when the models or the
     migration files can't be read, and then the template is left."""
-    from plain.postgres.test.schema import describe_schema, server_version_of
+    from plain.postgres.testing.schema import describe_schema, server_version_of
 
     try:
         return describe_schema(server_version=server_version_of(cluster.config)).hash

@@ -19,8 +19,8 @@ from plain.postgres.database_url import (
 )
 from plain.postgres.databases import drop_database, list_databases
 from plain.postgres.db import _db_conn
-from plain.postgres.test import CapturedQueries
-from plain.postgres.test.leftovers import read_template_record
+from plain.postgres.testing import CapturedQueries
+from plain.postgres.testing.leftovers import read_template_record
 
 
 @contextmanager
