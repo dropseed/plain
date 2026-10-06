@@ -1,5 +1,15 @@
 # plain-mcp changelog
 
+## [0.8.1](https://github.com/dropseed/plain/releases/plain-mcp@0.8.1) (2026-10-06)
+
+### What's changed
+
+- Tool input schemas are built from a signature read without evaluating its annotations, so a tool whose parameter annotation is a forward reference, or a name not yet imported, builds under deferred annotations instead of failing ([83c1194474](https://github.com/dropseed/plain/commit/83c1194474))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.8.0](https://github.com/dropseed/plain/releases/plain-mcp@0.8.0) (2026-09-21)
 
 ### What's changed
