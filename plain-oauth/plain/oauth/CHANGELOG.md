@@ -1,5 +1,15 @@
 # plain-oauth changelog
 
+## [0.51.1](https://github.com/dropseed/plain/releases/plain-oauth@0.51.1) (2026-10-06)
+
+### What's changed
+
+- Declares `cryptography>=41.0` as a dependency. `OAuthConnection` stores its tokens in `EncryptedTextField`s, which need it, and the package had relied on it arriving some other way ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.51.0](https://github.com/dropseed/plain/releases/plain-oauth@0.51.0) (2026-09-21)
 
 ### What's changed

@@ -1187,7 +1187,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-oauth"
-version = "0.51.0"
+version = "0.51.1"
 source = { editable = "plain-oauth" }
 dependencies = [
     { name = "cryptography" },
