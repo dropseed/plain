@@ -1,5 +1,15 @@
 # plain-passwords changelog
 
+## [0.27.1](https://github.com/dropseed/plain/releases/plain-passwords@0.27.1) (2026-10-06)
+
+### What's changed
+
+- `PasswordField` says its value is a secret (`value_is_secret = True`), so a failed test's report prints a user without the hash ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.27.0](https://github.com/dropseed/plain/releases/plain-passwords@0.27.0) (2026-09-21)
 
 ### What's changed

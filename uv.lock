@@ -1280,7 +1280,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-passwords"
-version = "0.27.0"
+version = "0.27.1"
 source = { editable = "plain-passwords" }
 dependencies = [
     { name = "plain" },
