@@ -1,5 +1,15 @@
 # plain-jobs changelog
 
+## [0.58.1](https://github.com/dropseed/plain/releases/plain-jobs@0.58.1) (2026-10-06)
+
+### What's changed
+
+- Constructing a job is typed as the job's own class: `SendWelcome(user_id=1)` is a `SendWelcome` to the type checker, where it was a `Job` ([6863fb208a](https://github.com/dropseed/plain/commit/6863fb208a))
+
+### Upgrade instructions
+
+- No changes required.
+
 ## [0.58.0](https://github.com/dropseed/plain/releases/plain-jobs@0.58.0) (2026-09-21)
 
 ### What's changed
