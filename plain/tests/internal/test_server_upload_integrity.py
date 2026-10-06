@@ -92,7 +92,7 @@ class _FramingHandler:
     async def handle(self, request: Any, executor: Any) -> ResponseLifecycle:
         cl = request.headers.get("Content-Length")
         te = request.headers.get("Transfer-Encoding")
-        ingested = request._body_ingest_seconds is not None
+        ingested = request.body_ingest_seconds is not None
         response = Response(
             f"cl={cl} te={te} ingested={ingested}", content_type="text/plain"
         )

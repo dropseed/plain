@@ -8,6 +8,7 @@
 - [Settings](#settings)
 - [Signals](#signals)
 - [Memory leak detection](#memory-leak-detection)
+- [Handling requests in-process](#handling-requests-in-process)
 - [FAQs](#faqs)
 - [Architecture](#architecture)
 - [Installation](#installation)
@@ -215,6 +216,63 @@ Suspected leaks:
 ```
 
 On Linux, RSS readings use `/proc/self/statm` for current (not peak) memory. On macOS, `ru_maxrss` (peak) is used as a fallback.
+
+## Handling requests in-process
+
+[`InProcessServer`](./inprocess.py#InProcessServer) handles a request on the calling thread, with no socket and no worker. It runs the same handler the server runs and reads the response the way the server's writers do, so what it reports is what a client would have received. It's what the test client and `plain request` are built on.
+
+```python
+from plain.http import Request
+from plain.server.inprocess import InProcessServer
+
+server = InProcessServer()
+
+request = Request(method="GET", path="/", headers={"Host": "example.com"})
+sent = server.handle(request).send()
+
+sent.status_code  # 200
+sent.body  # b"Hello, world!"
+```
+
+Handling is two steps, as it is in the server. `handle()` runs the request through middleware and the view, and returns a [`HandledRequest`](./inprocess.py#HandledRequest) whose `response` hasn't gone anywhere yet. `send()` then reads the body, closes the response, and returns a [`SentResponse`](./inprocess.py#SentResponse):
+
+- `status_code` is the status that went out, and `body` is the bytes that went out. A streaming body is read to its end.
+- `response` is the `Response` object the app returned. Its own status and content can differ from what was sent: a HEAD or a 204 sends no body, and a streaming body that fails before its first chunk is answered with a 500.
+- `request` is the request.
+
+An exception in a view or a middleware becomes the app's error response, as it does under a server, and is kept on `response.exception`.
+
+A request has a context of its own, as it does under a server, and every part of it runs there: middleware, the view, and the response body. That context starts as a copy of the caller's, so a value the caller set in a `ContextVar`, like an open database transaction, is what the request sees. What the request sets stays in the request.
+
+`handle()` and `send()` are ordinary calls, from a coroutine too. An async view or an async streaming body runs on an event loop of its own. When the calling thread is already running a loop, that loop runs on another thread, in the request's context, and the caller waits for it.
+
+A server loads the app's middleware at its first request and keeps it. Create a new `InProcessServer` to pick up a changed `MIDDLEWARE` setting.
+
+### WebSockets
+
+When the app accepts a WebSocket upgrade, `handled.response` is a `WebSocketResponse`. Serve it with `serve_websocket()` and don't call `send()`:
+
+```python
+import asyncio
+import socket
+
+from plain.http import WebSocketResponse
+
+
+async def serve(handled):
+    server_end, client_end = socket.socketpair()
+    reader, writer = await asyncio.open_connection(sock=client_end)
+    serving = asyncio.create_task(handled.serve_websocket(server_end))
+    ...  # speak the client's side of the protocol over reader and writer
+    await serving
+
+
+handled = server.handle(upgrade_request)
+if isinstance(handled.response, WebSocketResponse):
+    asyncio.run(serve(handled))
+```
+
+`serve_websocket()` takes the server's end of a connected socket pair and runs the code the server runs after it has written the 101, until the socket ends. It returns the exception the view's `websocket()` failed with, or `None`.
 
 ## FAQs
 

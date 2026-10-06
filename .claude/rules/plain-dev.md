@@ -15,6 +15,23 @@ line, that tunnel URL is the canonical app URL — use it for browser navigation
 screenshots, and shared links. Use the localhost `Server running at ...` URL only
 when there's no tunnel, or for local CLI checks (`curl`, `plain request`).
 
+## Requests without a server
+
+`uv run plain request /path` makes a request to the app in-process, against
+the dev database, and prints the response with a trace of what ran. It only
+runs when `DEBUG` is on.
+
+- `--user <id or email>` makes it that user's request. `--method`, `--data`,
+  `--header` and `--content-type` shape it.
+- `--status`, `--contains` and `--not-contains` assert on the response, and the
+  command exits non-zero when one fails.
+- Every response prints a trace summary: duration, span and query counts, and
+  each statement with its repeat count and call sites. There is one block per
+  request, so a followed redirect chain gets one per hop.
+- `--trace` adds the complete query list and the span tree. `--json` is the
+  context-frugal form: response metadata and the full traces, no response body.
+- Writes persist. It is the dev database, not a test one that rolls back.
+
 ## Worktrees and `.plain/`
 
 - `.plain/` holds a checkout's disposable _artifacts_ — logs, compiled assets,
@@ -35,7 +52,10 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 "use this" and turns all of it off.
 
 - Each checkout gets its own database derived from the directory name, so
-  worktrees never share data. Test databases derive from it too.
+  worktrees never share data. Test databases derive from it too, one per
+  test run, so any number of `plain test` runs can go at once in one checkout,
+  each a clone of a template the first run built and left for the next
+  (`test_<database>_t<schema>`, one per checkout's database).
 - A new worktree's database is forked from the project's main database **with
   its data** — don't re-seed by hand, and don't tell users to.
 - `plain db status --json` before diagnosing anything database-shaped: database,
@@ -48,8 +68,15 @@ checkout. Setting `PLAIN_POSTGRES_URL` (or `POSTGRES_URL` in settings) means
 - `plain postgres shell` for a psql prompt on the active database; it accepts
   piped SQL, so `echo 'select ...' | plain postgres shell` is the way to inspect
   data.
-- `plain db clean` drops databases whose checkout directory is gone. Forks are
-  full copies, so deleted worktrees do leave disk behind.
+- Forks are full copies, so deleted worktrees leave disk behind, and a killed
+  test run leaves its databases. `plain db clean --dry-run` lists every
+  database of the project with the reason it would be dropped or is left.
+  Run that, read it, and show it to the person.
+- Dropping a database can't be undone. `plain db clean` asks before it drops
+  and has no flag that skips the question, so it is the person's to run. Never
+  pass `--yes` or `--force` to `plain db drop` or `plain db reset` unless the
+  person named that database. Never drop a database by a pattern, a prefix, or
+  the result of a query: only by its whole name.
 - One Postgres container per project, started on demand and never removed
   automatically. `plain db server list` shows them all, `plain db server stop`
   frees one up (~76MB each), `plain db server remove` deletes it and its data.

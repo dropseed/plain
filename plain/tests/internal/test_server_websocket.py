@@ -9,9 +9,9 @@ half speaks masked frames with the same codec.
 import asyncio
 import logging
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
-import pytest
 from opentelemetry import trace
 from plain.http.websocket_frames import (
     OP_BINARY,
@@ -22,9 +22,8 @@ from plain.http.websocket_frames import (
     encode_frame,
 )
 from plain.internal.handlers.base import BaseHandler
-from plain.runtime import settings
-from plain.test.otel import install_test_tracer
-from server_stubs import H1Client, LogCapture, capture_logger, h1_connect, make_worker
+from plain.testing import CapturedSpans, capture_spans, case, cases, override_settings
+from server_stubs import H1Client, capture_logger, h1_connect, make_worker
 from websocket_helpers import (
     UPGRADE_ACCEPT,
     client_close,
@@ -34,35 +33,13 @@ from websocket_helpers import (
     upgrade_request,
 )
 
-_span_exporter = install_test_tracer()
 
-
-@pytest.fixture
-def request_log() -> Iterator[LogCapture]:
-    with capture_logger("plain.request") as capture:
-        yield capture
-
-
-@pytest.fixture
-def access_log() -> Iterator[LogCapture]:
-    with capture_logger("plain.server.access") as capture:
-        yield capture
-
-
-@pytest.fixture(autouse=True)
-def _spans_clean() -> None:
-    _span_exporter.clear()
-
-
-@pytest.fixture(autouse=True)
-def _plain_http() -> Any:
-    """The socketpair is plain HTTP; keep the HTTPS redirect out of the way."""
-    original = settings.HTTPS_REDIRECT_ENABLED
-    settings.HTTPS_REDIRECT_ENABLED = False
-    try:
-        yield
-    finally:
-        settings.HTTPS_REDIRECT_ENABLED = original
+@contextmanager
+def _socket_test() -> Iterator[CapturedSpans]:
+    """Every test here runs over plain HTTP — the socketpair is plain HTTP;
+    keep the HTTPS redirect out of the way. Yields the spans the test emits."""
+    with override_settings(HTTPS_REDIRECT_ENABLED=False), capture_spans() as spans:
+        yield spans
 
 
 def _worker() -> Any:
@@ -102,7 +79,8 @@ def test_upgrade_header_block() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
 def test_echo_text_and_binary_then_close() -> None:
@@ -125,7 +103,8 @@ def test_echo_text_and_binary_then_close() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
 def test_fragments_with_ping_between_reassemble() -> None:
@@ -144,17 +123,16 @@ def test_fragments_with_ping_between_reassemble() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
-@pytest.mark.parametrize(
-    ("path", "frame", "expected_code"),
-    [
-        ("/websocket/small", client_frame(OP_TEXT, b"x" * 17), 1009),
-        ("/websocket/echo", encode_frame(OP_TEXT, b"unmasked"), 1002),
-        ("/websocket/echo", client_frame(OP_TEXT, b"\xff\xfe"), 1007),
-    ],
-    ids=["too-big", "unmasked", "invalid-utf8"],
+@cases(
+    case("/websocket/small", client_frame(OP_TEXT, b"x" * 17), 1009, id="too-big"),
+    case("/websocket/echo", encode_frame(OP_TEXT, b"unmasked"), 1002, id="unmasked"),
+    case(
+        "/websocket/echo", client_frame(OP_TEXT, b"\xff\xfe"), 1007, id="invalid-utf8"
+    ),
 )
 def test_protocol_failures_close_with_the_right_code(
     path: str, frame: bytes, expected_code: int
@@ -170,10 +148,11 @@ def test_protocol_failures_close_with_the_right_code(
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
-def test_peer_vanishing_is_a_quiet_ending(request_log: LogCapture) -> None:
+def test_peer_vanishing_is_a_quiet_ending() -> None:
     async def run() -> None:
         worker = _worker()
         client, _ = await _upgrade(worker)
@@ -183,11 +162,12 @@ def test_peer_vanishing_is_a_quiet_ending(request_log: LogCapture) -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test(), capture_logger("plain.request") as request_log:
+        asyncio.run(run())
     assert [r for r in request_log.records if r.levelno >= logging.ERROR] == []
 
 
-def test_send_after_peer_left_is_a_quiet_ending(request_log: LogCapture) -> None:
+def test_send_after_peer_left_is_a_quiet_ending() -> None:
     async def run() -> None:
         worker = _worker()
         client, _ = await _upgrade(worker, "/websocket/talks")
@@ -199,13 +179,12 @@ def test_send_after_peer_left_is_a_quiet_ending(request_log: LogCapture) -> None
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test(), capture_logger("plain.request") as request_log:
+        asyncio.run(run())
     assert [r for r in request_log.records if r.levelno >= logging.ERROR] == []
 
 
-def test_view_exception_closes_1011_and_is_logged_on_a_span(
-    request_log: LogCapture,
-) -> None:
+def test_view_exception_closes_1011_and_is_logged_on_a_span() -> None:
     async def run() -> None:
         worker = _worker()
         client, _ = await _upgrade(worker, "/websocket/raises")
@@ -218,16 +197,15 @@ def test_view_exception_closes_1011_and_is_logged_on_a_span(
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test() as spans, capture_logger("plain.request") as request_log:
+        asyncio.run(run())
 
     errors = [r for r in request_log.records if r.levelno >= logging.ERROR]
     assert len(errors) == 1
     assert errors[0].exc_info is not None
     assert "websocket view boom" in str(errors[0].exc_info[1])
 
-    socket_spans = [
-        s for s in _span_exporter.get_finished_spans() if s.name.startswith("WEBSOCKET")
-    ]
+    socket_spans = [s for s in spans if s.name.startswith("WEBSOCKET")]
     assert len(socket_spans) == 1
     span = socket_spans[0]
     assert span.kind == trace.SpanKind.SERVER
@@ -256,10 +234,11 @@ def test_shutdown_sends_1001_and_cancels_the_view() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
-def test_bytes_behind_the_handshake_refuse_the_upgrade(access_log: LogCapture) -> None:
+def test_bytes_behind_the_handshake_refuse_the_upgrade() -> None:
     async def run() -> None:
         worker = _worker()
         client = await h1_connect(worker)
@@ -271,12 +250,16 @@ def test_bytes_behind_the_handshake_refuse_the_upgrade(access_log: LogCapture) -
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with (
+        _socket_test() as spans,
+        capture_logger("plain.server.access") as access_log,
+    ):
+        asyncio.run(run())
     assert [r.__dict__.get("status") for r in access_log.records] == [503]
     # The handshake's span records the 503 that went out, not a 101.
     handshake_spans = [
         s
-        for s in _span_exporter.get_finished_spans()
+        for s in spans
         if s.kind == trace.SpanKind.SERVER and not s.name.startswith("WEBSOCKET")
     ]
     assert [
@@ -294,7 +277,8 @@ def test_draining_worker_refuses_the_upgrade() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
 def test_past_the_keepalive_budget_still_upgrades() -> None:
@@ -310,10 +294,11 @@ def test_past_the_keepalive_budget_still_upgrades() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
-def test_access_log_records_the_socket_once_at_close(access_log: LogCapture) -> None:
+def test_access_log_records_the_socket_once_at_close() -> None:
     async def run() -> None:
         worker = _worker()
         client, _ = await _upgrade(worker)
@@ -325,7 +310,8 @@ def test_access_log_records_the_socket_once_at_close(access_log: LogCapture) -> 
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test(), capture_logger("plain.server.access") as access_log:
+        asyncio.run(run())
     assert [r.__dict__.get("status") for r in access_log.records] == [101]
 
 
@@ -343,10 +329,11 @@ def test_plain_get_to_a_websocket_view_runs_get() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())
 
 
-def test_peer_close_ends_a_view_that_is_not_reading(access_log: LogCapture) -> None:
+def test_peer_close_ends_a_view_that_is_not_reading() -> None:
     """The sleeping view never touches `ws`; the peer's CLOSE must still end
     the connection task (and run the closers) within the grace period."""
 
@@ -361,7 +348,8 @@ def test_peer_close_ends_a_view_that_is_not_reading(access_log: LogCapture) -> N
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test(), capture_logger("plain.server.access") as access_log:
+        asyncio.run(run())
     assert [r.__dict__.get("status") for r in access_log.records] == [101]
 
 
@@ -375,4 +363,5 @@ def test_peer_vanishing_ends_a_view_that_is_not_reading() -> None:
         finally:
             client.teardown()
 
-    asyncio.run(run())
+    with _socket_test():
+        asyncio.run(run())

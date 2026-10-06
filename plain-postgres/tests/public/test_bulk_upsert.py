@@ -10,7 +10,6 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import psycopg
-import pytest
 from app.examples.models.defaults import DBDefaultsExample
 from app.examples.models.indexes import IndexExample
 from app.examples.models.mixins import MixinTestModel
@@ -25,9 +24,10 @@ from app.examples.models.upsert import (
     UpsertValueKey,
 )
 from plain.postgres.exceptions import FieldError
+from plain.testing import raises
 
 
-def test_bulk_upsert_inserts_new_rows_and_sets_pks(db):
+def test_bulk_upsert_inserts_new_rows_and_sets_pks():
     items = [
         UpsertItem(key="a", value=1),
         UpsertItem(key="b", value=2),
@@ -42,7 +42,7 @@ def test_bulk_upsert_inserts_new_rows_and_sets_pks(db):
     assert stored == {"a": 1, "b": 2}
 
 
-def test_bulk_upsert_mixed_batch_inserts_and_updates(db):
+def test_bulk_upsert_mixed_batch_inserts_and_updates():
     UpsertItem(key="a", value=1).create()
     existing_id = UpsertItem.query.get(key="a").id
 
@@ -64,7 +64,7 @@ def test_bulk_upsert_mixed_batch_inserts_and_updates(db):
     assert stored == {"a": 10, "b": 20}
 
 
-def test_bulk_upsert_updates_only_named_fields(db):
+def test_bulk_upsert_updates_only_named_fields():
     UpsertItem(key="a", value=1, label="original").create()
 
     UpsertItem.query.bulk_upsert(
@@ -78,7 +78,7 @@ def test_bulk_upsert_updates_only_named_fields(db):
     assert row.label == "original"  # field not in update_fields preserved
 
 
-def test_bulk_upsert_hydrates_every_object_when_all_of_them_conflict(db):
+def test_bulk_upsert_hydrates_every_object_when_all_of_them_conflict():
     # Seed so every input row takes the DO UPDATE path, and pass them out of
     # key order so the deadlock sort actually reorders the batch.
     for key in ("a", "b", "c"):
@@ -105,7 +105,7 @@ def test_bulk_upsert_hydrates_every_object_when_all_of_them_conflict(db):
     assert stored == {"a": 1, "b": 2, "c": 3}
 
 
-def test_bulk_upsert_empty_returns_empty(db):
+def test_bulk_upsert_empty_returns_empty():
     assert (
         UpsertItem.query.bulk_upsert(
             [], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
@@ -114,7 +114,7 @@ def test_bulk_upsert_empty_returns_empty(db):
     )
 
 
-def test_bulk_upsert_batches(db):
+def test_bulk_upsert_batches():
     items = [UpsertItem(key=f"k{i}", value=i) for i in range(5)]
     UpsertItem.query.bulk_upsert(
         items,
@@ -127,8 +127,8 @@ def test_bulk_upsert_batches(db):
     assert UpsertItem.query.count() == 5
 
 
-def test_bulk_upsert_unique_fields_must_match_a_constraint(db):
-    with pytest.raises(ValueError, match="must name the primary key"):
+def test_bulk_upsert_unique_fields_must_match_a_constraint():
+    with raises(ValueError, match="must name the primary key"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[UpsertItem.value],
@@ -136,8 +136,8 @@ def test_bulk_upsert_unique_fields_must_match_a_constraint(db):
         )
 
 
-def test_bulk_upsert_null_unique_value_rejected(db):
-    with pytest.raises(ValueError, match="non-null key"):
+def test_bulk_upsert_null_unique_value_rejected():
+    with raises(ValueError, match="non-null key"):
         UpsertItem.query.bulk_upsert(
             # A null unique value is a type error the checker catches; the
             # runtime guard is what protects callers that aren't type-checked.
@@ -147,8 +147,8 @@ def test_bulk_upsert_null_unique_value_rejected(db):
         )
 
 
-def test_bulk_upsert_update_fields_cannot_overlap_unique_fields(db):
-    with pytest.raises(ValueError, match="cannot overlap unique_fields"):
+def test_bulk_upsert_update_fields_cannot_overlap_unique_fields():
+    with raises(ValueError, match="cannot overlap unique_fields"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[UpsertItem.key],
@@ -156,8 +156,8 @@ def test_bulk_upsert_update_fields_cannot_overlap_unique_fields(db):
         )
 
 
-def test_bulk_upsert_requires_update_fields(db):
-    with pytest.raises(ValueError, match="requires update_fields"):
+def test_bulk_upsert_requires_update_fields():
+    with raises(ValueError, match="requires update_fields"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[],
@@ -165,8 +165,8 @@ def test_bulk_upsert_requires_update_fields(db):
         )
 
 
-def test_bulk_upsert_string_field_rejected(db):
-    with pytest.raises(TypeError, match="takes field references, not strings"):
+def test_bulk_upsert_string_field_rejected():
+    with raises(TypeError, match="takes field references, not strings"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=["value"],  # ty: ignore[invalid-argument-type]
@@ -174,8 +174,8 @@ def test_bulk_upsert_string_field_rejected(db):
         )
 
 
-def test_bulk_upsert_wrong_model_field_rejected(db):
-    with pytest.raises(FieldError, match="belongs to a different model"):
+def test_bulk_upsert_wrong_model_field_rejected():
+    with raises(FieldError, match="belongs to a different model"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[UpsertItem.value],
@@ -183,21 +183,21 @@ def test_bulk_upsert_wrong_model_field_rejected(db):
         )
 
 
-def test_bulk_create_no_longer_accepts_update_conflicts(db):
+def test_bulk_create_no_longer_accepts_update_conflicts():
     # bulk_create is insert-only now; the conflict surface moved to bulk_upsert.
     removed_conflict_kwargs: dict[str, object] = {
         "update_conflicts": True,
         "update_fields": ["value"],
         "unique_fields": ["key"],
     }
-    with pytest.raises(TypeError):
+    with raises(TypeError):
         UpsertItem.query.bulk_create(
             [UpsertItem(key="a", value=1)],
             **removed_conflict_kwargs,  # ty: ignore[invalid-argument-type]
         )
 
 
-def test_bulk_upsert_composite_unique_fields(db):
+def test_bulk_upsert_composite_unique_fields():
     UpsertPair(bucket="b1", slug="s1", value=1).create()
     seeded_id = UpsertPair.query.get(bucket="b1", slug="s1").id
 
@@ -220,11 +220,11 @@ def test_bulk_upsert_composite_unique_fields(db):
     assert stored == {("b1", "s1"): 10, ("b1", "s2"): 20, ("b2", "s1"): 30}
 
 
-def test_bulk_upsert_duplicate_keys_in_one_batch_rejected(db):
+def test_bulk_upsert_duplicate_keys_in_one_batch_rejected():
     # Postgres refuses to touch a row twice in one statement. The raw
     # CardinalityViolation is re-raised as something that names the problem.
     # It aborts the surrounding transaction, so nothing is queried after it.
-    with pytest.raises(ValueError, match=r"same \['key'\] in one statement"):
+    with raises(ValueError, match=r"same \['key'\] in one statement"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1), UpsertItem(key="a", value=2)],
             update_fields=[UpsertItem.value],
@@ -232,7 +232,7 @@ def test_bulk_upsert_duplicate_keys_in_one_batch_rejected(db):
         )
 
 
-def test_bulk_upsert_duplicate_keys_in_separate_batches_are_legal(db):
+def test_bulk_upsert_duplicate_keys_in_separate_batches_are_legal():
     # Split across statements there is no cardinality violation: the first
     # inserts the row and the second updates it.
     items = [UpsertItem(key="a", value=1), UpsertItem(key="a", value=2)]
@@ -251,10 +251,10 @@ def test_bulk_upsert_duplicate_keys_in_separate_batches_are_legal(db):
     assert row.value == 2
 
 
-def test_bulk_upsert_database_generated_unique_field_rejected(db):
+def test_bulk_upsert_database_generated_unique_field_rejected():
     # db_uuid is generate=True, so the objects hold a DatabaseDefault sentinel
     # rather than a value to conflict on.
-    with pytest.raises(ValueError, match="the database generates its value"):
+    with raises(ValueError, match="the database generates its value"):
         DBDefaultsExample.query.bulk_upsert(
             [DBDefaultsExample(name="a")],
             update_fields=[DBDefaultsExample.name],
@@ -262,9 +262,9 @@ def test_bulk_upsert_database_generated_unique_field_rejected(db):
         )
 
 
-def test_bulk_upsert_validates_arguments_even_when_empty(db):
+def test_bulk_upsert_validates_arguments_even_when_empty():
     # An empty objs list is still a bad call if the fields are wrong.
-    with pytest.raises(TypeError, match="takes field references, not strings"):
+    with raises(TypeError, match="takes field references, not strings"):
         UpsertItem.query.bulk_upsert(
             [],
             update_fields=["value"],  # ty: ignore[invalid-argument-type]
@@ -272,7 +272,7 @@ def test_bulk_upsert_validates_arguments_even_when_empty(db):
         )
 
 
-def test_bulk_upsert_refreshes_update_now_columns_without_naming_them(db):
+def test_bulk_upsert_refreshes_update_now_columns_without_naming_them():
     MixinTestModel(name="a").create()
     seeded = MixinTestModel.query.get(name="a")
 
@@ -293,10 +293,10 @@ def test_bulk_upsert_refreshes_update_now_columns_without_naming_them(db):
     assert renamed.updated_at == row.updated_at
 
 
-def test_bulk_upsert_cannot_update_a_database_generated_column(db):
+def test_bulk_upsert_cannot_update_a_database_generated_column():
     # created_at is create_now-only: EXCLUDED would carry a fresh now() and
     # reset the creation timestamp on every update.
-    with pytest.raises(ValueError, match="the database generates its value"):
+    with raises(ValueError, match="the database generates its value"):
         MixinTestModel.query.bulk_upsert(
             [MixinTestModel(name="a")],
             update_fields=[MixinTestModel.created_at],
@@ -304,8 +304,8 @@ def test_bulk_upsert_cannot_update_a_database_generated_column(db):
         )
 
 
-def test_bulk_upsert_update_now_unique_field_rejected(db):
-    with pytest.raises(ValueError, match="stamped again on every write"):
+def test_bulk_upsert_update_now_unique_field_rejected():
+    with raises(ValueError, match="stamped again on every write"):
         MixinTestModel.query.bulk_upsert(
             [MixinTestModel(name="a")],
             update_fields=[MixinTestModel.name],
@@ -313,7 +313,7 @@ def test_bulk_upsert_update_now_unique_field_rejected(db):
         )
 
 
-def test_bulk_upsert_foreign_key_in_unique_fields(db):
+def test_bulk_upsert_foreign_key_in_unique_fields():
     # Model.fk is a relation descriptor, not a Field, but it is the only way to
     # name the foreign key column -- so the write-API field lists accept it.
     tenant = UpsertTenant(name="t1")
@@ -338,7 +338,7 @@ def test_bulk_upsert_foreign_key_in_unique_fields(db):
     assert stored == {"a": 10, "b": 20}
 
 
-def test_bulk_upsert_foreign_key_in_update_fields(db):
+def test_bulk_upsert_foreign_key_in_update_fields():
     first = UpsertTenant(name="t1")
     first.create()
     second = UpsertTenant(name="t2")
@@ -362,7 +362,7 @@ def test_bulk_upsert_foreign_key_in_update_fields(db):
     assert row.value == 2
 
 
-def test_bulk_upsert_keys_that_python_cannot_sort(db):
+def test_bulk_upsert_keys_that_python_cannot_sort():
     # ZoneInfo and memoryview have no ordering at all and a jsonb dict has no
     # useful one -- the batch still has to be put in a deterministic order.
     chicago = ZoneInfo("America/Chicago")
@@ -392,7 +392,7 @@ def test_bulk_upsert_keys_that_python_cannot_sort(db):
     assert stored == {10, 20, 30}
 
 
-def test_bulk_upsert_key_values_that_do_not_compare_to_each_other(db):
+def test_bulk_upsert_key_values_that_do_not_compare_to_each_other():
     # A jsonb conflict key can hold an object in one row and a number in the
     # next. Those don't compare, and the batches still have to be ordered.
     utc = ZoneInfo("UTC")
@@ -416,7 +416,7 @@ def test_bulk_upsert_key_values_that_do_not_compare_to_each_other(db):
     assert {row.value for row in UpsertValueKey.query.all()} == {1, 2, 3, 4}
 
 
-def test_bulk_upsert_json_key_with_non_string_object_keys(db):
+def test_bulk_upsert_json_key_with_non_string_object_keys():
     # jsonb object keys are always strings -- the encoder stringifies an int
     # key on the way in. The sort key has to be canonicalized the same way, or
     # sorting the object's keys compares an int against a str and raises.
@@ -452,7 +452,7 @@ def test_bulk_upsert_json_key_with_non_string_object_keys(db):
     assert UpsertValueKey.query.get(id=seeded_id).value == 99
 
 
-def test_bulk_upsert_nan_key_round_trips(db):
+def test_bulk_upsert_nan_key_round_trips():
     # Postgres holds NaN equal to NaN for uniqueness, so a NaN key really does
     # conflict -- and sorting it must not raise the way `<` on a NaN would.
     items = [UpsertFloatKey(score=float("nan"), value=1)]
@@ -476,9 +476,9 @@ def test_bulk_upsert_nan_key_round_trips(db):
     assert UpsertFloatKey.query.get(id=seeded_id).value == 2
 
 
-def test_bulk_upsert_duplicate_nan_keys_in_one_batch_rejected(db):
+def test_bulk_upsert_duplicate_nan_keys_in_one_batch_rejected():
     # Postgres holds the two NaNs equal, so this is the same row twice.
-    with pytest.raises(ValueError, match=r"same \['score'\] in one statement"):
+    with raises(ValueError, match=r"same \['score'\] in one statement"):
         UpsertFloatKey.query.bulk_upsert(
             [
                 UpsertFloatKey(score=float("nan"), value=1),
@@ -489,7 +489,7 @@ def test_bulk_upsert_duplicate_nan_keys_in_one_batch_rejected(db):
         )
 
 
-def test_bulk_upsert_accepts_any_sequence_of_field_references(db):
+def test_bulk_upsert_accepts_any_sequence_of_field_references():
     # The parameters are Sequence, so a tuple -- or a conflict target hoisted
     # into a variable, which a list parameter would reject as invariant --
     # works as well as an inline list.
@@ -505,7 +505,7 @@ def test_bulk_upsert_accepts_any_sequence_of_field_references(db):
     assert UpsertPair.query.get(bucket="b", slug="s").value == 1
 
 
-def test_bulk_upsert_honors_an_id_the_caller_set(db):
+def test_bulk_upsert_honors_an_id_the_caller_set():
     # An explicitly set id is the caller's choice, not ours to discard for a
     # generated one -- bulk_create() honors it, and so does this.
     item = UpsertItem(key="a", value=1)
@@ -518,7 +518,7 @@ def test_bulk_upsert_honors_an_id_the_caller_set(db):
     assert UpsertItem.query.get(key="a").id == 5
 
 
-def test_bulk_upsert_mixes_objects_with_and_without_ids(db):
+def test_bulk_upsert_mixes_objects_with_and_without_ids():
     # The two go out as separate statements; both still come back hydrated
     # from their own row.
     with_id = UpsertItem(key="a", value=1)
@@ -539,7 +539,7 @@ def test_bulk_upsert_mixes_objects_with_and_without_ids(db):
     }
 
 
-def test_bulk_upsert_across_several_batches_out_of_key_order(db):
+def test_bulk_upsert_across_several_batches_out_of_key_order():
     # Every other key already exists, the input is shuffled, and the batches
     # are smaller than the input -- so inserts and updates interleave across
     # statements and the sort reorders them. Each object still has to come
@@ -571,10 +571,10 @@ def test_bulk_upsert_across_several_batches_out_of_key_order(db):
     }
 
 
-def test_bulk_upsert_repeated_update_field_rejected(db):
+def test_bulk_upsert_repeated_update_field_rejected():
     # Postgres assigns each column once per statement; naming one twice is a
     # syntax error mid-transaction, so it's caught at the call instead.
-    with pytest.raises(ValueError, match=r"names \['value'\] more than once"):
+    with raises(ValueError, match=r"names \['value'\] more than once"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[UpsertItem.value, UpsertItem.value],
@@ -582,9 +582,9 @@ def test_bulk_upsert_repeated_update_field_rejected(db):
         )
 
 
-def test_bulk_upsert_repeated_update_field_rejected_before_any_query(db):
+def test_bulk_upsert_repeated_update_field_rejected_before_any_query():
     # Validation happens at the call, so an empty objs list is checked too.
-    with pytest.raises(ValueError, match="more than once"):
+    with raises(ValueError, match="more than once"):
         UpsertItem.query.bulk_upsert(
             [],
             update_fields=[UpsertItem.value, UpsertItem.value],
@@ -592,10 +592,10 @@ def test_bulk_upsert_repeated_update_field_rejected_before_any_query(db):
         )
 
 
-def test_bulk_upsert_unsaved_related_object_names_bulk_upsert(db):
+def test_bulk_upsert_unsaved_related_object_names_bulk_upsert():
     # The guard is shared with bulk_create(); the message has to name the call
     # the user actually made.
-    with pytest.raises(ValueError, match=r"^bulk_upsert\(\) prohibited"):
+    with raises(ValueError, match=r"^bulk_upsert\(\) prohibited"):
         UpsertScoped.query.bulk_upsert(
             [UpsertScoped(tenant=UpsertTenant(name="unsaved"), slug="s", value=1)],
             update_fields=[UpsertScoped.value],
@@ -603,7 +603,7 @@ def test_bulk_upsert_unsaved_related_object_names_bulk_upsert(db):
         )
 
 
-def test_bulk_upsert_decimal_key_conflicts_across_scales(db):
+def test_bulk_upsert_decimal_key_conflicts_across_scales():
     # numeric(12,4) stores 1.0 and 1.00 as the same value, so the second call
     # has to find the first one's row rather than insert beside it.
     first = [UpsertDecimalKey(amount=Decimal("1.0"), value=1)]
@@ -625,7 +625,7 @@ def test_bulk_upsert_decimal_key_conflicts_across_scales(db):
     assert UpsertDecimalKey.query.get(id=first[0].id).value == 2
 
 
-def test_bulk_upsert_decimal_key_conflicts_across_signed_zero(db):
+def test_bulk_upsert_decimal_key_conflicts_across_signed_zero():
     zero = [UpsertDecimalKey(amount=Decimal("0.0"), value=1)]
     UpsertDecimalKey.query.bulk_upsert(
         zero,
@@ -644,11 +644,11 @@ def test_bulk_upsert_decimal_key_conflicts_across_signed_zero(db):
     assert UpsertDecimalKey.query.count() == 1
 
 
-def test_bulk_upsert_decimal_keys_at_different_scales_in_one_batch(db):
+def test_bulk_upsert_decimal_keys_at_different_scales_in_one_batch():
     # Postgres holds these equal, so they are the same row twice in one
     # statement -- the sort renders them identically, and the cardinality
     # violation is reported as the duplicate it is.
-    with pytest.raises(ValueError, match=r"same \['amount'\] in one statement"):
+    with raises(ValueError, match=r"same \['amount'\] in one statement"):
         UpsertDecimalKey.query.bulk_upsert(
             [
                 UpsertDecimalKey(amount=Decimal("1.0"), value=1),
@@ -659,7 +659,7 @@ def test_bulk_upsert_decimal_keys_at_different_scales_in_one_batch(db):
         )
 
 
-def test_bulk_upsert_conflict_hydrates_the_stored_id_over_the_caller_s(db):
+def test_bulk_upsert_conflict_hydrates_the_stored_id_over_the_caller_s():
     # On the insert path a caller-set id is kept. On the conflict path the
     # stored row is the truth: its id is what comes back, not the one passed.
     UpsertItem(key="a", value=1).create()
@@ -676,7 +676,7 @@ def test_bulk_upsert_conflict_hydrates_the_stored_id_over_the_caller_s(db):
     assert UpsertItem.query.get(key="a").value == 2
 
 
-def test_bulk_upsert_id_colliding_with_another_row_raises(db):
+def test_bulk_upsert_id_colliding_with_another_row_raises():
     # The conflict target is `key`, so an id that collides with a different
     # row is an ordinary primary key violation -- raised raw, like any
     # set-based write.
@@ -685,16 +685,16 @@ def test_bulk_upsert_id_colliding_with_another_row_raises(db):
 
     item = UpsertItem(key="new", value=1)
     item.id = taken_id
-    with pytest.raises(psycopg.errors.UniqueViolation):
+    with raises(psycopg.errors.UniqueViolation):
         UpsertItem.query.bulk_upsert(
             [item], update_fields=[UpsertItem.value], unique_fields=[UpsertItem.key]
         )
 
 
-def test_bulk_upsert_unique_index_is_not_a_conflict_target(db):
+def test_bulk_upsert_unique_index_is_not_a_conflict_target():
     # A unique Index would work as a Postgres arbiter, but bulk_upsert asks
     # for a declared UniqueConstraint so the target is explicit in the model.
-    with pytest.raises(ValueError, match="must name the primary key"):
+    with raises(ValueError, match="must name the primary key"):
         IndexExample.query.bulk_upsert(
             [IndexExample(name="n", description="d")],
             update_fields=[IndexExample.description],
@@ -702,8 +702,8 @@ def test_bulk_upsert_unique_index_is_not_a_conflict_target(db):
         )
 
 
-def test_bulk_upsert_cannot_update_the_primary_key(db):
-    with pytest.raises(ValueError, match="cannot update primary key fields"):
+def test_bulk_upsert_cannot_update_the_primary_key():
+    with raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a", value=1)],
             update_fields=[UpsertItem.id],
@@ -711,7 +711,7 @@ def test_bulk_upsert_cannot_update_the_primary_key(db):
         )
 
 
-def test_bulk_upsert_ignores_queryset_filters(db):
+def test_bulk_upsert_ignores_queryset_filters():
     # Like bulk_create, the write is against the table -- a filter on the
     # queryset it is called from does not narrow or exclude anything.
     UpsertItem(key="a", value=1).create()

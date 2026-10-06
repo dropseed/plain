@@ -11,7 +11,7 @@ from app.examples.models.relationships import Tag, Widget
 from plain.postgres.fields.related import ManyToManyField
 
 
-def test_value_from_object_returns_related_objects(db):
+def test_value_from_object_returns_related_objects():
     """ManyToManyField.value_from_object must return the currently-related
     objects. ModelForm's `model_to_dict` calls this when given an instance
     so the form can populate `initial` for the M2M field — a regression
@@ -28,7 +28,7 @@ def test_value_from_object_returns_related_objects(db):
     assert {t.name for t in result} == {"GPS", "Sunroof"}
 
 
-def test_value_from_object_unsaved_instance_returns_empty(db):
+def test_value_from_object_unsaved_instance_returns_empty():
     """An unsaved instance has no related rows; value_from_object should
     return an empty list rather than crash.
     """

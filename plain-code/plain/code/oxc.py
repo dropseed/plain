@@ -37,7 +37,7 @@ def check_min_version(version: str) -> None:
 
 
 # Committed third-party code that we don't want to lint or format. Everything
-# else worth skipping (node_modules, .venv, htmlcov, .pytest_cache) is already
+# else worth skipping (node_modules, .venv, htmlcov) is already
 # gitignored, and both tools read .gitignore on their own.
 #
 # These go on the command line rather than in a config file, because config-file

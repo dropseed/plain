@@ -1,29 +1,30 @@
 from app.users.models import User
-from plain.test import Client
+from plain.auth.testing import login_client
+from plain.testing import Client
 
 
-def test_login_required_redirect(db):
+def test_login_required_redirect():
     client = Client()
     response = client.get("/protected")
     assert response.status_code == 302
-    assert response.url == "/login?next=/protected"
+    assert response.redirect_to == "/login?next=/protected"
 
 
-def test_view_without_login_required(db):
+def test_view_without_login_required():
     client = Client()
     response = client.get("/open")
     assert response.status_code == 200
-    assert response.content == b"open"
+    assert response.body == b"open"
     assert "Cache-Control" not in response.headers
 
 
-def test_admin_required(db):
+def test_admin_required():
     client = Client()
     # login required first
     assert client.get("/admin").status_code == 302
 
     user = User.query.create(username="user")
-    client.force_login(user)
+    login_client(client, user)
     # not admin -> 404
     assert client.get("/admin").status_code == 404
 
@@ -32,11 +33,11 @@ def test_admin_required(db):
     # now admin -> success
     resp = client.get("/admin")
     assert resp.status_code == 200
-    assert resp.content == b"admin"
+    assert resp.body == b"admin"
     assert resp.headers["Cache-Control"] == "private"
 
 
-def test_no_login_url_forbidden(db):
+def test_no_login_url_forbidden():
     client = Client()
     response = client.get("/nolink")
     assert response.status_code == 403

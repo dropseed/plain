@@ -29,13 +29,15 @@ def _is_excluded_path(path: Path, is_source: bool = False) -> bool:
 
 
 def _get_node_name(node: ast.AST) -> str | None:
-    """Get the name of a ClassDef, FunctionDef, or Assign node."""
+    """Get the name of a ClassDef, FunctionDef, Assign, or AnnAssign node."""
     if isinstance(node, ast.ClassDef | ast.FunctionDef):
         return node.name
     if isinstance(node, ast.Assign):
         for target in node.targets:
             if isinstance(target, ast.Name):
                 return target.id
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.target.id
     return None
 
 
@@ -312,7 +314,13 @@ class LLMDocs:
             return False
 
         def format_decorators(decorator_list: list[ast.expr], prefix: str) -> list[str]:
-            return [f"{prefix}@{ast.unparse(d)}" for d in decorator_list]
+            # A decorator whose name starts with an underscore is the
+            # module's own business, as a function named that way is.
+            return [
+                f"{prefix}@{ast.unparse(d)}"
+                for d in decorator_list
+                if not ast.unparse(d).startswith("_")
+            ]
 
         def process_node(node: ast.AST, indent: int = 0) -> list[str]:
             is_top_level = indent == 0
@@ -338,6 +346,13 @@ class LLMDocs:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         lines.append(f"{prefix}{target.id} = {ast.unparse(node.value)}")
+
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                # An annotated attribute: a dataclass field, a model field.
+                line = f"{prefix}{node.target.id}: {ast.unparse(node.annotation)}"
+                if node.value is not None:
+                    line += f" = {ast.unparse(node.value)}"
+                lines.append(line)
 
             return lines
 

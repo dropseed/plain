@@ -67,6 +67,12 @@ class DatabaseConnection:
         # Query logging in debug mode or when explicitly enabled.
         self.queries_log: deque[dict[str, Any]] = deque(maxlen=self.queries_limit)
         self.force_debug_cursor: bool = False
+        # What `capture_queries` reads, filled while `force_debug_cursor` is
+        # on. It is kept apart from `queries_log` because that one is emptied
+        # whenever the connection is returned, which is the end of every
+        # request that isn't inside a transaction. A capture around a request
+        # would find nothing the request did.
+        self.captured_queries_log: list[dict[str, Any]] = []
 
         # Transaction related attributes.
         # Tracks if the connection is in autocommit mode. Per PEP 249, by
@@ -129,6 +135,12 @@ class DatabaseConnection:
     @property
     def queries_logged(self) -> bool:
         return self.force_debug_cursor or settings.DEBUG
+
+    def log_query(self, entry: dict[str, Any]) -> None:
+        """Record something the database was asked to do."""
+        self.queries_log.append(entry)
+        if self.force_debug_cursor:
+            self.captured_queries_log.append(entry)
 
     @property
     def queries(self) -> list[dict[str, Any]]:

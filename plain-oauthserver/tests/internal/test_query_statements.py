@@ -4,7 +4,7 @@ Change detector: if a grant starts issuing different SQL — an extra round
 trip, a dropped `FOR UPDATE`, a lock that no longer covers the row being
 spent — these fail and you decide whether it should have.
 
-The `db` fixture already holds the test inside a transaction, so each view's
+Every test already runs inside a transaction, so each view's
 `transaction.atomic()` opens a SAVEPOINT rather than a BEGIN. In production
 those atomic blocks are the outermost ones.
 """
@@ -12,24 +12,19 @@ those atomic blocks are the outermost ones.
 import threading
 from datetime import timedelta
 
-from oauth_helpers import generate_pkce_pair, issue_token_pair
+from oauth_helpers import (
+    generate_pkce_pair,
+    issue_token_pair,
+    make_public_app,
+    make_user,
+)
 from plain.oauthserver.models import AuthorizationCode
 from plain.postgres.db import get_connection
-from plain.test import Client
+from plain.postgres.testing import capture_queries, isolated_db
+from plain.testing import Client
 from plain.utils import timezone
 
 REDIRECT_URI = "http://localhost:3000/callback"
-
-
-class StatementRecorder:
-    """Records every statement executed on a connection, in order."""
-
-    def __init__(self) -> None:
-        self.statements: list[str] = []
-
-    def __call__(self, execute, sql, params, many, context):
-        self.statements.append(" ".join(str(sql).split()))
-        return execute(sql, params, many, context)
 
 
 def make_auth_code(application, user, code_challenge):
@@ -45,16 +40,17 @@ def make_auth_code(application, user, code_challenge):
 
 def post_token(payload):
     """POST the token endpoint, returning (response, statements executed)."""
-    recorder = StatementRecorder()
-    with get_connection().execute_wrapper(recorder):
-        response = Client().post("/oauth/token", data=payload)
-    return response, recorder.statements
+    with capture_queries() as queries:
+        response = Client().post("/oauth/token", form_data=payload)
+    return response, queries.sql_statements()
 
 
 # -- Authorization code grant --
 
 
-def test_authorization_code_grant_statements(db, user, public_app) -> None:
+def test_authorization_code_grant_statements() -> None:
+    user = make_user()
+    public_app = make_public_app()
     verifier, challenge = generate_pkce_pair()
     auth_code = make_auth_code(public_app, user, challenge)
     payload = {
@@ -88,7 +84,9 @@ def test_authorization_code_grant_statements(db, user, public_app) -> None:
     assert statements[6].startswith("RELEASE SAVEPOINT ")
 
 
-def test_replayed_authorization_code_statements(db, user, public_app) -> None:
+def test_replayed_authorization_code_statements() -> None:
+    user = make_user()
+    public_app = make_public_app()
     verifier, challenge = generate_pkce_pair()
     auth_code = make_auth_code(public_app, user, challenge)
     payload = {
@@ -105,7 +103,7 @@ def test_replayed_authorization_code_statements(db, user, public_app) -> None:
     replay, statements = post_token(payload)
 
     assert replay.status_code == 400
-    assert replay.json()["error"] == "invalid_grant"
+    assert replay.json_data["error"] == "invalid_grant"
     # The replay stops at the locked read — nothing is written.
     assert len(statements) == 4
     assert statements[0].startswith("SELECT ")
@@ -120,7 +118,9 @@ def test_replayed_authorization_code_statements(db, user, public_app) -> None:
 # -- Refresh token grant --
 
 
-def test_refresh_token_grant_statements(db, user, public_app) -> None:
+def test_refresh_token_grant_statements() -> None:
+    user = make_user()
+    public_app = make_public_app()
     issue_token_pair(public_app, user)
     payload = {
         "grant_type": "refresh_token",
@@ -156,7 +156,9 @@ def test_refresh_token_grant_statements(db, user, public_app) -> None:
     assert statements[7].startswith("RELEASE SAVEPOINT ")
 
 
-def test_replayed_refresh_token_statements(db, user, public_app) -> None:
+def test_replayed_refresh_token_statements() -> None:
+    user = make_user()
+    public_app = make_public_app()
     issue_token_pair(public_app, user)
     payload = {
         "grant_type": "refresh_token",
@@ -170,7 +172,7 @@ def test_replayed_refresh_token_statements(db, user, public_app) -> None:
     replay, statements = post_token(payload)
 
     assert replay.status_code == 400
-    assert replay.json()["error"] == "invalid_grant"
+    assert replay.json_data["error"] == "invalid_grant"
     # The replay stops at the locked read — nothing is written.
     assert len(statements) == 4
     assert statements[0].startswith("SELECT ")
@@ -205,7 +207,7 @@ def race_token_requests(payload):
         _db_conn.set(connection)
         try:
             barrier.wait(timeout=10)
-            statuses[n] = Client().post("/oauth/token", data=payload).status_code
+            statuses[n] = Client().post("/oauth/token", form_data=payload).status_code
         finally:
             connection.close()
 
@@ -219,7 +221,8 @@ def race_token_requests(payload):
     return sorted(statuses.values())
 
 
-def test_concurrent_authorization_code_exchange(isolated_db) -> None:
+@isolated_db
+def test_concurrent_authorization_code_exchange() -> None:
     """`FOR UPDATE` makes the second exchange wait, then see a spent code."""
     from app.users.models import User
     from plain.oauthserver.models import OAuthApplication
@@ -244,7 +247,8 @@ def test_concurrent_authorization_code_exchange(isolated_db) -> None:
     assert statuses == [200, 400]
 
 
-def test_concurrent_refresh_token_use(isolated_db) -> None:
+@isolated_db
+def test_concurrent_refresh_token_use() -> None:
     """`FOR UPDATE` makes the second refresh wait, then see a revoked token."""
     from app.users.models import User
     from plain.oauthserver.models import OAuthApplication

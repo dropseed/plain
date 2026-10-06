@@ -1,7 +1,7 @@
 """Behavior regression baseline — plain.passwords authentication views.
 
 Drives login / signup / forgot-password / reset-via-token / change-password
-end-to-end through ``plain.test.Client``. Assertions cover only what a browser
+end-to-end through ``plain.testing.Client``. Assertions cover only what a browser
 observes — HTTP status, redirect targets, login state (probed via the
 login-gated ``/whoami`` view), database rows, and sent email.
 """
@@ -9,7 +9,9 @@ login-gated ``/whoami`` view), database rows, and sent email.
 import re
 
 from app.users.models import User
-from plain.test import Client
+from plain.auth.testing import login_client
+from plain.email.testing import outbox
+from plain.testing import Client
 
 # Passwords chosen to satisfy PasswordField's default validators
 # (minimum length, not a common password, not entirely numeric).
@@ -29,190 +31,198 @@ def is_logged_in(client: Client) -> bool:
 
 def password_works(email: str, password: str) -> bool:
     """Whether a fresh login with these credentials is accepted."""
-    response = Client().post("/login", data={"email": email, "password": password})
+    response = Client().post("/login", form_data={"email": email, "password": password})
     return response.status_code == 302
 
 
-class TestLogin:
-    def test_login_page_renders(self, db):
-        response = Client().get("/login")
+# Login
+def test_login_page_renders():
+    response = Client().get("/login")
 
-        assert response.status_code == 200
-        assert 'name="email"' in response.content.decode()
-
-    def test_valid_credentials_log_in_and_redirect(self, db):
-        make_user(email="login-ok@example.com")
-        client = Client()
-
-        response = client.post(
-            "/login",
-            data={"email": "login-ok@example.com", "password": OLD_PASSWORD},
-        )
-
-        assert response.status_code == 302
-        assert response.url == "/done"
-        assert is_logged_in(client)
-
-    def test_wrong_password_is_rejected(self, db):
-        make_user(email="login-bad@example.com")
-        client = Client()
-
-        response = client.post(
-            "/login",
-            data={"email": "login-bad@example.com", "password": WRONG_PASSWORD},
-        )
-
-        assert response.status_code == 200
-        assert "form-error" in response.content.decode()
-        assert not is_logged_in(client)
-
-    def test_unknown_email_is_rejected(self, db):
-        client = Client()
-
-        response = client.post(
-            "/login",
-            data={"email": "nobody@example.com", "password": OLD_PASSWORD},
-        )
-
-        assert response.status_code == 200
-        assert "form-error" in response.content.decode()
-        assert not is_logged_in(client)
+    assert response.status_code == 200
+    assert 'name="email"' in response.text
 
 
-class TestSignup:
-    def test_valid_signup_creates_user_and_redirects(self, db):
-        client = Client()
+def test_login_valid_credentials_log_in_and_redirect():
+    make_user(email="login-ok@example.com")
+    client = Client()
 
-        response = client.post(
-            "/signup",
-            data={
-                "email": "new@example.com",
-                "password": NEW_PASSWORD,
-                "confirm_password": NEW_PASSWORD,
-            },
-        )
+    response = client.post(
+        "/login",
+        form_data={"email": "login-ok@example.com", "password": OLD_PASSWORD},
+    )
 
-        assert response.status_code == 302
-        assert User.query.filter(email="new@example.com").exists()
-
-    def test_password_mismatch_creates_no_user(self, db):
-        client = Client()
-
-        response = client.post(
-            "/signup",
-            data={
-                "email": "mismatch@example.com",
-                "password": NEW_PASSWORD,
-                "confirm_password": WRONG_PASSWORD,
-            },
-        )
-
-        assert response.status_code == 200
-        assert "form-error" in response.content.decode()
-        assert not User.query.filter(email="mismatch@example.com").exists()
+    assert response.status_code == 302
+    assert response.redirect_to == "/done"
+    assert is_logged_in(client)
 
 
-class TestForgotPassword:
-    def test_known_email_sends_reset_email(self, db, mailoutbox):
-        make_user(email="known@example.com")
-        client = Client()
+def test_login_wrong_password_is_rejected():
+    make_user(email="login-bad@example.com")
+    client = Client()
 
-        response = client.post("/forgot", data={"email": "known@example.com"})
+    response = client.post(
+        "/login",
+        form_data={"email": "login-bad@example.com", "password": WRONG_PASSWORD},
+    )
 
-        assert response.status_code == 302
-        assert response.url == "/done"
-        assert len(mailoutbox) == 1
-        assert mailoutbox[0].to == ["known@example.com"]
-
-    def test_unknown_email_sends_nothing_without_leaking(self, db, mailoutbox):
-        client = Client()
-
-        response = client.post("/forgot", data={"email": "ghost@example.com"})
-
-        # Identical 302 -> /done as the known-email case: no existence leak.
-        assert response.status_code == 302
-        assert response.url == "/done"
-        assert len(mailoutbox) == 0
+    assert response.status_code == 200
+    assert "form-error" in response.text
+    assert not is_logged_in(client)
 
 
-class TestResetPassword:
-    def test_valid_token_sets_new_password(self, db, mailoutbox):
-        make_user(email="reset@example.com", password=OLD_PASSWORD)
+def test_login_unknown_email_is_rejected():
+    client = Client()
 
-        # Request the reset email and follow the tokened link it carries.
-        client = Client()
-        client.post("/forgot", data={"email": "reset@example.com"})
-        assert len(mailoutbox) == 1
-        match = re.search(r"/reset\?token=[^\s\"'<>]+", mailoutbox[0].body)
-        assert match, "reset email should contain a tokened /reset link"
-        assert client.get(match.group(0), follow=True).status_code == 200
+    response = client.post(
+        "/login",
+        form_data={"email": "nobody@example.com", "password": OLD_PASSWORD},
+    )
 
-        response = client.post(
-            "/reset",
-            data={"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
-        )
-
-        assert response.status_code == 302
-        assert password_works("reset@example.com", NEW_PASSWORD)
-        assert not password_works("reset@example.com", OLD_PASSWORD)
-
-    def test_invalid_token_is_rejected(self, db):
-        client = Client()
-
-        response = client.get("/reset?token=not-a-real-token", follow=True)
-
-        assert response.status_code == 400
-        assert not is_logged_in(client)
+    assert response.status_code == 200
+    assert "form-error" in response.text
+    assert not is_logged_in(client)
 
 
-class TestChangePassword:
-    def test_correct_old_password_changes_it(self, db):
-        client = Client()
-        client.force_login(make_user(email="change-ok@example.com"))
+# Signup
+def test_valid_signup_creates_user_and_redirects():
+    client = Client()
 
-        response = client.post(
-            "/change",
-            data={
-                "current_password": OLD_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": NEW_PASSWORD,
-            },
-        )
+    response = client.post(
+        "/signup",
+        form_data={
+            "email": "new@example.com",
+            "password": NEW_PASSWORD,
+            "confirm_password": NEW_PASSWORD,
+        },
+    )
 
-        assert response.status_code == 302
-        assert password_works("change-ok@example.com", NEW_PASSWORD)
-        assert not password_works("change-ok@example.com", OLD_PASSWORD)
+    assert response.status_code == 302
+    assert User.query.filter(email="new@example.com").exists()
 
-    def test_wrong_old_password_is_rejected(self, db):
-        client = Client()
-        client.force_login(make_user(email="change-bad@example.com"))
 
-        response = client.post(
-            "/change",
-            data={
-                "current_password": WRONG_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": NEW_PASSWORD,
-            },
-        )
+def test_signup_password_mismatch_creates_no_user():
+    client = Client()
 
-        assert response.status_code == 200
-        assert "form-error" in response.content.decode()
-        assert password_works("change-bad@example.com", OLD_PASSWORD)  # unchanged
+    response = client.post(
+        "/signup",
+        form_data={
+            "email": "mismatch@example.com",
+            "password": NEW_PASSWORD,
+            "confirm_password": WRONG_PASSWORD,
+        },
+    )
 
-    def test_mismatched_new_passwords_are_rejected(self, db):
-        client = Client()
-        client.force_login(make_user(email="change-mismatch@example.com"))
+    assert response.status_code == 200
+    assert "form-error" in response.text
+    assert not User.query.filter(email="mismatch@example.com").exists()
 
-        response = client.post(
-            "/change",
-            data={
-                "current_password": OLD_PASSWORD,
-                "new_password1": NEW_PASSWORD,
-                "new_password2": WRONG_PASSWORD,
-            },
-        )
 
-        assert response.status_code == 200
-        assert "form-error" in response.content.decode()
-        assert password_works("change-mismatch@example.com", OLD_PASSWORD)  # unchanged
+# Forgot password
+def test_forgot_password_known_email_sends_reset_email():
+    make_user(email="known@example.com")
+    client = Client()
+
+    response = client.post("/forgot", form_data={"email": "known@example.com"})
+
+    assert response.status_code == 302
+    assert response.redirect_to == "/done"
+    assert len(outbox) == 1
+    assert outbox[0].to == ["known@example.com"]
+
+
+def test_forgot_password_unknown_email_sends_nothing_without_leaking():
+    client = Client()
+
+    response = client.post("/forgot", form_data={"email": "ghost@example.com"})
+
+    # Identical 302 -> /done as the known-email case: no existence leak.
+    assert response.status_code == 302
+    assert response.redirect_to == "/done"
+    assert len(outbox) == 0
+
+
+# Reset password
+def test_reset_password_valid_token_sets_new_password():
+    make_user(email="reset@example.com", password=OLD_PASSWORD)
+
+    # Request the reset email and follow the tokened link it carries.
+    client = Client()
+    client.post("/forgot", form_data={"email": "reset@example.com"})
+    assert len(outbox) == 1
+    match = re.search(r"/reset\?token=[^\s\"'<>]+", outbox[0].body)
+    assert match, "reset email should contain a tokened /reset link"
+    assert client.get(match.group(0), follow_redirects=True).status_code == 200
+
+    response = client.post(
+        "/reset",
+        form_data={"new_password1": NEW_PASSWORD, "new_password2": NEW_PASSWORD},
+    )
+
+    assert response.status_code == 302
+    assert password_works("reset@example.com", NEW_PASSWORD)
+    assert not password_works("reset@example.com", OLD_PASSWORD)
+
+
+def test_reset_password_invalid_token_is_rejected():
+    client = Client()
+
+    response = client.get("/reset?token=not-a-real-token", follow_redirects=True)
+
+    assert response.status_code == 400
+    assert not is_logged_in(client)
+
+
+# Change password
+def test_change_password_correct_old_password_changes_it():
+    client = Client()
+    login_client(client, make_user(email="change-ok@example.com"))
+
+    response = client.post(
+        "/change",
+        form_data={
+            "current_password": OLD_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 302
+    assert password_works("change-ok@example.com", NEW_PASSWORD)
+    assert not password_works("change-ok@example.com", OLD_PASSWORD)
+
+
+def test_change_password_wrong_old_password_is_rejected():
+    client = Client()
+    login_client(client, make_user(email="change-bad@example.com"))
+
+    response = client.post(
+        "/change",
+        form_data={
+            "current_password": WRONG_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": NEW_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "form-error" in response.text
+    assert password_works("change-bad@example.com", OLD_PASSWORD)  # unchanged
+
+
+def test_change_password_mismatched_new_passwords_are_rejected():
+    client = Client()
+    login_client(client, make_user(email="change-mismatch@example.com"))
+
+    response = client.post(
+        "/change",
+        form_data={
+            "current_password": OLD_PASSWORD,
+            "new_password1": NEW_PASSWORD,
+            "new_password2": WRONG_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "form-error" in response.text
+    assert password_works("change-mismatch@example.com", OLD_PASSWORD)  # unchanged

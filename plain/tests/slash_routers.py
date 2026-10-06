@@ -1,6 +1,6 @@
 """Minimal URL routes for exercising trailing-slash behavior.
 
-The fixture sets `URLS_TRAILING_SLASH=True`; routes that want to keep
+The helper sets `URLS_TRAILING_SLASH=True`; routes that want to keep
 the no-slash form (regardless of the global setting) declare it with
 `force_trailing_slash=False`.
 """

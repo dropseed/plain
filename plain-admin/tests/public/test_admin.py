@@ -1,17 +1,18 @@
 from app.users.models import User
 from plain.admin.views.base import AdminView
 from plain.admin.views.registry import registry
-from plain.test import Client
+from plain.auth.testing import login_client
+from plain.testing import Client, override_settings
 
 
-def test_admin_login_required(db):
+def test_admin_login_required():
     client = Client()
 
     # Login required
     assert client.get("/admin").status_code == 302
 
     user = User.query.create(username="test")
-    client.force_login(user)
+    login_client(client, user)
 
     # Not admin yet
     assert client.get("/admin").status_code == 404
@@ -22,10 +23,11 @@ def test_admin_login_required(db):
     # Now admin — redirected into the admin (to the first registered list view)
     resp = client.get("/admin")
     assert resp.status_code == 302
-    assert resp.url.startswith("/admin/p/")
+    assert resp.redirect_to is not None
+    assert resp.redirect_to.startswith("/admin/p/")
 
 
-def test_has_permission_on_view(db):
+def test_has_permission_on_view():
     """A view with has_permission returning False denies access via check_auth."""
 
     class RestrictedView(AdminView):
@@ -46,9 +48,8 @@ def test_has_permission_on_view(db):
     assert AdminView.has_permission(user) is True
 
 
-def test_has_permission_setting(db):
+def test_has_permission_setting():
     """ADMIN_HAS_PERMISSION setting controls access to all views."""
-    from plain.runtime import settings
 
     class TargetView(AdminView):
         title = "Target"
@@ -60,28 +61,23 @@ def test_has_permission_setting(db):
 
     user = User.query.create(username="admin", is_admin=True)
 
-    original = settings.ADMIN_HAS_PERMISSION
-    try:
-        settings.ADMIN_HAS_PERMISSION = allow
-
+    with override_settings(ADMIN_HAS_PERMISSION=allow):
         # Setting denies TargetView
         assert TargetView.has_permission(user) is False
 
         # But allows other views
         assert AdminView.has_permission(user) is True
-    finally:
-        settings.ADMIN_HAS_PERMISSION = original
 
 
-def test_ui_view_renders(db):
+def test_ui_view_renders():
     """The UI catalog page renders for an admin user."""
     user = User.query.create(username="admin", is_admin=True)
     client = Client()
-    client.force_login(user)
+    login_client(client, user)
 
     resp = client.get("/admin/ui")
     assert resp.status_code == 200
-    body = resp.content.decode()
+    body = resp.text
     # Sanity-check a few markers from each major section
     assert "Customizing the admin" in body
     assert "btn-primary" in body
@@ -89,7 +85,7 @@ def test_ui_view_renders(db):
     assert "data-theme-set" in body
 
 
-def test_nav_sections_exclude_denied_views(db):
+def test_nav_sections_exclude_denied_views():
     """Nav sections should not include views the user is denied from."""
 
     class AllowedView(AdminView):

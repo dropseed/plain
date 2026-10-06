@@ -10,7 +10,6 @@ import threading
 from datetime import UTC
 
 import psycopg
-import pytest
 from app.examples.models.relationships import Tag, Widget
 from app.examples.models.upsert import (
     UpsertItem,
@@ -24,9 +23,11 @@ from plain.postgres.exceptions import FieldError
 from plain.postgres.expressions import F
 from plain.postgres.functions import Upper
 from plain.postgres.sources import build_connection_params
+from plain.postgres.testing import capture_queries, isolated_db
+from plain.testing import case, cases, raises
 
 
-def test_upsert_inserts_new_row(db):
+def test_upsert_inserts_new_row():
     obj, created = UpsertItem.query.upsert(
         key="a", value=1, unique_fields=[UpsertItem.key]
     )
@@ -38,7 +39,7 @@ def test_upsert_inserts_new_row(db):
     assert UpsertItem.query.get(key="a").value == 1
 
 
-def test_upsert_updates_conflicting_row(db):
+def test_upsert_updates_conflicting_row():
     UpsertItem(key="a", value=1).create()
     existing_id = UpsertItem.query.get(key="a").id
 
@@ -54,7 +55,7 @@ def test_upsert_updates_conflicting_row(db):
     assert UpsertItem.query.get(key="a").value == 99
 
 
-def test_upsert_defaults_apply_on_insert_and_update(db):
+def test_upsert_defaults_apply_on_insert_and_update():
     obj, created = UpsertItem.query.upsert(
         key="a", defaults={"value": 5}, unique_fields=[UpsertItem.key]
     )
@@ -66,7 +67,7 @@ def test_upsert_defaults_apply_on_insert_and_update(db):
     assert (created, obj.value) == (False, 7)
 
 
-def test_upsert_does_not_call_a_shadowed_callable(db):
+def test_upsert_does_not_call_a_shadowed_callable():
     """A callable in a lower-precedence source is never the value, so it must
     never run -- resolving it would fire a side effect nobody asked for.
     """
@@ -92,7 +93,7 @@ def test_upsert_does_not_call_a_shadowed_callable(db):
     assert obj.value == 1
 
 
-def test_upsert_create_defaults_apply_on_insert_only(db):
+def test_upsert_create_defaults_apply_on_insert_only():
     obj, created = UpsertItem.query.upsert(
         key="a",
         defaults={"value": 1},
@@ -114,7 +115,7 @@ def test_upsert_create_defaults_apply_on_insert_only(db):
     assert obj.value == 2
 
 
-def test_upsert_conflict_defaults_increment_counter_atomically(db):
+def test_upsert_conflict_defaults_increment_counter_atomically():
     UpsertItem(key="a", value=10).create()
 
     obj, created = UpsertItem.query.upsert(
@@ -129,7 +130,7 @@ def test_upsert_conflict_defaults_increment_counter_atomically(db):
     assert UpsertItem.query.get(key="a").value == 11
 
 
-def test_upsert_conflict_defaults_bind_to_their_own_columns(db):
+def test_upsert_conflict_defaults_bind_to_their_own_columns():
     """The SET clause is emitted in model field order while conflict_defaults
     is a dict in the caller's order, so the assignments and their parameters
     have to be built in one pass -- otherwise each value binds to the wrong
@@ -151,7 +152,7 @@ def test_upsert_conflict_defaults_bind_to_their_own_columns(db):
     assert (stored.value, stored.label) == (42, "HELLO")
 
 
-def test_upsert_conflict_defaults_set_order_matches_param_order(db, capture_queries):
+def test_upsert_conflict_defaults_set_order_matches_param_order():
     UpsertItem(key="a", value=1, label="old").create()
 
     with capture_queries() as queries:
@@ -163,13 +164,15 @@ def test_upsert_conflict_defaults_set_order_matches_param_order(db, capture_quer
             unique_fields=[UpsertItem.key],
         )
 
-    set_clause = queries[0]["sql"].split("DO UPDATE SET ")[1].split(" RETURNING")[0]
+    set_clause = (
+        queries[0].sql_with_params.split("DO UPDATE SET ")[1].split(" RETURNING")[0]
+    )
     # label precedes value in the model, so the literals must appear that way
     # round too -- the parameters are interpolated in the order they were sent.
     assert set_clause.index("'HELLO'") < set_clause.index("42")
 
 
-def test_upsert_conflict_defaults_resolve_callables(db):
+def test_upsert_conflict_defaults_resolve_callables():
     """A callable in conflict_defaults is called, like every other value
     source -- otherwise the callable itself reaches the column and a text
     column stores its repr.
@@ -190,7 +193,7 @@ def test_upsert_conflict_defaults_resolve_callables(db):
     assert (stored.label, stored.value) == ("computed", 42)
 
 
-def test_upsert_conflict_defaults_do_not_call_expressions(db):
+def test_upsert_conflict_defaults_do_not_call_expressions():
     """An expression is an object, not a callable, so callable resolution has
     to leave it alone for the atomic-counter case to survive.
     """
@@ -207,18 +210,18 @@ def test_upsert_conflict_defaults_do_not_call_expressions(db):
     assert obj.value == 15
 
 
-def test_upsert_rejects_a_property_name(db):
+def test_upsert_rejects_a_property_name():
     """upsert() derives its SET clause from columns, so a settable property
     would be written on insert and silently dropped on conflict.
     """
-    with pytest.raises(FieldError, match="is a property"):
+    with raises(FieldError, match="is a property"):
         UpsertItem.query.upsert(
             key="a", label_upper="HELLO", unique_fields=[UpsertItem.key]
         )
 
 
-def test_upsert_rejects_a_property_name_in_defaults(db):
-    with pytest.raises(FieldError, match="is a property"):
+def test_upsert_rejects_a_property_name_in_defaults():
+    with raises(FieldError, match="is a property"):
         UpsertItem.query.upsert(
             key="a",
             defaults={"label_upper": "HELLO"},
@@ -226,7 +229,7 @@ def test_upsert_rejects_a_property_name_in_defaults(db):
         )
 
 
-def test_upsert_ignores_queryset_filters(db):
+def test_upsert_ignores_queryset_filters():
     """upsert() targets the conflict constraint, never the queryset's filters
     -- the related-manager wrappers rely on calling through a filtered
     queryset, so this is documented rather than guarded.
@@ -242,7 +245,7 @@ def test_upsert_ignores_queryset_filters(db):
     assert UpsertItem.query.count() == 1
 
 
-def test_expression_as_an_inserted_value_on_a_text_column_is_rejected(db):
+def test_expression_as_an_inserted_value_on_a_text_column_is_rejected():
     """A text column coerces anything to str, so it would store the
     expression's repr rather than fail -- the check can't rely on coercion.
     """
@@ -261,32 +264,34 @@ def test_expression_as_an_inserted_value_on_a_text_column_is_rejected(db):
             unique_fields=[UpsertItem.key],
         ),
     ):
-        with pytest.raises(FieldError, match="cannot be an inserted value"):
+        with raises(FieldError, match="cannot be an inserted value"):
             call()
 
     assert UpsertItem.query.count() == 0
 
 
-def test_upsert_unique_fields_error_does_not_offer_the_primary_key(db):
+def test_upsert_unique_fields_error_does_not_offer_the_primary_key():
     """upsert() refuses a primary-key conflict target, so its message must not
     advertise one. bulk_upsert() does allow it, and still says so.
     """
-    with pytest.raises(ValueError, match="must name") as upsert_error:
+    with raises(ValueError, match="must name") as upsert_error:
         UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.value])
-    assert "must name a UniqueConstraint" in str(upsert_error.value)
-    assert "primary key" not in str(upsert_error.value)
+    assert "must name a UniqueConstraint" in str(upsert_error.exception)
+    assert "primary key" not in str(upsert_error.exception)
 
-    with pytest.raises(ValueError, match="must name") as bulk_error:
+    with raises(ValueError, match="must name") as bulk_error:
         UpsertItem.query.bulk_upsert(
             [UpsertItem(key="a")],
             update_fields=[UpsertItem.label],
             unique_fields=[UpsertItem.value],
         )
-    assert "must name the primary key or a UniqueConstraint" in str(bulk_error.value)
+    assert "must name the primary key or a UniqueConstraint" in str(
+        bulk_error.exception
+    )
 
 
-def test_upsert_rejects_a_property_name_in_create_defaults(db):
-    with pytest.raises(FieldError, match="is a property"):
+def test_upsert_rejects_a_property_name_in_create_defaults():
+    with raises(FieldError, match="is a property"):
         UpsertItem.query.upsert(
             key="a",
             create_defaults={"label_upper": "HELLO"},
@@ -294,8 +299,8 @@ def test_upsert_rejects_a_property_name_in_create_defaults(db):
         )
 
 
-def test_upsert_rejects_a_property_name_in_conflict_defaults(db):
-    with pytest.raises(FieldError, match="is a property"):
+def test_upsert_rejects_a_property_name_in_conflict_defaults():
+    with raises(FieldError, match="is a property"):
         UpsertItem.query.upsert(
             key="a",
             conflict_defaults={"label_upper": "HELLO"},
@@ -303,11 +308,11 @@ def test_upsert_rejects_a_property_name_in_conflict_defaults(db):
         )
 
 
-def test_upsert_names_defaults_when_passed_positionally(db):
+def test_upsert_names_defaults_when_passed_positionally():
     """update_or_create() took defaults positionally; a bare "takes 1
     positional argument" wouldn't say which keyword to use.
     """
-    with pytest.raises(TypeError, match="Pass the mapping as defaults="):
+    with raises(TypeError, match="Pass the mapping as defaults="):
         UpsertItem.query.upsert(
             {"value": 1},  # ty: ignore[invalid-argument-type]
             key="a",
@@ -315,8 +320,8 @@ def test_upsert_names_defaults_when_passed_positionally(db):
         )
 
 
-def test_upsert_conflict_defaults_rejects_the_primary_key(db):
-    with pytest.raises(ValueError, match="cannot update primary key fields"):
+def test_upsert_conflict_defaults_rejects_the_primary_key():
+    with raises(ValueError, match="cannot update primary key fields"):
         UpsertItem.query.upsert(
             key="a",
             conflict_defaults={"id": 999},
@@ -324,8 +329,8 @@ def test_upsert_conflict_defaults_rejects_the_primary_key(db):
         )
 
 
-def test_upsert_conflict_defaults_rejects_a_database_owned_column(db):
-    with pytest.raises(ValueError, match="the database generates its value"):
+def test_upsert_conflict_defaults_rejects_a_database_owned_column():
+    with raises(ValueError, match="the database generates its value"):
         UpsertStamped.query.upsert(
             key="a",
             conflict_defaults={"created_at": Excluded("created_at")},
@@ -333,7 +338,7 @@ def test_upsert_conflict_defaults_rejects_a_database_owned_column(db):
         )
 
 
-def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
+def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value():
     # On insert there's no existing row, so the inserted value stands; the
     # conflict_defaults override only takes effect on a later conflict.
     obj, created = UpsertItem.query.upsert(
@@ -345,7 +350,7 @@ def test_upsert_conflict_defaults_apply_on_insert_uses_inserted_value(db):
     assert (created, obj.value) == (True, 3)
 
 
-def test_upsert_excluded_accumulates_the_proposed_value(db):
+def test_upsert_excluded_accumulates_the_proposed_value():
     """F() reads the stored row, Excluded() reads the row the INSERT proposed,
     so combining them adds the incoming delta instead of overwriting.
     """
@@ -363,7 +368,7 @@ def test_upsert_excluded_accumulates_the_proposed_value(db):
     assert UpsertItem.query.get(key="a").value == 17
 
 
-def test_upsert_excluded_compiles_to_the_excluded_column(db, capture_queries):
+def test_upsert_excluded_compiles_to_the_excluded_column():
     UpsertItem(key="a", value=1).create()
 
     with capture_queries() as queries:
@@ -375,11 +380,11 @@ def test_upsert_excluded_compiles_to_the_excluded_column(db, capture_queries):
         )
 
     assert len(queries) == 1
-    sql = queries[0]["sql"]
+    sql = queries[0].sql_with_params
     assert '"value" = ("examples_upsertitem"."value" + EXCLUDED."value")' in sql
 
 
-def test_upsert_excluded_accumulates_across_repeated_calls(db):
+def test_upsert_excluded_accumulates_across_repeated_calls():
     """Each call adds its own delta to whatever is stored -- the property a
     concurrent caller relies on, exercised serially here.
     """
@@ -396,46 +401,47 @@ def test_upsert_excluded_accumulates_across_repeated_calls(db):
     assert UpsertItem.query.get(key="a").value == 12
 
 
-def test_excluded_outside_a_conflict_update_is_rejected(db):
-    with pytest.raises(FieldError, match="only valid in upsert"):
+def test_excluded_outside_a_conflict_update_is_rejected():
+    with raises(FieldError, match="only valid in upsert"):
         UpsertItem.query.filter(key="a").update(value=Excluded("value"))
 
-    with pytest.raises(FieldError, match="only valid in upsert"):
+    with raises(FieldError, match="only valid in upsert"):
         list(UpsertItem.query.filter(value=Excluded("value")))
 
 
-@pytest.mark.parametrize(
-    "expression",
-    [
-        Excluded("value"),
-        F("value") + Excluded("value"),
-        F("value"),
-        F("value") + 1,
-        Upper("label"),
-        lambda: F("value"),
-    ],
-    ids=["excluded", "excluded-nested", "f", "f-combined", "func", "callable"],
+INSERTED_EXPRESSIONS = {
+    "excluded": Excluded("value"),
+    "excluded-nested": F("value") + Excluded("value"),
+    "f": F("value"),
+    "f-combined": F("value") + 1,
+    "func": Upper("label"),
+    "callable": lambda: F("value"),
+}
+
+UPSERT_VALUE_SOURCES = {
+    "kwargs": lambda expression: UpsertItem.query.upsert(
+        key="a", value=expression, unique_fields=[UpsertItem.key]
+    ),
+    "defaults": lambda expression: UpsertItem.query.upsert(
+        key="a", defaults={"value": expression}, unique_fields=[UpsertItem.key]
+    ),
+    "create_defaults": lambda expression: UpsertItem.query.upsert(
+        key="a",
+        create_defaults={"value": expression},
+        unique_fields=[UpsertItem.key],
+    ),
+}
+
+
+# Every value source crossed with every expression.
+@cases(
+    *(
+        case(upsert_with, expression, id=f"{source}-{name}")
+        for source, upsert_with in UPSERT_VALUE_SOURCES.items()
+        for name, expression in INSERTED_EXPRESSIONS.items()
+    )
 )
-@pytest.mark.parametrize(
-    "upsert_with",
-    [
-        lambda expression: UpsertItem.query.upsert(
-            key="a", value=expression, unique_fields=[UpsertItem.key]
-        ),
-        lambda expression: UpsertItem.query.upsert(
-            key="a", defaults={"value": expression}, unique_fields=[UpsertItem.key]
-        ),
-        lambda expression: UpsertItem.query.upsert(
-            key="a",
-            create_defaults={"value": expression},
-            unique_fields=[UpsertItem.key],
-        ),
-    ],
-    ids=["kwargs", "defaults", "create_defaults"],
-)
-def test_excluded_as_an_inserted_value_is_rejected(
-    db, capture_queries, upsert_with, expression
-):
+def test_excluded_as_an_inserted_value_is_rejected(upsert_with, expression):
     """An expression is computed from a row, and the row an INSERT proposes
     doesn't exist yet -- Excluded() names that very row. Rejected in any of the
     three value sources, however it's spelled, including behind a callable,
@@ -443,25 +449,25 @@ def test_excluded_as_an_inserted_value_is_rejected(
     """
     with (
         capture_queries() as queries,
-        pytest.raises(FieldError, match="cannot be an inserted value"),
+        raises(FieldError, match="cannot be an inserted value"),
     ):
         upsert_with(expression)
 
     assert queries == []
 
 
-def test_excluded_as_an_inserted_value_on_a_text_column_is_rejected(db):
+def test_excluded_as_an_inserted_value_on_a_text_column_is_rejected():
     """A text column would coerce the expression to its repr and write that
     into the row, so the check can't rely on field coercion to catch it.
     """
-    with pytest.raises(FieldError, match="cannot be an inserted value"):
+    with raises(FieldError, match="cannot be an inserted value"):
         UpsertItem.query.upsert(
             key="a", label=Excluded("label"), unique_fields=[UpsertItem.key]
         )
 
 
-def test_upsert_excluded_unknown_column_is_rejected(db):
-    with pytest.raises(FieldError, match="does not name a column"):
+def test_upsert_excluded_unknown_column_is_rejected():
+    with raises(FieldError, match="does not name a column"):
         UpsertItem.query.upsert(
             key="a",
             value=1,
@@ -470,10 +476,10 @@ def test_upsert_excluded_unknown_column_is_rejected(db):
         )
 
 
-def test_upsert_rejects_updating_a_database_owned_column(db):
+def test_upsert_rejects_updating_a_database_owned_column():
     from datetime import datetime
 
-    with pytest.raises(ValueError, match="the database generates its value"):
+    with raises(ValueError, match="the database generates its value"):
         UpsertStamped.query.upsert(
             key="a",
             created_at=datetime(2020, 1, 1, tzinfo=UTC),
@@ -481,9 +487,8 @@ def test_upsert_rejects_updating_a_database_owned_column(db):
         )
 
 
-def test_upsert_excluded_increments_survive_concurrent_writers(
-    isolated_db, capture_queries
-):
+@isolated_db
+def test_upsert_excluded_increments_survive_concurrent_writers():
     """Concurrent callers each add their own delta -- none is lost.
 
     The read and the write happen in one statement, under the row lock
@@ -504,7 +509,7 @@ def test_upsert_excluded_increments_survive_concurrent_writers(
             conflict_defaults={"value": F("value") + Excluded("value")},
             unique_fields=[UpsertItem.key],
         )
-    increment_sql = queries[0]["sql"]
+    increment_sql = queries[0].sql_with_params
     assert f'"value" = ("{table}"."value" + EXCLUDED."value")' in increment_sql
 
     params = build_connection_params(get_connection().settings_dict)
@@ -513,7 +518,8 @@ def test_upsert_excluded_increments_survive_concurrent_writers(
     def race(_: int) -> None:
         with psycopg.connect(**params, autocommit=True) as session:
             barrier.wait()
-            session.execute(increment_sql)
+            # The statement capture_queries recorded, replayed as it ran.
+            session.execute(increment_sql)  # ty: ignore[invalid-argument-type]
 
     # Start from the row that first upsert() inserted, then race the same
     # statement -- every session takes the conflict path.
@@ -523,7 +529,7 @@ def test_upsert_excluded_increments_survive_concurrent_writers(
     assert UpsertItem.query.get(key=key).value == 1 + workers
 
 
-def test_upsert_all_unique_fields_is_idempotent(db):
+def test_upsert_all_unique_fields_is_idempotent():
     # When every inserted column is a unique field there's nothing to update;
     # the second call must still return the existing row (created=False).
     obj1, created1 = Widget.query.upsert(
@@ -539,7 +545,7 @@ def test_upsert_all_unique_fields_is_idempotent(db):
     assert Widget.query.count() == 1
 
 
-def test_upsert_conflicts_on_a_foreign_key(db):
+def test_upsert_conflicts_on_a_foreign_key():
     """`Model.fk` is the relation descriptor, not a Field, so a composite
     conflict target that includes a foreign key has to resolve it to the
     column. Static half: tests/typing/upsert_writes.py.
@@ -566,7 +572,7 @@ def test_upsert_conflicts_on_a_foreign_key(db):
     assert UpsertScoped.query.count() == 1
 
 
-def test_upsert_foreign_key_conflict_target_scopes_by_parent(db):
+def test_upsert_foreign_key_conflict_target_scopes_by_parent():
     """The same key under a different parent is a different row."""
     one = UpsertTenant(name="one").create()
     two = UpsertTenant(name="two").create()
@@ -588,7 +594,7 @@ def test_upsert_foreign_key_conflict_target_scopes_by_parent(db):
     assert UpsertScoped.query.count() == 2
 
 
-def test_reverse_manager_upsert_conflicts_on_the_parent_key(db):
+def test_reverse_manager_upsert_conflicts_on_the_parent_key():
     """Through the reverse manager the parent is filled in automatically, so
     the conflict target still needs the foreign key column.
     """
@@ -613,14 +619,14 @@ def test_reverse_manager_upsert_conflicts_on_the_parent_key(db):
     assert tenant.scoped.query.count() == 1
 
 
-def test_upsert_conflict_defaults_rejects_a_many_to_many_field(db):
+def test_upsert_conflict_defaults_rejects_a_many_to_many_field():
     """A many-to-many field is a forward field with no column of its own, so
     it passes the name lookup and used to fail in Postgres with a bare
     UndefinedColumn.
     """
     Widget.query.create(name="w", size="s")
 
-    with pytest.raises(FieldError, match="only database columns can be set"):
+    with raises(FieldError, match="only database columns can be set"):
         Widget.query.upsert(
             name="w",
             size="s",
@@ -629,8 +635,8 @@ def test_upsert_conflict_defaults_rejects_a_many_to_many_field(db):
         )
 
 
-def test_upsert_conflict_defaults_rejects_a_reverse_relation_name(db):
-    with pytest.raises(FieldError, match="Invalid conflict_defaults field name"):
+def test_upsert_conflict_defaults_rejects_a_reverse_relation_name():
+    with raises(FieldError, match="Invalid conflict_defaults field name"):
         Tag.query.upsert(
             name="t",
             conflict_defaults={"widgets": []},
@@ -638,23 +644,23 @@ def test_upsert_conflict_defaults_rejects_a_reverse_relation_name(db):
         )
 
 
-def test_upsert_requires_unique_fields(db):
-    with pytest.raises(ValueError, match="requires unique_fields"):
+def test_upsert_requires_unique_fields():
+    with raises(ValueError, match="requires unique_fields"):
         UpsertItem.query.upsert(key="a", unique_fields=[])
 
 
-def test_upsert_unique_fields_must_match_a_constraint(db):
-    with pytest.raises(ValueError, match="must name a UniqueConstraint"):
+def test_upsert_unique_fields_must_match_a_constraint():
+    with raises(ValueError, match="must name a UniqueConstraint"):
         UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.value])
 
 
-def test_upsert_rejects_null_unique_value(db):
-    with pytest.raises(ValueError, match="non-null"):
+def test_upsert_rejects_null_unique_value():
+    with raises(ValueError, match="non-null"):
         UpsertItem.query.upsert(key=None, unique_fields=[UpsertItem.key])
 
 
-def test_upsert_string_unique_field_rejected(db):
-    with pytest.raises(TypeError, match="takes field references, not strings"):
+def test_upsert_string_unique_field_rejected():
+    with raises(TypeError, match="takes field references, not strings"):
         UpsertItem.query.upsert(
             key="a",
             value=1,
@@ -662,12 +668,12 @@ def test_upsert_string_unique_field_rejected(db):
         )
 
 
-def test_upsert_wrong_model_unique_field_rejected(db):
-    with pytest.raises(FieldError, match="belongs to a different model"):
+def test_upsert_wrong_model_unique_field_rejected():
+    with raises(FieldError, match="belongs to a different model"):
         UpsertItem.query.upsert(key="a", value=1, unique_fields=[Widget.name])
 
 
-def test_upsert_conflict_defaults_accepts_related_instance(db):
+def test_upsert_conflict_defaults_accepts_related_instance():
     # A model instance as a conflict_defaults value exercises the related-field
     # branch of assignment-value compilation (prepare_database_save).
     tenant = UpsertTenant(name="owner").create()
@@ -688,7 +694,7 @@ def test_upsert_conflict_defaults_accepts_related_instance(db):
     assert reloaded.tenant.id == tenant.id
 
 
-def test_upsert_bumps_update_now_on_conflict(db):
+def test_upsert_bumps_update_now_on_conflict():
     """A DateTimeField(update_now=True) column nobody named still advances on
     the conflict path -- pre_save stamped it into the INSERT, so EXCLUDED
     carries it. A create_now-only column keeps its original value.
@@ -706,8 +712,8 @@ def test_upsert_bumps_update_now_on_conflict(db):
     assert second.created_at == first.created_at
 
 
-def test_upsert_conflict_defaults_rejects_unique_field(db):
-    with pytest.raises(ValueError, match="cannot name the unique field"):
+def test_upsert_conflict_defaults_rejects_unique_field():
+    with raises(ValueError, match="cannot name the unique field"):
         UpsertItem.query.upsert(
             key="a",
             conflict_defaults={"key": "b"},
@@ -715,8 +721,8 @@ def test_upsert_conflict_defaults_rejects_unique_field(db):
         )
 
 
-def test_upsert_conflict_defaults_rejects_unknown_field_name(db):
-    with pytest.raises(FieldError, match="conflict_defaults"):
+def test_upsert_conflict_defaults_rejects_unknown_field_name():
+    with raises(FieldError, match="conflict_defaults"):
         UpsertItem.query.upsert(
             key="a",
             conflict_defaults={"typo_field": 1},
@@ -724,26 +730,26 @@ def test_upsert_conflict_defaults_rejects_unknown_field_name(db):
         )
 
 
-def test_upsert_rejects_primary_key_unique_field(db):
-    with pytest.raises(ValueError, match="cannot conflict on the primary key"):
+def test_upsert_rejects_primary_key_unique_field():
+    with raises(ValueError, match="cannot conflict on the primary key"):
         UpsertItem.query.upsert(key="a", unique_fields=[UpsertItem.id])
 
 
-def test_upsert_rejects_unknown_field_name(db):
-    with pytest.raises(FieldError, match="typo_field"):
+def test_upsert_rejects_unknown_field_name():
+    with raises(FieldError, match="typo_field"):
         UpsertItem.query.upsert(
             key="a", defaults={"typo_field": 1}, unique_fields=[UpsertItem.key]
         )
 
 
-def test_upsert_insert_is_one_statement(db, capture_queries):
+def test_upsert_insert_is_one_statement():
     with capture_queries() as queries:
         UpsertItem.query.upsert(key="a", value=1, unique_fields=[UpsertItem.key])
 
     assert len(queries) == 1
 
 
-def test_upsert_conflict_is_one_statement(db, capture_queries):
+def test_upsert_conflict_is_one_statement():
     UpsertItem(key="a", value=1).create()
 
     with capture_queries() as queries:

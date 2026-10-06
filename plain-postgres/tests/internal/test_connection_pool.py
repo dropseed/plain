@@ -4,21 +4,21 @@ import concurrent.futures
 import threading
 import time
 
-import pytest
 from plain.postgres.db import (
     _db_conn,
     get_connection,
     return_database_connection,
 )
 from plain.postgres.sources import runtime_pool_source
-from plain.runtime import settings
+from plain.testing import override_settings, raises
+from postgres_test_helpers import clean_connection
 from psycopg_pool import PoolTimeout
 
 
-class TestPoolCheckoutReturn:
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_checkout_and_return(self, setup_db):
-        """First cursor use checks a connection out; return_database_connection puts it back."""
+# Pool checkout return
+def test_checkout_and_return():
+    """First cursor use checks a connection out; return_database_connection puts it back."""
+    with clean_connection():
         conn = get_connection()
         assert conn.connection is None, "No checkout until cursor is used"
 
@@ -29,9 +29,10 @@ class TestPoolCheckoutReturn:
         return_database_connection()
         assert conn.connection is None, "Inner connection is returned to pool"
 
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_wrapper_persists_after_return(self, setup_db):
-        """The wrapper stays in the ContextVar; next use checks out again."""
+
+def test_wrapper_persists_after_return():
+    """The wrapper stays in the ContextVar; next use checks out again."""
+    with clean_connection():
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -44,10 +45,10 @@ class TestPoolCheckoutReturn:
         assert conn.connection is not None
 
 
-class TestDirtyConnectionRollback:
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_dirty_connection_rolled_back(self, setup_db):
-        """Returning a connection mid-transaction rolls it back and restores autocommit."""
+# Dirty connection rollback
+def test_dirty_connection_rolled_back():
+    """Returning a connection mid-transaction rolls it back and restores autocommit."""
+    with clean_connection():
         conn = get_connection()
         conn.ensure_connection()
         raw = conn.connection
@@ -66,24 +67,24 @@ class TestDirtyConnectionRollback:
         assert conn.connection.autocommit is True
 
 
-class TestPoolRecreation:
-    def test_pool_recreated_after_close(self, setup_db):
-        """PoolSource.close() drops the pool; next acquire opens a fresh one."""
-        source = runtime_pool_source
-        pool = source._get_pool()
-        assert source._pool is pool
+# Pool recreation
+def test_pool_recreated_after_close():
+    """PoolSource.close() drops the pool; next acquire opens a fresh one."""
+    source = runtime_pool_source
+    pool = source._get_pool()
+    assert source._pool is pool
 
-        source.close()
-        assert source._pool is None
+    source.close()
+    assert source._pool is None
 
-        new_pool = source._get_pool()
-        assert new_pool is not pool
+    new_pool = source._get_pool()
+    assert new_pool is not pool
 
 
-class TestConcurrentCheckouts:
-    @pytest.mark.usefixtures("_unblock_cursor", "_clean_connection")
-    def test_concurrent_workers_hold_distinct_connections(self, setup_db):
-        """N worker threads querying simultaneously hold N distinct pool connections."""
+# Concurrent checkouts
+def test_concurrent_workers_hold_distinct_connections():
+    """N worker threads querying simultaneously hold N distinct pool connections."""
+    with clean_connection():
         n_workers = 4
         barrier = threading.Barrier(n_workers)
         pids: list[int] = []
@@ -115,24 +116,26 @@ class TestConcurrentCheckouts:
         )
 
 
-class TestPoolSettingsWiring:
-    def test_max_size_and_timeout_reach_the_pool(self, setup_db, monkeypatch):
-        """POSTGRES_POOL_MAX_SIZE caps concurrent checkouts; POSTGRES_POOL_TIMEOUT bounds the wait.
+# Pool settings wiring
+def test_max_size_and_timeout_reach_the_pool():
+    """POSTGRES_POOL_MAX_SIZE caps concurrent checkouts; POSTGRES_POOL_TIMEOUT bounds the wait.
 
-        If either setting silently stopped propagating to `ConnectionPool`,
-        a rename or typo would go unnoticed — existing tests all run under
-        the defaults. This forces a rebuild at tiny values and proves the
-        pool honors them.
-        """
-        runtime_pool_source.close()
-        monkeypatch.setattr(settings, "POSTGRES_POOL_MIN_SIZE", 1)
-        monkeypatch.setattr(settings, "POSTGRES_POOL_MAX_SIZE", 1)
-        monkeypatch.setattr(settings, "POSTGRES_POOL_TIMEOUT", 0.2)
-        try:
+    If either setting silently stopped propagating to `ConnectionPool`,
+    a rename or typo would go unnoticed — existing tests all run under
+    the defaults. This forces a rebuild at tiny values and proves the
+    pool honors them.
+    """
+    runtime_pool_source.close()
+    try:
+        with override_settings(
+            POSTGRES_POOL_MIN_SIZE=1,
+            POSTGRES_POOL_MAX_SIZE=1,
+            POSTGRES_POOL_TIMEOUT=0.2,
+        ):
             holder = runtime_pool_source.acquire()
             try:
                 start = time.monotonic()
-                with pytest.raises(PoolTimeout):
+                with raises(PoolTimeout):
                     runtime_pool_source.acquire()
                 elapsed = time.monotonic() - start
                 # Generous upper bound for CI noise; lower bound proves we
@@ -140,6 +143,6 @@ class TestPoolSettingsWiring:
                 assert 0.15 <= elapsed < 2.0, f"Expected ~0.2s wait, got {elapsed:.3f}s"
             finally:
                 runtime_pool_source.release(holder)
-        finally:
-            # Rebuild at default settings for subsequent tests.
-            runtime_pool_source.close()
+    finally:
+        # Rebuild at default settings for subsequent tests.
+        runtime_pool_source.close()

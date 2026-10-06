@@ -10,6 +10,7 @@ import os
 import tempfile
 import threading
 from io import BytesIO, StringIO
+from pathlib import Path
 
 from plain.http import FileResponse, StreamingResponse
 
@@ -99,13 +100,14 @@ def test_text_pipe_body_streams_line_by_line() -> None:
         reader.close()
 
 
-def test_unbuffered_binary_file_is_read_in_blocks(tmp_path) -> None:
+def test_unbuffered_binary_file_is_read_in_blocks() -> None:
     # No read1 on an unbuffered file: read(n) returns what's there, in
     # blocks — not a line (here, the whole newline-free file) at a time.
-    path = tmp_path / "data.bin"
-    path.write_bytes(b"x" * 200_000)
-    with open(path, "rb", buffering=0) as raw:
-        chunks = list(StreamingResponse(raw).streaming_content)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "data.bin"
+        path.write_bytes(b"x" * 200_000)
+        with open(path, "rb", buffering=0) as raw:
+            chunks = list(StreamingResponse(raw).streaming_content)
 
     assert b"".join(chunks) == b"x" * 200_000
     assert len(chunks) == 4
@@ -120,11 +122,12 @@ def test_text_mode_spooled_file_is_read() -> None:
         assert list(StreamingResponse(spooled).streaming_content) == [b"a,b\n1,2\n"]
 
 
-def test_regular_text_file_is_read_in_blocks(tmp_path) -> None:
+def test_regular_text_file_is_read_in_blocks() -> None:
     # Seekable text is read in blocks, not one pool trip per line.
-    path = tmp_path / "export.csv"
-    path.write_text("row\n" * 1000)
-    with open(path) as text_file:
-        chunks = list(StreamingResponse(text_file).streaming_content)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "export.csv"
+        path.write_text("row\n" * 1000)
+        with open(path) as text_file:
+            chunks = list(StreamingResponse(text_file).streaming_content)
 
     assert chunks == [b"row\n" * 1000]

@@ -4,9 +4,9 @@ Style: system-level — exercise real inserts and introspect the real schema.
 """
 
 import psycopg
-import pytest
 from app.examples.models.defaults import DefaultsExample
 from plain.postgres import get_connection
+from plain.testing import raises
 
 
 def _column_default(table_name: str, column_name: str) -> str | None:
@@ -24,23 +24,23 @@ def _column_default(table_name: str, column_name: str) -> str | None:
     return row[0] if row else None
 
 
-def test_static_string_default_applied_on_save(db):
+def test_static_string_default_applied_on_save():
     row = DefaultsExample.query.create(name="row")
     assert row.status == "pending"
 
 
-def test_static_int_default_applied_on_save(db):
+def test_static_int_default_applied_on_save():
     row = DefaultsExample.query.create(name="row")
     assert row.priority == 5
 
 
-def test_explicit_value_overrides_default(db):
+def test_explicit_value_overrides_default():
     row = DefaultsExample.query.create(name="row", status="done", priority=99)
     assert row.status == "done"
     assert row.priority == 99
 
 
-def test_static_defaults_persist_on_column(db):
+def test_static_defaults_persist_on_column():
     """Literal defaults are installed as the column's persistent DEFAULT so
     raw SQL INSERTs get them and convergence owns them uniformly alongside
     DB-expression defaults."""
@@ -53,7 +53,7 @@ def test_static_defaults_persist_on_column(db):
     assert "5" in priority_default
 
 
-def test_queryset_update_does_not_touch_default_column(db):
+def test_queryset_update_does_not_touch_default_column():
     """`.filter(...).update(field=...)` only writes the named columns — the
     defaulted column is untouched and keeps its originally-inserted value."""
     row = DefaultsExample.query.create(name="row")
@@ -66,7 +66,7 @@ def test_queryset_update_does_not_touch_default_column(db):
     assert reloaded.name == "updated"
 
 
-def test_get_or_create_applies_default_only_on_create(db):
+def test_get_or_create_applies_default_only_on_create():
     row, created = DefaultsExample.query.get_or_create(name="only-once")
     assert created is True
     assert row.status == "pending"
@@ -76,7 +76,7 @@ def test_get_or_create_applies_default_only_on_create(db):
     assert same.status == "pending"
 
 
-def test_explicit_none_on_nullable_overrides_default(db):
+def test_explicit_none_on_nullable_overrides_default():
     """Passing `note=None` inserts NULL — it does NOT silently fall back to
     the `default="auto"`."""
     default_row = DefaultsExample.query.create(name="default")
@@ -90,7 +90,7 @@ def test_explicit_none_on_nullable_overrides_default(db):
     assert reloaded.note is None
 
 
-def test_refresh_from_db_reads_persisted_value_not_default(db):
+def test_refresh_from_db_reads_persisted_value_not_default():
     """After save, refresh_from_db reflects what's actually in the DB — even
     after an in-memory attribute has been stomped on."""
     row = DefaultsExample.query.create(name="row")
@@ -101,7 +101,7 @@ def test_refresh_from_db_reads_persisted_value_not_default(db):
     assert row.status == "pending"
 
 
-def test_omitted_required_field_uses_python_empty_at_construction(db):
+def test_omitted_required_field_uses_python_empty_at_construction():
     """A required column field omitted at `Model()` construction takes the
     type's Python-side empty value (e.g. "" for text), not None. full_clean
     surfaces required-but-empty separately; this contract keeps non-validated
@@ -113,7 +113,7 @@ def test_omitted_required_field_uses_python_empty_at_construction(db):
     assert row.name == ""
 
 
-def test_raw_insert_uses_persisted_literal_default(db):
+def test_raw_insert_uses_persisted_literal_default():
     """A raw SQL INSERT that omits a column with a literal `default=` gets
     the value from the column's DEFAULT — the backstop the persistent column
     DEFAULT provides."""
@@ -130,16 +130,16 @@ def test_raw_insert_uses_persisted_literal_default(db):
     assert row == ("pending", "auto")
 
 
-def test_raw_insert_fails_when_required_column_has_no_default(db):
+def test_raw_insert_fails_when_required_column_has_no_default():
     """Columns without a literal/expression default still require a value."""
     with (
-        pytest.raises(psycopg.errors.NotNullViolation),
+        raises(psycopg.errors.NotNullViolation),
         get_connection().cursor() as cursor,
     ):
         cursor.execute(
             """
-                INSERT INTO examples_defaultsexample (priority)
-                VALUES (%s)
-                """,
+            INSERT INTO examples_defaultsexample (priority)
+            VALUES (%s)
+            """,
             [1],
         )

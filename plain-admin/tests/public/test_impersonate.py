@@ -6,60 +6,73 @@ can't be impersonated, and stopping restores the original user.
 """
 
 from app.users.models import User
-from plain.test import Client
+from plain.auth.requests import get_request_user
+from plain.auth.testing import login_client
+from plain.testing import Client
 
 
-def test_admin_can_impersonate_regular_user(db):
+def acting_user_id(response) -> int:
+    """The id of the user the request was served as.
+
+    `get_request_user` can return None (an anonymous request), so a lost
+    session fails here, naming the problem, rather than on `.id`.
+    """
+    user = get_request_user(response.request)
+    assert user is not None, "expected an authenticated request"
+    return user.id
+
+
+def test_admin_can_impersonate_regular_user():
     admin = User.query.create(username="admin", is_admin=True)
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
 
     started = client.get(f"/admin/impersonate/start/{target.id}")
     assert started.status_code == 302
 
     # Subsequent requests are now served as the target user.
     response = client.get("/whoami")
-    assert response.user.id == target.id
+    assert acting_user_id(response) == target.id
 
 
-def test_stopping_impersonation_restores_original_user(db):
+def test_stopping_impersonation_restores_original_user():
     admin = User.query.create(username="admin", is_admin=True)
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
     client.get(f"/admin/impersonate/start/{target.id}")
-    assert client.get("/whoami").user.id == target.id
+    assert acting_user_id(client.get("/whoami")) == target.id
 
     stopped = client.get("/admin/impersonate/stop")
     assert stopped.status_code == 302
 
     # Back to acting as the admin.
-    assert client.get("/whoami").user.id == admin.id
+    assert acting_user_id(client.get("/whoami")) == admin.id
 
 
-def test_non_admin_cannot_start_impersonation(db):
+def test_non_admin_cannot_start_impersonation():
     regular = User.query.create(username="regular", is_admin=False)
     target = User.query.create(username="target", is_admin=False)
 
     client = Client()
-    client.force_login(regular)
+    login_client(client, regular)
 
     started = client.get(f"/admin/impersonate/start/{target.id}")
     assert started.status_code == 403
 
     # The effective user is unchanged — no impersonation took hold.
-    assert client.get("/whoami").user.id == regular.id
+    assert acting_user_id(client.get("/whoami")) == regular.id
 
 
-def test_admin_users_cannot_be_impersonated(db):
+def test_admin_users_cannot_be_impersonated():
     admin = User.query.create(username="admin", is_admin=True)
     other_admin = User.query.create(username="other_admin", is_admin=True)
 
     client = Client()
-    client.force_login(admin)
+    login_client(client, admin)
 
     # The start view sets the session marker, but the middleware refuses to
     # swap to an admin target and clears it.
@@ -69,4 +82,4 @@ def test_admin_users_cannot_be_impersonated(db):
     assert blocked.status_code == 403
 
     # After the refusal the marker is cleared, so normal requests resume.
-    assert client.get("/whoami").user.id == admin.id
+    assert acting_user_id(client.get("/whoami")) == admin.id

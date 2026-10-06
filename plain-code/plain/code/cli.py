@@ -139,6 +139,7 @@ def check(
     if not skip_ty and python_paths and config.get("ty", {}).get("enabled", True):
         print_event("ty check...", newline=False)
         ty_args = ["ty", "check", *python_paths, "--no-progress"]
+        ty_args.extend(_tests_directory_search_path())
         for e in config.get("exclude", []):
             ty_args.extend(["--exclude", e])
         result = subprocess.run(ty_args, check=False)
@@ -352,6 +353,23 @@ def fix(
 
         if result.returncode != 0:
             sys.exit(result.returncode)
+
+
+def _tests_directory_search_path() -> list[str]:
+    """
+    The ty arguments that let a test file find the helper modules beside it.
+
+    `plain test` puts a project's `tests/` directory on the import path, so a
+    test file imports a helper module by its path from there
+    (`from helpers import create_user`). The type checker has to look in the
+    same place. It finds `tests/` by itself only when the directory isn't a
+    package, and with a `tests/__init__.py` in it every one of those imports
+    is reported as unresolved. This adds to any `extra-paths` the project's
+    own ty configuration lists.
+    """
+    if Path("tests").is_dir():
+        return ["--extra-search-path", "tests"]
+    return []
 
 
 def get_code_config() -> dict[str, Any]:

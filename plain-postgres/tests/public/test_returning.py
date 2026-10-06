@@ -11,7 +11,6 @@ import re
 from typing import TYPE_CHECKING, cast
 
 import psycopg
-import pytest
 from app.examples.models.delete import ChildCascade, DeleteParent
 from app.examples.models.querysets import CustomQuerySet, CustomQuerySetModel
 from app.examples.models.relationships import Widget
@@ -21,7 +20,10 @@ from plain.postgres import transaction
 from plain.postgres.db import get_connection
 from plain.postgres.exceptions import FieldError
 from plain.postgres.sources import build_connection_params
+from plain.postgres.testing import capture_queries, isolated_db
 from plain.postgres.transaction import TransactionManagementError
+from plain.testing import case, cases, raises
+from postgres_test_helpers import executed_sql
 
 if TYPE_CHECKING:
     from typing import LiteralString
@@ -38,13 +40,13 @@ def _seed_events() -> None:
 # ===========================================================================
 
 
-def test_update_without_returning_returns_int(db):
+def test_update_without_returning_returns_int():
     _seed_events()
     result = ReturningEvent.query.filter(label="a").update(count=5)
     assert result == 2
 
 
-def test_update_returning_instances_reflect_new_values(db):
+def test_update_returning_instances_reflect_new_values():
     _seed_events()
     rows = ReturningEvent.query.filter(label="a").returning().update(count=9)
 
@@ -57,7 +59,7 @@ def test_update_returning_instances_reflect_new_values(db):
     assert {p["n"] for p in payloads if p} == {1, 2}
 
 
-def test_update_returning_named_fields_are_dicts(db):
+def test_update_returning_named_fields_are_dicts():
     _seed_events()
     rows = (
         ReturningEvent.query.filter(label="a")
@@ -71,7 +73,7 @@ def test_update_returning_named_fields_are_dicts(db):
     assert {row["count"] for row in rows} == {7}
 
 
-def test_update_returning_empty_result_is_empty_list(db):
+def test_update_returning_empty_result_is_empty_list():
     _seed_events()
     rows = ReturningEvent.query.filter(label="missing").returning().update(count=1)
     assert rows == []
@@ -82,13 +84,13 @@ def test_update_returning_empty_result_is_empty_list(db):
 # ===========================================================================
 
 
-def test_delete_without_returning_returns_int(db):
+def test_delete_without_returning_returns_int():
     _seed_events()
     result = ReturningEvent.query.filter(label="a").delete()
     assert result == 2
 
 
-def test_delete_returning_named_fields_gives_deleted_rows(db):
+def test_delete_returning_named_fields_gives_deleted_rows():
     _seed_events()
     rows = (
         ReturningEvent.query.filter(label="a")
@@ -106,7 +108,7 @@ def test_delete_returning_named_fields_gives_deleted_rows(db):
     assert not ReturningEvent.query.filter(label="a").exists()
 
 
-def test_delete_returning_instances(db):
+def test_delete_returning_instances():
     _seed_events()
     rows = ReturningEvent.query.filter(label="b").returning().delete()
 
@@ -115,7 +117,7 @@ def test_delete_returning_instances(db):
     assert rows[0].label == "b"
 
 
-def test_delete_returning_empty_result_is_empty_list(db):
+def test_delete_returning_empty_result_is_empty_list():
     rows = (
         ReturningEvent.query.filter(label="missing")
         .returning(ReturningEvent.id)
@@ -134,14 +136,14 @@ def _seed_custom() -> None:
     CustomQuerySetModel(name="other").create()
 
 
-def test_custom_queryset_method_before_returning(db):
+def test_custom_queryset_method_before_returning():
     _seed_custom()
     rows = CustomQuerySetModel.query.get_custom().returning().update(name="claimed")
 
     assert [row.name for row in rows] == ["claimed"]
 
 
-def test_custom_queryset_method_after_returning(db):
+def test_custom_queryset_method_after_returning():
     # returning() sets state; it does not swap the class out from under a
     # custom QuerySet, so the model's own methods still chain after it.
     _seed_custom()
@@ -152,7 +154,7 @@ def test_custom_queryset_method_after_returning(db):
     assert [row.name for row in rows] == ["claimed"]
 
 
-def test_returning_state_survives_further_chaining(db):
+def test_returning_state_survives_further_chaining():
     _seed_events()
     qs = ReturningEvent.query.returning(ReturningEvent.id).filter(label="a")
     assert type(qs) is type(ReturningEvent.query)
@@ -161,26 +163,26 @@ def test_returning_state_survives_further_chaining(db):
     assert all(set(row) == {"id"} for row in rows)
 
 
-def test_returning_string_arg_errors(db):
-    with pytest.raises(TypeError, match="takes field references, not strings"):
+def test_returning_string_arg_errors():
+    with raises(TypeError, match="takes field references, not strings"):
         ReturningEvent.query.returning("count")  # ty: ignore[invalid-argument-type]
 
 
-def test_returning_wrong_model_field_errors(db):
-    with pytest.raises(FieldError, match="belongs to a different model"):
+def test_returning_wrong_model_field_errors():
+    with raises(FieldError, match="belongs to a different model"):
         ReturningEvent.query.returning(DeleteParent.name)
 
 
-def test_returning_before_filter_is_preserved(db):
+def test_returning_before_filter_is_preserved():
     _seed_events()
     rows = ReturningEvent.query.returning().filter(label="a").update(count=3)
     assert len(rows) == 2
     assert {row.count for row in rows} == {3}
 
 
-def test_returning_then_values_update_errors(db):
+def test_returning_then_values_update_errors():
     # .values() + returning() is nonsensical; it must not silently misbehave.
-    with pytest.raises(TypeError, match="after .values"):
+    with raises(TypeError, match="after .values"):
         ReturningEvent.query.returning().values("id").update(count=1)
 
 
@@ -189,7 +191,7 @@ def test_returning_then_values_update_errors(db):
 # ===========================================================================
 
 
-def test_delete_returning_excludes_cascade_deleted_children(db):
+def test_delete_returning_excludes_cascade_deleted_children():
     parent = DeleteParent(name="p").create()
     ChildCascade(parent=parent).create()
     ChildCascade(parent=parent).create()
@@ -211,7 +213,7 @@ def test_delete_returning_excludes_cascade_deleted_children(db):
 # ===========================================================================
 
 
-def test_update_returning_across_a_relation(db, capture_queries):
+def test_update_returning_across_a_relation():
     keep = DeleteParent(name="keep").create()
     move = DeleteParent(name="move").create()
     ChildCascade(parent=move).create()
@@ -228,12 +230,12 @@ def test_update_returning_across_a_relation(db, capture_queries):
     # Filtering across the FK rewrites the UPDATE to `WHERE id IN (subquery)`;
     # RETURNING has to survive that rewrite, in one statement.
     assert len(queries) == 1
-    assert "RETURNING" in queries[0]["sql"]
+    assert "RETURNING" in queries[0].sql_with_params
     assert len(rows) == 2
     assert ChildCascade.query.filter(parent=keep).count() == 3
 
 
-def test_delete_returning_across_a_relation(db, capture_queries):
+def test_delete_returning_across_a_relation():
     parent = DeleteParent(name="doomed").create()
     ChildCascade(parent=parent).create()
     ChildCascade(parent=parent).create()
@@ -242,7 +244,7 @@ def test_delete_returning_across_a_relation(db, capture_queries):
         rows = ChildCascade.query.filter(parent__name="doomed").returning().delete()
 
     assert len(queries) == 1
-    assert "RETURNING" in queries[0]["sql"]
+    assert "RETURNING" in queries[0].sql_with_params
     assert len(rows) == 2
     assert all(row.parent.id == parent.id for row in rows)
 
@@ -252,24 +254,20 @@ def test_delete_returning_across_a_relation(db, capture_queries):
 # ===========================================================================
 
 
-@pytest.mark.parametrize(
-    "reference",
-    [
-        lambda: ChildCascade.parent,
-        lambda: Widget.tags,
-        lambda: DeleteParent.childcascade_set,
-    ],
-    ids=["forward_fk", "many_to_many", "reverse_fk"],
+@cases(
+    case(lambda: ChildCascade.parent, id="forward_fk"),
+    case(lambda: Widget.tags, id="many_to_many"),
+    case(lambda: DeleteParent.childcascade_set, id="reverse_fk"),
 )
-def test_returning_relation_reference_errors(db, reference):
+def test_returning_relation_reference_errors(reference):
     # At class level a relation attribute is its descriptor -- that is what
     # lets where() traverse it -- so none of them is a column reference. Say
     # that, for every kind, instead of dumping the descriptor's repr.
-    with pytest.raises(FieldError, match="it is a relation, not a column"):
+    with raises(FieldError, match="it is a relation, not a column"):
         ChildCascade.query.returning(reference())
 
 
-def test_returning_instances_carry_foreign_keys(db):
+def test_returning_instances_carry_foreign_keys():
     parent = DeleteParent(name="p").create()
     ChildCascade(parent=parent).create()
 
@@ -284,42 +282,41 @@ def test_returning_instances_carry_foreign_keys(db):
 # ===========================================================================
 
 
-@pytest.mark.parametrize(
-    "write",
-    [
-        lambda qs: qs.create(label="x", count=1),
+@cases(
+    case(lambda qs: qs.create(label="x", count=1), id="create"),
+    case(
         lambda qs: qs.bulk_create([ReturningEvent(label="x", count=1)]),
+        id="bulk_create",
+    ),
+    case(
         lambda qs: qs.bulk_upsert(
             [ReturningEvent(label="x", count=1)],
             update_fields=[ReturningEvent.count],
             unique_fields=[ReturningEvent.id],
         ),
+        id="bulk_upsert",
+    ),
+    case(
         lambda qs: qs.bulk_update(list(ReturningEvent.query), ["count"]),
-        lambda qs: qs.get_or_create(label="x", count=1),
-        # ReturningEvent declares no UniqueConstraint, and upsert() refuses
-        # to conflict on the primary key, so this one case uses a model that
-        # has a real conflict target -- otherwise the call would fail for a
-        # reason other than the one under test.
+        id="bulk_update",
+    ),
+    case(lambda qs: qs.get_or_create(label="x", count=1), id="get_or_create"),
+    # ReturningEvent declares no UniqueConstraint, and upsert() refuses
+    # to conflict on the primary key, so this one case uses a model that
+    # has a real conflict target -- otherwise the call would fail for a
+    # reason other than the one under test.
+    case(
         lambda _qs: UpsertItem.query.returning().upsert(
             key="x",
             value=1,
             unique_fields=[UpsertItem.key],
         ),
-    ],
-    ids=[
-        "create",
-        "bulk_create",
-        "bulk_upsert",
-        "bulk_update",
-        "get_or_create",
-        "upsert",
-    ],
+        id="upsert",
+    ),
 )
-def test_returning_rejects_other_writes(db, write):
+def test_returning_rejects_other_writes(write):
     ReturningEvent(label="seed", count=1).create()
-    with pytest.raises(
-        TypeError, match="only applies to update\\(\\) and delete\\(\\)"
-    ):
+    with raises(TypeError, match="only applies to update\\(\\) and delete\\(\\)"):
         write(ReturningEvent.query.returning())
 
 
@@ -328,7 +325,7 @@ def test_returning_rejects_other_writes(db, write):
 # ===========================================================================
 
 
-def test_lock_then_returning_update(db, capture_queries):
+def test_lock_then_returning_update():
     # Locking the read side of a write is the job-claim pattern, so a lock
     # must not trip _reject_returning() -- update() still hands back rows.
     _seed_events()
@@ -338,7 +335,7 @@ def test_lock_then_returning_update(db, capture_queries):
     assert {row.count for row in rows} == {4}
 
 
-def test_returning_then_lock_keeps_the_returning_state(db):
+def test_returning_then_lock_keeps_the_returning_state():
     # The other order too: for_update() chains off a returning() queryset
     # without dropping the returning state or hitting the lock guard.
     _seed_events()
@@ -348,7 +345,7 @@ def test_returning_then_lock_keeps_the_returning_state(db):
     assert {row.count for row in rows} == {6}
 
 
-def test_lock_then_returning_delete(db):
+def test_lock_then_returning_delete():
     _seed_events()
     rows = (
         ReturningEvent.query.filter(label="a")
@@ -361,9 +358,7 @@ def test_lock_then_returning_delete(db):
     assert ReturningEvent.query.count() == 1
 
 
-def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
-    db, capture_queries
-):
+def test_lock_survives_into_the_subquery_of_a_joined_returning_update():
     # A join forces update() through an `id IN (SELECT ...)` rewrite. That
     # inner select is where the lock belongs, and RETURNING rides on the
     # outer UPDATE.
@@ -378,7 +373,7 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
             .update(parent=parent)
         )
 
-    sql = " ".join(q["sql"] for q in queries)
+    sql = " ".join(q.sql_with_params for q in queries)
     assert re.search(r"FOR UPDATE OF \w+ SKIP LOCKED", sql)
     assert "RETURNING" in sql
     assert [row.id for row in rows] == [child.id]
@@ -393,7 +388,7 @@ def test_lock_survives_into_the_subquery_of_a_joined_returning_update(
 # ===========================================================================
 
 
-def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries, executed_sql):
+def test_locked_update_puts_the_lock_in_the_subquery():
     # Single table, no joins -- the case that used to skip the rewrite.
     _seed_events()
     with capture_queries() as queries:
@@ -407,7 +402,7 @@ def test_locked_update_puts_the_lock_in_the_subquery(db, capture_queries, execut
     assert before_returning.index("IN (SELECT") < before_returning.index("FOR UPDATE")
 
 
-def test_locked_delete_puts_the_lock_in_the_subquery(db, capture_queries, executed_sql):
+def test_locked_delete_puts_the_lock_in_the_subquery():
     _seed_events()
     with capture_queries() as queries:
         ReturningEvent.query.filter(label="a").for_update(
@@ -443,9 +438,8 @@ def _race(sql: str) -> tuple[set, set]:
     return claimed_first, claimed_second
 
 
-def test_locked_returning_update_claims_rows_exclusively(
-    isolated_db, capture_queries, executed_sql
-):
+@isolated_db
+def test_locked_returning_update_claims_rows_exclusively():
     # Capture the statement while nothing matches, so the rows the two
     # sessions race for are still unclaimed. The race replays it on raw
     # connections -- the harness swaps the ORM's connection per context, so
@@ -466,9 +460,8 @@ def test_locked_returning_update_claims_rows_exclusively(
     assert not claimed_first & claimed_second
 
 
-def test_locked_returning_delete_claims_rows_exclusively(
-    isolated_db, capture_queries, executed_sql
-):
+@isolated_db
+def test_locked_returning_delete_claims_rows_exclusively():
     with capture_queries() as queries, transaction.atomic():
         ReturningEvent.query.filter(label="claim").for_update(
             skip_locked=True
@@ -494,7 +487,7 @@ def test_locked_returning_delete_claims_rows_exclusively(
 # ===========================================================================
 
 
-def test_or_carries_returning_from_the_left(db):
+def test_or_carries_returning_from_the_left():
     _seed_events()
     combined = ReturningEvent.query.filter(label="a").returning() | (
         ReturningEvent.query.filter(label="b")
@@ -505,7 +498,7 @@ def test_or_carries_returning_from_the_left(db):
     assert len(rows) == 3
 
 
-def test_or_carries_returning_from_the_right(db):
+def test_or_carries_returning_from_the_right():
     _seed_events()
     combined = ReturningEvent.query.filter(label="a") | (
         ReturningEvent.query.filter(label="b").returning()
@@ -516,7 +509,7 @@ def test_or_carries_returning_from_the_right(db):
     assert len(rows) == 3
 
 
-def test_and_carries_returning_from_the_right(db):
+def test_and_carries_returning_from_the_right():
     _seed_events()
     combined = ReturningEvent.query.filter(label="a") & (
         ReturningEvent.query.filter(count=1).returning(ReturningEvent.id)
@@ -527,16 +520,16 @@ def test_and_carries_returning_from_the_right(db):
     assert all(set(row) == {"id"} for row in rows)
 
 
-@pytest.mark.parametrize("op", [operator.or_, operator.and_])
-def test_combining_different_returning_selections_errors(db, op):
+@cases(operator.or_, operator.and_)
+def test_combining_different_returning_selections_errors(op):
     left = ReturningEvent.query.filter(label="a").returning()
     right = ReturningEvent.query.filter(label="b").returning(ReturningEvent.id)
 
-    with pytest.raises(TypeError, match="one RETURNING clause"):
+    with raises(TypeError, match="one RETURNING clause"):
         op(left, right)
 
 
-def test_none_keeps_returning_and_writes_nothing(db, capture_queries):
+def test_none_keeps_returning_and_writes_nothing():
     _seed_events()
     empty = ReturningEvent.query.returning().none()
 
@@ -553,7 +546,7 @@ def test_none_keeps_returning_and_writes_nothing(db, capture_queries):
 # ===========================================================================
 
 
-def test_deleted_instances_keep_their_data(db):
+def test_deleted_instances_keep_their_data():
     seeded = ReturningEvent(label="gone", count=3, payload={"n": 1}).create()
 
     (row,) = ReturningEvent.query.filter(label="gone").returning().delete()
@@ -566,18 +559,18 @@ def test_deleted_instances_keep_their_data(db):
     assert row.payload == {"n": 1}
 
 
-@pytest.mark.parametrize("method", ["create", "update", "delete"])
-def test_deleted_instances_refuse_writes(db, method):
+@cases("create", "update", "delete")
+def test_deleted_instances_refuse_writes(method):
     ReturningEvent(label="gone", count=3).create()
     (row,) = ReturningEvent.query.filter(label="gone").returning().delete()
 
     # Every write says the same thing, because there is one reason: the row
     # this instance describes is gone.
-    with pytest.raises(ValueError, match="snapshot of a row that returning"):
+    with raises(ValueError, match="snapshot of a row that returning"):
         getattr(row, method)()
 
 
-def test_updated_instances_are_still_live(db):
+def test_updated_instances_are_still_live():
     # Only the delete path marks snapshots -- update() hands back rows that
     # are still there and still writable.
     _seed_events()
@@ -594,7 +587,7 @@ def test_updated_instances_are_still_live(db):
 # ===========================================================================
 
 
-def test_reads_on_a_returning_queryset_are_unaffected(db):
+def test_reads_on_a_returning_queryset_are_unaffected():
     # returning() describes what the *next write* hands back. Reads on the
     # same queryset behave exactly as they would without it -- rejecting
     # them would break inspecting a chain before writing it.
@@ -616,15 +609,16 @@ def test_reads_on_a_returning_queryset_are_unaffected(db):
 # ===========================================================================
 
 
-@pytest.mark.parametrize("write", ["update", "delete"])
-def test_locked_write_outside_a_transaction_raises(isolated_db, write):
+@cases("update", "delete")
+@isolated_db
+def test_locked_write_outside_a_transaction_raises(write):
     # The lock now lands on a sub-select, which Postgres only honors inside a
     # transaction -- so the write refuses rather than running unlocked, the
     # way it used to.
     ReturningEvent(label="a", count=1).create()
     qs = ReturningEvent.query.filter(label="a").for_update(skip_locked=True)
 
-    with pytest.raises(TransactionManagementError, match="outside of a transaction"):
+    with raises(TransactionManagementError, match="outside of a transaction"):
         qs.update(count=2) if write == "update" else qs.delete()
 
     # The row is untouched, and the same write inside atomic() goes through.
@@ -632,16 +626,12 @@ def test_locked_write_outside_a_transaction_raises(isolated_db, write):
         assert ReturningEvent.query.filter(label="a").for_update().update(count=2) == 1
 
 
-@pytest.mark.parametrize(
-    "narrow",
-    [
-        lambda qs: qs.defer("payload"),
-        lambda qs: qs.only("label"),
-        lambda qs: qs.reverse(),
-    ],
-    ids=["defer", "only", "reverse"],
+@cases(
+    case(lambda qs: qs.defer("payload"), id="defer"),
+    case(lambda qs: qs.only("label"), id="only"),
+    case(lambda qs: qs.reverse(), id="reverse"),
 )
-def test_column_selection_keeps_the_returning_state(db, narrow):
+def test_column_selection_keeps_the_returning_state(narrow):
     # defer()/only()/reverse() shape a read; the write after them still
     # hands back rows, and whole ones -- no-arg returning() selects every
     # column regardless of what was deferred.
@@ -653,7 +643,7 @@ def test_column_selection_keeps_the_returning_state(db, narrow):
     assert all(row.payload is not None for row in rows)
 
 
-def test_deepcopy_of_a_returning_queryset_still_combines(db):
+def test_deepcopy_of_a_returning_queryset_still_combines():
     # deepcopy() copies the Field objects, so comparing the selections by
     # identity called a queryset and its own copy a mismatch.
     _seed_events()

@@ -76,8 +76,6 @@ SKIP_DIRS = {
     "work",
 }
 
-SKIP_FILES = {"conftest.py"}
-
 
 # ── AST analysis ──────────────────────────────────────────────────────────────
 
@@ -224,8 +222,6 @@ def _other_files_referencing(
                 "--glob",
                 "!**/migrations/**",
                 "--glob",
-                "!**/conftest.py",
-                "--glob",
                 "!**/__pycache__/**",
                 "--glob",
                 "!**/example/**",
@@ -261,7 +257,7 @@ def _should_skip_path(path: Path) -> bool:
     for part in path.parts:
         if part in SKIP_DIRS:
             return True
-    return path.name in SKIP_FILES
+    return False
 
 
 def collect_source_files(root: Path, target: str | None = None) -> list[Path]:

@@ -22,7 +22,10 @@ Running `plain agent install` copies these files from your installed packages in
 
 ```bash
 $ plain agent install
-Agent: installed 5 in .claude/
+Agent: wrote 3 in .claude/
+  wrote skills/plain-upgrade
+  wrote rules/plain.md
+  wrote rules/plain-postgres.md
 ```
 
 This is the recommended way to keep your AI assistant up to date with the Plain packages you have installed.
@@ -39,8 +42,9 @@ The command:
 
 - **Copies rules** (`.md` files) into `.claude/rules/`
 - **Copies skills** (directories with `SKILL.md`) into `.claude/skills/`
-- **Skips unchanged files** by comparing modification times, so repeated runs are fast
-- **Removes orphans** — if you uninstall a package, its rules and skills are cleaned up automatically
+- **Writes what differs** — a rule or skill is written when your project doesn't have it, or has one that isn't what the package ships. It goes by what the files hold, not when they were written, and the command names each one it wrote
+- **Says `Agent: up to date`** when everything in `.claude/` already matches
+- **Removes orphans** — if you uninstall a package, its rules and skills are cleaned up automatically, and named
 
 Only items prefixed with `plain` or `plainx` are managed. Your own custom rules and skills are never touched.
 

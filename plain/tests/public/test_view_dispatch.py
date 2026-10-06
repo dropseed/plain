@@ -1,4 +1,4 @@
-from plain.test import Client
+from plain.testing import Client
 from plain.views import View
 
 
@@ -23,8 +23,7 @@ def test_unknown_method_is_not_allowed():
     client = Client()
 
     for method in ("GET_RESPONSE", "GET_REQUEST_HANDLER", "_ALLOWED_METHODS"):
-        request = client._request_factory.generic(method, "/")
-        response = client.request(request)
+        response = client.request(method=method, path="/")
         assert response.status_code == 405, (
             f"method={method} returned {response.status_code}"
         )

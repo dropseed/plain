@@ -2,13 +2,13 @@
 
 These exercise the functions users actually call from their login views —
 covering session persistence across requests, session-fixation protection,
-logout, and safe user-switching — rather than the test-only ``force_login``
+logout, and safe user-switching — rather than the test-only ``login_client``
 shortcut.
 """
 
 from app.users.models import User
 from plain.runtime import settings
-from plain.test import Client
+from plain.testing import Client
 
 SESSION_COOKIE = settings.SESSION_COOKIE_NAME
 
@@ -18,23 +18,23 @@ def _session_cookie(client):
     return morsel.value if morsel else None
 
 
-def test_login_persists_across_requests(db):
+def test_login_persists_across_requests():
     user = User.query.create(username="alice")
     client = Client()
 
     # A protected page is unreachable before logging in.
     assert client.get("/whoami").status_code == 302
 
-    resp = client.post("/session-login", data={"user_id": user.id})
+    resp = client.post("/session-login", form_data={"user_id": user.id})
     assert resp.status_code == 200
 
     # The same client is now recognized on a later, separate request.
     resp = client.get("/whoami")
     assert resp.status_code == 200
-    assert resp.content == b"alice"
+    assert resp.body == b"alice"
 
 
-def test_login_rotates_session_key(db):
+def test_login_rotates_session_key():
     """Logging in from an anonymous session issues a new session key
     (session-fixation protection)."""
     user = User.query.create(username="bob")
@@ -45,18 +45,18 @@ def test_login_rotates_session_key(db):
     anon_key = _session_cookie(client)
     assert anon_key is not None
 
-    client.post("/session-login", data={"user_id": user.id})
+    client.post("/session-login", form_data={"user_id": user.id})
     logged_in_key = _session_cookie(client)
 
     assert logged_in_key is not None
     assert logged_in_key != anon_key
 
 
-def test_logout_flushes_session(db):
+def test_logout_flushes_session():
     user = User.query.create(username="carol")
     client = Client()
 
-    client.post("/session-login", data={"user_id": user.id})
+    client.post("/session-login", form_data={"user_id": user.id})
     assert client.get("/whoami").status_code == 200
 
     resp = client.post("/session-logout")
@@ -66,42 +66,42 @@ def test_logout_flushes_session(db):
     assert client.get("/whoami").status_code == 302
 
 
-def test_login_as_different_user_replaces_session(db):
+def test_login_as_different_user_replaces_session():
     """Logging in as a second user must not retain the first user's session."""
     first = User.query.create(username="first")
     second = User.query.create(username="second")
     client = Client()
 
-    client.post("/session-login", data={"user_id": first.id})
-    assert client.get("/whoami").content == b"first"
+    client.post("/session-login", form_data={"user_id": first.id})
+    assert client.get("/whoami").body == b"first"
 
-    client.post("/session-login", data={"user_id": second.id})
-    assert client.get("/whoami").content == b"second"
+    client.post("/session-login", form_data={"user_id": second.id})
+    assert client.get("/whoami").body == b"second"
 
 
-def test_session_holding_a_string_user_id_still_resolves(db):
+def test_session_holding_a_string_user_id_still_resolves():
     """The id is parsed at the boundary, so an older session keeps working."""
     user = User.query.create(username="dave")
     client = Client()
 
     client.post(
         "/legacy-session-id",
-        data={"user_id": user.id, "stored_id": str(user.id)},
+        form_data={"user_id": user.id, "stored_id": str(user.id)},
     )
 
     resp = client.get("/whoami")
     assert resp.status_code == 200
-    assert resp.content == b"dave"
+    assert resp.body == b"dave"
 
 
-def test_session_holding_an_unparseable_user_id_is_no_user(db):
+def test_session_holding_an_unparseable_user_id_is_no_user():
     """A value that isn't an id ends the session rather than erroring."""
     user = User.query.create(username="erin")
     client = Client()
 
     client.post(
         "/legacy-session-id",
-        data={"user_id": user.id, "stored_id": "not-an-id"},
+        form_data={"user_id": user.id, "stored_id": "not-an-id"},
     )
 
     assert client.get("/whoami").status_code == 302

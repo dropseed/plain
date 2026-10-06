@@ -25,13 +25,13 @@ skips all of this. Only the outermost process does any real work.
 """
 
 import os
-import sys
 from enum import Enum, auto
 from pathlib import Path
 
 import click
 
 from ..state import checkout_id, checkout_state_path
+from ..utils import running_command
 from .backends import (
     LOCAL_PORT,
     Server,
@@ -113,16 +113,15 @@ def url_already_configured() -> bool:
     )
 
 
-def command_may_start_server() -> bool:
+def command_may_start_server(command: str | None) -> bool:
     """Should we go as far as *starting* a server for this command?
 
-    Only consults the top-level command, so `plain run test` isn't mistaken for
-    `plain test`.
+    `command` is the top-level command being run (`running_command()`), or
+    None for a bare `plain` / `plain --help`.
     """
-    argv = [a for a in sys.argv[1:] if not a.startswith("-")]
-    if not argv:
-        return False  # bare `plain` / `plain --help`
-    return argv[0] not in COMMANDS_THAT_DONT_START_A_SERVER
+    if command is None:
+        return False
+    return command not in COMMANDS_THAT_DONT_START_A_SERVER
 
 
 def cache_path(project_root: Path) -> Path:
@@ -370,7 +369,7 @@ def ensure_postgres(project_root: Path) -> str | None:
         write_cached_url(project_root, url=url)
         return url
 
-    if not command_may_start_server():
+    if not command_may_start_server(running_command()):
         # We won't start a server for this command — but that's a question about
         # side effects, not about which database this checkout owns. `POSTGRES_URL`
         # is a required setting, so refusing to answer here left the app unable to

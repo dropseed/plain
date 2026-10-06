@@ -10,16 +10,15 @@ from plain.http import (
     Response,
     StreamingResponse,
 )
-from plain.test import Client
+from plain.testing import Client
 from plain.urls import Router, path
 from plain.views import ServerSentEvent, ServerSentEventsView, View
 
 
 def fresh_client() -> Client:
-    """A Client whose middleware chain is rebuilt from the current settings."""
-    client = Client(raise_request_exception=False)
-    client.handler._middleware_chain = None
-    client.handler.load_middleware()
+    """A new Client. It builds its middleware chain from the settings in place
+    at its first request, and keeps a 5xx as a response instead of raising."""
+    client = Client(raise_exceptions=False)
     return client
 
 

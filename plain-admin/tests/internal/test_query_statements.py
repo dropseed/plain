@@ -10,19 +10,16 @@ columns, adding a join, or dropping a clause, these fail and you decide
 whether it should have.
 """
 
-import pytest
+from admin_test_helpers import make_admin_client
 from app.users.models import User
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from plain.admin.models import PinnedNavItem
-from plain.test import Client
+from plain.postgres.testing import capture_queries
 
 LIST_URL = "/admin/p/user"
 LIST_VIEW_SLUG = "app_users_admin_useradmin_listview"
 
-PINNED_TABLE = '"plainadmin_pinnednavitem"'
-USER_TABLE = '"users_user"'
+PINNED_TABLE = "plainadmin_pinnednavitem"
+USER_TABLE = "users_user"
 
 # One column, no join. PinnedNavItem orders by ("order", "created_at"), so the
 # ORDER BY is the model's default, not something a call site asked for.
@@ -53,39 +50,29 @@ USERS_BY_SELECTED_IDS = (
 )
 
 
-@pytest.fixture
-def admin_client(db) -> Client:
-    user = User.query.create(username="admin", is_admin=True)
-    client = Client()
-    client.force_login(user)
-    return client
+def test_a_page_render_reads_only_the_pinned_view_slugs():
+    """registry.get_nav_tabs() and AdminView's template context, in that order."""
+    admin_client = make_admin_client()
 
+    with capture_queries() as queries:
+        assert admin_client.get(LIST_URL).status_code == 200
 
-def statements(otel_spans: InMemorySpanExporter, table: str) -> list[str]:
-    """Every statement the captured spans carry that touches `table`, in order."""
-    return [
-        " ".join(str(span.attributes["db.query.text"]).split())
-        for span in otel_spans.get_finished_spans()
-        if span.attributes
-        and "db.query.text" in span.attributes
-        and table in str(span.attributes["db.query.text"])
+    assert queries.sql_statements(table=PINNED_TABLE) == [
+        NAV_TAB_SLUGS,
+        PINNED_SLUGS,
     ]
 
 
-def test_a_page_render_reads_only_the_pinned_view_slugs(admin_client, otel_spans):
-    """registry.get_nav_tabs() and AdminView's template context, in that order."""
-    otel_spans.clear()
-    assert admin_client.get(LIST_URL).status_code == 200
+def test_pinning_reads_only_the_order_column():
+    admin_client = make_admin_client()
 
-    assert statements(otel_spans, PINNED_TABLE) == [NAV_TAB_SLUGS, PINNED_SLUGS]
-
-
-def test_pinning_reads_only_the_order_column(admin_client, otel_spans):
-    otel_spans.clear()
-    response = admin_client.post("/admin/_/pin", data={"view_slug": LIST_VIEW_SLUG})
+    with capture_queries() as queries:
+        response = admin_client.post(
+            "/admin/_/pin", form_data={"view_slug": LIST_VIEW_SLUG}
+        )
     assert response.status_code == 302
 
-    sql = statements(otel_spans, PINNED_TABLE)
+    sql = queries.sql_statements(table=PINNED_TABLE)
     assert len(sql) == 4
     assert sql[0].startswith('SELECT COUNT(*) AS "__count"')
     assert sql[1] == MAX_ORDER
@@ -94,44 +81,50 @@ def test_pinning_reads_only_the_order_column(admin_client, otel_spans):
     assert sql[3].startswith('INSERT INTO "plainadmin_pinnednavitem"')
 
 
-def test_reordering_reads_only_the_pinned_view_slugs(admin_client, otel_spans):
+def test_reordering_reads_only_the_pinned_view_slugs():
+    admin_client = make_admin_client()
     user = User.query.get(username="admin")
     PinnedNavItem.query.create(user=user, view_slug=LIST_VIEW_SLUG, order=0)
 
-    otel_spans.clear()
-    response = admin_client.post(
-        "/admin/_/reorder", data={"slugs": f'["{LIST_VIEW_SLUG}"]'}
-    )
+    with capture_queries() as queries:
+        response = admin_client.post(
+            "/admin/_/reorder", form_data={"slugs": f'["{LIST_VIEW_SLUG}"]'}
+        )
     assert response.status_code == 200
 
-    sql = statements(otel_spans, PINNED_TABLE)
+    sql = queries.sql_statements(table=PINNED_TABLE)
     assert len(sql) == 2
     assert sql[0] == PINNED_SLUGS
     assert sql[1].startswith('UPDATE "plainadmin_pinnednavitem" SET "order" = %s')
 
 
-def test_the_detail_view_looks_its_object_up_by_id(admin_client, otel_spans):
+def test_the_detail_view_looks_its_object_up_by_id():
+    admin_client = make_admin_client()
     user = User.query.create(username="subject")
 
-    otel_spans.clear()
-    assert admin_client.get(f"{LIST_URL}/{user.id}").status_code == 200
+    with capture_queries() as queries:
+        assert admin_client.get(f"{LIST_URL}/{user.id}").status_code == 200
 
     # Two lookups with the same shape: the session resolving the logged-in
     # user, then AdminModelDetailView.get_object().
-    assert statements(otel_spans, USER_TABLE) == [USER_BY_ID, USER_BY_ID]
+    assert queries.sql_statements(table=USER_TABLE) == [USER_BY_ID, USER_BY_ID]
 
 
-def test_an_action_matches_the_selected_ids_with_any_of(admin_client, otel_spans):
+def test_an_action_matches_the_selected_ids_with_any_of():
+    admin_client = make_admin_client()
     a = User.query.create(username="a")
     b = User.query.create(username="b")
 
-    otel_spans.clear()
-    response = admin_client.post(
-        LIST_URL,
-        data={"action_name": "Make admin", "action_ids": f"{a.id},{b.id}"},
-    )
+    with capture_queries() as queries:
+        response = admin_client.post(
+            LIST_URL,
+            form_data={"action_name": "Make admin", "action_ids": f"{a.id},{b.id}"},
+        )
     assert response.status_code == 302
 
     # select_objects_by_id() keeps the queryset lazy, so the membership test
     # lands on the UPDATE the action performs.
-    assert statements(otel_spans, USER_TABLE) == [USER_BY_ID, USERS_BY_SELECTED_IDS]
+    assert queries.sql_statements(table=USER_TABLE) == [
+        USER_BY_ID,
+        USERS_BY_SELECTED_IDS,
+    ]

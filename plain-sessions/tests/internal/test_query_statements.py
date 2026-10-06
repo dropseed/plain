@@ -7,43 +7,30 @@ to the read-then-write shape shows up as a failing test rather than as extra
 round trips in production.
 
 The SAVEPOINT / RELEASE SAVEPOINT statements come from save()'s own
-`transaction.atomic()` nesting inside the `db` fixture's outer transaction.
+`transaction.atomic()` nesting inside the transaction every test runs in.
 """
 
 import concurrent.futures
 import threading
 from datetime import timedelta
 
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from plain.postgres.connection import DatabaseConnection
 from plain.postgres.db import _db_conn, get_connection
 from plain.postgres.sources import DirectSource
+from plain.postgres.testing import capture_queries, isolated_db
 from plain.sessions.core import SessionStore
 from plain.sessions.models import Session
 from plain.utils import timezone
 
 
-def statements(otel_spans: InMemorySpanExporter) -> list[str]:
-    """Every SQL statement the captured spans carry, in the order it ran."""
-    return [
-        " ".join(str(span.attributes["db.query.text"]).split())
-        for span in otel_spans.get_finished_spans()
-        if span.attributes and "db.query.text" in span.attributes
-    ]
-
-
-def test_new_session_save_is_one_insert_on_conflict(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_new_session_save_is_one_insert_on_conflict() -> None:
     store = SessionStore()
     store["a"] = 1
 
-    otel_spans.clear()
-    store.save()
+    with capture_queries() as queries:
+        store.save()
 
-    sql = statements(otel_spans)
+    sql = queries.sql_statements()
     assert len(sql) == 4
     assert sql[0].startswith("SAVEPOINT")
     # _get_new_session_key() checks the key it minted isn't already taken.
@@ -54,9 +41,7 @@ def test_new_session_save_is_one_insert_on_conflict(
     assert sql[3].startswith("RELEASE SAVEPOINT")
 
 
-def test_resaving_a_session_is_one_insert_on_conflict(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_resaving_a_session_is_one_insert_on_conflict() -> None:
     store = SessionStore()
     store["a"] = 1
     store.save()
@@ -64,10 +49,10 @@ def test_resaving_a_session_is_one_insert_on_conflict(
     reopened = SessionStore(store.session_key)
     reopened["a"] = 2  # loads the row, before we start capturing
 
-    otel_spans.clear()
-    reopened.save()
+    with capture_queries() as queries:
+        reopened.save()
 
-    sql = statements(otel_spans)
+    sql = queries.sql_statements()
     assert len(sql) == 3
     assert sql[0].startswith("SAVEPOINT")
     assert sql[1].startswith('INSERT INTO "plainsessions_session"')
@@ -79,9 +64,7 @@ def test_resaving_a_session_is_one_insert_on_conflict(
     assert not any("FOR UPDATE" in statement for statement in sql)
 
 
-def test_conflict_updates_the_session_but_not_created_at(
-    db: None, otel_spans: InMemorySpanExporter
-) -> None:
+def test_conflict_updates_the_session_but_not_created_at() -> None:
     store = SessionStore()
     store["a"] = 1
     store.save()
@@ -89,10 +72,10 @@ def test_conflict_updates_the_session_but_not_created_at(
     reopened = SessionStore(store.session_key)
     reopened["a"] = 2
 
-    otel_spans.clear()
-    reopened.save()
+    with capture_queries() as queries:
+        reopened.save()
 
-    insert = next(s for s in statements(otel_spans) if s.startswith("INSERT"))
+    insert = next(s for s in queries.sql_statements() if s.startswith("INSERT"))
     set_clause = insert.split("DO UPDATE SET")[1].split(" RETURNING ")[0]
     assert '"expires_at" = EXCLUDED."expires_at"' in set_clause
     assert '"session_data" = EXCLUDED."session_data"' in set_clause
@@ -100,7 +83,8 @@ def test_conflict_updates_the_session_but_not_created_at(
     assert '"created_at"' not in set_clause
 
 
-def test_concurrent_saves_of_one_session_key_write_one_row(isolated_db: None) -> None:
+@isolated_db
+def test_concurrent_saves_of_one_session_key_write_one_row() -> None:
     """Eight requests carrying the same session cookie, saving at once.
 
     One statement per save, so there is no read-then-write window for a second

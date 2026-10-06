@@ -9,6 +9,7 @@
     - [Body data](#body-data)
     - [Content negotiation](#content-negotiation)
     - [Cookies](#cookies)
+    - [Constructing a request](#constructing-a-request)
 - [Response](#response)
     - [Response types](#response-types)
     - [Setting cookies](#setting-cookies)
@@ -127,6 +128,32 @@ session_id = self.request.cookies.get("session_id")
 # Read a signed cookie (returns None if signature is invalid)
 user_id = self.request.get_signed_cookie("user_id", default=None)
 ```
+
+### Constructing a request
+
+A `Request` is an ordinary object. The server builds one for each request it receives, and you can build one the same way, to hand to a view or a middleware directly.
+
+```python
+from plain.http import Request
+
+body = b'{"event": "paid"}'
+
+request = Request(
+    method="POST",
+    path="/webhooks/",
+    headers={
+        "Content-Type": "application/json",
+        "Content-Length": str(len(body)),
+    },
+    body=body,
+)
+
+request.json_data  # {"event": "paid"}
+```
+
+- `body` is `bytes`, or anything with `read`, `readline` and `close` to read them from. It defaults to an empty body.
+- `body` is only the bytes. The `Content-Type` and `Content-Length` headers describe it, and you pass those in `headers`. Without a `Content-Type`, `form_data` is empty and `json_data` raises.
+- `query_string`, `server_scheme`, `server_name`, `server_port` and `remote_addr` are the rest of what a connection would have supplied.
 
 ## Response
 

@@ -5,28 +5,29 @@ exercise ManyToManyField accessors, the through model, and the Widget-specific
 unique constraint that produces a realistic ValidationError on duplicate create.
 """
 
-import pytest
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from plain.exceptions import NON_FIELD_ERRORS, ValidationError
 from plain.postgres import transaction
+from plain.postgres.testing import capture_queries
+from plain.testing import raises
 
 
-def test_create_unique_constraint(db):
+def test_create_unique_constraint():
     Widget.query.create(name="Toyota", size="Tundra")
 
     # No pre-check: the duplicate is rejected by the database and mapped to a
     # ValidationError. Wrap in atomic() so the savepoint rolls back and the
     # transaction stays usable for the count() below.
-    with pytest.raises(ValidationError) as e, transaction.atomic():
+    with raises(ValidationError) as e, transaction.atomic():
         Widget.query.create(name="Toyota", size="Tundra")
 
-    assert e.value.messages == ["A widget with this name and size already exists."]
-    assert NON_FIELD_ERRORS in e.value.error_dict
+    assert e.exception.messages == ["A widget with this name and size already exists."]
+    assert NON_FIELD_ERRORS in e.exception.error_dict
 
     assert Widget.query.count() == 1
 
 
-def test_upsert_unique_constraint(db):
+def test_upsert_unique_constraint():
     Widget.query.upsert(
         name="Toyota", size="Tundra", unique_fields=[Widget.name, Widget.size]
     )
@@ -37,7 +38,7 @@ def test_upsert_unique_constraint(db):
     assert Widget.query.count() == 1
 
 
-def test_m2m_manager_upsert_adds_relationship_on_insert(db):
+def test_m2m_manager_upsert_adds_relationship_on_insert():
     """The M2M manager's upsert() writes the target row and relates it."""
     widget = Widget.query.create(name="Tesla", size="Model 3")
 
@@ -47,7 +48,7 @@ def test_m2m_manager_upsert_adds_relationship_on_insert(db):
     assert widget.tags.query.first() == tag
 
 
-def test_m2m_manager_upsert_does_not_readd_on_conflict(db):
+def test_m2m_manager_upsert_does_not_readd_on_conflict():
     widget = Widget.query.create(name="Tesla", size="Model 3")
     gps = Tag.query.create(name="GPS")
     widget.tags.add(gps)
@@ -60,7 +61,7 @@ def test_m2m_manager_upsert_does_not_readd_on_conflict(db):
     assert widget.tags.query.count() == 1
 
 
-def test_m2m_manager_upsert_relates_an_existing_unrelated_target(db):
+def test_m2m_manager_upsert_relates_an_existing_unrelated_target():
     """The target row can already exist without being related to this
     instance, so upsert() must still add the through-row -- created=False is
     about the target row, not the relationship.
@@ -75,7 +76,7 @@ def test_m2m_manager_upsert_relates_an_existing_unrelated_target(db):
     assert widget.tags.query.count() == 1
 
 
-def test_many_to_many_forward_accessor(db):
+def test_many_to_many_forward_accessor():
     """Test that the forward ManyToManyField accessor works."""
     widget = Widget.query.create(name="Tesla", size="Model 3")
     gps = Tag.query.create(name="GPS")
@@ -90,7 +91,7 @@ def test_many_to_many_forward_accessor(db):
     assert tag_names == {"GPS", "Sunroof"}
 
 
-def test_many_to_many_reverse_accessor(db):
+def test_many_to_many_reverse_accessor():
     """Test that the reverse ManyToManyField accessor works."""
     widget1 = Widget.query.create(name="Tesla", size="Model 3")
     widget2 = Widget.query.create(name="Toyota", size="Camry")
@@ -106,7 +107,7 @@ def test_many_to_many_reverse_accessor(db):
     assert widget_sizes == {"Model 3", "Camry"}
 
 
-def test_many_to_many_remove(db):
+def test_many_to_many_remove():
     """Test removing items from a ManyToManyField."""
     widget = Widget.query.create(name="Honda", size="Accord")
     gps = Tag.query.create(name="GPS")
@@ -123,7 +124,7 @@ def test_many_to_many_remove(db):
     assert tag_names == {"GPS", "Leather Seats"}
 
 
-def test_many_to_many_clear(db):
+def test_many_to_many_clear():
     """Test clearing all items from a ManyToManyField."""
     widget = Widget.query.create(name="BMW", size="X5")
     gps = Tag.query.create(name="GPS")
@@ -137,7 +138,7 @@ def test_many_to_many_clear(db):
     assert widget.tags.query.count() == 0
 
 
-def test_many_to_many_through_model(db):
+def test_many_to_many_through_model():
     """Test accessing the through model directly."""
     widget = Widget.query.create(name="Ford", size="Mustang")
     gps = Tag.query.create(name="GPS")
@@ -157,7 +158,7 @@ def test_many_to_many_through_model(db):
     assert through_instance.tag == gps
 
 
-def test_many_to_many_prefetch(db, capture_queries):
+def test_many_to_many_prefetch():
     """prefetch() on a forward M2M batches the related rows into one
     query and assigns each set to the right instance.
 

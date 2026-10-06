@@ -14,17 +14,21 @@ No build tool is involved — these are hand-placed fixtures exercising
 Both rules are inert for existing apps (no top-level src//dist/ today).
 """
 
-import pytest
+import tempfile
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
+
 from plain.assets import finders
 from plain.assets.compile import compile_assets
 from plain.assets.manifest import AssetsManifest
 from plain.assets.views import AssetView
 from plain.runtime import PLAIN_TEMP_PATH
-from plain.test import RequestFactory
+from plain.testing import build_request, patch
 
 
-@pytest.fixture
-def assets_tree(tmp_path, monkeypatch):
+@contextmanager
+def assets_tree(tmp_path: Path) -> Generator[Path]:
     """A fixture tree: a src/ input, an already-hashed dist/ output, a static file."""
     root = tmp_path / "assets"
     (root / "src").mkdir(parents=True)
@@ -35,10 +39,10 @@ def assets_tree(tmp_path, monkeypatch):
     (root / "css").mkdir()
     (root / "css" / "app.css").write_text("body{}")
 
-    monkeypatch.setattr(finders, "_APP_ASSETS_DIR", root)
     # compile_assets saves the manifest under PLAIN_TEMP_PATH/assets/
     (PLAIN_TEMP_PATH / "assets").mkdir(parents=True, exist_ok=True)
-    return root
+    with patch(finders, "_APP_ASSETS_DIR", root):
+        yield root
 
 
 def compile_tree(target_dir) -> dict[str, str]:
@@ -54,14 +58,20 @@ def compile_tree(target_dir) -> dict[str, str]:
     }
 
 
-class TestSrcIsNotServed:
-    def test_src_is_never_served(self, assets_tree, tmp_path):
-        compiled = compile_tree(tmp_path / "out")
-        leaked = [p for p in compiled if p.startswith("src/")]
-        assert leaked == [], f"src/ holds build inputs and must not be served: {leaked}"
+# Src is not served
+def test_src_is_never_served():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        with assets_tree(tmp_path):
+            compiled = compile_tree(tmp_path / "out")
+    leaked = [p for p in compiled if p.startswith("src/")]
+    assert leaked == [], f"src/ holds build inputs and must not be served: {leaked}"
 
-    def test_src_pruned_in_every_asset_dir(self, tmp_path, monkeypatch):
-        """Each asset dir (e.g. a package dir + the app dir) prunes its own src/."""
+
+def test_src_pruned_in_every_asset_dir():
+    """Each asset dir (e.g. a package dir + the app dir) prunes its own src/."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
         dir_a = tmp_path / "pkg_assets"
         (dir_a / "src").mkdir(parents=True)
         (dir_a / "src" / "a.js").write_text("// input")
@@ -70,55 +80,66 @@ class TestSrcIsNotServed:
         (dir_b / "src").mkdir(parents=True)
         (dir_b / "src" / "b.js").write_text("// input")
         (dir_b / "keep_b.css").write_text("/* b */")
-        monkeypatch.setattr(
-            finders, "_iter_asset_dirs", lambda: iter([str(dir_a), dir_b])
-        )
+        with patch(finders, "_iter_asset_dirs", lambda: iter([str(dir_a), dir_b])):
+            served = {asset.url_path for asset in finders._iter_assets()}
 
-        served = {asset.url_path for asset in finders._iter_assets()}
-        assert not any(p.startswith("src/") for p in served), served
-        assert {"keep_a.css", "keep_b.css"} <= served
+    assert not any(p.startswith("src/") for p in served), served
+    assert {"keep_a.css", "keep_b.css"} <= served
 
 
-class TestDistIsAlreadyHashed:
-    def test_dist_served_at_its_own_name(self, assets_tree, tmp_path):
-        # already content-hashed by the build tool → served as-is, NOT re-md5'd.
-        compiled = compile_tree(tmp_path / "out")
-        assert compiled.get("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
+# Dist is already hashed
+def test_dist_served_at_its_own_name():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        with assets_tree(tmp_path):
+            compiled = compile_tree(tmp_path / "out")
+    # already content-hashed by the build tool → served as-is, NOT re-md5'd.
+    assert compiled.get("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
 
 
-class TestStaticRegressionGuard:
-    def test_static_is_still_md5_fingerprinted(self, assets_tree, tmp_path):
-        compiled = compile_tree(tmp_path / "out")
-        resolved = compiled["css/app.css"]
-        assert resolved != "css/app.css"
-        assert resolved.startswith("css/app.")
-        assert resolved.endswith(".css")
+# Static regression guard
+def test_static_is_still_md5_fingerprinted():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        with assets_tree(tmp_path):
+            compiled = compile_tree(tmp_path / "out")
+    resolved = compiled["css/app.css"]
+    assert resolved != "css/app.css"
+    assert resolved.startswith("css/app.")
+    assert resolved.endswith(".css")
 
 
-class TestCompileToReload:
-    """The full assets-side chain: discover → compile → persist → fresh reload,
-    the way production does it (compile writes the manifest, serving reads it)."""
+# Compile to reload
+#
+# The full assets-side chain: discover → compile → persist → fresh reload,
+# the way production does it (compile writes the manifest, serving reads it).
+def test_compiled_dist_is_immutable_after_reload():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        with assets_tree(tmp_path):
+            compile_tree(
+                tmp_path / "out"
+            )  # compile_assets writes manifest.json to disk
 
-    def test_compiled_dist_is_immutable_after_reload(self, assets_tree, tmp_path):
-        compile_tree(tmp_path / "out")  # compile_assets writes manifest.json to disk
+    reloaded = AssetsManifest()  # path defaults to where compile just saved it
+    reloaded.load()
 
-        reloaded = AssetsManifest()  # path defaults to where compile just saved it
-        reloaded.load()
-
-        assert reloaded.is_immutable("dist/app-A1B2C3.js") is True
-        assert reloaded.resolve("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
-        # the static original is mutable (it redirects to its fingerprinted name)
-        assert reloaded.is_immutable("css/app.css") is False
-        resolved = reloaded.resolve("css/app.css")
-        assert resolved is not None
-        assert resolved.startswith("css/app.")
+    assert reloaded.is_immutable("dist/app-A1B2C3.js") is True
+    assert reloaded.resolve("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
+    # the static original is mutable (it redirects to its fingerprinted name)
+    assert reloaded.is_immutable("css/app.css") is False
+    resolved = reloaded.resolve("css/app.css")
+    assert resolved is not None
+    assert resolved.startswith("css/app.")
 
 
-class TestManifestRoundTrip:
-    """The immutable contract must survive save → load — production compiles the
-    manifest to disk, then AssetView.get_manifest() loads it back to serve."""
-
-    def test_already_hashed_immutable_survives_reload(self, tmp_path):
+# Manifest round trip
+#
+# The immutable contract must survive save → load — production compiles the
+# manifest to disk, then AssetView.get_manifest() loads it back to serve.
+def test_already_hashed_immutable_survives_reload():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
         saved = AssetsManifest()
         saved.path = tmp_path / "manifest.json"
         saved.add_already_hashed("dist/app-A1B2C3.js")
@@ -129,26 +150,26 @@ class TestManifestRoundTrip:
         loaded.path = tmp_path / "manifest.json"
         loaded.load()
 
-        # Both the already-hashed file and a normal fingerprinted target stay immutable.
-        assert loaded.is_immutable("dist/app-A1B2C3.js") is True
-        assert loaded.is_immutable("css/style.abc1234.css") is True
-        assert loaded.resolve("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
-        assert loaded.resolve("css/style.css") == "css/style.abc1234.css"
+    # Both the already-hashed file and a normal fingerprinted target stay immutable.
+    assert loaded.is_immutable("dist/app-A1B2C3.js") is True
+    assert loaded.is_immutable("css/style.abc1234.css") is True
+    assert loaded.resolve("dist/app-A1B2C3.js") == "dist/app-A1B2C3.js"
+    assert loaded.resolve("css/style.css") == "css/style.abc1234.css"
 
 
-class TestDistServedImmutable:
-    """Serving side: an already-hashed dist/ file is cached immutable (far-future)."""
+# Dist served immutable
+#
+# Serving side: an already-hashed dist/ file is cached immutable (far-future).
+def test_dist_file_is_immutable():
+    manifest = AssetsManifest()
+    manifest.add_already_hashed("dist/app-A1B2C3.js")
 
-    def test_dist_file_is_immutable(self):
-        manifest = AssetsManifest()
-        manifest.add_already_hashed("dist/app-A1B2C3.js")
+    class _View(AssetView):
+        def get_manifest(self):
+            return manifest
 
-        class _View(AssetView):
-            def get_manifest(self):
-                return manifest
-
-        view = _View(
-            request=RequestFactory().get("/assets/dist/app-A1B2C3.js"),
-            url_kwargs={"path": "dist/app-A1B2C3.js"},
-        )
-        assert view.is_immutable("dist/app-A1B2C3.js") is True
+    view = _View(
+        request=build_request("GET", "/assets/dist/app-A1B2C3.js"),
+        url_kwargs={"path": "dist/app-A1B2C3.js"},
+    )
+    assert view.is_immutable("dist/app-A1B2C3.js") is True

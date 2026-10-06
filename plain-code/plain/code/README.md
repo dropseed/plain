@@ -68,6 +68,8 @@ plain code check --skip-oxc
 plain code check --skip-annotations
 ```
 
+The type check looks in your project's `tests/` directory for modules, the same as `plain test` does, so a test file's `from helpers import create_user` resolves to `tests/helpers.py`, and `from billing.refund_helpers import create_refund` to `tests/billing/refund_helpers.py`, with nothing to configure.
+
 If [`plain.dev`](/plain-dev/README.md) is installed, `plain code check` will be run automatically as a part of `plain pre-commit` to help catch issues before they are committed.
 
 ### `plain code annotations`
@@ -137,7 +139,7 @@ plain code update
 
 #### Why are test files excluded from annotation coverage?
 
-Test files (`test_*.py`, `*_test.py`, and files in `tests/` or `test/` directories) are excluded by default because they typically contain many small helper functions where type annotations add noise without providing significant value. You can customize this behavior via the `exclude` option in the annotations configuration.
+Test files (`test_*.py`, `*_test.py`, and files in a `tests/` directory) are excluded by default because they typically contain many small helper functions where type annotations add noise without providing significant value. A directory named `test` is counted: it is source, like the `test` module a package ships its test helpers in. If yours holds tests, add it to the `exclude` option in the annotations configuration.
 
 #### How do I check a specific directory?
 

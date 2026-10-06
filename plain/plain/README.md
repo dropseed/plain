@@ -21,7 +21,6 @@ The `plain` package includes everything you need to start handling web requests 
 - [preflight](./preflight/README.md) - Preflight checks for your app.
 - [runtime](./runtime/README.md) - Runtime settings and configuration.
 - [templates](./templates/README.md) - Jinja2 templates and rendering.
-- [test](./test/README.md) - Test utilities and fixtures.
 - [urls](./urls/README.md) - URL routing and request dispatching.
 - [views](./views/README.md) - Class-based views and request handlers.
 
@@ -51,7 +50,7 @@ The `plain` package includes everything you need to start handling web requests 
 ## Dev Packages
 
 - [plain.dev](/plain-dev/plain/dev/README.md) - A single command for local development.
-- [plain.pytest](/plain-pytest/plain/pytest/README.md) - Pytest fixtures and helpers.
+- [plain.testing](/plain-testing/plain/testing/README.md) - Write and run tests.
 - [plain.code](/plain-code/plain/code/README.md) - Code formatting and linting.
 - [plain.portal](/plain-portal/plain/portal/README.md) - Remote Python shell and file transfer via encrypted tunnel.
 - [plain.tunnel](/plain-tunnel/plain/tunnel/README.md) - Expose your local server to the internet.

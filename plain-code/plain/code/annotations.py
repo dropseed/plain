@@ -217,25 +217,27 @@ def analyze_file(file_path: Path) -> FileStats | None:
 def find_python_files(
     directory: Path, exclude_patterns: list[str] | None = None
 ) -> list[Path]:
-    """Find all Python files in a directory, excluding certain patterns."""
+    """
+    Find all Python files in a directory, excluding certain patterns.
+
+    A directory whose name starts with a dot is never looked in: `.git`,
+    `.venv`, and the caches that tools leave behind.
+    """
     default_patterns = [
         "__pycache__",
-        ".git",
-        ".venv",
         "venv",
         "env",
-        ".tox",
         "build",
         "dist",
         "*.egg-info",
-        ".mypy_cache",
-        ".pytest_cache",
         "node_modules",
-        # Exclude test files from annotation metrics
+        # Test files are left out of annotation metrics: a file named like
+        # a test, and everything in a `tests` directory. A directory named
+        # `test` is not one of those. It is source: the
+        # `plain/<package>/test/` helpers a package ships.
         "test_*.py",
         "*_test.py",
         "tests",
-        "test",
     ]
 
     patterns = list(default_patterns)
@@ -259,7 +261,11 @@ def find_python_files(
     for root, dirs, files in os.walk(directory):
         # Filter out excluded directories
         root_path = Path(root)
-        dirs[:] = [d for d in dirs if not should_exclude(root_path / d)]
+        dirs[:] = [
+            d
+            for d in dirs
+            if not d.startswith(".") and not should_exclude(root_path / d)
+        ]
 
         for file in files:
             if file.endswith(".py"):

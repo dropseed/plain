@@ -170,6 +170,9 @@ class EncryptedField[T](Field[T]):
     (``TextField``, ``JSONField``), which supplies the column behavior.
     """
 
+    # It is kept encrypted because it is one.
+    value_is_secret = True
+
     def __init__(self, **kwargs: Any) -> None:
         # Present only for the type checker. ty resolves `super().__init__` in
         # EncryptedJSONField through this class and lands on `Field.__init__`,

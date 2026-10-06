@@ -1,5 +1,6 @@
 import sys
 import threading
+import time
 from collections import Counter
 from collections.abc import Iterable
 from importlib import import_module
@@ -33,6 +34,12 @@ class PackagesRegistry:
 
         # Whether the registry is populated.
         self.packages_ready = self.ready = False
+
+        # How long each package's import took, by name in the order imported,
+        # and how long the `ready()` methods took together. For whoever
+        # reports on how long a process took to start.
+        self.import_seconds_by_package: dict[str, float] = {}
+        self.ready_seconds = 0.0
 
         # Lock for thread-safe population.
         self._lock = threading.RLock()
@@ -74,10 +81,14 @@ class PackagesRegistry:
                 return
 
             for entry in installed_packages:
+                started = time.perf_counter()
                 if isinstance(entry, PackageConfig):
                     # Some instances of the registry pass in the
                     # PackageConfig directly...
                     self.register_config(package_config=entry)
+                    self.import_seconds_by_package[entry.name] = (
+                        time.perf_counter() - started
+                    )
                 else:
                     try:
                         import_module(f"{entry}.{_CONFIG_MODULE_NAME}")
@@ -96,6 +107,9 @@ class PackagesRegistry:
                         # Use PackageConfig class as-is, without any customization.
                         auto_package_config = PackageConfig(entry)
                         entry_config = self.register_config(auto_package_config)
+                    self.import_seconds_by_package[entry] = (
+                        time.perf_counter() - started
+                    )
 
             # Make sure we have the same number of configs as we have installed packages
             installed_packages_list = list(installed_packages)
@@ -120,8 +134,10 @@ class PackagesRegistry:
             self.packages_ready = True
 
             # Phase 3: run ready() methods of app configs.
+            started = time.perf_counter()
             for package_config in self.get_package_configs():
                 package_config.ready()
+            self.ready_seconds = time.perf_counter() - started
 
             self.ready = True
 

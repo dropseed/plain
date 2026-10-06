@@ -1,21 +1,7 @@
 import asyncio
 import hashlib
-import os
-from io import BytesIO
 
-from opentelemetry import trace
-from opentelemetry.semconv.attributes.code_attributes import (
-    CODE_FILE_PATH,
-    CODE_FUNCTION_NAME,
-    CODE_LINE_NUMBER,
-)
-from opentelemetry.semconv.attributes.db_attributes import (
-    DB_OPERATION_NAME,
-    DB_QUERY_TEXT,
-)
 from plain.http import (
-    AsyncStreamingResponse,
-    FileResponse,
     ForbiddenError403,
     JsonResponse,
     Response,
@@ -25,27 +11,10 @@ from plain.http import (
 from plain.urls import Router, path
 from plain.views import View
 
-_tracer = trace.get_tracer("plain.tests")
-
-# One path under the working directory (shortens to a relative app path) and
-# one under `site-packages` (shortens to its package path) — the two display
-# shortenings `plain request` applies to call sites.
-_APP_FILE = os.path.join(os.getcwd(), "app", "views.py")
-_DEPENDENCY_FILE = os.path.join(
-    os.getcwd(), ".venv", "lib", "site-packages", "plain", "sessions", "core.py"
-)
-
 
 class TestView(View):
     def get(self):
         return Response("Hello, world!")
-
-
-class StreamView(View):
-    """Returns a streaming response, which has no readable `.content`."""
-
-    def get(self):
-        return StreamingResponse(BytesIO(b"streamed-bytes"), content_type="text/plain")
 
 
 class StreamGeneratorView(View):
@@ -59,24 +28,6 @@ class StreamGeneratorView(View):
         return StreamingResponse(lines(), content_type="text/plain")
 
 
-class FileView(View):
-    """Serves a file-backed response."""
-
-    def get(self):
-        return FileResponse(BytesIO(b"file bytes"), content_type="text/plain")
-
-
-class AsyncStreamFailsView(View):
-    """Streams one event, then raises — an async body that fails partway."""
-
-    def get(self):
-        async def events():
-            yield b"data: 1\n\n"
-            raise ValueError("feed failed")
-
-        return AsyncStreamingResponse(events(), content_type="text/event-stream")
-
-
 class StreamFailsFirstView(View):
     """Streams nothing — the body raises before its first chunk."""
 
@@ -84,17 +35,6 @@ class StreamFailsFirstView(View):
         def lines():
             raise ValueError("query failed")
             yield b"never"
-
-        return StreamingResponse(lines(), content_type="text/plain")
-
-
-class StreamFailsView(View):
-    """Streams one line, then raises — a body that fails after the status."""
-
-    def get(self):
-        def lines():
-            yield b"line 1\n"
-            raise ValueError("export failed")
 
         return StreamingResponse(lines(), content_type="text/plain")
 
@@ -144,66 +84,6 @@ class MultipartEchoView(View):
         )
 
 
-def _query_span(sql: str, *, file_path: str, function: str, line: int) -> None:
-    """Emit a span shaped like the one a db instrumentation would record."""
-    with _tracer.start_as_current_span(
-        sql.split()[0],
-        kind=trace.SpanKind.CLIENT,
-        attributes={
-            DB_QUERY_TEXT: sql,
-            DB_OPERATION_NAME: sql.split()[0],
-            CODE_FILE_PATH: file_path,
-            CODE_FUNCTION_NAME: function,
-            CODE_LINE_NUMBER: line,
-        },
-    ):
-        pass
-
-
-class QueriesView(View):
-    """Emits the span shape a request with an N+1 produces.
-
-    The repeated statement is issued once by a dependency and three times by
-    app code, exercising call-site dedup and path shortening for both kinds
-    of sites.
-    """
-
-    def get(self):
-        _query_span(
-            'SELECT "u"."id", "u"."email" FROM "u" WHERE "u"."id" = %s',
-            file_path=_DEPENDENCY_FILE,
-            function="_get_session_data",
-            line=92,
-        )
-        for _ in range(3):
-            _query_span(
-                'SELECT "u"."id", "u"."email" FROM "u" WHERE "u"."id" = %s',
-                file_path=_APP_FILE,
-                function="index",
-                line=41,
-            )
-        _query_span(
-            'SELECT "slow"."id" FROM "slow"',
-            file_path=_APP_FILE,
-            function="index",
-            line=52,
-        )
-        _query_span(
-            'SAVEPOINT "s1"',
-            file_path=_DEPENDENCY_FILE,
-            function="save",
-            line=172,
-        )
-        return Response("queried")
-
-
-class BoomView(View):
-    """Raises, so the CLI's failure path can be exercised."""
-
-    def get(self):
-        raise ValueError("kaboom")
-
-
 class EchoWebSocketView(View):
     """Serves a page on GET and echoes every message on its socket."""
 
@@ -242,14 +122,6 @@ class TalkingWebSocketView(View):
         await ws.send("still here?")
 
 
-class ClosingWebSocketView(View):
-    """Closes the socket itself, with an application code."""
-
-    async def websocket(self, ws: WebSocket) -> None:
-        await ws.send("bye")
-        await ws.close(4000, "done here")
-
-
 class ForbiddenWebSocketView(EchoWebSocketView):
     def before_request(self) -> None:
         raise ForbiddenError403("not for you")
@@ -264,17 +136,10 @@ class AppRouter(Router):
         path("websocket/raises", RaisingWebSocketView, name="websocket_raises"),
         path("websocket/sleeps", SleepingWebSocketView, name="websocket_sleeps"),
         path("websocket/talks", TalkingWebSocketView, name="websocket_talks"),
-        path("websocket/closes", ClosingWebSocketView, name="websocket_closes"),
         path("websocket/forbidden", ForbiddenWebSocketView, name="websocket_forbidden"),
-        path("stream", StreamView, name="stream"),
         path("stream-generator", StreamGeneratorView, name="stream_generator"),
-        path("stream-fails", StreamFailsView, name="stream_fails"),
         path("stream-fails-first", StreamFailsFirstView, name="stream_fails_first"),
-        path("file", FileView, name="file"),
-        path("async-stream-fails", AsyncStreamFailsView, name="async_stream_fails"),
         path("upload", UploadView, name="upload"),
         path("echo-body", EchoBodyView, name="echo_body"),
         path("multipart-echo", MultipartEchoView, name="multipart_echo"),
-        path("queries", QueriesView, name="queries"),
-        path("boom", BoomView, name="boom"),
     )

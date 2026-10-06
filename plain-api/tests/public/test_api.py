@@ -1,14 +1,13 @@
 import typing
 from typing import Any, Literal, TypedDict
 
-import pytest
 from plain.api import openapi
 from plain.api.openapi.generator import OpenAPISchemaGenerator
 from plain.api.openapi.utils import schema_from_type
 from plain.api.openapi.validation import validate_openapi_schema
 from plain.api.views import APIKeyView, APIView
 from plain.http import HTTPException
-from plain.test import Client, RequestFactory
+from plain.testing import Client, build_request, raises
 from plain.urls import Router, path
 
 
@@ -16,7 +15,7 @@ def test_api_view():
     client = Client()
     response = client.get("/test")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, world!"}
+    assert response.json_data == {"message": "Hello, world!"}
 
 
 def test_typed_dict_return_value_serializes_as_json():
@@ -24,7 +23,7 @@ def test_typed_dict_return_value_serializes_as_json():
     client = Client()
     response = client.get("/typed-dict-return")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, typed!"}
+    assert response.json_data == {"message": "Hello, typed!"}
 
 
 def test_tuple_status_code_return_overrides_default_200():
@@ -32,12 +31,12 @@ def test_tuple_status_code_return_overrides_default_200():
     client = Client()
     response = client.post("/tuple-status-return")
     assert response.status_code == 201
-    assert response.json() == {"id": 42, "created": True}
+    assert response.json_data == {"id": 42, "created": True}
 
 
 def test_tuple_bodiless_status_sends_empty_response():
     """`return 204, {}` sends a bodiless 204 (a 204 can't carry JSON)."""
-    view = APIView(request=RequestFactory().post("/"))
+    view = APIView(request=build_request("POST", "/"))
     response = view.convert_result_to_response((204, {}))
     assert response.status_code == 204
     assert response.content == b""
@@ -58,7 +57,7 @@ def test_bodiless_http_exception_renders_bodiless():
         def get(self):
             raise NotModified304()
 
-    view = RaisingView(request=RequestFactory().get("/"))
+    view = RaisingView(request=build_request("GET", "/"))
     response = view.get_response()
     assert response.status_code == 304
     assert response.content == b""
@@ -67,8 +66,8 @@ def test_bodiless_http_exception_renders_bodiless():
 
 def test_tuple_bodiless_status_with_data_raises():
     """`return 204, {...}` is a contradiction — raise with a pointed message."""
-    view = APIView(request=RequestFactory().post("/"))
-    with pytest.raises(ValueError, match="cannot include data"):
+    view = APIView(request=build_request("POST", "/"))
+    with raises(ValueError, match="cannot include data"):
         view.convert_result_to_response((204, {"deleted": True}))
 
 
@@ -77,20 +76,18 @@ def test_versioned_api_view():
     response = client.post(
         "/test-versioned",
         headers={"API-Version": "v2"},
-        data={"name": "Dave"},
-        content_type="application/json",
+        json_data={"name": "Dave"},
     )
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, Dave!"}
+    assert response.json_data == {"message": "Hello, Dave!"}
 
     response = client.post(
         "/test-versioned",
         headers={"API-Version": "v1"},
-        data={"to": "Dave"},
-        content_type="application/json",
+        json_data={"to": "Dave"},
     )
     assert response.status_code == 200
-    assert response.json() == {"msg": "Hello, Dave!"}
+    assert response.json_data == {"msg": "Hello, Dave!"}
 
 
 def test_validation_error_is_returned_as_400_json():
@@ -105,33 +102,30 @@ def test_validation_error_is_returned_as_400_json():
 
     response = client.post(
         "/validation-error",
-        data={"shape": "string"},
-        content_type="application/json",
+        json_data={"shape": "string"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"].startswith("Validation error: ")
     assert "errors" not in body
 
     response = client.post(
         "/validation-error",
-        data={"shape": "list"},
-        content_type="application/json",
+        json_data={"shape": "list"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"].startswith("Validation error: ")
     assert "errors" not in body
 
     response = client.post(
         "/validation-error",
-        data={"shape": "dict"},
-        content_type="application/json",
+        json_data={"shape": "dict"},
     )
     assert response.status_code == 400
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "validation_error"
     assert body["message"] == "Validation error"
     assert body["errors"] == [
@@ -142,12 +136,12 @@ def test_validation_error_is_returned_as_400_json():
 def test_unhandled_exception_attaches_response_exception():
     """APIView 5xx responses carry the original exception so observability
     tooling can record it from the response."""
-    client = Client(raise_request_exception=False)
+    client = Client(raise_exceptions=False)
 
     response = client.get("/unhandled-exception")
     assert response.status_code == 500
     assert isinstance(response.exception, RuntimeError)
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "server_error"
 
 
@@ -162,11 +156,11 @@ def test_unsupported_media_type_is_returned_as_415_json():
 
     response = client.post(
         "/json-echo",
-        data="hello",
+        body="hello",
         content_type="text/plain",
     )
     assert response.status_code == 415
-    body = response.json()
+    body = response.json_data
     assert body["id"] == "unsupported_media_type"
 
 
@@ -342,13 +336,11 @@ def test_json_not_found_view_returns_json_404_for_any_method():
     response = client.get("/missing/anything")
     assert response.status_code == 404
     assert response.headers["Content-Type"].startswith("application/json")
-    assert response.json()["id"] == "not_found"
+    assert response.json_data["id"] == "not_found"
 
-    response = client.post(
-        "/missing/anything", data="{}", content_type="application/json"
-    )
+    response = client.post("/missing/anything", json_data={})
     assert response.status_code == 404
-    assert response.json()["id"] == "not_found"
+    assert response.json_data["id"] == "not_found"
 
 
 def test_api_key_view_auto_emits_security_scheme():
@@ -554,7 +546,7 @@ def test_schema_from_type_optional_typed_dict_is_a_nullable_ref():
 
 def test_schema_from_type_unsupported_generic_still_raises():
     """Unions are handled, but an unmodelled container is still a hard error."""
-    with pytest.raises(ValueError, match="Unknown type"):
+    with raises(ValueError, match="Unknown type"):
         schema_from_type(tuple[int, str])
 
 

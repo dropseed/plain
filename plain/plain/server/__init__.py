@@ -4,6 +4,6 @@
 #
 # Vendored and modified for Plain.
 
-from .app import ServerApplication
-
-__all__ = ["ServerApplication"]
+# Nothing is imported here. `plain.server.app` holds the server itself
+# (the arbiter, the workers, the reloader), and importing this package must
+# not load it: `plain.server.inprocess` handles requests with none of that.

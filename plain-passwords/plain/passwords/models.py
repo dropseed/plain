@@ -10,6 +10,10 @@ from .hashers import (
 
 
 class PasswordField(postgres.TextField):
+    # A hash is what an attacker who got the table would start from. A
+    # failed test's report prints a user without it.
+    value_is_secret = True
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs["max_length"] = 128
         kwargs.setdefault(

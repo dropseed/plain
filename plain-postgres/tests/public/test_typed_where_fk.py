@@ -5,7 +5,6 @@
 field, renamed to `parent__name`, so its condition methods build that path.
 """
 
-import pytest
 from app.examples.models.delete import (
     ChildCascade,
     ChildSetNull,
@@ -17,6 +16,7 @@ from app.examples.models.delete import (
 from app.examples.models.relationships import Tag, Widget, WidgetTag
 from app.examples.models.shadowing import ShadowSource, ShadowTarget
 from plain.postgres import Q
+from plain.testing import cases, raises
 
 
 def test_fk_field_access_builds_prefixed_q():
@@ -49,7 +49,7 @@ def test_fk_field_access_supports_other_lookups():
     ]
 
 
-def test_fk_traversal_in_where_clause(db):
+def test_fk_traversal_in_where_clause():
     """End-to-end: build a query through the FK and verify it runs."""
     parent = DeleteParent.query.create(name="alice")
     other = DeleteParent.query.create(name="bob")
@@ -61,7 +61,7 @@ def test_fk_traversal_in_where_clause(db):
     assert matches[0].parent.id == parent.id
 
 
-def test_fk_traversal_combines_with_local_conditions(db):
+def test_fk_traversal_combines_with_local_conditions():
     """Mix a traversal condition with a local condition via &."""
     p1 = DeleteParent.query.create(name="alice")
     p2 = DeleteParent.query.create(name="alice")
@@ -77,7 +77,7 @@ def test_fk_traversal_combines_with_local_conditions(db):
     assert {c.parent.id for c in matches} == {p1.id, p2.id}
 
 
-def test_multiple_fks_on_one_model(db):
+def test_multiple_fks_on_one_model():
     """WidgetTag has FKs to both Widget and Tag — each path resolves independently."""
     w = Widget.query.create(name="cog", size="small")
     t = Tag.query.create(name="metal")
@@ -88,7 +88,7 @@ def test_multiple_fks_on_one_model(db):
     assert WidgetTag.query.where(WidgetTag.widget.name.equals("missing")).count() == 0
 
 
-def test_fk_traversal_or_combination(db):
+def test_fk_traversal_or_combination():
     p1 = DeleteParent.query.create(name="alice")
     p2 = DeleteParent.query.create(name="bob")
     p3 = DeleteParent.query.create(name="carol")
@@ -108,7 +108,7 @@ def test_fk_traversal_or_combination(db):
 def test_unknown_attribute_on_related_raises_attribute_error():
     """Traversal into a non-existent field on the related model fails loudly,
     not silently producing a wrong-shaped Q."""
-    with pytest.raises(AttributeError):
+    with raises(AttributeError):
         _ = ChildCascade.parent.nonexistent_field  # ty: ignore[unresolved-attribute]
 
 
@@ -122,7 +122,7 @@ def test_two_hop_traversal_builds_double_prefixed_q():
     assert q.children == [("mid_parent__grandparent__name", "alice")]
 
 
-def test_two_hop_traversal_runs(db):
+def test_two_hop_traversal_runs():
     g1 = Grandparent.query.create(name="alice")
     g2 = Grandparent.query.create(name="bob")
     m1 = MidParent.query.create(grandparent=g1)
@@ -136,7 +136,7 @@ def test_two_hop_traversal_runs(db):
     assert {gc.mid_parent.grandparent.name for gc in matches} == {"alice"}
 
 
-def test_two_hop_chain_combines_with_or(db):
+def test_two_hop_chain_combines_with_or():
     g1 = Grandparent.query.create(name="alice")
     g2 = Grandparent.query.create(name="bob")
     g3 = Grandparent.query.create(name="carol")
@@ -172,10 +172,7 @@ def test_two_hop_chain_combines_with_or(db):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "name",
-    ["field", "is_cached", "get_queryset", "get_prefetch_queryset"],
-)
+@cases("field", "is_cached", "get_queryset", "get_prefetch_queryset")
 def test_shadowed_field_name_traverses_to_field(name):
     """ShadowTarget defines fields named after descriptor attributes.
     Traversal through ShadowSource.ref resolves each to the field, building
@@ -185,7 +182,7 @@ def test_shadowed_field_name_traverses_to_field(name):
     assert q.children == [(f"ref__{name}", "x")]
 
 
-def test_shadowed_field_traversal_runs(db):
+def test_shadowed_field_traversal_runs():
     """End-to-end: a where() through the shadowed `field` name filters rows."""
     matched = ShadowTarget.query.create(
         field="hit",
@@ -226,7 +223,7 @@ def test_relation_key_conditions_build_q():
     assert ChildCascade.parent.id.not_equal(7).children == [("parent__id", 7)]
 
 
-def test_where_filters_by_relation_key(db):
+def test_where_filters_by_relation_key():
     kept = DeleteParent.query.create(name="kept")
     other = DeleteParent.query.create(name="other")
     mine = ChildCascade.query.create(parent=kept)
@@ -236,7 +233,7 @@ def test_where_filters_by_relation_key(db):
     assert [r.id for r in rows] == [mine.id]
 
 
-def test_relation_key_matches_filter_on_the_relation(db):
+def test_relation_key_matches_filter_on_the_relation():
     """The documented equivalence: traversing to the key is the typed spelling
     of `filter(parent=obj)`, not merely something similar."""
     kept = DeleteParent.query.create(name="kept")
@@ -252,7 +249,7 @@ def test_relation_key_matches_filter_on_the_relation(db):
     assert len(typed) == 1
 
 
-def test_where_filters_by_relation_key_is_in(db):
+def test_where_filters_by_relation_key_is_in():
     a = DeleteParent.query.create(name="a")
     b = DeleteParent.query.create(name="b")
     c = DeleteParent.query.create(name="c")
@@ -263,7 +260,7 @@ def test_where_filters_by_relation_key_is_in(db):
     assert sorted(r.parent.id for r in rows) == sorted([a.id, c.id])
 
 
-def test_where_filters_by_null_relation_key(db):
+def test_where_filters_by_null_relation_key():
     kept = DeleteParent.query.create(name="kept")
     doomed = DeleteParent.query.create(name="doomed")
     attached = ChildSetNull.query.create(parent=kept)
@@ -280,16 +277,16 @@ def test_where_filters_by_null_relation_key(db):
     assert [r.id for r in non_nulls] == [attached.id]
 
 
-@pytest.mark.parametrize("method", ["equals", "is_in", "is_null", "gte", "contains"])
+@cases("equals", "is_in", "is_null", "gte", "contains")
 def test_condition_on_the_relation_itself_raises_helpful_error(method):
     """An AttributeError, so `hasattr`/`getattr(..., default)` keep working --
     but one that names the spelling that does work, or the constraint just
     looks like a missing feature. (The sweep across every condition name is in
     tests/internal/test_typed_where_internals.py.)"""
-    with pytest.raises(AttributeError) as excinfo:
+    with raises(AttributeError) as excinfo:
         getattr(ChildCascade.parent, method)
 
-    message = str(excinfo.value)
+    message = str(excinfo.exception)
     assert "is a relation, not a field" in message
     assert f"parent.id.{method}(...)" in message
 
@@ -302,7 +299,7 @@ def test_condition_on_the_relation_keeps_the_attribute_protocol():
 def test_unknown_relation_attribute_still_raises_attribute_error():
     """A genuine typo gets the plain "not a traversable field" message rather
     than the condition-method advice."""
-    with pytest.raises(AttributeError, match="parent.nope is not a traversable"):
+    with raises(AttributeError, match="parent.nope is not a traversable"):
         getattr(ChildCascade.parent, "nope")
 
 
@@ -337,16 +334,16 @@ def test_m2m_traversal_through_a_foreign_key():
 
 
 def test_condition_on_a_traversed_m2m_gets_the_same_advice():
-    with pytest.raises(AttributeError) as excinfo:
+    with raises(AttributeError) as excinfo:
         getattr(WidgetTag.widget.tags, "equals")
 
-    message = str(excinfo.value)
+    message = str(excinfo.exception)
     assert "is a relation, not a field" in message
     assert "WidgetTag.widget.tags" not in message  # the prefix, not the model
     assert "widget.tags.id.equals(...)" in message
 
 
-def test_where_filters_through_a_foreign_key_then_an_m2m(db):
+def test_where_filters_through_a_foreign_key_then_an_m2m():
     metal = Tag.query.create(name="metal")
     plastic = Tag.query.create(name="plastic")
     cog = Widget.query.create(name="cog", size="small")
@@ -365,60 +362,62 @@ def test_reverse_relation_says_it_is_not_traversable():
     """`filter(parent__childcascade_set__...)` works, so "not a traversable
     field or relation" would be a lie -- the typed API is what can't express
     it, and the message has to say which."""
-    with pytest.raises(AttributeError) as excinfo:
+    with raises(AttributeError) as excinfo:
         getattr(ChildCascade.parent, "childcascade_set")
 
-    message = str(excinfo.value)
+    message = str(excinfo.exception)
     assert "reverse relation" in message
     assert "filter(parent__childcascade_set__...=...)" in message
 
 
-class TestTraversedConditionsBelongToTheirRoot:
-    """A traversed condition belongs to the model the traversal *started* from,
-    not the related model the column lives on. `ChildCascade.parent.name`
-    builds `parent__name`, which only means anything to a `ChildCascade`
-    queryset -- so that is the model `where()` checks it against."""
+# Traversed conditions belong to their root
+#
+# A traversed condition belongs to the model the traversal *started* from,
+# not the related model the column lives on. `ChildCascade.parent.name`
+# builds `parent__name`, which only means anything to a `ChildCascade`
+# queryset -- so that is the model `where()` checks it against.
+def test_traversed_condition_passes_on_its_root():
+    parent = DeleteParent.query.create(name="p")
+    ChildCascade.query.create(parent=parent)
+    rows = ChildCascade.query.where(ChildCascade.parent.name.equals("p"))
+    assert len(list(rows)) == 1
 
-    def test_traversed_condition_passes_on_its_root(self, db):
-        parent = DeleteParent.query.create(name="p")
-        ChildCascade.query.create(parent=parent)
-        rows = ChildCascade.query.where(ChildCascade.parent.name.equals("p"))
-        assert len(list(rows)) == 1
 
-    def test_traversed_condition_raises_on_another_model(self, db):
-        """`parent__name` is meaningless to DeleteParent, and the root is what
-        the error names -- not DeleteParent, whose column it actually is."""
-        with pytest.raises(TypeError) as excinfo:
-            DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
-        message = str(excinfo.value)
-        assert "ChildCascade.parent__name" in message
-        assert "DeleteParent queryset" in message
+def test_traversed_condition_raises_on_another_model():
+    """`parent__name` is meaningless to DeleteParent, and the root is what
+    the error names -- not DeleteParent, whose column it actually is."""
+    with raises(TypeError) as excinfo:
+        DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
+    message = str(excinfo.exception)
+    assert "ChildCascade.parent__name" in message
+    assert "DeleteParent queryset" in message
 
-    def test_traversed_condition_is_not_the_related_models(self, db):
-        """The tempting wrong answer: treating the condition as DeleteParent's
-        because that is where `name` is declared."""
-        with pytest.raises(TypeError, match="ChildCascade.parent__name"):
-            DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
 
-    def test_multi_hop_traversal_keeps_the_root(self, db):
-        """Every hop carries the root unchanged, so a two-hop path is still
-        Grandchild's."""
-        grandparent = Grandparent.query.create(name="g")
-        mid = MidParent.query.create(grandparent=grandparent)
-        Grandchild.query.create(mid_parent=mid)
+def test_traversed_condition_is_not_the_related_models():
+    """The tempting wrong answer: treating the condition as DeleteParent's
+    because that is where `name` is declared."""
+    with raises(TypeError, match="ChildCascade.parent__name"):
+        DeleteParent.query.where(ChildCascade.parent.name.equals("p"))
 
-        rows = Grandchild.query.where(
-            Grandchild.mid_parent.grandparent.name.equals("g")
-        )
-        assert len(list(rows)) == 1
 
-        with pytest.raises(TypeError, match="Grandchild.mid_parent__grandparent__name"):
-            MidParent.query.where(Grandchild.mid_parent.grandparent.name.equals("g"))
+def test_multi_hop_traversal_keeps_the_root():
+    """Every hop carries the root unchanged, so a two-hop path is still
+    Grandchild's."""
+    grandparent = Grandparent.query.create(name="g")
+    mid = MidParent.query.create(grandparent=grandparent)
+    Grandchild.query.create(mid_parent=mid)
 
-    def test_traversed_and_local_conditions_combine_on_the_root(self, db):
-        parent = DeleteParent.query.create(name="p")
-        ChildCascade.query.create(parent=parent)
-        rows = ChildCascade.query.where(
-            ChildCascade.parent.name.equals("p") & ChildCascade.id.gte(1)
-        )
-        assert len(list(rows)) == 1
+    rows = Grandchild.query.where(Grandchild.mid_parent.grandparent.name.equals("g"))
+    assert len(list(rows)) == 1
+
+    with raises(TypeError, match="Grandchild.mid_parent__grandparent__name"):
+        MidParent.query.where(Grandchild.mid_parent.grandparent.name.equals("g"))
+
+
+def test_traversed_and_local_conditions_combine_on_the_root():
+    parent = DeleteParent.query.create(name="p")
+    ChildCascade.query.create(parent=parent)
+    rows = ChildCascade.query.where(
+        ChildCascade.parent.name.equals("p") & ChildCascade.id.gte(1)
+    )
+    assert len(list(rows)) == 1

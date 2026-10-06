@@ -1,6 +1,6 @@
 """Shared test helpers.
 
-A uniquely-named module (rather than `conftest`) so type-checking resolves it
+A uniquely-named module so type-checking resolves it
 unambiguously across the workspace's shared test path.
 """
 
@@ -10,7 +10,33 @@ import secrets
 from datetime import timedelta
 from typing import Any
 
+from plain.auth.testing import login_client
+from plain.testing import Client
 from plain.utils import timezone
+
+
+def make_user(*, email: str = "test@example.com") -> Any:
+    from app.users.models import User
+
+    return User.query.create(email=email)
+
+
+def make_public_app() -> Any:
+    """A public client (no secret) — how Claude registers via DCR."""
+    from plain.oauthserver.models import OAuthApplication
+
+    return OAuthApplication.query.create(
+        name="Test App",
+        redirect_uris=(
+            "https://claude.ai/api/mcp/auth_callback http://localhost:3000/callback"
+        ),
+    )
+
+
+def login_as(user: Any) -> Client:
+    client = Client()
+    login_client(client, user)
+    return client
 
 
 def generate_pkce_pair() -> tuple[str, str]:
