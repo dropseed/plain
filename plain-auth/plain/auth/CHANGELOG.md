@@ -1,5 +1,17 @@
 # plain-auth changelog
 
+## [0.31.0](https://github.com/dropseed/plain/releases/plain-auth@0.31.0) (2026-10-06)
+
+### What's changed
+
+- `plain.auth.test` is `plain.auth.testing`. `login_client(client, user)` writes the session cookie to a `plain.testing` client once, without going through a login view, so every request afterwards is that user's; `logout_client(client)` ends the session and clears the client's cookies, and writes nothing when the client has no session. They replace `client.force_login()` and `client.logout()`, which the new client doesn't have ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- `from plain.auth.test import login_client` becomes `from plain.auth.testing import login_client`.
+- `client.force_login(user)` becomes `login_client(client, user)`; `client.logout()` becomes `logout_client(client)`.
+- To check who a request was authenticated as, read `get_request_user(response.request)` from `plain.auth.requests`.
+
 ## [0.30.0](https://github.com/dropseed/plain/releases/plain-auth@0.30.0) (2026-09-21)
 
 ### What's changed
