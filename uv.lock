@@ -946,7 +946,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-connect"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "plain-connect" }
 dependencies = [
     { name = "cryptography" },

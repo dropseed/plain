@@ -1,5 +1,15 @@
 # plain-connect changelog
 
+## [0.11.0](https://github.com/dropseed/plain/releases/plain-connect@0.11.0) (2026-10-06)
+
+### What's changed
+
+- Nothing is exported during a test run. When `PLAIN_TEST_RUNNING` is set, which `plain test` does before the app is set up and every process a test starts inherits, `Config.ready()` installs no exporters, whatever `CONNECT_EXPORT_TOKEN` and the settings say ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- `PLAIN_CONNECT_EXPORT_ENABLED=false` in `.env.test`, if it was there for the tests, can be removed.
+
 ## [0.10.0](https://github.com/dropseed/plain/releases/plain-connect@0.10.0) (2026-09-21)
 
 ### What's changed
