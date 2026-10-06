@@ -1,5 +1,16 @@
 # plain-sessions changelog
 
+## [0.48.0](https://github.com/dropseed/plain/releases/plain-sessions@0.48.0) (2026-10-06)
+
+### What's changed
+
+- `plain.sessions.test` is `plain.sessions.testing`. `get_client_session(client)` gives the session a `plain.testing` client's cookie points to, creating one and setting the cookie when the client has none. It replaces `client.session`, which the new client doesn't have; the README's Testing section shows reading and setting values ([2278c086af](https://github.com/dropseed/plain/commit/2278c086af))
+
+### Upgrade instructions
+
+- `from plain.sessions.test import get_client_session` becomes `from plain.sessions.testing import get_client_session`.
+- `client.session` becomes `get_client_session(client)`. To change it, set the value and call `session.save()`.
+
 ## [0.47.0](https://github.com/dropseed/plain/releases/plain-sessions@0.47.0) (2026-09-21)
 
 ### What's changed

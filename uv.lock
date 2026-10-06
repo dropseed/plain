@@ -1394,7 +1394,7 @@ dev = [{ name = "plain-testing", editable = "plain-testing" }]
 
 [[package]]
 name = "plain-sessions"
-version = "0.47.0"
+version = "0.48.0"
 source = { editable = "plain-sessions" }
 dependencies = [
     { name = "plain" },
