@@ -4,6 +4,7 @@ from . import (  # noqa: F401
     constraints,
     defaults,
     delete,
+    describe,
     encrypted,
     forms,
     indexes,

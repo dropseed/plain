@@ -6,8 +6,8 @@ import click
 from ..convergence.analysis import ModelAnalysis, analyze_model
 from ..convergence.planning import can_auto_correct
 from ..db import get_connection
+from ..describe import select_models
 from ..introspection import MANAGED_CONSTRAINT_TYPES, get_unknown_tables
-from ..registry import models_registry
 from .decorators import database_management_command
 
 
@@ -105,24 +105,20 @@ def _render_model(analysis: ModelAnalysis) -> None:
 
 
 @click.command()
-@click.argument("model_label", required=False)
+@click.argument("target", required=False)
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 @database_management_command
-def schema(model_label: str | None, output_json: bool) -> None:
-    """Show database schema from models, compared against the actual database"""
-    models = models_registry.get_models()
+def schema(target: str | None, output_json: bool) -> None:
+    """Show database schema from models, compared against the actual database.
 
-    if model_label:
-        model_label_lower = model_label.lower()
-        models = [
-            m
-            for m in models
-            if m.model_options.label_lower == model_label_lower
-            or m.model_options.db_table == model_label
-            or m.__name__.lower() == model_label_lower
-        ]
-        if not models:
-            raise click.ClickException(f"No model found matching '{model_label}'")
+    TARGET narrows it to one model (by class name, label or table) or one
+    package.
+    """
+    targets = (target,) if target else ()
+    try:
+        models = select_models(targets, include_packages=True)
+    except LookupError as e:
+        raise click.ClickException(str(e)) from e
 
     conn = get_connection()
 
@@ -132,7 +128,7 @@ def schema(model_label: str | None, output_json: bool) -> None:
         for model in models:
             analyses.append(analyze_model(conn, cursor, model))
 
-    unknown_tables = get_unknown_tables(conn) if not model_label else []
+    unknown_tables = get_unknown_tables(conn) if not target else []
     total_issues = sum(a.issue_count for a in analyses) + len(unknown_tables)
 
     if output_json:

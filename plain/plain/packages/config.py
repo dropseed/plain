@@ -38,6 +38,12 @@ class PackageConfig:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.package_label}>"
 
+    @property
+    def is_app(self) -> bool:
+        """Whether this is one of the project's own packages, under `app`,
+        rather than an installed one."""
+        return self.name.startswith("app.")
+
     @cached_property
     def path(self) -> str:
         # Filesystem path to the application directory e.g.

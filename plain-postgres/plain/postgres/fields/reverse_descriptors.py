@@ -36,6 +36,12 @@ class BaseReverseDescriptor(Generic[T, QS]):
         self._resolved_model: type[T] | None = None
         self._resolved_field: Any = None
 
+    @property
+    def reversed_field(self) -> Any:
+        """The field on the target model this accessor reverses, or None until
+        the target model has resolved."""
+        return self._resolved_field
+
     def contribute_to_class(self, cls: type[Model], name: str) -> None:
         """
         Register this reverse relation with the model class.

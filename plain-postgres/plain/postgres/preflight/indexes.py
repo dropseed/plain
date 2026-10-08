@@ -15,7 +15,7 @@ def _get_app_models() -> list[Any]:
     """Return models from the user's app packages only (not framework/third-party)."""
     app_models = []
     for package_config in packages_registry.get_package_configs():
-        if package_config.name.startswith("app."):
+        if package_config.is_app:
             app_models.extend(
                 models_registry.get_models(package_label=package_config.package_label)
             )

@@ -16,6 +16,7 @@
 - [Fields](#fields)
 - [Relationships](#relationships)
 - [Constraints](#constraints)
+- [Describing the data model](#describing-the-data-model)
 - [Forms](#forms)
 - [Architecture](#architecture)
 - [Diagnostics](#diagnostics)
@@ -1293,6 +1294,7 @@ In development (`DEBUG=True`), sync auto-generates migrations before applying th
 | `plain postgres sync --check`  | Exit non-zero if anything would change (for CI)                       |
 | `plain postgres schema`        | Show schema state with drift detection                                |
 | `plain postgres schema --json` | Machine-readable schema output                                        |
+| `plain postgres models`        | Describe the models: relations, constraints, reverse accessors        |
 | `plain postgres converge`      | Run convergence alone (advanced)                                      |
 
 ### Structural migrations
@@ -1477,6 +1479,7 @@ When you run `postgres sync`, convergence detects that these indexes and constra
 - **Per-operation commits** — each fix is committed independently so a single failure doesn't roll back other fixes.
 - **Self-healing** — detects and rebuilds `INVALID` indexes (e.g. from a previously failed `CREATE INDEX CONCURRENTLY`).
 - **Rename-aware** — detects renamed indexes and constraints by matching their structure, avoiding unnecessary drop + recreate.
+- **Repairs doubled `%` literals** — a constraint created by an earlier plain-postgres stored `'100%'` as `'100%%'`. Convergence recognizes that one difference and replaces the constraint under its own name instead of treating it as a definition change you have to stage.
 
 **Inspecting schema state:**
 
@@ -1484,7 +1487,7 @@ Use `postgres schema` to see what convergence would do. It shows every model's c
 
 ```bash
 plain postgres schema           # all models
-plain postgres schema User      # single model
+plain postgres schema User      # one model, or a package
 plain postgres schema --json    # machine-readable output
 ```
 
@@ -2121,6 +2124,52 @@ nickname: Field[str] = types.TextField(max_length=50, allow_null=True)
 
 # Good — single empty representation
 nickname: Field[str] = types.TextField(max_length=50, default="")
+```
+
+## Describing the data model
+
+`plain postgres models` prints the data model as the registry sees it: every field, every relation with its target and `on_delete` rule, the relations pointing back at each model, and the constraints and indexes with their conditions compiled to SQL. It reads the model classes, so it needs no database.
+
+```bash
+plain postgres models                 # every model in the app
+plain postgres models Thread          # one model, by class name
+plain postgres models changes.Thread  # or by label, or by table name
+plain postgres models changes         # a whole package
+plain postgres models --all           # include models from installed packages
+plain postgres models --json          # the same facts, structured
+```
+
+```
+changes.Thread  →  changes_thread
+  id                        PrimaryKey              PK
+  key                       Text                    unique
+  bot                       → projects.Bot          CASCADE
+  owner                     → users.User            RESTRICT
+  origin                    → changes.Thread        SET_NULL null
+  ← terminals.Terminal.change                       filter: terminal
+  ← changes.Computer.thread                         1:1 filter: one_offs
+  unique   change_key_unique  (key)
+  unique   change_one_triggered_open_per_bot  (bot) WHERE ("closed_at" IS NULL AND NOT ("trigger" = ''))
+  index    change_bot_idx  (bot)
+```
+
+The point is the facts you can't read off a `models.py` by eye:
+
+- **`unique` and `1:1` mean effective uniqueness.** A field is marked unique when an unconditional, single-field unique constraint covers it, and a foreign key covered that way is one-to-one. A partial unique (one with a `condition`) is listed with its `WHERE` clause and never promoted — at most one open thread per bot is not the same thing as one thread per bot.
+- **Reverse relations are listed on the model they point at**, with the declared [`ReverseForeignKey`](./fields/reverse_descriptors.py#ReverseForeignKey) or [`ReverseManyToMany`](./fields/reverse_descriptors.py#ReverseManyToMany) accessor when there is one, and the name to use in `filter()` either way.
+- **Check constraints, partial conditions and expression indexes are shown as the SQL Postgres enforces**, not as `Q` objects. One wrinkle: with no database connection open, a string literal that contains a backslash is written in Postgres's `E'...'` escape form, which means the same thing.
+- **A relation whose target never resolved** (a typo in a string reference, a package no longer installed) shows the reference as written instead of failing the whole listing.
+
+`--json` carries everything above as data; its shape is the `to_dict()` of each [`ModelDescription`](./describe.py#ModelDescription). It is the input for anything built on top: an entity-relationship diagram, a containment outline, a what-deletes-what walk. Those are views, and they are left to whoever is reading, so the command stays a statement of fact.
+
+The same facts are available in Python through [`describe_models`](./describe.py#describe_models):
+
+```python
+from plain.postgres.describe import describe_models
+
+for model in describe_models(("changes",)):
+    for relation in model.relations:
+        print(model.label, relation.name, relation.to, relation.on_delete)
 ```
 
 ## Forms

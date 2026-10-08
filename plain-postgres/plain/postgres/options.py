@@ -205,6 +205,17 @@ class Options:
             )
         ]
 
+    @property
+    def unique_field_names(self) -> set[str]:
+        """Field names each made unique on their own by an unconditional unique
+        constraint. A partial or expression-based constraint never counts, so
+        this is the set a foreign key must be in to be one-to-one."""
+        return {
+            constraint.fields[0]
+            for constraint in self.total_unique_constraints
+            if len(constraint.fields) == 1
+        }
+
     def unique_fields_match_constraint(self, field_names: set[str | None]) -> bool:
         """True if field_names names the primary key, or a UniqueConstraint on
         the model that has no condition and no expressions."""

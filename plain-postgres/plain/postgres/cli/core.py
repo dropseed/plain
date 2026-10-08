@@ -15,6 +15,7 @@ from ..dialect import quote_name
 from .converge import converge
 from .decorators import cli_schema_lock, database_management_command
 from .diagnose import diagnose
+from .models import models
 from .schema import schema
 from .sync import sync
 
@@ -27,6 +28,7 @@ def cli() -> None:
 
 cli.add_command(converge)
 cli.add_command(diagnose)
+cli.add_command(models)
 cli.add_command(schema)
 cli.add_command(sync)
 

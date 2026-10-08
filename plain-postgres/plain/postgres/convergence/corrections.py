@@ -9,8 +9,10 @@ from plain.runtime import settings as plain_settings
 
 from ..constraints import BaseConstraint, CheckConstraint, UniqueConstraint
 from ..db import get_connection
-from ..dialect import build_timeout_set_clauses, quote_name
+from ..ddl import compile_expression_sql
+from ..dialect import MAX_NAME_LENGTH, build_timeout_set_clauses, quote_name
 from ..indexes import Index
+from ..utils import truncate_name
 
 if TYPE_CHECKING:
     from ..base import Model
@@ -561,6 +563,83 @@ class ValidateConstraintCorrection(Correction):
         sql = _validate_constraint_sql(self.table, self.name)
         _execute_and_commit(sql, blocking=False)
         return sql
+
+
+@dataclass
+class ReplaceConstraintCorrection(Correction):
+    """Replace a constraint under its own name, from the model, for a
+    definition that only differs by a doubled `%` literal
+    (`ConstraintPercentDrift`).
+
+    The table is never without the constraint. A check is dropped and
+    re-added in one statement, then validated. A unique is rebuilt as a new
+    index first, concurrently, and swapped in under the old name in one
+    transaction.
+    """
+
+    pass_order = 2
+
+    table: str
+    constraint: BaseConstraint
+    model: type[Model]
+
+    def describe(self) -> str:
+        return f"{self.table}: replace constraint {self.constraint.name} (doubled % literal)"
+
+    def apply(self) -> str:
+        if isinstance(self.constraint, CheckConstraint):
+            return self._replace_check(self.constraint)
+        if isinstance(self.constraint, UniqueConstraint):
+            return self._replace_unique(self.constraint)
+        raise TypeError(f"Cannot replace {self.constraint!r}")
+
+    def _replace_check(self, constraint: CheckConstraint) -> str:
+        table = quote_name(self.table)
+        name = quote_name(constraint.name)
+        check = compile_expression_sql(self.model, constraint.check)
+        swap_sql = (
+            f"ALTER TABLE {table} DROP CONSTRAINT {name},"
+            f" ADD CONSTRAINT {name} CHECK ({check}) NOT VALID"
+        )
+        _execute_and_commit(swap_sql)
+
+        validate_sql = _validate_constraint_sql(self.table, constraint.name)
+        _execute_and_commit(validate_sql, blocking=False)
+        return f"{swap_sql}; {validate_sql}"
+
+    def _replace_unique(self, constraint: UniqueConstraint) -> str:
+        # Build the replacement under a temporary name without blocking
+        # writes, then drop the old one, take its name, and (for a
+        # constraint-backed unique) attach it, all in one transaction.
+        replacement = constraint.clone()
+        if not isinstance(replacement, UniqueConstraint):  # clone keeps the class
+            raise TypeError(f"Expected a UniqueConstraint clone, got {replacement!r}")
+        replacement.name = truncate_name(
+            f"{constraint.name}_replacement", MAX_NAME_LENGTH
+        )
+        create_sql = replacement.to_sql(self.model, concurrently=True)
+        _execute_autocommit(create_sql)
+
+        old_name = quote_name(constraint.name)
+        if constraint.index_only:
+            drop_sql = f"DROP INDEX {old_name}"
+        else:
+            drop_sql = (
+                f"ALTER TABLE {quote_name(self.table)} DROP CONSTRAINT {old_name}"
+            )
+        rename_sql = f"ALTER INDEX {quote_name(replacement.name)} RENAME TO {old_name}"
+        swap = [drop_sql, rename_sql]
+        if not constraint.index_only:
+            swap.append(constraint.to_attach_sql(self.model))
+        try:
+            _execute_and_commit(swap)
+        except Exception:
+            # The old constraint is untouched; clean up the orphaned index.
+            _execute_autocommit(
+                f"DROP INDEX CONCURRENTLY IF EXISTS {quote_name(replacement.name)}"
+            )
+            raise
+        return "; ".join([create_sql, *swap])
 
 
 @dataclass

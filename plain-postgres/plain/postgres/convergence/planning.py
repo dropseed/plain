@@ -11,6 +11,7 @@ from .analysis import (
     ColumnShouldBeNotNullDrift,
     ConstraintModelDrift,
     ConstraintNameDrift,
+    ConstraintPercentDrift,
     ConstraintRenameDrift,
     Drift,
     DriftKind,
@@ -37,6 +38,7 @@ from .corrections import (
     RebuildIndexCorrection,
     RenameConstraintCorrection,
     RenameIndexCorrection,
+    ReplaceConstraintCorrection,
     ReplaceForeignKeyCorrection,
     ResetStorageParameterCorrection,
     SetColumnDefaultCorrection,
@@ -96,6 +98,8 @@ def _plan_drift(drift: Drift) -> PlanItem:
                     " then remove the old one."
                 ),
             )
+        case ConstraintPercentDrift(table=t, constraint=c, model=m):
+            return PlanItem(drift, ReplaceConstraintCorrection(t, c, m))
         case ConstraintNameDrift(kind=DriftKind.UNVALIDATED, table=t, name=n):
             return PlanItem(drift, ValidateConstraintCorrection(t, n))
         case ConstraintNameDrift(kind=DriftKind.UNDECLARED, table=t, name=n):

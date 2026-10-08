@@ -20,13 +20,15 @@ if TYPE_CHECKING:
 
 
 def quote_value(value: Any) -> str:
-    """Quote a value for safe inclusion in a SQL string.
+    """Quote a value for inclusion in a SQL string that is executed as written.
 
     Not safe against injection from user code — intended only for SQL scripts,
     default values, and constraint expressions (which are not user-defined).
+
+    A `%` is left alone. The DDL built from this runs with no parameters, so
+    psycopg never treats `%` as a placeholder; doubling it would store the
+    doubled literal in the constraint.
     """
-    if isinstance(value, str):
-        value = value.replace("%", "%%")
     conn = get_connection()
     return psycopg.sql.quote(value, conn.connection)
 
@@ -55,14 +57,9 @@ def compile_database_default_sql(expression: Any) -> str:
 
 
 def compile_literal_default_sql(field: Any) -> str:
-    """Compile a field's literal ``default=`` value as DDL-ready SQL.
-
-    Result is executed directly (no ``%s`` interpolation), so we use
-    ``psycopg.sql.quote`` — not ``quote_value``, which doubles ``%``.
-    """
-    conn = get_connection()
-    prepared = field.get_db_prep_save(field.default, conn)
-    return psycopg.sql.quote(prepared, conn.connection)
+    """Compile a field's literal ``default=`` value as DDL-ready SQL."""
+    prepared = field.get_db_prep_save(field.default, get_connection())
+    return quote_value(prepared)
 
 
 def compile_index_expressions_sql(
