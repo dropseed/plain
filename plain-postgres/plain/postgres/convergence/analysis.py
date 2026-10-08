@@ -121,6 +121,31 @@ class ConstraintModelDrift:
 
 
 @dataclass
+class ConstraintPercentDrift:
+    """The DB's definition matches the model's except that every `%` in a
+    literal is doubled: the constraint was created by a plain-postgres that
+    escaped `%` for a parameter substitution the DDL never went through, so
+    `'100%'` was stored as `'100%%'`. Replaced under the same name.
+
+    A stored `'100%%'` is also what a model literal of `100%%` writes now, so
+    a model edited from `100%%` to `100%` looks the same and is replaced in
+    place rather than staged under a new name. The replacement validates
+    existing rows and fails sync if they don't satisfy it, so the edit can't
+    slip through unchecked."""
+
+    table: str
+    constraint: CheckConstraint | UniqueConstraint
+    model: type[Model]
+
+    kind: ClassVar[DriftKind] = DriftKind.CHANGED
+
+    def describe(self) -> str:
+        return (
+            f"{self.table}: constraint {self.constraint.name} has a doubled % literal"
+        )
+
+
+@dataclass
 class ConstraintNameDrift:
     """An existing constraint to validate (UNVALIDATED) or drop (UNDECLARED)."""
 
@@ -148,7 +173,12 @@ class ConstraintRenameDrift:
         return f"{self.table}: constraint {self.old_name} → {self.new_name}"
 
 
-ConstraintDrift = ConstraintModelDrift | ConstraintNameDrift | ConstraintRenameDrift
+ConstraintDrift = (
+    ConstraintModelDrift
+    | ConstraintPercentDrift
+    | ConstraintNameDrift
+    | ConstraintRenameDrift
+)
 
 
 @dataclass
@@ -810,6 +840,8 @@ def _compare_indexes(
 
         # Check if definition matches
         if db_idx.definition:
+            # A doubled % literal here is just a changed definition: an
+            # index is rebuilt without blocking, so nothing to single out.
             issue = _compare_normalized_index(
                 cursor=cursor,
                 model=model,
@@ -1029,21 +1061,14 @@ def _compare_unique_constraints(
                 cursor, model, constraint, actual[constraint.name], table
             )
         elif actual_def := actual[constraint.name].definition:
-            expected_def = _get_expected_unique_definition(cursor, model, constraint)
             # Both sides are deparsed by pg_get_constraintdef → string equality.
-            if actual_def != expected_def:
-                if expected_def:
-                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
-                else:
-                    # Round-trip normalization couldn't complete; normalized
-                    # model text is unavailable for the diagnostic.
-                    issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintModelDrift(
-                    table=table,
-                    constraint=constraint,
-                    model=model,
-                    kind=DriftKind.CHANGED,
-                )
+            issue, drift = _compare_constraint_definition(
+                table=table,
+                constraint=constraint,
+                model=model,
+                actual_def=actual_def,
+                expected_def=_get_expected_unique_definition(cursor, model, constraint),
+            )
 
         statuses.append(
             ConstraintStatus(
@@ -1132,21 +1157,14 @@ def _compare_check_constraints(
                 kind=DriftKind.UNVALIDATED,
             )
         elif actual_def := actual[constraint.name].definition:
-            expected_def = _get_expected_check_definition(cursor, model, constraint)
             # Both sides are deparsed by pg_get_constraintdef → string equality.
-            if actual_def != expected_def:
-                if expected_def:
-                    issue = f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
-                else:
-                    # Round-trip normalization couldn't complete; normalized
-                    # model text is unavailable for the diagnostic.
-                    issue = f"definition differs: DB has {actual_def!r}"
-                drift = ConstraintModelDrift(
-                    table=table,
-                    constraint=constraint,
-                    model=model,
-                    kind=DriftKind.CHANGED,
-                )
+            issue, drift = _compare_constraint_definition(
+                table=table,
+                constraint=constraint,
+                model=model,
+                actual_def=actual_def,
+                expected_def=_get_expected_check_definition(cursor, model, constraint),
+            )
 
         statuses.append(
             ConstraintStatus(
@@ -1608,24 +1626,59 @@ def _compare_index_only_unique(
     if not actual_def:
         return None, None
 
-    issue = _compare_normalized_index(
-        cursor=cursor,
-        model=model,
+    # Round-trip the model side so both are pg_get_indexdef bodies.
+    expected_tail = _normalize_index_def(
+        cursor,
+        model,
         expressions=constraint.expressions,
         fields_orders=[(f, "") for f in constraint.fields],
         opclasses=list(constraint.opclasses),
         condition=constraint.condition,
         include=constraint.include,
-        actual_def=actual_def,
         unique=True,
     )
-    if issue:
-        changed = ConstraintModelDrift(
-            table=table, constraint=constraint, model=model, kind=DriftKind.CHANGED
-        )
-        return issue, changed
+    return _compare_constraint_definition(
+        table=table,
+        constraint=constraint,
+        model=model,
+        actual_def=_index_def_tail(actual_def),
+        expected_def=expected_tail,
+    )
 
-    return None, None
+
+def _compare_constraint_definition(
+    *,
+    table: str,
+    constraint: CheckConstraint | UniqueConstraint,
+    model: type[Model],
+    actual_def: str,
+    expected_def: str,
+) -> tuple[str | None, ConstraintDrift | None]:
+    """Compare a constraint's stored definition against the model's.
+
+    An empty `expected_def` means the model side couldn't be normalized,
+    which counts as a change.
+    """
+    if actual_def == expected_def:
+        return None, None
+    if expected_def and actual_def.replace("%%", "%") == expected_def:
+        # The form an earlier plain-postgres stored; see ConstraintPercentDrift.
+        return (
+            f"doubled % literal: DB has {actual_def!r}, model expects {expected_def!r}",
+            ConstraintPercentDrift(table=table, constraint=constraint, model=model),
+        )
+    if expected_def:
+        issue = (
+            f"definition differs: DB has {actual_def!r}, model expects {expected_def!r}"
+        )
+    else:
+        # Round-trip normalization couldn't complete; normalized model text
+        # is unavailable for the diagnostic.
+        issue = f"definition differs: DB has {actual_def!r}"
+    changed = ConstraintModelDrift(
+        table=table, constraint=constraint, model=model, kind=DriftKind.CHANGED
+    )
+    return issue, changed
 
 
 def _compare_normalized_index(
@@ -1638,9 +1691,8 @@ def _compare_normalized_index(
     condition: Q | None,
     include: tuple[str, ...] | None,
     actual_def: str,
-    unique: bool = False,
 ) -> str | None:
-    """Compare a model index/constraint against pg_get_indexdef text.
+    """Compare a model index against pg_get_indexdef text.
 
     Round-trips the model side through Postgres so both sides come from
     pg_get_indexdef, then string-compares the normalized `USING ...` bodies.
@@ -1655,7 +1707,6 @@ def _compare_normalized_index(
         opclasses=opclasses,
         condition=condition,
         include=include,
-        unique=unique,
     )
     actual_tail = _index_def_tail(actual_def)
     if not expected_tail:

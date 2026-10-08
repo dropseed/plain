@@ -164,6 +164,10 @@ Run `uv run plain docs postgres` for full patterns with code examples.
 
 Run `uv run plain docs postgres` for full patterns with code examples.
 
+## Reading the Data Model
+
+Before reasoning about how models relate — what cascades, what is one-to-one, what a reverse accessor is called — run `uv run plain postgres models` (a model name or package to scope it, `--json` for data). It needs no database. Don't infer cardinality from field definitions: uniqueness lives in constraints, and a partial unique is not a one-to-one.
+
 ## Database Doctor
 
 Use the `/plain-postgres-doctor` skill to check overall database health — migration sync, schema correctness, and operational health.

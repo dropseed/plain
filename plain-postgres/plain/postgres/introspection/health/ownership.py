@@ -17,7 +17,7 @@ def build_table_owners() -> dict[str, TableOwner]:
 
     owners: dict[str, TableOwner] = {}
     for package_config in packages_registry.get_package_configs():
-        source = "app" if package_config.name.startswith("app.") else "package"
+        source = "app" if package_config.is_app else "package"
         for model in models_registry.get_models(
             package_label=package_config.package_label
         ):
