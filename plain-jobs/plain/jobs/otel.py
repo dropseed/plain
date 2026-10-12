@@ -1,6 +1,6 @@
 import datetime
 import importlib.metadata
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
@@ -70,7 +70,7 @@ def record_span_error(span: trace.Span, exc: BaseException) -> str:
 
 
 @contextmanager
-def error_consumer_span(*, name: str, exc: BaseException) -> Iterator[None]:
+def error_consumer_span(*, name: str, exc: BaseException) -> Generator[None]:
     """Open a one-off CONSUMER span solely to carry a failure that has no
     other entry span — a DB error before the span that would normally own
     the work is ever reached. Stamps the canonical failure signal so the

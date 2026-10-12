@@ -8,7 +8,7 @@ half speaks masked frames with the same codec.
 
 import asyncio
 import logging
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -35,7 +35,7 @@ from websocket_helpers import (
 
 
 @contextmanager
-def _socket_test() -> Iterator[CapturedSpans]:
+def _socket_test() -> Generator[CapturedSpans]:
     """Every test here runs over plain HTTP — the socketpair is plain HTTP;
     keep the HTTPS redirect out of the way. Yields the spans the test emits."""
     with override_settings(HTTPS_REDIRECT_ENABLED=False), capture_spans() as spans:

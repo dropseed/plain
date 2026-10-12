@@ -1,7 +1,7 @@
 import contextvars
 import json
 import re
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -1790,7 +1790,7 @@ _active_probe_session: contextvars.ContextVar[_ProbeSession | None] = (
 
 
 @contextmanager
-def _probe_session(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+def _probe_session(cursor: CursorWrapper, model: type[Model]) -> Generator[None]:
     """Reuse one probe table across every round-trip in a model's analysis.
 
     The temp table is created lazily by the first probe inside this scope and
@@ -1833,7 +1833,7 @@ def _create_probe_table(cursor: CursorWrapper, model: type[Model]) -> None:
 
 
 @contextmanager
-def _probe_table(cursor: CursorWrapper, model: type[Model]) -> Iterator[None]:
+def _probe_table(cursor: CursorWrapper, model: type[Model]) -> Generator[None]:
     """Provide an empty temp table mirroring the model's real table for one
     round-trip, isolating the probe's DDL so it can't leak into the analyze
     transaction.

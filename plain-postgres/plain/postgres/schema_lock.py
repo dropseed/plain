@@ -17,7 +17,7 @@ clusters don't contend.
 """
 
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
 import psycopg
@@ -55,7 +55,7 @@ class SchemaLockLost(Exception):
 
 
 @contextmanager
-def schema_lock() -> Iterator[Callable[[], None]]:
+def schema_lock() -> Generator[Callable[[], None]]:
     """Hold the schema advisory lock for the duration of the block.
 
     Acquisition is non-blocking with retry (`pg_try_advisory_lock`), so a

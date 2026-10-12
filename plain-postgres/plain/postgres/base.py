@@ -1,6 +1,6 @@
 import copy
 import warnings
-from collections.abc import Collection, Iterable, Iterator, Sequence
+from collections.abc import Collection, Generator, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Self, dataclass_transform
@@ -564,7 +564,7 @@ class Model(metaclass=ModelBase):
         return ValidationError(error.update_error_dict({}))
 
     @contextmanager
-    def _mapped_write(self) -> Iterator[None]:
+    def _mapped_write(self) -> Generator[None]:
         """Run a table write inside the rollback guard, mapping a
         declared-constraint IntegrityError to the ValidationError a pre-check
         would have raised -- so the same violation surfaces identically whether

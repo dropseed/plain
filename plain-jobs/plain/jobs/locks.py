@@ -1,7 +1,7 @@
 """Lock implementations for job enqueueing."""
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 @contextmanager
-def postgres_advisory_lock(job: Job, concurrency_key: str) -> Iterator[None]:
+def postgres_advisory_lock(job: Job, concurrency_key: str) -> Generator[None]:
     """
     PostgreSQL advisory lock context manager.
 

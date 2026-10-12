@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from plain.preflight import PreflightResult
 
@@ -43,8 +43,8 @@ class PrimaryKeyField(ColumnField[int]):
         return (
             self.name,
             "plain.postgres.PrimaryKeyField",
-            cast(list[Any], []),
-            cast(dict[str, Any], {}),
+            [],
+            {},
         )
 
     def validate(self, value: Any, model_instance: Model) -> None:
