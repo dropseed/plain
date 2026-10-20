@@ -37,7 +37,7 @@ class Supervisor:
     state_filename: str
     log_dir: Path
     # Foreground command that re-runs this supervisor, e.g. ["dev", "services"].
-    background_command: list[str]
+    background_command: tuple[str, ...]
     # Human label for "already running" warnings, e.g. "Services".
     display_name: str
 

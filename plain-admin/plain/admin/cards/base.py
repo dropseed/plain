@@ -29,7 +29,7 @@ class Card:
     text: str = ""
     link: str = ""
     metric: int | float | Decimal | None = None
-    filters: list[str] | Enum | None = None
+    filters: list[str] | type[Enum] | None = None
 
     # These will be accessible at render time
     view: AdminView
@@ -97,7 +97,7 @@ class Card:
     def get_current_filter(self) -> str:
         return self.request.query_params.get(f"{self.get_slug()}.filter", "")
 
-    def get_filters(self) -> list[str] | Enum | None:
+    def get_filters(self) -> list[str] | type[Enum] | None:
         if isinstance(self.filters, list):
             # Avoid mutating the class attribute
             return self.filters.copy()

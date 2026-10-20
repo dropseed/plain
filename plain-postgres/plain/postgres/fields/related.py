@@ -304,8 +304,10 @@ class RelatedField(FieldCacheMixin, Field):
 
 class ForeignKeyField(ColumnField, RelatedField):
     # Narrow the base class's `ForeignObjectRel` annotation — a FK's remote_field
-    # is always a ForeignKeyRel with a concrete on_delete action.
-    remote_field: ForeignKeyRel
+    # is always a ForeignKeyRel with a concrete on_delete action. Only
+    # __init__ and __deepcopy__ assign it, both with a ForeignKeyRel, which
+    # is the write ty can't rule out.
+    remote_field: ForeignKeyRel  # ty: ignore[invalid-mutable-override]
 
     """
     Provide a many-to-one relation by adding a column to the local model
@@ -590,7 +592,8 @@ class ManyToManyField(RelatedField):
     """
 
     # ManyToManyField uses ManyToManyRel which has through/through_fields
-    remote_field: ManyToManyRel
+    # (see ForeignKeyField.remote_field for the ignore)
+    remote_field: ManyToManyRel  # ty: ignore[invalid-mutable-override]
 
     def __init__(
         self,

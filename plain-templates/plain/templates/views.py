@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from functools import cached_property
 from typing import Any, NoReturn
 
@@ -142,7 +141,7 @@ class FormView[F: "BaseForm"](TemplateView):
     """
 
     form_class: type[F] | None = None
-    success_url: Callable | str | None = None
+    success_url: str | None = None
 
     def get_form(self) -> F:
         """Return an instance of the form to be used in this view."""

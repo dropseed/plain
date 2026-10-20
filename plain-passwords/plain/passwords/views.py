@@ -166,7 +166,9 @@ class PasswordLoginView(AuthView, FormView[PasswordLoginForm]):
     def get(self) -> Response:
         # Redirect if the user is already logged in
         if self.user:
-            return RedirectResponse(self.success_url, status_code=302)
+            return RedirectResponse(
+                str(self.success_url) if self.success_url else "/", status_code=302
+            )
 
         return super().get()
 

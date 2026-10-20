@@ -554,6 +554,13 @@ class StreamingResponse(Response):
             "`streaming_content` instead."
         )
 
+    @content.setter
+    def content(self, value: bytes | str | Iterator[bytes] | None) -> None:
+        raise AttributeError(
+            f"This {self.__class__.__name__} instance has no `content` attribute. Use "
+            "`streaming_content` instead."
+        )
+
     @property
     def streaming_content(self) -> Iterator[bytes]:
         return map(self.make_bytes, self._iterator)
@@ -607,6 +614,13 @@ class AsyncStreamingResponse(Response):
 
     @property
     def content(self) -> bytes:
+        raise AttributeError(
+            f"This {self.__class__.__name__} instance has no `content` attribute. Use "
+            "`streaming_content` instead."
+        )
+
+    @content.setter
+    def content(self, value: bytes | str | Iterator[bytes] | None) -> None:
         raise AttributeError(
             f"This {self.__class__.__name__} instance has no `content` attribute. Use "
             "`streaming_content` instead."

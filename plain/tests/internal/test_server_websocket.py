@@ -202,7 +202,7 @@ def test_view_exception_closes_1011_and_is_logged_on_a_span() -> None:
 
     errors = [r for r in request_log.records if r.levelno >= logging.ERROR]
     assert len(errors) == 1
-    assert errors[0].exc_info is not None
+    assert errors[0].exc_info
     assert "websocket view boom" in str(errors[0].exc_info[1])
 
     socket_spans = [s for s in spans if s.name.startswith("WEBSOCKET")]

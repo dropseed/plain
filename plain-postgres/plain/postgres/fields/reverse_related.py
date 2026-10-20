@@ -45,8 +45,6 @@ class ForeignObjectRel(FieldCacheMixin):
     allow_null = True
     empty_strings_allowed = False
 
-    # Type annotations for instance attributes
-    on_delete: OnDelete | None
     # The target model as given to the field: a "package.Model" string (or
     # "self") until lazy_related_operation resolves it to the class. Read
     # `model` for the resolved class.
@@ -58,7 +56,6 @@ class ForeignObjectRel(FieldCacheMixin):
         field: RelatedField,
         to: str | type[Model],
         related_query_name: str | None = None,
-        on_delete: OnDelete | None = None,
     ):
         # Annotated here rather than as a class-body attribute: RelatedField
         # is itself a descriptor, so a class-body `field: RelatedField` would
@@ -67,7 +64,6 @@ class ForeignObjectRel(FieldCacheMixin):
         self.field: RelatedField = field
         self.model_ref = to
         self.related_query_name = related_query_name
-        self.on_delete = on_delete
 
         self.symmetrical = False
 
@@ -125,7 +121,6 @@ class ForeignObjectRel(FieldCacheMixin):
             self.field,
             self.model_ref,
             self.related_query_name,
-            self.on_delete,
             self.symmetrical,
         )
 
@@ -173,9 +168,6 @@ class ForeignKeyRel(ForeignObjectRel):
     one-to-many reverse relations.
     """
 
-    # Type annotations for instance attributes
-    on_delete: OnDelete  # narrowed: FK rel always has a concrete action
-
     def __init__(
         self,
         *,
@@ -188,12 +180,17 @@ class ForeignKeyRel(ForeignObjectRel):
             field=field,
             to=to,
             related_query_name=related_query_name,
-            on_delete=on_delete,
         )
         # Narrows self.field from RelatedField to ForeignKeyField (see
         # ForeignObjectRel.__init__ for why this can't be a class-body
-        # annotation).
-        self.field: ForeignKeyField
+        # annotation). The rel is built by its field and never repointed at
+        # another kind of field, which is the write ty can't rule out.
+        self.field: ForeignKeyField  # ty: ignore[invalid-mutable-override]
+        self.on_delete = on_delete
+
+    @property
+    def identity(self) -> tuple[Any, ...]:
+        return super().identity + (self.on_delete,)
 
     def __getstate__(self) -> dict[str, Any]:
         state = super().__getstate__()
@@ -235,8 +232,8 @@ class ManyToManyRel(ForeignObjectRel):
         )
         # Narrows self.field from RelatedField to ManyToManyField (see
         # ForeignObjectRel.__init__ for why this can't be a class-body
-        # annotation).
-        self.field: ManyToManyField
+        # annotation, and ForeignKeyRel.__init__ for the ignore).
+        self.field: ManyToManyField  # ty: ignore[invalid-mutable-override]
 
         self.through_ref = through
         self.through_fields = through_fields

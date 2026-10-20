@@ -79,7 +79,7 @@ def test_duplicate_namespace_among_includes_raises():
     """Two `include()`s under one router sharing a namespace is always a
     mistake (one side is unreachable from `reverse()`) — registration-time
     error, not just a preflight warning."""
-    child_urls = [path("home/", _View, name="home")]
+    child_urls = (path("home/", _View, name="home"),)
 
     class _ChildRouter(Router):
         namespace = "shared"

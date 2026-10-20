@@ -3,7 +3,7 @@ import itertools
 import math
 from collections.abc import Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from plain.postgres.dialect import (
     OPERATORS,
@@ -36,7 +36,8 @@ if TYPE_CHECKING:
 
 
 class Lookup(Expression):
-    lookup_name: str | None = None
+    # Every concrete lookup names itself; only abstract bases leave it unset.
+    lookup_name: ClassVar[str]
     prepare_rhs: bool = True
     can_use_none_as_rhs: bool = False
     lhs: Any
@@ -165,11 +166,13 @@ class Lookup(Expression):
         return cols
 
     @cached_property
-    def output_field(self) -> BooleanField:
+    def output_field(self) -> Field:
         return BooleanField()
 
+    # Expression caches its identity, but a lookup's must follow lhs and rhs,
+    # which resolve_expression() reassigns on a copy.
     @property
-    def identity(self) -> tuple[type[Lookup], Any, Any]:
+    def identity(self) -> tuple[type[Lookup], Any, Any]:  # ty: ignore[invalid-property-type-override]
         return self.__class__, self.lhs, self.rhs
 
     def __eq__(self, other: object) -> bool:
@@ -214,7 +217,7 @@ class Transform(RegisterLookupMixin, Func):
 
     lookup_name: str | None = None
     bilateral: bool = False
-    arity: int = 1
+    arity = 1
 
     @property
     def lhs(self) -> Any:
@@ -234,9 +237,6 @@ class BuiltinLookup(Lookup):
     def process_lhs(
         self, compiler: SQLCompiler, connection: DatabaseConnection, lhs: Any = None
     ) -> tuple[str, list[Any]]:
-        assert self.lookup_name is not None, (
-            "lookup_name must be set on Lookup subclass"
-        )
         lhs_sql, params = super().process_lhs(compiler, connection, lhs)
         lhs_sql = lookup_cast(self.lookup_name, self.lhs.output_field) % lhs_sql
         return lhs_sql, list(params)
@@ -251,9 +251,6 @@ class BuiltinLookup(Lookup):
         return f"{lhs_sql} {rhs_sql}", params
 
     def get_rhs_op(self, connection: DatabaseConnection, rhs: str | list[str]) -> str:
-        assert self.lookup_name is not None, (
-            "lookup_name must be set on Lookup subclass"
-        )
         return OPERATORS[self.lookup_name] % rhs
 
 
@@ -382,7 +379,7 @@ class OperatorLookup(Lookup):
 
 @Field.register_lookup
 class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name: str = "exact"
+    lookup_name = "exact"
 
     def get_prep_lookup(self) -> Any:
         from plain.postgres.sql.query import Query  # avoid circular import
@@ -414,28 +411,28 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
 
 @Field.register_lookup
 class IExact(BuiltinLookup):
-    lookup_name: str = "iexact"
+    lookup_name = "iexact"
     prepare_rhs: bool = False
 
 
 @Field.register_lookup
 class GreaterThan(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name: str = "gt"
+    lookup_name = "gt"
 
 
 @Field.register_lookup
 class GreaterThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name: str = "gte"
+    lookup_name = "gte"
 
 
 @Field.register_lookup
 class LessThan(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name: str = "lt"
+    lookup_name = "lt"
 
 
 @Field.register_lookup
 class LessThanOrEqual(FieldGetDbPrepValueMixin, BuiltinLookup):
-    lookup_name: str = "lte"
+    lookup_name = "lte"
 
 
 class IntegerFieldOverflow:
@@ -500,7 +497,7 @@ class IntegerLessThanOrEqual(IntegerFieldOverflow, LessThanOrEqual):
 
 @Field.register_lookup
 class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
-    lookup_name: str = "in"
+    lookup_name = "in"
 
     def get_prep_lookup(self) -> Any:
         from plain.postgres.sql.query import Query  # avoid circular import
@@ -571,7 +568,7 @@ class AnyOf(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
     values are keys already -- and the kwarg path has `__in` for that.
     """
 
-    lookup_name: str = "any_of"
+    lookup_name = "any_of"
 
     def get_prep_lookup(self) -> Any:
         """Refuse everything a single bound array can't carry.
@@ -692,9 +689,6 @@ class PatternLookup(BuiltinLookup):
         # SQL reference values or SQL transformations we need the correct
         # pattern added.
         if hasattr(self.rhs, "as_sql") or self.bilateral_transforms:
-            assert self.lookup_name is not None, (
-                "lookup_name must be set on Lookup subclass"
-            )
             pattern = PATTERN_OPS[self.lookup_name].format(PATTERN_ESC)
             return pattern.format(rhs)
         else:
@@ -714,39 +708,39 @@ class PatternLookup(BuiltinLookup):
 
 @Field.register_lookup
 class Contains(PatternLookup):
-    lookup_name: str = "contains"
+    lookup_name = "contains"
 
 
 @Field.register_lookup
 class IContains(Contains):
-    lookup_name: str = "icontains"
+    lookup_name = "icontains"
 
 
 @Field.register_lookup
 class StartsWith(PatternLookup):
-    lookup_name: str = "startswith"
+    lookup_name = "startswith"
     param_pattern: str = "%s%%"
 
 
 @Field.register_lookup
 class IStartsWith(StartsWith):
-    lookup_name: str = "istartswith"
+    lookup_name = "istartswith"
 
 
 @Field.register_lookup
 class EndsWith(PatternLookup):
-    lookup_name: str = "endswith"
+    lookup_name = "endswith"
     param_pattern: str = "%%%s"
 
 
 @Field.register_lookup
 class IEndsWith(EndsWith):
-    lookup_name: str = "iendswith"
+    lookup_name = "iendswith"
 
 
 @Field.register_lookup
 class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
-    lookup_name: str = "range"
+    lookup_name = "range"
 
     def get_rhs_op(self, connection: DatabaseConnection, rhs: str | list[str]) -> str:
         # Range lookup always receives a list of two elements from process_rhs
@@ -756,7 +750,7 @@ class Range(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
 
 @Field.register_lookup
 class IsNull(BuiltinLookup):
-    lookup_name: str = "isnull"
+    lookup_name = "isnull"
     prepare_rhs: bool = False
 
     def as_sql(
@@ -775,7 +769,7 @@ class IsNull(BuiltinLookup):
 
 @Field.register_lookup
 class Regex(BuiltinLookup):
-    lookup_name: str = "regex"
+    lookup_name = "regex"
     prepare_rhs: bool = False
 
     def as_sql(
@@ -792,7 +786,7 @@ class Regex(BuiltinLookup):
 
 @Field.register_lookup
 class IRegex(Regex):
-    lookup_name: str = "iregex"
+    lookup_name = "iregex"
 
 
 class YearLookup(Lookup):
@@ -828,9 +822,6 @@ class YearLookup(Lookup):
         return super().as_sql(compiler, connection)
 
     def get_direct_rhs_sql(self, connection: DatabaseConnection, rhs: str) -> str:
-        assert self.lookup_name is not None, (
-            "lookup_name must be set on Lookup subclass"
-        )
         return OPERATORS[self.lookup_name] % rhs
 
     def get_bound_params(self, start: Any, finish: Any) -> tuple[Any, ...]:

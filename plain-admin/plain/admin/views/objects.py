@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 from plain.htmx.views import HTMXView
 from plain.http import RedirectResponse, Response
-from plain.postgres import QuerySet
+from plain.postgres import Q, QuerySet
 from plain.templates.views import (
     CreateView,
     DeleteView,
@@ -62,9 +62,10 @@ class AdminListView(HTMXView, AdminView, ListView):
     search_fields: tuple[FieldRef, ...] = ()
     actions: tuple[str, ...] = ()
     # Filter *names* shown in the UI, not fields -- `filter_queryset` maps a
-    # name to whatever query it means.
-    filters: tuple[str, ...] = ()
-    page_size: int = 20
+    # name to whatever query it means. `AdminModelListView` also takes a dict
+    # mapping a filter name to a Q object, which filters the queryset itself.
+    filters: tuple[str, ...] | dict[str, Q] = ()
+    page_size = 20
     allow_global_search = False
 
     @cached_property
@@ -75,13 +76,16 @@ class AdminListView(HTMXView, AdminView, ListView):
     def get_objects(self) -> list[Any] | QuerySet[Any]:
         return self.process_objects()
 
-    def get_page_size(self) -> int:
+    def get_page_size(self) -> int | None:
+        default = self.page_size
+        if default is None:
+            return None
         try:
-            page_size = int(self.request.query_params.get("page_size", self.page_size))
+            page_size = int(self.request.query_params.get("page_size", default))
         except ValueError:
-            return self.page_size
+            return default
         if page_size < 1:
-            return self.page_size
+            return default
         return page_size
 
     def get_template_context(self) -> dict[str, Any]:
@@ -245,7 +249,7 @@ class AdminListView(HTMXView, AdminView, ListView):
         return self.actions
 
     def get_filter_names(self) -> tuple[str, ...]:
-        return self.filters
+        return tuple(self.filters)
 
     def get_search_fields(self) -> tuple[str, ...]:
         """`search_fields` as lookup paths, whichever way each was declared.

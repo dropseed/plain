@@ -31,6 +31,7 @@ class OAuthCallbackView(TemplateView):
     """
 
     template_name = "oauth/error.html"
+    oauth_error: OAuthError | None = None
 
     def get(self) -> Response:
         provider = self.url_kwargs["provider"]
@@ -44,17 +45,15 @@ class OAuthCallbackView(TemplateView):
             return self.render(status_code=400)
 
     def get_template_names(self) -> list[str]:
-        names = []
-        if (
-            oauth_error := getattr(self, "oauth_error", None)
-        ) and oauth_error.template_name:
-            names.append(oauth_error.template_name)
-        names.append(self.template_name)
+        names: list[str] = []
+        if self.oauth_error and self.oauth_error.template_name:
+            names.append(self.oauth_error.template_name)
+        names.extend(super().get_template_names())
         return names
 
     def get_template_context(self) -> dict:
         context = super().get_template_context()
-        context["oauth_error"] = getattr(self, "oauth_error", None)
+        context["oauth_error"] = self.oauth_error
         return context
 
 
