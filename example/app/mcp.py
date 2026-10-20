@@ -29,7 +29,9 @@ class NotesTool(MCPTool):
     `self.user` as the demo user the bearer token maps to.
     """
 
-    mcp: NotesMCP
+    # The documented narrowing pattern; ty flags any narrowed mutable
+    # attribute, but the dispatcher only ever sets a NotesMCP here.
+    mcp: NotesMCP  # ty: ignore[invalid-mutable-override]
 
     @property
     def user(self) -> User:

@@ -50,9 +50,9 @@ class LoginLinkFormView(AuthView, FormView[LoginLinkForm]):
         if next_url := form.cleaned_data.get("next"):
             # Keep the next URL in the query string so the sent
             # view can redirect to it if reloaded and logged in already.
-            return f"{self.success_url}?next={next_url}"
+            return f"{super().get_success_url(form)}?next={next_url}"
         else:
-            return self.success_url
+            return super().get_success_url(form)
 
 
 class LoginLinkSentView(AuthView, TemplateView):

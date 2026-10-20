@@ -272,8 +272,10 @@ class Query(BaseExpression):
         # Maps alias -> Annotation Expression.
         self.annotations = {}
 
+    # Follows the current select, so it can't be cached like an expression's,
+    # and None ("not a single column") is an answer Subquery relies on.
     @property
-    def output_field(self) -> Field | None:
+    def output_field(self) -> Field | None:  # ty: ignore[invalid-property-type-override]
         if len(self.select) == 1:
             select = self.select[0]
             return getattr(select, "target", None) or select.field
@@ -356,7 +358,7 @@ class Query(BaseExpression):
     @overload
     def chain(self, klass: type[QueryType]) -> QueryType: ...
 
-    def chain(self, klass: type[Query] | None = None) -> Query:
+    def chain(self: Query, klass: type[Query] | None = None) -> Query:
         """
         Return a copy of the current Query that's ready for another operation.
         The klass argument changes the type of the Query, e.g. UpdateQuery.
@@ -367,8 +369,8 @@ class Query(BaseExpression):
         if not obj.filter_is_sticky:
             obj.used_aliases = set()
         obj.filter_is_sticky = False
-        if hasattr(obj, "_setup_query"):
-            obj._setup_query()  # ty: ignore[call-non-callable]
+        if isinstance(obj, UpdateQuery):
+            obj._setup_query()
         return obj
 
     def relabeled_clone(self, change_map: dict[str, str]) -> Self:

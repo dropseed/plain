@@ -1,5 +1,5 @@
 import functools
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -11,7 +11,7 @@ from ..schema_lock import SchemaLockLost, SchemaLockTimeout, schema_lock
 
 
 @contextmanager
-def cli_schema_lock() -> Iterator[Callable[[], None]]:
+def cli_schema_lock() -> Generator[Callable[[], None]]:
     """`schema_lock()` for CLI commands: a timeout or lost lock surfaces as a
     clean one-line error instead of a traceback burying it. Yields the lock's
     verify callable for multi-phase commands to check between phases."""

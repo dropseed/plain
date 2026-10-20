@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from plain.postgres.dialect import (
@@ -349,7 +351,11 @@ class TruncBase(TimezoneMixin, Transform):
             )
         return copy
 
-    def convert_value(
+    @cached_property
+    def convert_value(self) -> Callable[[Any, Any, Any], Any]:
+        return self._convert_truncated_value
+
+    def _convert_truncated_value(
         self, value: Any, expression: Any, connection: DatabaseConnection
     ) -> Any:
         if isinstance(self.output_field, DateTimeField):

@@ -35,7 +35,9 @@ class UploadedFile(File):
         content_type_extra: dict[str, str] | None = None,
     ) -> None:
         super().__init__(file, name)
-        self.size: int | None = size
+        if size is not None:
+            # Otherwise `File.size` works it out from the file itself.
+            self.size = size
         self.content_type = content_type
         self.charset = charset
         self.content_type_extra = content_type_extra

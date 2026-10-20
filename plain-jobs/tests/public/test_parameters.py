@@ -1,4 +1,3 @@
-# ruff: noqa: DTZ001 — naive datetimes are deliberate here: Schedule does
 # tz-independent calendar math, and these exercise exactly that.
 import datetime
 

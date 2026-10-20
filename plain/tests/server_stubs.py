@@ -11,7 +11,7 @@ import logging
 import os
 import socket
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Any
@@ -188,7 +188,7 @@ class LogCapture(logging.Handler):
 
 
 @contextmanager
-def capture_logger(name: str, *, level: int = logging.INFO) -> Iterator[LogCapture]:
+def capture_logger(name: str, *, level: int = logging.INFO) -> Generator[LogCapture]:
     logger = logging.getLogger(name)
     handler = LogCapture()
     original_level = logger.level

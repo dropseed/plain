@@ -210,7 +210,7 @@ def naive_datetime_from_date(value: date) -> datetime:
     Deliberately naive: callers either localize it (form/field parsing) or are
     doing tz-independent calendar math (timesince).
     """
-    return datetime(value.year, value.month, value.day)  # noqa: DTZ001
+    return datetime(value.year, value.month, value.day)
 
 
 def make_aware(value: datetime, timezone: tzinfo | None = None) -> datetime:

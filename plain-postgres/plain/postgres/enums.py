@@ -49,21 +49,21 @@ class ChoicesMeta(enum.EnumMeta):
         return super().__contains__(member)
 
     @property
-    def names(cls) -> list[str]:
+    def names(cls: type[TextChoices]) -> list[str]:
         empty = ["__empty__"] if hasattr(cls, "__empty__") else []
-        return empty + [member.name for member in cls]  # ty: ignore[unresolved-attribute]
+        return empty + [member.name for member in cls]
 
     @property
-    def choices(cls) -> list[tuple[Any, str]]:
+    def choices(cls: type[TextChoices]) -> list[tuple[Any, str]]:
         empty = [(None, cls.__empty__)] if hasattr(cls, "__empty__") else []
-        return empty + [(member.value, member.label) for member in cls]  # ty: ignore[unresolved-attribute]
+        return empty + [(member.value, member.label) for member in cls]
 
     @property
-    def labels(cls) -> list[str]:
+    def labels(cls: type[TextChoices]) -> list[str]:
         return [label for _, label in cls.choices]
 
     @property
-    def values(cls) -> list[Any]:
+    def values(cls: type[TextChoices]) -> list[Any]:
         return [value for value, _ in cls.choices]
 
 
@@ -72,6 +72,8 @@ class TextChoices(str, enum.Enum, metaclass=ChoicesMeta):
 
     # Dynamically set by metaclass
     _label_: str
+    # Optional label for a blank choice, set by subclasses that want one
+    __empty__: str
 
     @DynamicClassAttribute
     def label(self) -> str:

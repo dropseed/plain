@@ -61,5 +61,5 @@ def test_unexpected_handler_error_is_logged_not_raised() -> None:
         if record.getMessage() == "Unexpected connection error"
     ]
     assert len(records) == 1
-    assert records[0].exc_info is not None
+    assert records[0].exc_info
     assert records[0].exc_info[0] is RuntimeError

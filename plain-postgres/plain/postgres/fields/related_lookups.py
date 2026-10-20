@@ -58,12 +58,6 @@ class RelatedIn(In):
 
 
 class RelatedLookupMixin(Lookup):
-    # Type hints for attributes/methods expected from Lookup base class
-    lhs: Any
-    rhs: Any
-    prepare_rhs: bool
-    lookup_name: str | None
-
     def get_prep_lookup(self) -> Any:
         if not hasattr(self.rhs, "resolve_expression"):
             self.rhs = get_normalized_value(self.rhs, self.lhs)

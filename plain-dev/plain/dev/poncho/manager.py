@@ -61,7 +61,7 @@ class Manager:
         self._processes = {}
 
         self._terminating = False
-        self._terminate_start = datetime.datetime.min  # noqa: DTZ901 — poncho's clock is consistently naive
+        self._terminate_start = datetime.datetime.min
         self._killed = False
 
     def add_process(

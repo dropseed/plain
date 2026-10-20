@@ -482,8 +482,8 @@ def year_lookup_bounds_for_datetime_field(
             value + 1, 1, 1
         ) - datetime.timedelta(microseconds=1)
     else:
-        first = datetime.datetime(value, 1, 1)  # noqa: DTZ001 — made aware just below
-        second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)  # noqa: DTZ001 — made aware just below
+        first = datetime.datetime(value, 1, 1)
+        second = datetime.datetime(value, 12, 31, 23, 59, 59, 999999)
 
     # Make sure that datetimes are aware in the current timezone
     tz = timezone.get_current_timezone()

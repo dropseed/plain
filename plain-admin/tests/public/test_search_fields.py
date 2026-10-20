@@ -124,8 +124,10 @@ class PropertySearch(AdminModelListView):
     model = PinnedNavItem
     title = "Property search"
 
+    # A read-only property where the base declares an attribute: unsound to
+    # the checker, and exactly the runtime path under test.
     @property
-    def search_fields(self) -> tuple[FieldRef, ...]:
+    def search_fields(self) -> tuple[FieldRef, ...]:  # ty: ignore[invalid-property-type-override]
         return (PinnedNavItem.view_slug,)
 
 

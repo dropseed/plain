@@ -456,7 +456,7 @@ class DateField(BaseTemporalField):
 
     def strptime(self, value: str, format: str) -> datetime.date:
         # Only the date survives; the intermediate datetime's tz is irrelevant.
-        return datetime.datetime.strptime(value, format).date()  # noqa: DTZ007
+        return datetime.datetime.strptime(value, format).date()
 
 
 class TimeField(BaseTemporalField):
@@ -476,7 +476,7 @@ class TimeField(BaseTemporalField):
 
     def strptime(self, value: str, format: str) -> datetime.time:
         # Only the time survives; the intermediate datetime's tz is irrelevant.
-        return datetime.datetime.strptime(value, format).time()  # noqa: DTZ007
+        return datetime.datetime.strptime(value, format).time()
 
 
 class DateTimeFormatsIterator:
@@ -517,7 +517,7 @@ class DateTimeField(BaseTemporalField):
 
     def strptime(self, value: str, format: str) -> datetime.datetime:
         # Parsed naive by design; to_python localizes via from_current_timezone.
-        return datetime.datetime.strptime(value, format)  # noqa: DTZ007
+        return datetime.datetime.strptime(value, format)
 
 
 class DurationField(Field):

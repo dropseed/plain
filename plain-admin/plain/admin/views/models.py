@@ -53,10 +53,6 @@ class AdminModelListView(AdminListView):
     queryset_order: tuple[FieldRef, ...] = ()
     search_fields: tuple[FieldRef, ...] = ("id",)
 
-    # Filter *names* shown in the UI, not fields. Can also be a dict mapping a
-    # filter name to a Q object, which filters the queryset automatically.
-    filters: tuple[str, ...] | dict[str, Q] = ()
-
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         # Normalize the declared field references now, so a reference to
@@ -98,13 +94,6 @@ class AdminModelListView(AdminListView):
     def get_initial_queryset(self) -> postgres.QuerySet:
         """Override this to customize the base queryset (e.g., add annotations)."""
         return self.model.query.all()
-
-    def get_filter_names(self) -> tuple[str, ...]:
-        """Return filter names. Supports both tuple[str, ...] and dict[str, Q] formats."""
-        filters = self.filters
-        if isinstance(filters, dict):
-            return tuple(filters.keys())
-        return super().get_filter_names()
 
     def get_search_fields(self) -> tuple[str, ...]:
         """`search_fields` as lookup paths, checked against the view's model."""

@@ -52,7 +52,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v2
       - name: Set up Python
-        run: uv python install
+        run: uv python install 3.14
       - run: uv sync
       - run: uv run plain-code check . --skip-ty
       # Annotation coverage plus `ty check` over every fully typed path --

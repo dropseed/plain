@@ -14,6 +14,7 @@ from .registry import registry, track_recent_nav
 from .types import Img
 
 if TYPE_CHECKING:
+    from app.users.models import User
     from plain.http import Response
     from plain.postgres import Model
 
@@ -26,7 +27,10 @@ _URL_NAMESPACE = "admin"
 
 class AdminView(AuthView, TemplateView):
     admin_required = True
-    user: Model  # Always set — admin_required guarantees authentication
+    # Always a user once `check_auth` passes -- admin_required rejects anonymous
+    # requests before any handler runs. Narrowing a writable attribute is
+    # unsound to the checker, which is the cost of not re-checking everywhere.
+    user: User  # ty: ignore[invalid-mutable-override]
 
     # True for framework-provided views (index, search, settings, etc.)
     # Available for use in ADMIN_HAS_PERMISSION to make per-view decisions.
@@ -61,7 +65,7 @@ class AdminView(AuthView, TemplateView):
     extra_links: ClassVar[dict[str, str]] = {}
     field_templates: ClassVar[dict[str, str]] = {}
 
-    parent_view_class: AdminView | None = None
+    parent_view_class: type[AdminView] | None = None
 
     # Set dynamically by AdminViewset.get_views()
     viewset: type[AdminViewset] | None = None
@@ -84,7 +88,7 @@ class AdminView(AuthView, TemplateView):
         return ""
 
     template_name = "admin/page.html"
-    cards: tuple[Card, ...] = ()
+    cards: tuple[type[Card], ...] = ()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -160,7 +164,7 @@ class AdminView(AuthView, TemplateView):
         return cls.path
 
     @classmethod
-    def get_parent_view_classes(cls) -> list[AdminView]:
+    def get_parent_view_classes(cls) -> list[type[AdminView]]:
         parents = []
         parent = cls.parent_view_class
         while parent:
@@ -194,7 +198,7 @@ class AdminView(AuthView, TemplateView):
     def get_extra_links(self) -> dict[str, str]:
         return self.extra_links.copy()
 
-    def get_cards(self) -> tuple[Card, ...]:
+    def get_cards(self) -> tuple[type[Card], ...]:
         return self.cards
 
     def get_field_value(self, obj: Any, field: str) -> Any:

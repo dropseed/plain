@@ -1625,7 +1625,7 @@ class SQLInsertCompiler(SQLCompiler):
         return convert_returning_rows(rows, self.returning_fields, self.connection)
 
 
-class SQLWriteCompiler(SQLCompiler):
+class SQLWriteCompiler[Q: UpdateQuery | DeleteQuery](SQLCompiler):
     """Base for the UPDATE and DELETE compilers.
 
     Both of their queries can carry returning_fields, so both run the
@@ -1633,7 +1633,7 @@ class SQLWriteCompiler(SQLCompiler):
     rows when fields were asked for.
     """
 
-    query: UpdateQuery | DeleteQuery
+    query: Q
 
     def lock_only_the_target(self, inner: Query) -> None:
         """Point the sub-select's lock at the table being written.
@@ -1671,9 +1671,7 @@ class SQLWriteCompiler(SQLCompiler):
             cursor.close()
 
 
-class SQLDeleteCompiler(SQLWriteCompiler):
-    query: DeleteQuery
-
+class SQLDeleteCompiler(SQLWriteCompiler["DeleteQuery"]):
     @cached_property
     def single_alias(self) -> bool:
         # Ensure base table is in aliases.
@@ -1743,9 +1741,7 @@ class SQLDeleteCompiler(SQLWriteCompiler):
         return self._as_sql(outerq)
 
 
-class SQLUpdateCompiler(SQLWriteCompiler):
-    query: UpdateQuery
-
+class SQLUpdateCompiler(SQLWriteCompiler["UpdateQuery"]):
     def as_sql(
         self, with_limits: bool = True, with_col_aliases: bool = False
     ) -> SqlWithParams:

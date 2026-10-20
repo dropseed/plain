@@ -5,7 +5,7 @@ test_server_websocket.py; this pins the message layer's edges directly.
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from plain.http import WebSocket, WebSocketClosed
@@ -23,7 +23,7 @@ async def _open(
     max_message_size: int = 1024,
     ping_interval: float = PING_INTERVAL,
     ping_timeout: float = PING_TIMEOUT,
-) -> AsyncIterator[tuple[WebSocket, asyncio.StreamReader, asyncio.StreamWriter]]:
+) -> AsyncGenerator[tuple[WebSocket, asyncio.StreamReader, asyncio.StreamWriter]]:
     """A started `WebSocket` on the server end of a socketpair, plus the client end."""
     conn, client_reader, client_writer = await socketpair_connection(StubApp())
     ws = WebSocket(
