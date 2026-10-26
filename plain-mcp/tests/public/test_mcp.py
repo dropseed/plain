@@ -849,7 +849,7 @@ def test_malformed_anyof_schema_is_permissive() -> None:
 
 def test_non_dict_input_schema_is_permissive() -> None:
     class Weird(MCPTool):
-        input_schema = "totally not a schema"  # misconfigured, non-dict
+        input_schema = "totally not a schema"  # ty: ignore[invalid-assignment]  # misconfigured, non-dict
 
         def __init__(self, x: int):
             self.x = x
