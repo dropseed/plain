@@ -65,6 +65,11 @@ _VAR_BARE_RE = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
 _ESCAPED_DOLLAR = "\x00DOLLAR\x00"
 
 _PLAIN_ENV_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+
+# The dev server, and the commands that stand in for it against the same
+# database, load its config. Everything else leaves `PLAIN_ENV` unset, so the
+# commands that run in CI (`check`, `preflight`, `build`) never need the key.
+DEV_ENV_COMMANDS = frozenset({"dev", "request", "shell"})
 _files_loaded = False
 
 # Which file bound each key, filled in as files load. A key already in the
@@ -121,9 +126,9 @@ def load_dotenv_files(*, decrypt: bool = True) -> None:
     Files load in `dotenv_ladder()` order — `load_dotenv()` doesn't override
     existing keys, so the first file to bind a key wins.
 
-    `PLAIN_ENV` is set by the CLI dispatcher (`plain.cli.core`) based on the
-    active command — `plain dev` → `dev`, `plain test` → `test` — and by
-    `plain env`, which sets its own. Export `PLAIN_ENV` yourself to override.
+    `PLAIN_ENV` defaults to `dev` for the commands in `DEV_ENV_COMMANDS`.
+    `plain test` and `plain env` set their own. Export `PLAIN_ENV` yourself
+    to override.
 
     With `decrypt=False`, plain values bind as usual and encrypted ones are
     left unbound: no key is needed, and nothing fails. That's what `plain env`
@@ -135,6 +140,10 @@ def load_dotenv_files(*, decrypt: bool = True) -> None:
     if _files_loaded:
         return
     _files_loaded = True
+
+    # In `os.environ`, not just here, so the processes they start load the same.
+    if running_command() in DEV_ENV_COMMANDS:
+        os.environ.setdefault("PLAIN_ENV", "dev")
 
     plain_env = os.environ.get("PLAIN_ENV", "")
     if plain_env and not _PLAIN_ENV_RE.fullmatch(plain_env):

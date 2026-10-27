@@ -11,7 +11,7 @@ from .results import PreflightResult
 NON_SETTING_ENV_VARS = frozenset(
     {
         "PLAIN_SETTINGS_MODULE",  # which settings module to import
-        "PLAIN_ENV",  # which `.env` files load, set by the CLI for `plain dev` / `plain test`
+        "PLAIN_ENV",  # which `.env` files load, set by plain.dev and plain.testing
     }
 )
 

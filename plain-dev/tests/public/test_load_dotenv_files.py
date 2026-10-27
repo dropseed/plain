@@ -4,7 +4,7 @@ import os
 
 from dev_test_helpers import running, sandbox
 from plain.dev.dotenv import load_dotenv_files
-from plain.testing import raises
+from plain.testing import cases, raises
 
 
 def test_unset_plain_env_loads_local_and_base():
@@ -49,6 +49,24 @@ def test_test_env_still_loads_test_local():
         box.write(".env.test.local", "SECRET=from-test-local\n")
         load_dotenv_files()
         assert os.environ["SECRET"] == "from-test-local"
+
+
+@cases("dev", "request", "shell")
+def test_commands_on_the_dev_database_load_env_dev(command):
+    """`plain request` and `plain shell` work against the dev database, so they
+    get the dev server's config."""
+    with sandbox() as box, running(command):
+        box.write(".env.dev", "X=dev\n")
+        load_dotenv_files()
+        assert os.environ["X"] == "dev"
+
+
+def test_other_commands_skip_env_dev():
+    """`plain check` runs in CI, where there is no key to decrypt `.env.dev`."""
+    with sandbox() as box, running("check"):
+        box.write(".env.dev", "X=dev\n")
+        load_dotenv_files()
+        assert "X" not in os.environ
 
 
 def test_invalid_plain_env_raises():

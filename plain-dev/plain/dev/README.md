@@ -130,7 +130,7 @@ $ plain request /admin/ --user 1
 
 You can set the method and body (`--method`, `--data`, `--header`, `--content-type`), make it a user's request by id or email (`--user`, which needs [plain.auth](../../../plain-auth/plain/auth/README.md)), and assert on the result (`--status`, `--contains`, `--not-contains`) so it works as a quick check in a script. Redirects are followed unless you pass `--no-follow`.
 
-It makes its requests with the same [client](../../../plain-testing/plain/testing/README.md) your tests use. What's different is the database: this is your dev database, so what a `POST` writes stays written. The command only runs when `DEBUG` is on.
+It makes its requests with the same [client](../../../plain-testing/plain/testing/README.md) your tests use. What's different is the database: this is your dev database, so what a `POST` writes stays written. It loads the same [`.env` files](#env-files) as `plain dev`, so the app runs with the dev server's config. The command only runs when `DEBUG` is on.
 
 Every response also prints a **trace**: duration, span and query counts, and each distinct statement with how many times it ran and the call sites that issued it, which is usually where an N+1 turns out to live. It reports what ran and leaves the diagnosis to you. A followed redirect chain is several requests, so it prints one block per hop rather than one merged summary.
 
@@ -328,7 +328,7 @@ Files are read in this order (highest precedence first — the first file to def
 
 Add `.env.local` and `.env.*.local` to your `.gitignore` (not `.env*`, which would also ignore the committed files).
 
-`PLAIN_ENV` is set automatically by the CLI: `plain dev` → `dev`, `plain test` → `test`. `plain env` sets `dev` itself, since it runs before any app setup. Other commands leave `PLAIN_ENV` unset (only `.env.local` and `.env` load). Export `PLAIN_ENV` yourself to override.
+`PLAIN_ENV` is set automatically: `plain dev`, `plain request` and `plain shell` → `dev` (all three work against your dev database, so they need its key), `plain test` → `test`. `plain env` sets `dev` itself, since it runs before any app setup. Other commands leave it unset, so only `.env.local` and `.env` load and no key is needed, in CI for instance. Export `PLAIN_ENV` yourself to override.
 
 Under `PLAIN_ENV=test`, `.env.local` is skipped (matches Next.js and Rails dotenv) so test runs stay deterministic and personal credentials don't leak into the suite. `plain test` sets `PLAIN_ENV=test` for you and loads `.env.test*` through this ladder.
 

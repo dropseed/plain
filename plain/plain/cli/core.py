@@ -1,4 +1,3 @@
-import os
 import sys
 import traceback
 from importlib.metadata import EntryPoint, entry_points, version
@@ -33,16 +32,6 @@ from .utils import utils
 @click.group()
 def plain_cli() -> None:
     pass
-
-
-# Maps top-level command names to the PLAIN_ENV they imply. Set before
-# plain.runtime.setup() runs so plain.dev's dotenv loader picks up the right
-# `.env.<env>*` files for the active command. `plain env` isn't here — it runs
-# without setup and sets its own PLAIN_ENV.
-_PLAIN_ENV_DEFAULTS = {
-    "dev": "dev",
-    "test": "test",
-}
 
 
 plain_cli.add_command(check)
@@ -257,11 +246,6 @@ class PlainCommandCollection(click.CommandCollection):
         return name, command, remaining
 
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
-        # Set PLAIN_ENV default before any setup runs so plain.dev's dotenv
-        # loader picks up the right `.env.<env>*` files for this command.
-        if env := _PLAIN_ENV_DEFAULTS.get(cmd_name):
-            os.environ.setdefault("PLAIN_ENV", env)
-
         # Try built-in commands first
         cmd = super().get_command(ctx, cmd_name)
 

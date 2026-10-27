@@ -19,7 +19,8 @@ when there's no tunnel, or for local CLI checks (`curl`, `plain request`).
 
 `uv run plain request /path` makes a request to the app in-process, against
 the dev database, and prints the response with a trace of what ran. It only
-runs when `DEBUG` is on.
+runs when `DEBUG` is on, and loads `.env.dev` like `plain dev`, so it needs
+the project's env key too.
 
 - `--user <id or email>` makes it that user's request. `--method`, `--data`,
   `--header` and `--content-type` shape it.
