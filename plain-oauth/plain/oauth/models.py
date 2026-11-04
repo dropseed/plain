@@ -64,20 +64,50 @@ class OAuthConnection(postgres.Model):
         return f"{self.provider_key}[{self.user}:{self.provider_user_id}]"
 
     def refresh_access_token(self) -> None:
-        from .providers import OAuthToken, get_oauth_provider_instance
+        """Get a new access token from the provider and save it.
 
-        provider_instance = get_oauth_provider_instance(provider_key=self.provider_key)
-        oauth_token = OAuthToken(
+        Safe to call from concurrent requests. Many providers (GitHub among
+        them) make refresh tokens single-use, so two requests refreshing at
+        once would both send the same refresh token and the provider would
+        refuse the second. The row is locked for the refresh, and a request
+        that finds another one already replaced the token uses that instead.
+
+        The provider retires the old refresh token as soon as it answers, so
+        call this outside a transaction that might roll back, or the new one
+        is lost with it.
+        """
+        from .providers import get_oauth_provider_instance
+
+        with transaction.atomic():
+            locked = OAuthConnection.query.for_update().get(id=self.id)
+            if (
+                locked.access_token == self.access_token
+                or locked.access_token_expired()
+            ):
+                provider_instance = get_oauth_provider_instance(
+                    provider_key=self.provider_key
+                )
+                locked.set_token_fields(
+                    provider_instance.refresh_oauth_token(
+                        oauth_token=locked._stored_oauth_token()
+                    )
+                )
+                # Saved through the freshly locked row, so the write doesn't
+                # put back any other columns this instance has stale.
+                locked.update()
+
+        self.set_token_fields(locked._stored_oauth_token())
+        self.updated_at = locked.updated_at
+
+    def _stored_oauth_token(self) -> OAuthToken:
+        from .providers import OAuthToken
+
+        return OAuthToken(
             access_token=self.access_token,
             refresh_token=self.refresh_token,
             access_token_expires_at=self.access_token_expires_at,
             refresh_token_expires_at=self.refresh_token_expires_at,
         )
-        refreshed_oauth_token = provider_instance.refresh_oauth_token(
-            oauth_token=oauth_token
-        )
-        self.set_token_fields(refreshed_oauth_token)
-        self.update()
 
     def set_token_fields(self, oauth_token: OAuthToken) -> None:
         self.access_token = oauth_token.access_token

@@ -5,6 +5,7 @@ from plain.auth.requests import get_request_user
 from plain.auth.testing import login_client
 from plain.oauth.models import OAuthConnection
 from plain.oauth.providers import OAuthProvider, OAuthToken, OAuthUser
+from plain.postgres import transaction
 from plain.testing import Client, override_settings, raises
 
 
@@ -384,3 +385,76 @@ def test_dummy_refresh():
         assert connection.refresh_token_expires_at == datetime.datetime(
             2029, 1, 2, 0, 0, tzinfo=datetime.UTC
         )
+
+
+def _expired_dummy_connection():
+    user = User.query.create(username="dummy_username", email="dummy@example.com")
+    return OAuthConnection.query.create(
+        user=user,
+        provider_key="dummy",
+        provider_user_id="dummy_id",
+        access_token="dummy_access_token",
+        refresh_token="dummy_refresh_token",
+        access_token_expires_at=datetime.datetime(
+            2020, 1, 1, 0, 0, tzinfo=datetime.UTC
+        ),
+    )
+
+
+class RefusingProvider(DummyProvider):
+    """A provider that refuses every refresh, so a test passing with it shows
+    the provider wasn't asked."""
+
+    def refresh_oauth_token(self, *, oauth_token: OAuthToken) -> OAuthToken:
+        raise RuntimeError("bad_refresh_token")
+
+
+REFUSING_PROVIDERS = {
+    "dummy": {**DUMMY_PROVIDERS["dummy"], "class": f"{__name__}.RefusingProvider"}
+}
+
+
+def test_refresh_uses_a_token_another_request_already_refreshed():
+    """Two requests that loaded the same expired connection both refresh it.
+    The second gets the first one's token instead of sending the spent refresh
+    token to the provider again."""
+    with override_settings(OAUTH_LOGIN_PROVIDERS=DUMMY_PROVIDERS):
+        connection = _expired_dummy_connection()
+        first = OAuthConnection.query.get(id=connection.id)
+        second = OAuthConnection.query.get(id=connection.id)
+
+        first.refresh_access_token()
+
+    with override_settings(OAUTH_LOGIN_PROVIDERS=REFUSING_PROVIDERS):
+        second.refresh_access_token()
+
+    assert second.access_token == "refreshed_dummy_access_token"
+    assert second.refresh_token == "refreshed_dummy_refresh_token"
+
+
+def test_refresh_does_not_use_another_requests_token_once_it_has_expired():
+    with override_settings(OAUTH_LOGIN_PROVIDERS=DUMMY_PROVIDERS):
+        connection = _expired_dummy_connection()
+        # Another request replaced the token long ago, and it has expired too.
+        OAuthConnection.query.filter(id=connection.id).update(
+            access_token="since_expired_access_token"
+        )
+
+        connection.refresh_access_token()
+
+        connection.refresh_from_db()
+        assert connection.access_token == "refreshed_dummy_access_token"
+
+
+def test_refresh_under_the_callers_own_row_lock():
+    """An app that locks the row itself and refreshes inside its own
+    transaction still gets a refresh."""
+    with override_settings(OAUTH_LOGIN_PROVIDERS=DUMMY_PROVIDERS):
+        connection = _expired_dummy_connection()
+
+        with transaction.atomic():
+            locked = OAuthConnection.query.for_update().get(id=connection.id)
+            locked.refresh_access_token()
+
+        connection.refresh_from_db()
+        assert connection.access_token == "refreshed_dummy_access_token"

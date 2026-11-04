@@ -198,6 +198,8 @@ response = httpx.get(
 )
 ```
 
+`refresh_access_token()` is safe to call from concurrent requests, even with providers like GitHub whose refresh tokens only work once: it locks the connection's row, and a request that finds the token already refreshed uses that one. Call it outside a transaction that might roll back, since the provider has already retired the old refresh token by the time it returns.
+
 ## Customizing the provider
 
 The [`OAuthProvider`](./providers.py#OAuthProvider) class has several methods you can override:
