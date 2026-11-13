@@ -1,14 +1,9 @@
 //==========================================================
 // head-support.js
 //
-// An extension to htmx 1.0 to add head tag merging.
+// An extension to add head tag merging.
 //==========================================================
 (function(){
-
-    if (htmx.version && !htmx.version.startsWith("1.")) {
-        console.warn("WARNING: You are using an htmx 1 extension with htmx " + htmx.version +
-            ".  It is recommended that you move to the version of this extension found on https://htmx.org/extensions")
-    }
 
     var api = null;
 
@@ -120,9 +115,12 @@
             api = apiRef;
 
             htmx.on('htmx:afterSwap', function(evt){
-                var serverResponse = evt.detail.xhr.response;
-                if (api.triggerEvent(document.body, "htmx:beforeHeadMerge", evt.detail)) {
-                    mergeHead(serverResponse, evt.detail.boosted ? "merge" : "append");
+                let xhr = evt.detail.xhr;
+                if (xhr) {
+                    var serverResponse = xhr.response;
+                    if (api.triggerEvent(document.body, "htmx:beforeHeadMerge", evt.detail)) {
+                        mergeHead(serverResponse, evt.detail.boosted ? "merge" : "append");
+                    }
                 }
             })
 
